@@ -1,0 +1,39 @@
+{
+  "name": "photo-search-intent-first-electron",
+  "version": "0.1.0",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "dev": "electron .",
+    "build:ui": "cd ../webapp && npm install && npm run build",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder -mwl"
+  },
+  "devDependencies": {
+    "electron": "^29.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.photos.search.intentfirst",
+    "productName": "Photo Search",
+    "files": [
+      "**/*",
+      "!node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!**/*.map"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.photography"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    }
+  }
+}

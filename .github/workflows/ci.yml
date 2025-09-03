@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[ann,dev]
+      - name: Lint
+        run: |
+          ruff check .
+      - name: Type check (skip errors)
+        run: |
+          mypy photo-search-intent-first || true
+      - name: Smoke tests
+        run: |
+          PYTHONPATH=photo-search-classic python3 photo-search-classic/tests/smoke_dummy.py
+          PYTHONPATH=photo-search-intent-first python3 photo-search-intent-first/tests/smoke_dummy.py
+          PYTHONPATH=photo-search-intent-first python3 photo-search-intent-first/tests/test_provider_index_key.py
+

@@ -1,0 +1,13 @@
+version: '3.9'
+services:
+  classic:
+    build: ./photo-search-classic
+    image: photo-search-classic:latest
+    ports:
+      - "8001:8001"
+  intent:
+    build: ./photo-search-intent-first
+    image: photo-search-intent-first:latest
+    ports:
+      - "8000:8000"
+

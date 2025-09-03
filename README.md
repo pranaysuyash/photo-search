@@ -1,0 +1,66 @@
+Photo Search – Two Approaches
+
+What’s Included
+- `photo-search-classic`: Straightforward Streamlit app with a single engine module.
+- `photo-search-intent-first`: Same app built using Intent-First methodology with layered architecture and explicit intent docs.
+
+Run Either App
+1. Create a virtualenv and install requirements:
+   - Classic: `cd photo-search-classic && python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt`
+   - Intent-First: `cd photo-search-intent-first && python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt`
+2. Launch Streamlit:
+   - Classic: `streamlit run app.py`
+- Intent-First: `streamlit run ui/app.py`
+3. In the app sidebar, enter your photo directory, build the index, and search by text (e.g., “friends having tea”).
+
+Deploy Separately
+- See `DEPLOYMENT.md` for Docker builds and docker-compose to run Classic (port 8001) and Intent‑First (port 8000) independently.
+
+CLI (Intent-First)
+- Index: `python3 photo-search-intent-first/cli.py index --dir /path/to/photos --provider local`
+- Search: `python3 photo-search-intent-first/cli.py search --dir /path/to/photos --query "friends having tea" --top-k 12`
+ 
+Package + Entry Point
+- Install package in editable mode:
+  - `python -m pip install -e .[ann,faiss,hnsw,ocr]`
+    - Extras (optional): `ann` (Annoy), `faiss` (FAISS), `hnsw` (HNSW), `ocr` (EasyOCR)
+- Run the CLI anywhere:
+  - `ps-intent index --dir /path/to/photos --provider local`
+  - `ps-intent search --dir /path/to/photos --query "friends having tea"`
+- Launch the UI anywhere:
+  - `ps-intent-ui` (uses `PS_INTENT_PORT` env var if set)
+
+Features Snapshot (Intent‑First)
+- Build/Workspace:
+  - Build/Update Library; Workspace tools (Build all folders, Prepare faster search, Show per‑folder search data, Show workspace search data)
+- Search:
+  - Natural language search, EXIF filters + timeline chart, Saved searches
+  - Favorites (♥), Tags (filter + editor), Collections, Recent queries
+  - Export (copy/symlink), Compact/List modes, Zoom popover, “Open top N in Files”
+- Map:
+  - Plot photos with GPS EXIF; include other folders; limit plotted count
+- Preflight:
+  - Engine/device status, diagnostics export, reset settings, look‑alike photos (beta)
+- Advanced:
+  - Faster search engines: Annoy, FAISS, HNSW (optional installs)
+  - OCR (EasyOCR) with language selection; thumbnail size + cache cap
+
+FAISS vs others
+- We support multiple ANN options in both apps (optional installs on Classic):
+  - Annoy (angular), FAISS (inner‑product/cosine), and HNSW (cosine) when available.
+  - Pick based on your platform and preference in Advanced settings.
+
+
+Package + Entry Point
+- Install package in editable mode:
+  - `python -m pip install -e .[ann]` (add `[faiss]` if you have FAISS available)
+- Run the CLI anywhere:
+  - `ps-intent index --dir /path/to/photos --provider local`
+  - `ps-intent search --dir /path/to/photos --query "friends having tea"`
+
+Testing Without Downloading Models
+- Each folder contains a dummy smoke test that validates indexing and search logic without network/model downloads:
+  - Classic: `PYTHONPATH=photo-search-classic python3 photo-search-classic/tests/smoke_dummy.py`
+  - Intent-First: `PYTHONPATH=photo-search-intent-first python3 photo-search-intent-first/tests/smoke_dummy.py`
+
+See `DIFFERENCES.md` for a comparison of the two approaches.
