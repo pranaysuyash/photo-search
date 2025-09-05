@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+  <rect width="1200" height="800" fill="#0b0b0f"/>
+  <rect x="60" y="60" width="1080" height="80" rx="12" fill="#111827" stroke="#1f2937"/>
+  <text x="80" y="110" fill="#9CA3AF" font-family="Inter,system-ui" font-size="22">People & Pets</text>
+  <g transform="translate(60,160)">
+    <rect x="0" y="0" width="1080" height="580" rx="16" fill="#111827" stroke="#1f2937"/>
+    <g transform="translate(24,24)">
+      <g>
+        <circle cx="60" cy="60" r="40" fill="#4B5563"/>
+        <rect x="120" y="30" width="220" height="28" rx="6" fill="#1f2937"/>
+        <rect x="120" y="70" width="150" height="20" rx="6" fill="#1f2937"/>
+      </g>
+      <g transform="translate(0,120)">
+        <circle cx="60" cy="60" r="40" fill="#4B5563"/>
+        <rect x="120" y="30" width="220" height="28" rx="6" fill="#1f2937"/>
+        <rect x="120" y="70" width="150" height="20" rx="6" fill="#1f2937"/>
+      </g>
+      <g transform="translate(0,240)">
+        <circle cx="60" cy="60" r="40" fill="#4B5563"/>
+        <rect x="120" y="30" width="220" height="28" rx="6" fill="#1f2937"/>
+        <rect x="120" y="70" width="150" height="20" rx="6" fill="#1f2937"/>
+      </g>
+    </g>
+  </g>
+  <text x="72" y="760" fill="#9CA3AF" font-family="Inter,system-ui" font-size="18">People view (placeholder)</text>
+</svg>
+

@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 
 import json
 from pathlib import Path
@@ -100,7 +101,7 @@ def load_resolved(index_dir: Path) -> List[str]:
             if isinstance(data, list):
                 return [str(x) for x in data]
     except Exception:
-        pass
+        logging.exception("dupe hash build failure for %s", str(path))
     return []
 
 
@@ -109,4 +110,4 @@ def save_resolved(index_dir: Path, ids: List[str]) -> None:
     try:
         _resolved_file(index_dir).write_text(dumps(sorted(set(ids))))
     except Exception:
-        pass
+        logging.exception("dupe group load failure")

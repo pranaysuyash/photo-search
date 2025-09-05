@@ -30,6 +30,10 @@ export async function apiSearch(
     dateFrom?: number; dateTo?: number;
     useFast?: boolean; fastKind?: string; useCaptions?: boolean;
     camera?: string; isoMin?: number; isoMax?: number; fMin?: number; fMax?: number;
+    flash?: 'fired'|'noflash'; wb?: 'auto'|'manual'; metering?: string;
+    altMin?: number; altMax?: number; headingMin?: number; headingMax?: number;
+    place?: string; useOcr?: boolean; hasText?: boolean; person?: string; persons?: string[];
+    sharpOnly?: boolean; excludeUnder?: boolean; excludeOver?: boolean;
   }
 ) {
   return post<{ search_id: string; results: SearchResult[] }>(
@@ -39,9 +43,20 @@ export async function apiSearch(
       hf_token: opts?.hfToken, openai_key: opts?.openaiKey,
       favorites_only: opts?.favoritesOnly, tags: opts?.tags,
       date_from: opts?.dateFrom, date_to: opts?.dateTo,
-      use_fast: opts?.useFast, fast_kind: opts?.fastKind, use_captions: opts?.useCaptions,
+      use_fast: opts?.useFast, fast_kind: opts?.fastKind, use_captions: opts?.useCaptions, use_ocr: opts?.useOcr,
       camera: opts?.camera, iso_min: opts?.isoMin, iso_max: opts?.isoMax, f_min: opts?.fMin, f_max: opts?.fMax,
+      flash: opts?.flash, wb: opts?.wb, metering: opts?.metering,
+      alt_min: opts?.altMin, alt_max: opts?.altMax, heading_min: opts?.headingMin, heading_max: opts?.headingMax,
+      place: opts?.place, has_text: opts?.hasText, person: opts?.person, persons: opts?.persons,
+      sharp_only: opts?.sharpOnly, exclude_underexp: opts?.excludeUnder, exclude_overexp: opts?.excludeOver,
     },
+  )
+}
+
+export async function apiSearchLikePlus(dir: string, path: string, provider: string, topK = 24, text?: string, weight = 0.5) {
+  return post<{ results: SearchResult[] }>(
+    '/search_like_plus',
+    { dir, path, provider, top_k: topK, text, weight },
   )
 }
 
@@ -98,10 +113,19 @@ export async function apiMap(dir: string) {
   return r.json() as Promise<{ points: { lat: number; lon: number }[] }>
 }
 
-export async function apiDiagnostics(dir: string) {
-  const r = await fetch(`${API_BASE}/diagnostics?dir=${encodeURIComponent(dir)}`)
+export async function apiDiagnostics(dir: string, provider?: string) {
+  const qs = new URLSearchParams({ dir })
+  if (provider) qs.set('provider', provider)
+  const r = await fetch(`${API_BASE}/diagnostics?${qs.toString()}`)
   if (!r.ok) throw new Error(await r.text())
   return r.json() as Promise<{ folder: string; engines: { key: string; index_dir: string; count: number; fast?: { annoy: boolean; faiss: boolean; hnsw: boolean } }[]; free_gb: number; os: string }>
+}
+
+export async function apiLibrary(dir: string, provider: string, limit = 120, offset = 0) {
+  const qs = new URLSearchParams({ dir, provider, limit: String(limit), offset: String(offset) })
+  const r = await fetch(`${API_BASE}/library?${qs.toString()}`)
+  if (!r.ok) throw new Error(await r.text())
+  return r.json() as Promise<{ total: number; offset: number; limit: number; paths: string[] }>
 }
 
 export async function apiBuildFast(dir: string, kind: 'annoy'|'faiss'|'hnsw', provider: string, hfToken?: string, openaiKey?: string) {
@@ -151,10 +175,20 @@ export async function apiWorkspaceRemove(path: string) {
   )
 }
 
-export async function apiSearchWorkspace(dir: string, query: string, provider: string, topK = 24, opts?: { favoritesOnly?: boolean; tags?: string[]; dateFrom?: number; dateTo?: number }) {
+export async function apiSearchWorkspace(
+  dir: string,
+  query: string,
+  provider: string,
+  topK = 24,
+  opts?: { favoritesOnly?: boolean; tags?: string[]; dateFrom?: number; dateTo?: number; place?: string; hasText?: boolean; person?: string; persons?: string[] }
+) {
   return post<{ search_id: string; results: SearchResult[] }>(
     '/search_workspace',
-    { dir, provider, query, top_k: topK, favorites_only: opts?.favoritesOnly, tags: opts?.tags, date_from: opts?.dateFrom, date_to: opts?.dateTo },
+    {
+      dir, provider, query, top_k: topK,
+      favorites_only: opts?.favoritesOnly, tags: opts?.tags, date_from: opts?.dateFrom, date_to: opts?.dateTo,
+      place: opts?.place, has_text: opts?.hasText, person: opts?.person, persons: opts?.persons,
+    },
   )
 }
 
@@ -174,6 +208,18 @@ export async function apiSetTags(dir: string, path: string, tags: string[]) {
 export function thumbUrl(dir: string, provider: string, path: string, size = 256) {
   const qs = new URLSearchParams({ dir, provider, path, size: String(size) })
   return `${API_BASE}/thumb?${qs.toString()}`
+}
+
+export function thumbFaceUrl(dir: string, provider: string, path: string, emb: number, size = 196) {
+  const qs = new URLSearchParams({ dir, provider, path, emb: String(emb), size: String(size) })
+  return `${API_BASE}/thumb_face?${qs.toString()}`
+}
+
+export async function apiMetadataDetail(dir: string, path: string) {
+  const qs = new URLSearchParams({ dir, path })
+  const r = await fetch(`${API_BASE}/metadata/detail?${qs.toString()}`)
+  if (!r.ok) throw new Error(await r.text())
+  return r.json() as Promise<{ ok: boolean; meta: any }>
 }
 
 export async function apiOpen(dir: string, path: string) {
@@ -212,7 +258,7 @@ export async function apiBuildMetadata(dir: string, provider: string, hfToken?: 
 export async function apiGetMetadata(dir: string) {
   const r = await fetch(`${API_BASE}/metadata?dir=${encodeURIComponent(dir)}`)
   if (!r.ok) throw new Error(await r.text())
-  return r.json() as Promise<{ cameras: string[] }>
+  return r.json() as Promise<{ cameras: string[]; places?: string[] }>
 }
 
 
@@ -242,4 +288,69 @@ export async function apiDeleteCollection(dir: string, name: string) {
     '/collections/delete',
     { dir, name },
   )
+}
+
+export async function apiGetSmart(dir: string) {
+  const r = await fetch(`${API_BASE}/smart_collections?dir=${encodeURIComponent(dir)}`)
+  if (!r.ok) throw new Error(await r.text())
+  return r.json() as Promise<{ smart: Record<string, any> }>
+}
+
+export async function apiSetSmart(dir: string, name: string, rules: any) {
+  return post<{ ok: boolean; smart: Record<string, any> }>(
+    '/smart_collections',
+    { dir, name, rules },
+  )
+}
+
+export async function apiDeleteSmart(dir: string, name: string) {
+  return post<{ ok: boolean; deleted: string|null }>(
+    '/smart_collections/delete',
+    { dir, name },
+  )
+}
+
+export async function apiResolveSmart(dir: string, name: string, provider: string, topK = 24) {
+  return post<{ search_id: string|null; results: SearchResult[] }>(
+    '/smart_collections/resolve',
+    { dir, name, provider, top_k: topK },
+  )
+}
+
+export async function apiOcrSnippets(dir: string, paths: string[], limit = 160) {
+  return post<{ snippets: Record<string,string> }>(
+    '/ocr/snippets',
+    { dir, paths, limit },
+  )
+}
+
+export async function apiBuildFaces(dir: string, provider: string) {
+  return post<{ updated: number; faces: number; clusters: number }>(
+    '/faces/build',
+    { dir, provider },
+  )
+}
+
+export async function apiFacesClusters(dir: string) {
+  const r = await fetch(`${API_BASE}/faces/clusters?dir=${encodeURIComponent(dir)}`)
+  if (!r.ok) throw new Error(await r.text())
+  return r.json() as Promise<{ clusters: { id: string; name?: string; size: number; examples: [string, number][] }[] }>
+}
+
+export async function apiFacesName(dir: string, clusterId: string, name: string) {
+  return post<{ ok: boolean }>(
+    '/faces/name',
+    { dir, cluster_id: clusterId, name },
+  )
+}
+export async function apiTripsBuild(dir: string, provider: string) {
+  return post<{ trips: any[] }>(
+    '/trips/build',
+    { dir, provider },
+  )
+}
+export async function apiTripsList(dir: string) {
+  const r = await fetch(`${API_BASE}/trips?dir=${encodeURIComponent(dir)}`)
+  if (!r.ok) throw new Error(await r.text())
+  return r.json() as Promise<{ trips: { id: string; count: number; place?: string; start_ts?: number; end_ts?: number; paths: string[] }[] }>
 }

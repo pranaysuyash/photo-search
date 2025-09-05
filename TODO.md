@@ -74,6 +74,32 @@ This backlog lists high‑value features for a best‑in‑class, private‑firs
 - Release pipeline: CI build artifacts per tag; upload to S3/Drive
   - Acceptance: one‑click release draft with checksums
 
+## Updates & Upgrades (Electron)
+- Auto‑updates (electron‑updater) for v1.x
+  - Acceptance: app checks on launch; update available/progress/ready events surface in UI; successful in‑place update on macOS/Windows
+- Feed strategy for majors
+  - Acceptance: v1 apps only receive 1.x; v2 apps receive 2.x; optional “v2 available” banner in v1 with link (no forced upgrade)
+- Offline license validation (Ed25519) with major gating
+  - Acceptance: v1 license unlocks 1.x; v2 requires new/upgrade license; app blocks auto‑install of higher major and shows upgrade CTA
+- License UI
+  - Acceptance: “Manage License” dialog (paste/load), validation result, store to app‑data
+- Release notes & channels
+  - Acceptance: stable channel; optional beta with pre‑releases; notes visible in Updates dialog
+- Code signing & notarization
+  - Acceptance: macOS builds notarized and stapled; Windows builds signed; SmartScreen/macOS warnings minimized
+- Differential updates & checksums
+  - Acceptance: blockmap enabled; SHA256 checksums generated and attached to releases
+- Rollback & deferral UX
+  - Acceptance: "Revert to previous" available; update banner supports Snooze (24h/7d)
+- Maintenance & EOL policy
+  - Acceptance: documented v1 maintenance window (e.g., 12 months); final v1 installers archived and linkable
+
+## Electron (Classic App) Parity
+- Port updater + license modules to Classic electron app
+  - Acceptance: classic `electron/main.js` wired with electron-updater events, menu items, and license gating identical to intent-first
+- Add publish config in Classic `electron/package.json`
+  - Acceptance: GitHub/S3 provider set; build artifacts publish successfully in CI
+
 ## Monetization & Add‑ons
 - Add‑on marketplace UI: list optional AI engines (OpenAI, Gemini, HF)
   - Acceptance: install switches per provider; usage caps; per‑feature paywall friendly copy
@@ -95,4 +121,43 @@ This backlog lists high‑value features for a best‑in‑class, private‑firs
 ## Implementor Notes
 - Keep Classic minimal in deps; gate heavy features with optional extras and graceful fallbacks. Intent‑First can host layered integrations first, then uplift to Classic once stable.
 - Maintain private‑by‑default posture: local models first; cloud add‑ons explicit and never persisted.
+## From Research: New TODOs (2024–2025 Landscape)
+- Smart Albums (dynamic saved searches)
+  - Store rule JSON (text, tags, EXIF, dates, favorites) and resolve to items on open/refresh
+  - UI: mark collection as Smart; show rule summary; manual “Refresh” button
+- Reverse Geocoding & Place Chips
+  - Enrich GPS with city/region names (offline lib); add place chips for filters and display
+  - Batch task: backfill for existing libraries
+- Culling Metrics & Filters
+  - Compute sharpness (Laplacian var), brightness, contrast during EXIF build
+  - Filters: “Sharp only”, “Exclude under/over‑exposed”; surface in details
+- Multi‑modal Similarity
+  - “Like this + text” blending with weight slider; API route and UI action
+- OCR UX Enhancements
+  - “Has text” filter; exact‑match quotes; show OCR snippets in details
+- Collections Utilities
+  - Copy paths, Export CSV, Pin as Smart, “Open in Files” for all
+- People & Pets (local‑first)
+  - Face detection + clustering (InsightFace); name clusters; search by person; pet grouping
+- Trips/Events Auto‑Collections
+  - Cluster by time + geo; generate titled trips; optional calendar correlation
+- Aesthetic/Best‑Shot Picker
+  - Heuristic MVP (sharpness/exposure/faces‑open) → later ML aesthetic score
+- Global Shortcuts + Cheat Sheet
+  - “/” focus search, g/c switch tabs, j/k grid, f favorite, o reveal
+- Theme Support
+  - Dark/light toggle with persistence
 
+### Sprint Plan
+- Sprint A (now)
+  - Smart Albums (Saved → Smart Collections)
+  - Reverse Geocoding + Place chips
+  - Culling metrics + filters (sharp/under/over)
+- Sprint B
+  - Multi‑modal Like+Text; OCR chips + exact match; Collections utilities
+- Sprint C
+  - People/Pets clustering; Trips/Events; Aesthetic picker (heuristics)
+
+### Notes
+- Keep on‑device, privacy‑first; gate heavy models; degrade gracefully.
+- Workspace search EXIF parity: optionally extend cross‑folder filters.

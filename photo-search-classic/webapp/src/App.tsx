@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { apiIndex, apiSearch, apiSearchWorkspace, apiGetFavorites, apiSetFavorite, apiGetSaved, apiAddSaved, apiDeleteSaved, apiMap, apiDiagnostics, apiExif, thumbUrl, apiOpen, apiBuildFast, apiBuildOCR, apiLookalikes, apiResolveLookalike, apiWorkspaceList, apiWorkspaceAdd, apiWorkspaceRemove, apiEditOps, apiUpscale, type SearchResult } from './api'
+import { apiIndex, apiSearch, apiSearchWorkspace, apiGetFavorites, apiSetFavorite, apiGetSaved, apiAddSaved, apiDeleteSaved, apiMap, apiDiagnostics, apiExif, thumbUrl, thumbFaceUrl, apiOpen, apiBuildFast, apiBuildOCR, apiLookalikes, apiResolveLookalike, apiWorkspaceList, apiWorkspaceAdd, apiWorkspaceRemove, apiEditOps, apiUpscale, apiFacesBuild, apiFacesClusters, apiFacesName, apiGetSmart, apiSetSmart, apiDeleteSmart, apiResolveSmart, apiGetMetadata, apiBuildMetadata, type SearchResult } from './api'
 
 const engines = [
   { key: 'local', label: 'On-device (Recommended)' },
@@ -28,7 +28,7 @@ export default function App() {
   const [allTags, setAllTags] = useState<string[]>([])
   const [tagsMap, setTagsMap] = useState<Record<string, string[]>>({})
   const [tagFilter, setTagFilter] = useState('')
-  const [tab, setTab] = useState<'search'|'saved'|'map'|'diag'|'look'|'ws'|'coll'>('search')
+  const [tab, setTab] = useState<'search'|'saved'|'map'|'diag'|'look'|'ws'|'coll'|'people'|'smart'>('search')
   const [collections, setCollections] = useState<Record<string,string[]>>({})
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [detail, setDetail] = useState<{ path: string; exif?: any } | null>(null)
@@ -44,6 +44,15 @@ export default function App() {
   const [wsToggle, setWsToggle] = useState(false)
   const [workspace, setWorkspace] = useState<string[]>([])
   const [groups, setGroups] = useState<{ id: string; paths: string[]; resolved: boolean }[]>([])
+  const [cameras, setCameras] = useState<string[]>([])
+  const [clusters, setClusters] = useState<{ id: string; name?: string; size: number; examples: [string, number][] }[]>([])
+  const [persons, setPersons] = useState<string[]>([])
+  const [smart, setSmart] = useState<Record<string, any>>({})
+  const [camera, setCamera] = useState('')
+  const [isoMin, setIsoMin] = useState('')
+  const [isoMax, setIsoMax] = useState('')
+  const [fMin, setFMin] = useState('')
+  const [fMax, setFMax] = useState('')
 
   async function loadFav() {
     try { const r = await apiGetFavorites(dir); setFav(r.favorites || []) } catch {}
@@ -60,6 +69,7 @@ export default function App() {
   async function loadDiagnostics() {
     try { const r = await apiDiagnostics(dir, engine); setDiag(r as any) } catch {}
   }
+  useEffect(()=>{ if (dir) { apiGetMetadata(dir).then(md=>setCameras(md.cameras||[])).catch(()=>{}) } }, [dir])
   async function loadTags() {
     try {
       const API_BASE = (import.meta as any).env?.VITE_API_BASE || (typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:8001')
@@ -78,10 +88,17 @@ export default function App() {
       const fromTs = dateFrom ? new Date(dateFrom + 'T00:00:00').getTime()/1000 : undefined
       const toTs = dateTo ? new Date(dateTo + 'T23:59:59').getTime()/1000 : undefined
       let r
+      const ppl = persons.filter(Boolean)
       if (wsToggle) {
         r = await apiSearchWorkspace(dir, query, engine, topK, { favoritesOnly: favOnly, tags: selectedTags.length ? selectedTags : undefined, dateFrom: fromTs, dateTo: toTs })
       } else {
-        r = await apiSearch(dir, query, engine, topK, undefined, undefined, favOnly, selectedTags.length ? selectedTags : undefined, fromTs, toTs, useFast, fastKind || undefined, useCaps)
+        r = await apiSearch(
+          dir, query, engine, topK,
+          undefined, undefined,
+          favOnly, selectedTags.length ? selectedTags : undefined, fromTs, toTs,
+          useFast, fastKind || undefined, useCaps,
+          { ...(ppl.length === 1 ? { person: ppl[0] } : (ppl.length > 1 ? { persons: ppl } : {})) }
+        )
       }
       setResults(r.results || []);
       setNote(`Found ${r.results?.length || 0}`);
@@ -160,7 +177,7 @@ export default function App() {
 
       {/* Tabs */}
       <div className="flex gap-2 mb-3">
-        {['search','saved','map','diag','look','ws','coll'].map(t=> (
+        {['search','saved','map','diag','look','ws','coll','people','smart'].map(t=> (
           <button key={t} onClick={()=>setTab(t as any)} className={`px-3 py-1 rounded ${tab===t?'bg-blue-600 text-white':'bg-gray-200'}`}>{t[0].toUpperCase()+t.slice(1)}</button>
         ))}
       </div>
@@ -194,12 +211,20 @@ export default function App() {
         <div className="text-sm">Filter tags (comma):</div>
         <input value={tagFilter} onChange={e=>setTagFilter(e.target.value)} placeholder="e.g., beach,friends" className="border rounded px-2 py-1" />
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={useFast} onChange={e=>setUseFast(e.target.checked)} /> Use fast index</label>
-        <select value={fastKind} onChange={e=>setFastKind(e.target.value as any)} className="border rounded px-2 py-1 text-sm">
-          <option value="">Auto</option>
-          <option value="faiss">FAISS</option>
-          <option value="hnsw">HNSW</option>
-          <option value="annoy">Annoy</option>
-        </select>
+        {(() => {
+          const st = (diag as any)?.engines?.[0]?.fast || undefined
+          const fa = st?.faiss ?? true
+          const hs = st?.hnsw ?? true
+          const an = st?.annoy ?? true
+          return (
+            <select value={fastKind} onChange={e=>setFastKind(e.target.value as any)} className="border rounded px-2 py-1 text-sm">
+              <option value="">Auto</option>
+              <option value="faiss" disabled={!fa}>FAISS{st && !fa ? ' (not built)' : ''}</option>
+              <option value="hnsw" disabled={!hs}>HNSW{st && !hs ? ' (not built)' : ''}</option>
+              <option value="annoy" disabled={!an}>Annoy{st && !an ? ' (not built)' : ''}</option>
+            </select>
+          )
+        })()}
         <div className="flex items-center gap-2 text-sm">
           <div>View</div>
           <select value={viewMode} onChange={e=>setViewMode(e.target.value as any)} className="border rounded px-2 py-1 text-sm">
@@ -219,7 +244,7 @@ export default function App() {
           <input value={fMin} onChange={e=>setFMin(e.target.value)} placeholder="min" className="w-20 border rounded px-2 py-1" />
           <div>to</div>
           <input value={fMax} onChange={e=>setFMax(e.target.value)} placeholder="max" className="w-20 border rounded px-2 py-1" />
-          <button onClick={async()=>{ setBusy('Building metadata…'); try{ const { apiBuildMetadata } = await import('./api'); const r = await apiBuildMetadata(dir, engine); setNote(`Metadata ready (${r.updated})`); } catch(e:any){ setNote(e.message) } finally { setBusy('') } }} className="bg-gray-200 rounded px-2 py-1">Build Metadata</button>
+          <button onClick={async()=>{ setBusy('Building metadata…'); try{ const r = await apiBuildMetadata(dir, engine); setNote(`Metadata ready (${r.updated})`); const md = await apiGetMetadata(dir); setCameras(md.cameras||[]) } catch(e:any){ setNote(e.message) } finally { setBusy('') } }} className="bg-gray-200 rounded px-2 py-1">Build Metadata</button>
         </div>
         <div className="flex gap-1 flex-wrap">
           {allTags.map(t => {
@@ -254,6 +279,101 @@ export default function App() {
       <datalist id="cameras_list">
         {cameras.map(c=> <option key={c} value={c} />)}
       </datalist>
+      )}
+      {tab==='people' && (
+      <div className="mt-6 bg-white border rounded p-3">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold">People</h2>
+          <div className="flex gap-2">
+            <button onClick={async()=>{ try{ setBusy('Scanning faces…'); const r = await apiFacesBuild(dir, engine); setBusy(''); setNote(`Faces: ${r.faces}, clusters: ${r.clusters}`); const c = await apiFacesClusters(dir); setClusters(c.clusters||[]) } catch(e:any){ setBusy(''); setNote(e.message) } }} className="bg-gray-200 rounded px-3 py-1 text-sm">Build/Update</button>
+            <button onClick={async()=>{ try{ const c = await apiFacesClusters(dir); setClusters(c.clusters||[]) } catch(e:any){ setNote(e.message) } }} className="bg-gray-200 rounded px-3 py-1 text-sm">Refresh</button>
+          </div>
+        </div>
+        {clusters.length === 0 ? (
+          <div className="text-sm text-gray-600 mt-2">No face clusters yet.</div>
+        ) : (
+          <div className="mt-2 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 text-sm">
+            {clusters.map((c)=> (
+              <div key={c.id} className="border rounded p-2">
+                <div className="flex items-center justify-between">
+                  <div className="font-semibold truncate" title={c.name || `Cluster ${c.id}`}>{c.name || `Cluster ${c.id}`}</div>
+                  <div className="text-xs text-gray-600">{c.size}</div>
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-1">
+                  {c.examples.map(([p,emb],i)=> (
+                    <img key={i} src={thumbFaceUrl(dir, engine, p, emb, 196)} className="w-full h-16 object-cover rounded" />
+                  ))}
+                </div>
+                <div className="mt-2 flex gap-2">
+                  <button onClick={()=>{ const nm = c.name || ''; if(!nm) return; setPersons(prev=> prev.includes(nm) ? prev.filter(x=>x!==nm) : [...prev, nm]) }} disabled={!c.name} className={`px-2 py-1 rounded ${c.name && persons.includes(c.name) ? 'bg-blue-700 text-white' : (c.name ? 'bg-blue-600 text-white' : 'bg-gray-200')}`}>{c.name && persons.includes(c.name) ? 'Remove' : 'Add'}</button>
+                  <button onClick={async()=>{ const n = prompt('Name this person as…', c.name||'')||''; if(!n.trim()) return; try{ await apiFacesName(dir, String(c.id), n.trim()); const c2 = await apiFacesClusters(dir); setClusters(c2.clusters||[]) } catch{} }} className="px-2 py-1 rounded bg-gray-200">Name</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {persons.length > 0 && (
+          <div className="mt-2 text-sm flex items-center gap-2 flex-wrap">
+            {persons.map(p => (
+              <span key={p} className="px-2 py-1 bg-blue-600 text-white rounded flex items-center gap-2">{p} <button onClick={()=> setPersons(persons.filter(x=>x!==p))} className="bg-white/20 rounded px-1">×</button></span>
+            ))}
+            <button onClick={()=>setPersons([])} className="px-2 py-1 bg-gray-200 rounded">Clear</button>
+          </div>
+        )}
+      </div>
+      )}
+
+      {tab==='smart' && (
+      <div className="mt-6 bg-white border rounded p-3">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold">Smart Collections</h2>
+          <div className="flex gap-2">
+            <button onClick={async()=>{ try{ const r = await apiGetSmart(dir); setSmart(r.smart||{}) } catch(e:any){ setNote(e.message) } }} className="bg-gray-200 rounded px-3 py-1 text-sm">Refresh</button>
+            <button onClick={async()=>{
+              const name = (prompt('Save current search as Smart (name):')||'').trim(); if(!name) return;
+              try {
+                const tags = tagFilter.split(',').map(s=>s.trim()).filter(Boolean)
+                const fromTs = dateFrom ? new Date(dateFrom + 'T00:00:00').getTime()/1000 : undefined
+                const toTs = dateTo ? new Date(dateTo + 'T23:59:59').getTime()/1000 : undefined
+                const rules: any = {
+                  query, favoritesOnly: favOnly, tags,
+                  useCaptions: useCaps,
+                  camera: camera || undefined,
+                  isoMin: isoMin ? parseInt(isoMin,10) : undefined,
+                  isoMax: isoMax ? parseInt(isoMax,10) : undefined,
+                  fMin: fMin ? parseFloat(fMin) : undefined,
+                  fMax: fMax ? parseFloat(fMax) : undefined,
+                  dateFrom: fromTs, dateTo: toTs,
+                }
+                const ppl = persons.filter(Boolean)
+                if (ppl.length === 1) rules.person = ppl[0]; else if (ppl.length > 1) rules.persons = ppl
+                await apiSetSmart(dir, name, rules)
+                const r = await apiGetSmart(dir)
+                setSmart(r.smart||{})
+                setNote('Saved smart collection')
+              } catch(e:any){ setNote(e.message||'Failed to save smart') }
+            }} className="bg-blue-600 text-white rounded px-3 py-1 text-sm">Save current as Smart</button>
+          </div>
+        </div>
+        {Object.keys(smart||{}).length === 0 ? (
+          <div className="text-sm text-gray-600 mt-2">No smart collections yet.</div>
+        ) : (
+          <div className="mt-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
+            {Object.keys(smart).map((name)=> (
+              <div key={name} className="border rounded p-2">
+                <div className="flex items-center justify-between">
+                  <div className="font-semibold truncate" title={name}>{name}</div>
+                  <div className="flex gap-2">
+                    <button onClick={async()=>{ try { const r = await apiResolveSmart(dir, name, engine, topK); setResults(r.results||[]); setNote(`Opened smart: ${name}`) } catch(e:any){ setNote(e.message) } }} className="px-2 py-1 bg-blue-600 text-white rounded">Open</button>
+                    <button onClick={async()=>{ if(!confirm(`Delete smart collection "${name}"?`)) return; try{ await apiDeleteSmart(dir, name); const r = await apiGetSmart(dir); setSmart(r.smart||{}) } catch(e:any){ setNote(e.message) } }} className="px-2 py-1 bg-red-600 text-white rounded">Delete</button>
+                  </div>
+                </div>
+                <div className="mt-1 text-xs text-gray-600 truncate">{JSON.stringify(smart[name])}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
       )}
       {tab==='search' && (
       <div className="mt-4 bg-white border rounded p-3">

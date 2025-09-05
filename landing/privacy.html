@@ -3,24 +3,21 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Privacy Policy — Photo Search</title>
+    <title>Privacy Policy – Photo Search</title>
     <script src="https://cdn.tailwindcss.com"></script>
   </head>
   <body class="bg-gray-50 text-gray-900">
     <div class="max-w-3xl mx-auto px-4 py-10">
-      <h1 class="text-2xl font-semibold mb-4">Privacy Policy</h1>
-      <p class="text-sm text-gray-700">Last updated: <span id="d"></span></p>
-      <div class="mt-4 space-y-3 text-sm text-gray-800">
-        <p><strong>Local‑first.</strong> By default, Photo Search processes your images and indexes locally on your device. We do not collect or transmit your photos.</p>
-        <p><strong>Cloud add‑ons.</strong> If you enable cloud providers (e.g., OpenAI, Hugging Face, Gemini), your content or prompts may be sent to those services per your configuration. Your API keys are entered by you and not saved unless you choose to.</p>
-        <p><strong>Analytics.</strong> Local usage logs (e.g., search stats) are stored on your device. No telemetry is sent to us without your consent.</p>
-        <p><strong>Payments.</strong> Purchases are processed by Gumroad or Razorpay. We do not store your payment details. Refer to their respective policies.</p>
-        <p><strong>Data retention.</strong> Indexes and preferences are stored locally. You can delete them at any time in settings.</p>
-        <p><strong>Contact.</strong> privacy@ (replace) — <a href="mailto:privacy@example.com" class="underline">privacy@example.com</a></p>
+      <h1 class="text-2xl font-semibold">Privacy Policy</h1>
+      <p class="mt-2 text-gray-700 text-sm">Last updated: <span id="d"></span></p>
+      <div class="mt-6 space-y-4 text-sm leading-6 text-gray-800">
+        <p><span class="font-semibold">Local Processing:</span> Photo Search runs on your device by default. Your photos and embeddings are kept locally.</p>
+        <p><span class="font-semibold">Optional Cloud:</span> If you enable cloud add‑ons (e.g., OpenAI, HF), only the required data for that feature is sent to the provider. Keys are not persisted unless explicitly saved.</p>
+        <p><span class="font-semibold">Analytics:</span> The app may record local usage logs for diagnostics. No tracking is sent externally by default.</p>
+        <p><span class="font-semibold">Data Control:</span> You can delete indexes and local data at any time from within the app.</p>
       </div>
-      <div class="mt-8"><a href="./index.html" class="underline">Back</a></div>
+      <div class="mt-8"><a href="./index.html" class="underline">Back to Home</a></div>
     </div>
     <script>document.getElementById('d').textContent = new Date().toISOString().slice(0,10)</script>
   </body>
   </html>
-
