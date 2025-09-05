@@ -41,6 +41,7 @@ import {
   thumbUrl,
   type SearchResult,
 } from './api'
+import { apiDelete, apiUndoDelete } from './api'
 
 import {
   // Individual settings hooks
@@ -838,7 +839,26 @@ export default function ModernApp() {
             )}
             <button type="button"
               className="flex items-center gap-1 px-3 py-1 text-sm text-red-700 hover:bg-red-100 rounded-md transition-colors"
-              onClick={() => alert('Delete not implemented yet')}
+              onClick={async () => {
+                if (selected.size === 0) return
+                if (!confirm(`Move ${selected.size} item(s) to Trash?`)) return
+                try {
+                  uiActions.setBusy('Deleting…')
+                  const r = await apiDelete(dir, Array.from(selected))
+                  uiActions.setNote(`Moved ${r.moved} to Trash`)
+                  setSelected(new Set())
+                  setTimeout(async () => {
+                    if (confirm('Undo delete?')) {
+                      const u = await apiUndoDelete(dir)
+                      uiActions.setNote(`Restored ${u.restored}`)
+                    }
+                  }, 100)
+                } catch (e:any) {
+                  uiActions.setNote(e.message)
+                } finally {
+                  uiActions.setBusy('')
+                }
+              }}
             >
               <Trash2 className="w-4 h-4" />
               Delete
@@ -1171,6 +1191,21 @@ export default function ModernApp() {
             }}
             onMoreLikeThis={async ()=> { try{ const { apiSearchLike } = await import('./api'); const p = results && detailIdx !== null ? results[detailIdx]?.path : undefined; if (!p) return; uiActions.setBusy('Searching similar…'); const r = await apiSearchLike(dir, p, engine, topK); photoActions.setResults(r.results||[]); setSelectedView('results'); } catch(e:any){ uiActions.setNote(e.message) } finally { uiActions.setBusy('') } }}
           />
+        )}
+
+        {/* Global progress overlay */}
+        {!!busy && (
+          <div className="fixed inset-0 z-[1050] bg-black/40 flex items-center justify-center">
+            <div className="bg-white dark:bg-gray-900 rounded-lg shadow p-4 w-full max-w-sm text-sm">
+              <div className="flex items-center gap-3">
+                <div className="h-6 w-6 border-2 border-gray-300 dark:border-gray-700 border-t-blue-600 rounded-full animate-spin"></div>
+                <div className="min-w-0">
+                  <div className="font-medium text-gray-900 dark:text-gray-100">{busy}</div>
+                  {note && <div className="text-gray-600 dark:text-gray-300 truncate">{note}</div>}
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

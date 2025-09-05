@@ -12,7 +12,9 @@ function startAPI() {
 
 function createWindow() {
   const win = new BrowserWindow({ width: 1280, height: 800 })
-  win.loadURL('http://127.0.0.1:8001/')
+  // Load the React app instead of the API directly
+  // Note: Vite may use port 5174 if 5173 is occupied
+  win.loadURL('http://127.0.0.1:5174/')
 }
 
 app.whenReady().then(() => {

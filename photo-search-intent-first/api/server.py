@@ -23,6 +23,7 @@ from infra.edits import apply_ops as _edit_apply_ops, upscale as _edit_upscale, 
 from adapters.vlm_caption_hf import VlmCaptionHF
 import shutil, os
 import json
+import time
 
 from PIL import Image, ExifTags
 
@@ -1096,6 +1097,9 @@ def api_edit_ops(dir: str, path: str, rotate: int = 0, flip: Optional[str] = Non
     return {"out_path": str(out)}
 
 
+# In‑memory delete session (last batch) per process
+_last_delete = None
+
 @app.post("/edit/upscale")
 def api_edit_upscale(dir: str, path: str, scale: int = 2, engine: str = "pil") -> Dict[str, Any]:
     folder = Path(dir)
@@ -1182,6 +1186,7 @@ def api_diagnostics(dir: str, provider: Optional[str] = None, hf_token: Optional
                 cnt = 0
                 try:
                     import json
+import time
                     if p.exists():
                         data = json.loads(p.read_text())
                         cnt = len(data.get("paths", []))
@@ -1504,3 +1509,76 @@ def api_autotag(dir: str, provider: str = "local", min_len: int = 4, max_tags_pe
             updated += 1
     save_tags(store.index_dir, tmap)
     return {"updated": updated}
+
+
+@app.post("/delete")
+def api_delete(dir: str, paths: list[str]) -> dict[str, object]:
+    """Move files to a local trash folder inside the index dir for safe undo."""
+    folder = Path(dir)
+    if not folder.exists():
+        raise HTTPException(400, "Folder not found")
+    store = IndexStore(folder, index_key=None)
+    store.load()
+    trash_root = store.index_dir / 'trash'
+    ts = str(int(time.time()))
+    dest_root = trash_root / ts
+    moved: list[dict[str,str]] = []
+    os.makedirs(dest_root, exist_ok=True)
+    for p in paths:
+        sp = Path(p)
+        try:
+            sp_res = sp.resolve(); folder_res = folder.resolve()
+            if not str(sp_res).startswith(str(folder_res)):
+                continue
+        except Exception:
+            continue
+        rel = sp.resolve().relative_to(folder.resolve())
+        dst = dest_root / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            import shutil as _sh; _sh.move(str(sp), str(dst))
+            moved.append({"src": str(sp), "dst": str(dst)})
+        except Exception:
+            continue
+    global _last_delete
+    _last_delete = {"dir": str(folder), "batch": moved, "ts": ts}
+    try:
+        (trash_root / 'last.json').write_text(json.dumps(_last_delete, indent=2), encoding='utf-8')
+    except Exception:
+        pass
+    return {"ok": True, "moved": len(moved)}
+
+
+@app.post("/undo_delete")
+def api_undo_delete(dir: str) -> dict[str, object]:
+    """Undo last delete by moving files back from trash. Best‑effort."""
+    folder = Path(dir)
+    trash_root = IndexStore(folder, index_key=None).index_dir / 'trash'
+    state = None
+    global _last_delete
+    if _last_delete and _last_delete.get('dir') == str(folder):
+        state = _last_delete
+    else:
+        p = trash_root / 'last.json'
+        if p.exists():
+            try:
+                state = json.loads(p.read_text(encoding='utf-8'))
+            except Exception:
+                state = None
+    if not state:
+        return {"ok": False, "restored": 0}
+    restored = 0
+    for item in state.get('batch', []):
+        src = Path(item.get('dst')); dst = Path(item.get('src'))
+        try:
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            import shutil as _sh; _sh.move(str(src), str(dst))
+            restored += 1
+        except Exception:
+            continue
+    try:
+        (trash_root / 'last.json').unlink(missing_ok=True)
+    except Exception:
+        pass
+    _last_delete = None
+    return {"ok": True, "restored": restored}

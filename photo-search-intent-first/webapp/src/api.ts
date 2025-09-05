@@ -360,3 +360,21 @@ export async function apiTodo() {
   if (!r.ok) throw new Error(await r.text())
   return r.json() as Promise<{ text: string }>
 }
+
+export async function apiDelete(dir: string, paths: string[]) {
+  const r = await fetch(`${API_BASE}/delete`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dir, paths }),
+  })
+  if (!r.ok) throw new Error(await r.text())
+  return r.json() as Promise<{ ok: boolean; moved: number }>
+}
+
+export async function apiUndoDelete(dir: string) {
+  const r = await fetch(`${API_BASE}/undo_delete`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dir }),
+  })
+  if (!r.ok) throw new Error(await r.text())
+  return r.json() as Promise<{ ok: boolean; restored: number }>
+}

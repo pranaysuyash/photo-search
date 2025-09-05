@@ -275,10 +275,10 @@ export default function App() {
           a.download = 'search_results.csv'
           a.click()
         }} className="bg-gray-200 rounded px-3 py-1 text-sm">Export CSV</button>
+        <datalist id="cameras_list">
+          {cameras.map(c=> <option key={c} value={c} />)}
+        </datalist>
       </div>
-      <datalist id="cameras_list">
-        {cameras.map(c=> <option key={c} value={c} />)}
-      </datalist>
       )}
       {tab==='people' && (
       <div className="mt-6 bg-white border rounded p-3">
