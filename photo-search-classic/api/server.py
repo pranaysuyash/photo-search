@@ -10,9 +10,9 @@ from fastapi.responses import FileResponse
 
 from engine import IndexStore
 from providers import get_provider
-from storage import load_collections, save_collections, load_tags, save_tags, all_tags, load_saved, save_saved
+from storage import load_collections, save_collections, load_tags, save_tags, all_tags, load_saved, save_saved, load_smart, save_smart
 from analytics import log_search, log_feedback
-from thumbs import get_or_create_thumb
+from thumbs import get_or_create_thumb, get_or_create_face_thumb
 from editing import apply_ops as _edit_apply_ops, upscale as _edit_upscale, EditOps as _EditOps
 import shutil
 import os
@@ -21,8 +21,15 @@ from dupes import build_hashes as build_dupe_hashes, find_lookalikes
 from dupes import _group_id as _dupe_group_id  # type: ignore
 from storage import load_prefs, save_prefs
 from storage import APP_DIR as _APP_DIR
+from storage import load_collections as _load_collections, save_collections as _save_collections
+from storage import load_saved as _load_saved
+from storage import all_tags as _all_tags
 
 from PIL import Image, ExifTags
+import logging
+if not logging.getLogger().handlers:
+    logging.basicConfig(level=logging.INFO)
+from faces import build_faces as _build_faces, list_clusters as _face_list, set_cluster_name as _face_name, photos_for_person as _face_photos, load_faces as _faces_load
 
 
 app = FastAPI(title="Photo Search – Classic API")
@@ -60,7 +67,9 @@ def api_search(dir: str, query: str, top_k: int = 12, provider: str = "local", h
                favorites_only: bool = False, tags: Optional[List[str]] = None, date_from: Optional[float] = None, date_to: Optional[float] = None,
                use_fast: bool = False, fast_kind: Optional[str] = None, use_caps: bool = False,
                camera: Optional[str] = None, iso_min: Optional[int] = None, iso_max: Optional[int] = None,
-               f_min: Optional[float] = None, f_max: Optional[float] = None) -> Dict[str, Any]:
+               f_min: Optional[float] = None, f_max: Optional[float] = None,
+               person: Optional[str] = None, persons: Optional[List[str]] = None,
+               has_text: bool = False) -> Dict[str, Any]:
     folder = Path(dir)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
@@ -116,6 +125,23 @@ def api_search(dir: str, query: str, top_k: int = 12, provider: str = "local", h
         tmap = load_tags(store.index_dir)
         need = set(tags)
         out = [(p, s) for (p, s) in out if need.issubset(set(tmap.get(p, [])))]
+    # Person filters (single or AND across multiple)
+    try:
+        if persons and isinstance(persons, list) and len(persons) > 0:
+            sets: List[set] = []
+            for nm in persons:
+                try:
+                    sets.append(set(_face_photos(store.index_dir, str(nm))))
+                except Exception:
+                    sets.append(set())
+            if sets:
+                inter = set.intersection(*sets) if len(sets) > 1 else sets[0]
+                out = [(p, s) for (p, s) in out if p in inter]
+        elif person:
+            ppl = set(_face_photos(store.index_dir, str(person)))
+            out = [(p, s) for (p, s) in out if p in ppl]
+    except Exception:
+        logging.exception("EXIF filter evaluation failed for %s", str(store.index_dir))
     if date_from is not None and date_to is not None:
         mmap = {sp: float(mt) for sp, mt in zip(store.paths or [], store.mtimes or [])}
         out = [(p, s) for (p, s) in out if date_from <= mmap.get(p, 0.0) <= date_to]
@@ -151,9 +177,43 @@ def api_search(dir: str, query: str, top_k: int = 12, provider: str = "local", h
             out = [(p,s) for (p,s) in out if ok(p)]
     except Exception:
         pass
+    # OCR has_text filter
+    if has_text:
+        try:
+            texts_map: Dict[str, str] = {}
+            if store.ocr_texts_file.exists():
+                d = json.loads(store.ocr_texts_file.read_text())
+                texts_map = {p: (t or '') for p, t in zip(d.get('paths', []), d.get('texts', []))}
+            out = [(p, s) for (p, s) in out if (texts_map.get(p, '').strip() != '')]
+        except Exception:
+            logging.exception("has_text filter failed for %s", str(store.index_dir))
 
     sid = log_search(store.index_dir, getattr(emb, 'index_id', 'default'), query, out)
     return {"search_id": sid, "results": [{"path": p, "score": s} for p, s in out]}
+
+
+# Faces (People) endpoints
+@app.post("/faces/build")
+def api_build_faces(dir: str, provider: str = "local") -> Dict[str, Any]:
+    folder = Path(dir)
+    if not folder.exists():
+        raise HTTPException(400, "Folder not found")
+    emb = _emb(provider, None, None)
+    store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
+    store.load()
+    return _build_faces(store.index_dir, store.paths or [])
+
+
+@app.get("/faces/clusters")
+def api_faces_clusters(dir: str) -> Dict[str, Any]:
+    store = IndexStore(Path(dir))
+    return {"clusters": _face_list(store.index_dir)}
+
+
+@app.post("/faces/name")
+def api_faces_name(dir: str, cluster_id: str, name: str) -> Dict[str, Any]:
+    store = IndexStore(Path(dir))
+    return _face_name(store.index_dir, cluster_id, name)
 
 
 @app.get("/favorites")
@@ -243,6 +303,149 @@ def api_delete_saved(dir: str, name: str) -> Dict[str, Any]:
     saved = [s for s in saved if str(s.get("name")) != name]
     save_saved(store.index_dir, saved)
     return {"ok": True, "deleted": before - len(saved), "saved": saved}
+
+
+# Smart Collections
+@app.get("/smart_collections")
+def api_get_smart_collections(dir: str) -> Dict[str, Any]:
+    store = IndexStore(Path(dir))
+    return {"smart": load_smart(store.index_dir)}
+
+
+@app.post("/smart_collections")
+def api_set_smart_collection(dir: str, name: str, rules: Dict[str, Any]) -> Dict[str, Any]:
+    store = IndexStore(Path(dir))
+    data = load_smart(store.index_dir)
+    data[name] = rules
+    save_smart(store.index_dir, data)
+    return {"ok": True, "smart": data}
+
+
+@app.post("/smart_collections/delete")
+def api_delete_smart_collection(dir: str, name: str) -> Dict[str, Any]:
+    store = IndexStore(Path(dir))
+    data = load_smart(store.index_dir)
+    if name in data:
+        del data[name]
+        save_smart(store.index_dir, data)
+        return {"ok": True, "deleted": name}
+    return {"ok": False, "deleted": None}
+
+
+@app.post("/smart_collections/resolve")
+def api_resolve_smart_collection(dir: str, name: str, provider: str = "local", top_k: int = 24, hf_token: Optional[str] = None, openai_key: Optional[str] = None) -> Dict[str, Any]:
+    folder = Path(dir)
+    if not folder.exists():
+        raise HTTPException(400, "Folder not found")
+    emb = _emb(provider, hf_token, openai_key)
+    store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
+    store.load()
+    data = load_smart(store.index_dir)
+    rules = data.get(name)
+    if not isinstance(rules, dict):
+        return {"search_id": None, "results": []}
+    # Extract rules
+    query = str(rules.get('query') or '').strip()
+    fav_only = bool(rules.get('favoritesOnly'))
+    tags = rules.get('tags') or []
+    date_from = rules.get('dateFrom'); date_to = rules.get('dateTo')
+    use_caps = bool(rules.get('useCaptions'))
+    person = rules.get('person'); persons = rules.get('persons') or None
+    camera = rules.get('camera'); iso_min = rules.get('isoMin'); iso_max = rules.get('isoMax')
+    f_min = rules.get('fMin'); f_max = rules.get('fMax')
+    has_text = bool(rules.get('hasText'))
+    # Search
+    if use_caps and store.captions_available():
+        try:
+            import numpy as _np
+            qv = emb.embed_text(query) if hasattr(emb, 'embed_text') else emb.encode([query])[0]
+            E = store.embeddings
+            T = _np.load(store.cap_embeds_file)
+            sims = 0.5*(E @ qv).astype(float) + 0.5*(T @ qv).astype(float)
+            k = max(1, min(top_k, len(sims)))
+            idx = _np.argpartition(-sims, k - 1)[:k]
+            idx = idx[_np.argsort(-sims[idx])]
+            results = [(store.paths[i], float((E @ qv)[i])) for i in idx]
+        except Exception:
+            results = store.search(emb, query, top_k=top_k)
+    else:
+        results = store.search(emb, query, top_k=top_k)
+    out = results
+    # Favorites filter
+    if fav_only:
+        coll = load_collections(store.index_dir)
+        favs = set(coll.get('Favorites', []))
+        out = [(p, s) for (p, s) in out if p in favs]
+    # Tags
+    if tags:
+        tmap = load_tags(store.index_dir)
+        req = set(tags)
+        out = [(p, s) for (p, s) in out if req.issubset(set(tmap.get(p, [])))]
+    # Person filters
+    try:
+        if persons and isinstance(persons, list) and len(persons) > 0:
+            sets: List[set] = []
+            for nm in persons:
+                try:
+                    sets.append(set(_face_photos(store.index_dir, str(nm))))
+                except Exception:
+                    sets.append(set())
+            if sets:
+                inter = set.intersection(*sets) if len(sets) > 1 else sets[0]
+                out = [(p, s) for (p, s) in out if p in inter]
+        elif person:
+            ppl = set(_face_photos(store.index_dir, str(person)))
+            out = [(p, s) for (p, s) in out if p in ppl]
+    except Exception:
+        logging.exception("EXIF read failed for %s", str(p))
+    # Date filter
+    if date_from is not None and date_to is not None:
+        mmap = {sp: float(mt) for sp, mt in zip(store.paths or [], store.mtimes or [])}
+        out = [(p, s) for (p, s) in out if float(date_from) <= mmap.get(p, 0.0) <= float(date_to)]
+    # EXIF filters (subset: camera/ISO/fnumber)
+    try:
+        meta_p = store.index_dir / 'exif_index.json'
+        if meta_p.exists() and any([camera, iso_min is not None, iso_max is not None, f_min is not None, f_max is not None]):
+            m = json.loads(meta_p.read_text())
+            cam_map = {p: (c or '') for p, c in zip(m.get('paths',[]), m.get('camera',[]))}
+            iso_map = {p: (i if isinstance(i,int) else None) for p, i in zip(m.get('paths',[]), m.get('iso',[]))}
+            f_map = {p: (float(x) if isinstance(x,(int,float)) else None) for p, x in zip(m.get('paths',[]), m.get('fnumber',[]))}
+            def ok(p: str) -> bool:
+                if camera and camera.strip():
+                    if camera.strip().lower() not in (cam_map.get(p,'') or '').lower():
+                        return False
+                if iso_min is not None:
+                    v = iso_map.get(p)
+                    if v is None or v < int(iso_min):
+                        return False
+                if iso_max is not None:
+                    v = iso_map.get(p)
+                    if v is None or v > int(iso_max):
+                        return False
+                if f_min is not None:
+                    v = f_map.get(p)
+                    if v is None or v < float(f_min):
+                        return False
+                if f_max is not None:
+                    v = f_map.get(p)
+                    if v is None or v > float(f_max):
+                        return False
+                return True
+            out = [(p, s) for (p, s) in out if ok(p)]
+    except Exception:
+        pass
+    # OCR has-text filter
+    if has_text:
+        try:
+            texts_map: Dict[str, str] = {}
+            if store.ocr_texts_file.exists():
+                d = json.loads(store.ocr_texts_file.read_text())
+                texts_map = {p: (t or '') for p, t in zip(d.get('paths', []), d.get('texts', []))}
+            out = [(p, s) for (p, s) in out if (texts_map.get(p, '').strip() != '')]
+        except Exception:
+            pass
+    sid = log_search(store.index_dir, getattr(emb, 'index_id', 'default'), f"smart:{name}:{query}", out)
+    return {"search_id": sid, "results": [{"path": p, "score": s} for p, s in out]}
 
 
 @app.post("/feedback")
@@ -570,6 +773,41 @@ def api_thumb(dir: str, path: str, provider: str = "local", size: int = 512, hf_
         raise HTTPException(404, "Thumb not found")
 
 
+@app.get("/thumb_face")
+def api_thumb_face(dir: str, path: str, emb: int, provider: str = "local", size: int = 256, hf_token: Optional[str] = None, openai_key: Optional[str] = None):
+    folder = Path(dir)
+    if not folder.exists():
+        raise HTTPException(400, "Folder not found")
+    embd = _emb(provider, hf_token, openai_key)
+    store = IndexStore(folder, index_key=getattr(embd, 'index_id', None))
+    store.load()
+    try:
+        idx_map = {sp: float(mt) for sp, mt in zip(store.paths or [], store.mtimes or [])}
+        mtime = idx_map.get(path, 0.0)
+        data = _faces_load(store.index_dir)
+        bbox = None
+        for it in data.get('photos', {}).get(path, []) or []:
+            try:
+                if int(it.get('emb')) == int(emb):
+                    bb = it.get('bbox')
+                    if isinstance(bb, list) and len(bb) == 4:
+                        bbox = (int(bb[0]), int(bb[1]), int(bb[2]), int(bb[3]))
+                        break
+            except Exception:
+                continue
+        if bbox is None:
+            tp = get_or_create_thumb(store.index_dir, Path(path), float(mtime), size=size)
+            if tp is None or not tp.exists():
+                raise HTTPException(404, "Thumb not found")
+            return FileResponse(str(tp))
+        fp = get_or_create_face_thumb(store.index_dir, Path(path), float(mtime), bbox, size=size)
+        if fp is None or not fp.exists():
+            raise HTTPException(404, "Face thumb not found")
+        return FileResponse(str(fp))
+    except Exception:
+        raise HTTPException(404, "Face thumb not found")
+
+
 @app.post("/search_like")
 def api_search_like(dir: str, path: str, top_k: int = 12, provider: str = "local", hf_token: Optional[str] = None, openai_key: Optional[str] = None) -> Dict[str, Any]:
     folder = Path(dir)
@@ -626,6 +864,7 @@ def api_diagnostics(dir: str, provider: Optional[str] = None, hf_token: Optional
                 "hnsw": bool(store.hnsw_status().get('exists')),
             }
         except Exception:
+            logging.exception("diagnostics fast status failed for %s", str(store.index_dir))
             info["fast"] = {"annoy": False, "faiss": False, "hnsw": False}
         engines.append(info)
     else:
@@ -642,6 +881,7 @@ def api_diagnostics(dir: str, provider: Optional[str] = None, hf_token: Optional
                         data = json.loads(p.read_text())
                         cnt = len(data.get("paths", []))
                 except Exception:
+                    logging.exception("diagnostics read paths.json failed under %s", str(sub))
                     cnt = 0
                 engines.append({"key": sub.name, "index_dir": str(sub), "count": cnt})
     import shutil, platform
@@ -663,7 +903,7 @@ def _load_workspace() -> List[str]:
             if isinstance(data, list):
                 return list(dict.fromkeys([str(p) for p in data]))
     except Exception:
-        pass
+        logging.exception("workspace load failed")
     return []
 
 
@@ -673,7 +913,7 @@ def _save_workspace(folders: List[str]) -> None:
         _APP_DIR.mkdir(parents=True, exist_ok=True)
         WS_FILE.write_text(json.dumps({"folders": list(dict.fromkeys(folders))}, indent=2))
     except Exception:
-        pass
+        logging.exception("workspace save failed")
 
 
 @app.get("/workspace")

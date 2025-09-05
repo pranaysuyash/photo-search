@@ -6,12 +6,16 @@
   "scripts": {
     "dev": "electron .",
     "build:ui": "cd ../webapp && npm install && npm run build",
-    "pack": "electron-builder --dir",
-    "dist": "electron-builder -mwl"
+    "pack": "npm run build:ui && electron-builder --dir",
+    "dist": "npm run build:ui && electron-builder -mwl"
   },
   "devDependencies": {
     "electron": "^29.0.0",
     "electron-builder": "^24.13.3"
+  },
+  "dependencies": {
+    "electron-updater": "^6.1.8",
+    "tweetnacl": "^1.0.3"
   },
   "build": {
     "appId": "com.photos.search.intentfirst",
@@ -34,6 +38,9 @@
       "target": [
         "nsis"
       ]
-    }
+    },
+    "publish": [
+      { "provider": "github", "owner": "yourorg", "repo": "photo-search" }
+    ]
   }
 }

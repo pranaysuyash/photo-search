@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 
 import json
 import uuid
@@ -54,7 +55,7 @@ def load_feedback(index_dir: Path) -> Dict[str, Dict[str, int]]:
             if isinstance(data, dict):
                 return {str(q): {str(k): int(v) for k, v in d.items()} for q, d in data.items() if isinstance(d, dict)}
     except Exception:
-        pass
+        logging.exception("analytics log_search failed")
     return {}
 
 
@@ -62,7 +63,7 @@ def save_feedback(index_dir: Path, fb: Dict[str, Dict[str, int]]) -> None:
     try:
         _feedback_file(index_dir).write_text(json.dumps(fb, indent=2))
     except Exception:
-        pass
+        logging.exception("analytics log_open failed")
 
 
 def log_feedback(index_dir: Path, search_id: str, query: str, positives: List[str], note: str = "") -> None:
@@ -100,4 +101,3 @@ def apply_feedback_boost(index_dir: Path, query: str, results: List[Tuple[str, f
     # re-sort by adjusted score desc, stable
     adjusted.sort(key=lambda x: -x[1])
     return adjusted
-

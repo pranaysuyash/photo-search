@@ -4,97 +4,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Photo Search – Intent-First</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module" crossorigin src="/assets/index-DTE-jOyO.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-Dk3Del7f.css">
   </head>
-  <body class="bg-gray-50 text-gray-900">
-    <div class="max-w-6xl mx-auto p-4">
-      <h1 class="text-2xl font-semibold mb-2">📸 Photo Search – Intent-First (API)</h1>
-      <p class="text-sm text-gray-600 mb-4">Simple, modern UI to try the API. Private by default; choose cloud engines only if you want.</p>
-
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-        <div>
-          <label class="block text-sm">Folder</label>
-          <input id="dir" class="w-full border rounded px-3 py-2" placeholder="/path/to/photos" />
-        </div>
-        <div>
-          <label class="block text-sm">Engine</label>
-          <select id="engine" class="w-full border rounded px-3 py-2">
-            <option value="local">On-device (Recommended)</option>
-            <option value="local-compat">On-device (Compatible)</option>
-            <option value="hf">Hugging Face (CLIP)</option>
-            <option value="hf-caption">Hugging Face (Caption)</option>
-            <option value="openai">OpenAI (Captions)</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm">Query</label>
-          <input id="query" class="w-full border rounded px-3 py-2" placeholder="friends on beach" />
-        </div>
-        <div>
-          <button id="btnSearch" class="w-full bg-blue-600 text-white rounded px-3 py-2">Search</button>
-        </div>
-      </div>
-
-      <div id="note" class="text-sm text-gray-500 mt-2"></div>
-
-      <div id="results" class="mt-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3"></div>
-
-      <div id="fb" class="mt-4 hidden">
-        <details class="bg-white rounded border p-3">
-          <summary class="cursor-pointer">Help improve results</summary>
-          <div class="mt-2">
-            <p class="text-sm text-gray-600">Select the correct photos below, then submit.</p>
-            <div id="fbList" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mt-2"></div>
-            <textarea id="fbNote" class="w-full border rounded px-2 py-2 mt-2" placeholder="Any notes?"></textarea>
-            <button id="fbSubmit" class="mt-2 bg-gray-800 text-white rounded px-3 py-2">Submit feedback</button>
-          </div>
-        </details>
-      </div>
-    </div>
-
-    <script>
-      const $ = (s) => document.querySelector(s);
-      const api = (p, body) => fetch(p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json());
-      let last = { search_id: null, dir: null, engine: null, results: [] };
-
-      async function doSearch() {
-        const dir = $('#dir').value.trim();
-        const engine = $('#engine').value;
-        const query = $('#query').value.trim();
-        if (!dir || !query) { $('#note').textContent = 'Enter a folder and a query.'; return; }
-        $('#note').textContent = 'Searching…';
-        const data = await api('/search', { dir, provider: engine, query, top_k: 24 });
-        last = { search_id: data.search_id, dir, engine, results: data.results };
-        $('#note').textContent = `Found ${data.results.length} results.`;
-        const r = $('#results'); r.innerHTML = '';
-        const fb = $('#fbList'); fb.innerHTML = '';
-        for (const item of data.results) {
-          const el = document.createElement('div');
-          el.className = 'bg-white rounded border p-2 text-xs';
-          el.innerHTML = `<div class="font-semibold truncate" title="${item.path}">${item.path.split('/').pop()}</div>
-                          <div class="text-gray-600">score ${item.score.toFixed(3)}</div>`;
-          r.appendChild(el);
-          // feedback box
-          const f = document.createElement('label');
-          f.className = 'flex items-center gap-2 bg-white rounded border p-2 text-xs';
-          f.innerHTML = `<input type="checkbox" value="${item.path}" /> <span class="truncate" title="${item.path}">${item.path.split('/').pop()}</span>`;
-          fb.appendChild(f);
-        }
-        $('#fb').classList.remove('hidden');
-      }
-
-      async function doFeedback() {
-        const boxes = Array.from(document.querySelectorAll('#fbList input[type=checkbox]:checked'));
-        const positives = boxes.map(b => b.value);
-        const note = $('#fbNote').value;
-        if (!last.search_id) { alert('Please run a search first.'); return; }
-        await api('/feedback', { dir: last.dir, search_id: last.search_id, query: $('#query').value.trim(), positives, note });
-        alert('Thanks! Feedback saved.');
-      }
-
-      $('#btnSearch').addEventListener('click', doSearch);
-      $('#fbSubmit').addEventListener('click', doFeedback);
-    </script>
+  <body>
+    <div id="root"></div>
   </body>
   </html>
 

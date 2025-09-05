@@ -138,10 +138,10 @@ class IndexStore:
         if subset is not None and len(subset) > 0:
             idx = [subset[i] for i in idx]
             sims_sorted = [float((self.state.embeddings @ q)[i]) for i in idx]
-            return [SearchResult(path=Path(self.state.paths[i]), score=sims_sorted[k]) for k, i in enumerate(idx)]
+            return [SearchResult(path=Path(self.state.paths[i]), score=sims_sorted[j]) for j, i in enumerate(idx)]
         return [SearchResult(path=Path(self.state.paths[i]), score=float((self.state.embeddings @ q)[i])) for i in idx]
 
-    def search_like(self, path: str, top_k: int = 12, subset: Optional[list[int]] = None) -> list[SearchResult]:
+    def search_like(self, embedder, path: str, top_k: int = 12, subset: Optional[list[int]] = None) -> list[SearchResult]:
         if self.state.embeddings is None or not self.state.paths:
             return []
         try:
@@ -244,7 +244,6 @@ class IndexStore:
         if not self.state.paths:
             return 0
         texts = {}
-        import json
         if self.cap_texts_file.exists():
             try:
                 d = json.loads(self.cap_texts_file.read_text())
@@ -303,91 +302,13 @@ class IndexStore:
             idx = idx[_np.argsort(-sims[idx])]
             if subset is not None and len(subset) > 0:
                 idx = [subset[i] for i in idx]
-                exact = (self.state.embeddings @ q).astype(float)
-                idx = sorted(idx, key=lambda i: -exact[i])[:k]
-                return [SearchResult(path=Path(self.state.paths[i]), score=float(exact[i])) for i in idx]
-            return [SearchResult(path=Path(self.state.paths[i]), score=float((self.state.embeddings @ q)[i])) for i in idx]
-
-    def search_like(self, path: str, top_k: int = 12, subset: Optional[list[int]] = None) -> list[SearchResult]:
-        if self.state.embeddings is None or not self.state.paths:
-            return []
-        try:
-            i = self.state.paths.index(path)
-        except ValueError:
-            return []
-        q = self.state.embeddings[i]
-        import numpy as _np
-        E = self.state.embeddings if subset is None else self.state.embeddings[subset]
-        sims = (E @ q).astype(float)
-        k = max(1, min(top_k, len(sims)))
-        idx = _np.argpartition(-sims, k - 1)[:k]
-        idx = idx[_np.argsort(-sims[idx])]
-        if subset:
-            idx = [subset[i] for i in idx]
-        return [SearchResult(path=Path(self.state.paths[i]), score=float((self.state.embeddings @ q)[i])) for i in idx]
+            # Return exact weighted scores for final ranking
+            full_T = _np.load(self.cap_embeds_file)
+            exact_img = (self.state.embeddings @ q).astype(float)
+            exact_txt = (full_T @ q).astype(float)
+            return [SearchResult(path=Path(self.state.paths[i]), score=float(weight_img * exact_img[i] + weight_cap * exact_txt[i])) for i in idx]
         except Exception:
             return base
-
-    # ANN (Annoy) support
-    def ann_status(self) -> dict:
-        import json
-        status = {"exists": self.ann_file.exists() and self.ann_meta_file.exists()}
-        if status["exists"]:
-            try:
-                meta = json.loads(self.ann_meta_file.read_text())
-                status.update(meta)
-            except Exception:
-                status["exists"] = False
-        return status
-
-    def build_annoy(self, trees: int = 50) -> bool:
-        try:
-            from annoy import AnnoyIndex
-        except Exception:
-            return False
-        if self.state.embeddings is None:
-            self.load()
-        if self.state.embeddings is None or len(self.state.embeddings) == 0:
-            return False
-        dim = int(self.state.embeddings.shape[1])
-        ann = AnnoyIndex(dim, metric='angular')
-        for i, v in enumerate(self.state.embeddings):
-            ann.add_item(i, v.tolist())
-        ann.build(trees)
-        ann.save(str(self.ann_file))
-        meta = {"dim": dim, "size": len(self.state.embeddings), "trees": trees}
-        self.ann_meta_file.write_text(json.dumps(meta))
-        return True
-
-    def search_annoy(self, embedder, query: str, top_k: int = 12, re_rank: bool = True, subset: Optional[List[int]] = None) -> List[SearchResult]:
-        try:
-            from annoy import AnnoyIndex
-        except Exception:
-            return self.search(embedder, query, top_k=top_k, subset=subset)
-        status = self.ann_status()
-        if not status.get("exists"):
-            return self.search(embedder, query, top_k=top_k, subset=subset)
-        q = embedder.embed_text(query)
-        dim = status.get("dim") or (self.state.embeddings.shape[1] if self.state.embeddings is not None else None)
-        if dim is None:
-            return []
-        ann = AnnoyIndex(dim, metric='angular')
-        if not ann.load(str(self.ann_file)):
-            return self.search(embedder, query, top_k=top_k, subset=subset)
-        k = min(max(1, top_k), status.get("size", top_k))
-        candidates, _ = ann.get_nns_by_vector(q.tolist(), k, include_distances=True)
-        # Apply subset filter if provided
-        if subset:
-            cand_set = set(candidates)
-            candidates = [i for i in subset if i in cand_set]
-        if not candidates:
-            return []
-        if re_rank and self.state.embeddings is not None:
-            sims = (self.state.embeddings @ q).astype(float)
-            cand_scores = [(i, float(sims[i])) for i in candidates]
-            cand_scores.sort(key=lambda x: -x[1])
-            candidates = [i for i, _ in cand_scores[:k]]
-        return [SearchResult(path=Path(self.state.paths[i]), score=float((self.state.embeddings @ q)[i])) for i in candidates]
 
     # HNSW (hnswlib) support
     def hnsw_status(self) -> dict:
@@ -507,3 +428,64 @@ class IndexStore:
             cand_scores.sort(key=lambda x: -x[1])
             candidates = [i for i, _ in cand_scores[:top_k]]
         return [SearchResult(path=Path(self.state.paths[i]), score=float((self.state.embeddings @ q)[i])) for i in candidates]
+
+    # Annoy (optional) support
+    def ann_status(self) -> dict:
+        import json
+        status = {"exists": self.ann_file.exists() and self.ann_meta_file.exists()}
+        if status["exists"]:
+            try:
+                meta = json.loads(self.ann_meta_file.read_text())
+                status.update(meta)
+            except Exception:
+                status["exists"] = False
+        return status
+
+    def build_annoy(self, trees: int = 50) -> bool:
+        try:
+            from annoy import AnnoyIndex  # type: ignore
+        except Exception:
+            return False
+        if self.state.embeddings is None:
+            self.load()
+        if self.state.embeddings is None or len(self.state.embeddings) == 0:
+            return False
+        E = self.state.embeddings.astype('float32')
+        dim = int(E.shape[1])
+        index = AnnoyIndex(dim, metric='angular')
+        for i in range(E.shape[0]):
+            index.add_item(i, E[i].tolist())
+        index.build(max(1, int(trees)))
+        index.save(str(self.ann_file))
+        import json
+        self.ann_meta_file.write_text(json.dumps({"dim": dim, "size": int(E.shape[0]), "trees": int(trees)}))
+        return True
+
+    def search_annoy(self, embedder, query: str, top_k: int = 12, subset: Optional[List[int]] = None) -> List[SearchResult]:
+        # Subset not supported efficiently; fall back to exact for subset
+        if subset:
+            return self.search(embedder, query, top_k=top_k, subset=subset)
+        try:
+            from annoy import AnnoyIndex  # type: ignore
+        except Exception:
+            return self.search(embedder, query, top_k=top_k)
+        status = self.ann_status()
+        if not status.get('exists'):
+            return self.search(embedder, query, top_k=top_k)
+        dim = int(status.get('dim') or 0)
+        if dim <= 0:
+            return self.search(embedder, query, top_k=top_k)
+        q = embedder.embed_text(query).astype('float32')
+        idx = AnnoyIndex(dim, metric='angular')
+        idx.load(str(self.ann_file))
+        k = min(max(1, top_k), int(status.get('size', top_k)))
+        # get_nns_by_vector returns labels (indices)
+        labs = idx.get_nns_by_vector(q.tolist(), k, include_distances=False)
+        # Re-rank using exact similarities if embeddings available
+        if self.state.embeddings is not None:
+            sims = (self.state.embeddings @ q).astype(float)
+            labs = sorted(labs, key=lambda i: -sims[i])[:k]
+            return [SearchResult(path=Path(self.state.paths[i]), score=float(sims[i])) for i in labs]
+        # Fallback without exact rerank
+        return [SearchResult(path=Path(self.state.paths[i]), score=1.0) for i in labs]
+

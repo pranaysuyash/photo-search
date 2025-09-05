@@ -33,10 +33,11 @@ export async function apiSearch(
   useFast?: boolean,
   fastKind?: 'annoy' | 'faiss' | 'hnsw' | '',
   useCaptions?: boolean,
+  opts?: { person?: string; persons?: string[]; hasText?: boolean }
 ) {
   return post<{ search_id: string; results: SearchResult[] }>(
     '/search',
-    { dir, provider, query, top_k: topK, hf_token: hfToken, openai_key: openaiKey, favorites_only: !!favoritesOnly, tags, date_from: dateFrom, date_to: dateTo, use_fast: !!useFast, fast_kind: fastKind || undefined, use_caps: !!useCaptions },
+    { dir, provider, query, top_k: topK, hf_token: hfToken, openai_key: openaiKey, favorites_only: !!favoritesOnly, tags, date_from: dateFrom, date_to: dateTo, use_fast: !!useFast, fast_kind: fastKind || undefined, use_caps: !!useCaptions, person: opts?.person, persons: opts?.persons, has_text: opts?.hasText },
   )
 }
 
@@ -90,6 +91,58 @@ export async function apiDiagnostics(dir: string, provider?: string) {
 export function thumbUrl(dir: string, provider: string, path: string, size = 256) {
   const qs = new URLSearchParams({ dir, provider, path, size: String(size) })
   return `${API_BASE}/thumb?${qs.toString()}`
+}
+
+export function thumbFaceUrl(dir: string, provider: string, path: string, emb: number, size = 196) {
+  const qs = new URLSearchParams({ dir, provider, path, emb: String(emb), size: String(size) })
+  return `${API_BASE}/thumb_face?${qs.toString()}`
+}
+
+export async function apiFacesBuild(dir: string, provider: string) {
+  return post<{ updated: number; faces: number; clusters: number }>(
+    '/faces/build',
+    { dir, provider },
+  )
+}
+
+export async function apiFacesClusters(dir: string) {
+  const r = await fetch(`${API_BASE}/faces/clusters?dir=${encodeURIComponent(dir)}`)
+  if (!r.ok) throw new Error(await r.text())
+  return r.json() as Promise<{ clusters: { id: string; name?: string; size: number; examples: [string, number][] }[] }>
+}
+
+export async function apiFacesName(dir: string, clusterId: string, name: string) {
+  return post<{ ok: boolean }>(
+    '/faces/name',
+    { dir, cluster_id: clusterId, name },
+  )
+}
+
+export async function apiGetSmart(dir: string) {
+  const r = await fetch(`${API_BASE}/smart_collections?dir=${encodeURIComponent(dir)}`)
+  if (!r.ok) throw new Error(await r.text())
+  return r.json() as Promise<{ smart: Record<string, any> }>
+}
+
+export async function apiSetSmart(dir: string, name: string, rules: any) {
+  return post<{ ok: boolean; smart: Record<string, any> }>(
+    '/smart_collections',
+    { dir, name, rules },
+  )
+}
+
+export async function apiDeleteSmart(dir: string, name: string) {
+  return post<{ ok: boolean; deleted: string|null }>(
+    '/smart_collections/delete',
+    { dir, name },
+  )
+}
+
+export async function apiResolveSmart(dir: string, name: string, provider: string, topK = 24) {
+  return post<{ search_id: string|null; results: SearchResult[] }>(
+    '/smart_collections/resolve',
+    { dir, name, provider, top_k: topK },
+  )
 }
 
 export async function apiOpen(dir: string, path: string) {
