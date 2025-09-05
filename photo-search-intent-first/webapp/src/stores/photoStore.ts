@@ -69,7 +69,7 @@ export const useFavOnly = () => usePhotoStore((state) => state.favOnly)
 export const useTopK = () => usePhotoStore((state) => state.topK)
 export const useTagFilter = () => usePhotoStore((state) => state.tags.tagFilter)
 export const useAllTags = () => usePhotoStore((state) => state.tags.allTags)
-export const useTags = () => usePhotoStore((state) => state.tags, shallow)
+export const useTags = () => usePhotoStore((state) => state.tags)
 export const useSavedSearches = () => usePhotoStore((state) => state.saved)
 export const useCollections = () => usePhotoStore((state) => state.collections)
 export const useSmartCollections = () => usePhotoStore((state) => state.smart)
@@ -94,4 +94,4 @@ const photoActionsSelector = (state: any) => ({
 })
 
 // Actions selectors - use shallow comparison
-export const usePhotoActions = () => usePhotoStore(photoActionsSelector, shallow)
+export const usePhotoActions = () => usePhotoStore(photoActionsSelector)

@@ -29,31 +29,31 @@ export default function IndexManager({
       <div className="bg-white border rounded p-3">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold">Index Management</h2>
-          <button onClick={onIndex} disabled={!dir || busy} className="bg-gray-800 text-white rounded px-3 py-2 disabled:opacity-50">
+          <button onClick={onIndex} disabled={!dir || !!busy} className="bg-gray-800 text-white rounded px-3 py-2 disabled:opacity-50">
             {busy || 'Build Index'}
           </button>
         </div>
         
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          <button onClick={()=>onBuildFast('faiss')} disabled={!dir || busy} className="bg-blue-600 text-white rounded px-3 py-2 text-sm disabled:opacity-50">
+          <button onClick={()=>onBuildFast('faiss')} disabled={!dir || !!busy} className="bg-blue-600 text-white rounded px-3 py-2 text-sm disabled:opacity-50">
             Build FAISS
           </button>
-          <button onClick={()=>onBuildFast('hnsw')} disabled={!dir || busy} className="bg-blue-600 text-white rounded px-3 py-2 text-sm disabled:opacity-50">
+          <button onClick={()=>onBuildFast('hnsw')} disabled={!dir || !!busy} className="bg-blue-600 text-white rounded px-3 py-2 text-sm disabled:opacity-50">
             Build HNSW
           </button>
-          <button onClick={()=>onBuildFast('annoy')} disabled={!dir || busy} className="bg-blue-600 text-white rounded px-3 py-2 text-sm disabled:opacity-50">
+          <button onClick={()=>onBuildFast('annoy')} disabled={!dir || !!busy} className="bg-blue-600 text-white rounded px-3 py-2 text-sm disabled:opacity-50">
             Build Annoy
           </button>
-          <button onClick={onBuildOCR} disabled={!dir || busy} className="bg-green-600 text-white rounded px-3 py-2 text-sm disabled:opacity-50">
+          <button onClick={onBuildOCR} disabled={!dir || !!busy} className="bg-green-600 text-white rounded px-3 py-2 text-sm disabled:opacity-50">
             Build OCR
           </button>
         </div>
         
         <div className="grid grid-cols-2 gap-2 mt-2">
-          <button onClick={onBuildMetadata} disabled={!dir || busy} className="bg-purple-600 text-white rounded px-3 py-2 text-sm disabled:opacity-50">
+          <button onClick={onBuildMetadata} disabled={!dir || !!busy} className="bg-purple-600 text-white rounded px-3 py-2 text-sm disabled:opacity-50">
             Build Metadata
           </button>
-          <button onClick={onAutoTag} disabled={!dir || busy} className="bg-orange-600 text-white rounded px-3 py-2 text-sm disabled:opacity-50">
+          <button onClick={onAutoTag} disabled={!dir || !!busy} className="bg-orange-600 text-white rounded px-3 py-2 text-sm disabled:opacity-50">
             Auto Tag
           </button>
         </div>

@@ -124,4 +124,4 @@ const settingsActionsSelector = (state: any) => ({
 })
 
 // Actions selector - use shallow comparison
-export const useSettingsActions = () => useSettingsStore(settingsActionsSelector, shallow)
+export const useSettingsActions = () => useSettingsStore(settingsActionsSelector)

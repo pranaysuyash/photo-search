@@ -42,7 +42,7 @@ const uiActionsSelector = (state: any) => ({
 })
 
 // Actions selector - use shallow comparison
-export const useUIActions = () => useUIStore(uiActionsSelector, shallow)
+export const useUIActions = () => useUIStore(uiActionsSelector)
 
 // Computed selectors
 export const useIsBusy = () => useUIStore((state) => Boolean(state.busy))

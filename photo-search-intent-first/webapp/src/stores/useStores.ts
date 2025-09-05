@@ -132,13 +132,13 @@ const workspaceSelector = (state: any): WorkspaceState => ({
 
 // Use these only when you need ALL values from a store
 export const useSettings = (): SettingsWithComputed => 
-  useSettingsStore(settingsSelector, shallow)
+  useSettingsStore(settingsSelector)
 
 export const usePhoto = (): PhotoState => 
-  usePhotoStore(photoSelector, shallow)
+  usePhotoStore(photoSelector)
 
 export const useUI = (): UIState => 
-  useUIStore(uiSelector, shallow)
+  useUIStore(uiSelector)
 
 export const useWorkspaceState = (): WorkspaceState => 
-  useWorkspaceStore(workspaceSelector, shallow)
+  useWorkspaceStore(workspaceSelector)

@@ -76,4 +76,4 @@ const workspaceActionsSelector = (state: any) => ({
 })
 
 // Actions selector - use shallow comparison
-export const useWorkspaceActions = () => useWorkspaceStore(workspaceActionsSelector, shallow)
+export const useWorkspaceActions = () => useWorkspaceStore(workspaceActionsSelector)

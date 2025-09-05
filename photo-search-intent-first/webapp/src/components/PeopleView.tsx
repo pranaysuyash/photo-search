@@ -41,7 +41,7 @@ export default function PeopleView({
                 ))}
               </div>
               <div className="mt-2 flex gap-2">
-                <button onClick={()=>{ const nm = c.name || ''; if(!nm) return; setPersons(prev=> prev.includes(nm) ? prev.filter(x=>x!==nm) : [...prev, nm]) }} disabled={!c.name} className={`px-2 py-1 rounded ${c.name && persons.includes(c.name) ? 'bg-blue-700 text-white' : (c.name ? 'bg-blue-600 text-white' : 'bg-gray-200')}`}>{c.name && persons.includes(c.name) ? 'Remove' : 'Add'}</button>
+                <button onClick={()=>{ const nm = c.name || ''; if(!nm) return; const next = persons.includes(nm) ? persons.filter((x:string)=>x!==nm) : [...persons, nm]; setPersons(next) }} disabled={!c.name} className={`px-2 py-1 rounded ${c.name && persons.includes(c.name) ? 'bg-blue-700 text-white' : (c.name ? 'bg-blue-600 text-white' : 'bg-gray-200')}`}>{c.name && persons.includes(c.name) ? 'Remove' : 'Add'}</button>
                 <button onClick={async()=>{ const n = prompt('Name this person as…', c.name||'')||''; if(!n.trim()) return; try{ await apiFacesName(dir, String(c.id), n.trim()); await onLoadFaces() } catch{} }} className="px-2 py-1 rounded bg-gray-200">Name</button>
               </div>
             </div>

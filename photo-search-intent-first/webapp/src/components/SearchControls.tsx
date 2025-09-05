@@ -3,7 +3,7 @@ import {
   useSettings,
   usePhoto,
   useUI,
-  useWorkspace,
+  useWorkspaceState,
   useSettingsActions,
   usePhotoActions,
   useUIActions,
@@ -29,7 +29,7 @@ export default function SearchControls({ onSearch, onShowHelp }: SearchControlsP
   const settings = useSettings()
   const photo = usePhoto()
   const ui = useUI()
-  const workspace = useWorkspace()
+  const workspace = useWorkspaceState()
   
   // Actions
   const settingsActions = useSettingsActions() as SettingsActions
@@ -110,11 +110,11 @@ export default function SearchControls({ onSearch, onShowHelp }: SearchControlsP
         <div className="text-sm">Filter tags (comma):</div>
         <input value={tagFilter} onChange={e=>searchActions.setTagFilter(e.target.value)} placeholder="e.g., beach,friends" className="border rounded px-2 py-1" />
         <div className="flex gap-1 flex-wrap">
-          {allTags.map(t => {
-            const chosen = (tagFilter.split(',').map(s=>s.trim()).filter(Boolean)).includes(t)
+          {allTags.map((t: string) => {
+            const chosen = (tagFilter.split(',').map((s: string)=>s.trim()).filter(Boolean)).includes(t)
             return (
               <button key={t} onClick={()=>{
-                const cur = new Set(tagFilter.split(',').map(s=>s.trim()).filter(Boolean))
+                const cur = new Set(tagFilter.split(',').map((s: string)=>s.trim()).filter(Boolean))
                 if (cur.has(t)) cur.delete(t); else cur.add(t)
                 searchActions.setTagFilter(Array.from(cur).join(','))
               }} className={`text-xs px-2 py-1 rounded ${chosen ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>{t}</button>
