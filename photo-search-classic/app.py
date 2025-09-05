@@ -46,8 +46,55 @@ DEFAULT_PREFS = {
     "batch_size": 32,
     "grid_cols": 6,
     "more_folders": [],
+    "onboarding_done": False,
 }
 prefs = load_prefs(DEFAULT_PREFS)
+
+# Top‑bar helpers: Welcome (first‑run) and Help
+if 'show_help' not in st.session_state:
+    st.session_state['show_help'] = False
+
+cols_hdr = st.columns([5, 1, 1])
+with cols_hdr[1]:
+    if st.button("Help", key="btn_help_top"):
+        st.session_state['show_help'] = True
+with cols_hdr[2]:
+    if not prefs.get("onboarding_done"):
+        st.button("Welcome", key="btn_welcome_top_disabled")
+
+# Welcome wizard (first‑run)
+if not prefs.get("onboarding_done"):
+    with st.container():
+        st.subheader("Welcome to Photo Search")
+        st.markdown(
+            """
+            1. Enter your photo folder in the sidebar
+            2. Click “Index / Update Photos” in Settings
+            3. Go to Search and type a description
+            """
+        )
+        st.caption("Tip: Prepare thumbnails for faster browsing. Build OCR/Captions to improve recall.")
+        if st.button("Get started", type="primary", key="btn_get_started"):
+            prefs["onboarding_done"] = True
+            save_prefs(prefs)
+            st.experimental_rerun()
+
+# Quick Help panel (modal‑like)
+if st.session_state.get('show_help'):
+    with st.container():
+        st.subheader("Quick Help")
+        st.markdown(
+            """
+            - Use the sidebar Settings to choose your photo folder and engine.
+            - Build or update the index in the Index tab.
+            - In Search, refine with favorites, tags, and EXIF date ranges.
+            - Save searches or manage Collections in Browse.
+            - Filmstrip view and keyboard navigation are in progress.
+            - Provide feedback on results to improve ranking.
+            """
+        )
+        if st.button("Close", key="btn_help_close"):
+            st.session_state['show_help'] = False
 
 with st.sidebar:
     st.header("Settings")

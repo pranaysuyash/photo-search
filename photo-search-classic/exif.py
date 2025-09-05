@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 
 import json
 from datetime import datetime
@@ -45,7 +46,7 @@ def load_exif_dates(index_dir: Path) -> Dict[str, float]:
                 # ensure floats
                 return {k: float(v) for k, v in data.items() if isinstance(k, str)}
     except Exception:
-        pass
+        logging.exception("exif date load failed for %s", str(dir))
     return {}
 
 
@@ -53,7 +54,7 @@ def save_exif_dates(index_dir: Path, data: Dict[str, float]) -> None:
     try:
         _exif_store(index_dir).write_text(json.dumps(data))
     except Exception:
-        pass
+        logging.exception("preload capture dates failed for %s", str(dir))
 
 
 def preload_capture_dates(index_dir: Path, paths: Iterable[str]) -> int:
@@ -72,4 +73,3 @@ def preload_capture_dates(index_dir: Path, paths: Iterable[str]) -> int:
             added += 1
     save_exif_dates(index_dir, cache)
     return added
-

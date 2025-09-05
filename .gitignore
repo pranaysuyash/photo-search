@@ -150,3 +150,15 @@ Thumbs.db
 # Photo search specific
 .photo_index/
 .thumbs/
+
+# Node and webapp artifacts
+node_modules/
+**/dist/
+**/.vite/
+**/.next/
+**/.DS_Store
+*.map
+
+# Electron build/cache
+**/out/
+**/release/

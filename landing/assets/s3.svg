@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+  <rect width="1200" height="800" fill="#0b0b0f"/>
+  <rect x="60" y="60" width="1080" height="80" rx="12" fill="#111827" stroke="#1f2937"/>
+  <text x="80" y="110" fill="#9CA3AF" font-family="Inter,system-ui" font-size="22">Map</text>
+  <g transform="translate(60,160)">
+    <rect x="0" y="0" width="1080" height="580" rx="16" fill="#0b0b0f" stroke="#1f2937"/>
+    <rect x="0" y="0" width="1080" height="580" rx="16" fill="#0f172a" opacity="0.6"/>
+    <!-- Dots -->
+    <g fill="#60A5FA" opacity="0.9">
+      <circle cx="200" cy="120" r="6"/>
+      <circle cx="260" cy="300" r="5"/>
+      <circle cx="600" cy="220" r="7"/>
+      <circle cx="920" cy="340" r="5"/>
+      <circle cx="700" cy="420" r="4"/>
+      <circle cx="480" cy="480" r="6"/>
+    </g>
+  </g>
+  <text x="72" y="760" fill="#9CA3AF" font-family="Inter,system-ui" font-size="18">Map view (placeholder)</text>
+</svg>
+
