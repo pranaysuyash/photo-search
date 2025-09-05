@@ -62,8 +62,8 @@ export const useFastIndexStatus = () => useWorkspaceStore((state) => {
   return firstEngine?.fast || undefined
 })
 
-// Actions selector - use shallow comparison
-export const useWorkspaceActions = () => useWorkspaceStore((state) => ({
+// Stable actions selector
+const workspaceActionsSelector = (state: any) => ({
   setWorkspace: state.setWorkspace,
   setWsToggle: state.setWsToggle,
   setPersons: state.setPersons,
@@ -73,4 +73,7 @@ export const useWorkspaceActions = () => useWorkspaceStore((state) => ({
   setGroups: state.setGroups,
   setPoints: state.setPoints,
   setDiag: state.setDiag,
-}), shallow)
+})
+
+// Actions selector - use shallow comparison
+export const useWorkspaceActions = () => useWorkspaceStore(workspaceActionsSelector, shallow)

@@ -46,7 +46,33 @@ _candidates = [
 ]
 _static = next((p for p in _candidates if p.exists()), None)
 if _static is not None:
-    app.mount("/", StaticFiles(directory=str(_static), html=True), name="static")
+    # Mount UI under /app to avoid shadowing API routes like /workspace, /tags, etc.
+    app.mount("/app", StaticFiles(directory=str(_static), html=True), name="static")
+    # Also mount assets at /assets because Vite production build references absolute "/assets/..." URLs
+    assets_dir = _static / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir), html=False), name="assets")
+
+    # Redirect root to /app for convenience
+    from fastapi.responses import RedirectResponse
+
+    @app.get("/")
+    def _root_redirect():
+        return RedirectResponse(url="/app/")
+
+
+@app.get("/todo")
+def api_todo() -> Dict[str, Any]:
+    """Return the repository TODO.md contents for in-app Tasks view."""
+    try:
+        # server.py -> api -> intent-first -> repo root
+        repo_root = Path(__file__).resolve().parents[2]
+        todo_path = repo_root / 'TODO.md'
+        if not todo_path.exists():
+            return {"text": "# TODO\nNo TODO.md found."}
+        return {"text": todo_path.read_text(encoding='utf-8')}
+    except Exception:
+        return {"text": "# TODO\nUnable to load TODO.md."}
 
 
 def _emb(provider: str, hf_token: Optional[str], openai_key: Optional[str], st_model: Optional[str] = None,

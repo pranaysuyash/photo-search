@@ -1,12 +1,82 @@
-// Unified store hook to prevent excessive re-renders
+// Unified store hooks to prevent excessive re-renders
+// Use individual hooks for specific values to avoid object recreation
+export { 
+  useDir, 
+  useEngine, 
+  useHfToken, 
+  useOpenaiKey, 
+  useFastIndexEnabled, 
+  useFastKind, 
+  useCaptionsEnabled, 
+  useOcrEnabled, 
+  useHasText, 
+  usePlace,
+  useCamera,
+  useIsoMin,
+  useIsoMax,
+  useFMin,
+  useFMax,
+  useNeedsHf,
+  useNeedsOAI,
+  useSettingsActions
+} from './settingsStore'
+
+export {
+  useSearchResults,
+  useSearchQuery,
+  useSearchId,
+  useFavorites,
+  useFavOnly,
+  useTopK,
+  useTags,
+  useSavedSearches,
+  useCollections,
+  useSmartCollections,
+  useLibrary,
+  usePhotoActions
+} from './photoStore'
+
+export {
+  useBusy,
+  useNote,
+  useViewMode,
+  useShowWelcome,
+  useShowHelp,
+  useUIActions
+} from './uiStore'
+
+export {
+  useWorkspace,
+  useWsToggle,
+  usePersons,
+  useClusters,
+  useGroups,
+  usePoints,
+  useDiag,
+  useWorkspaceActions
+} from './workspaceStore'
+
+// For components that need grouped state, provide stable selectors
 import { useSettingsStore } from './settingsStore'
 import { usePhotoStore } from './photoStore'
 import { useUIStore } from './uiStore'
 import { useWorkspaceStore } from './workspaceStore'
-import { useShallow } from 'zustand/react/shallow'
+import { shallow } from 'zustand/shallow'
+import { 
+  SettingsState, 
+  PhotoState, 
+  UIState, 
+  WorkspaceState 
+} from './types'
 
-// Use these hooks instead of individual hooks to prevent infinite loops
-export const useSettings = () => useSettingsStore(useShallow((state) => ({
+// Type definitions for grouped selectors with computed properties
+interface SettingsWithComputed extends SettingsState {
+  needsHf: boolean
+  needsOAI: boolean
+}
+
+// Create stable selector functions outside of the hook
+const settingsSelector = (state: any): SettingsWithComputed => ({
   dir: state.dir,
   engine: state.engine,
   hfToken: state.hfToken,
@@ -26,9 +96,9 @@ export const useSettings = () => useSettingsStore(useShallow((state) => ({
   // Computed
   needsHf: state.engine.startsWith('hf'),
   needsOAI: state.engine === 'openai',
-}))
+})
 
-export const usePhoto = () => usePhotoStore(useShallow((state) => ({
+const photoSelector = (state: any): PhotoState => ({
   results: state.results,
   searchId: state.searchId,
   query: state.query,
@@ -40,17 +110,17 @@ export const usePhoto = () => usePhotoStore(useShallow((state) => ({
   collections: state.collections,
   smart: state.smart,
   library: state.library,
-}))
+})
 
-export const useUI = () => useUIStore(useShallow((state) => ({
+const uiSelector = (state: any): UIState => ({
   busy: state.busy,
   note: state.note,
   viewMode: state.viewMode,
   showWelcome: state.showWelcome,
   showHelp: state.showHelp,
-}))
+})
 
-export const useWorkspace = () => useWorkspaceStore(useShallow((state) => ({
+const workspaceSelector = (state: any): WorkspaceState => ({
   workspace: state.workspace,
   wsToggle: state.wsToggle,
   persons: state.persons,
@@ -58,10 +128,17 @@ export const useWorkspace = () => useWorkspaceStore(useShallow((state) => ({
   groups: state.groups,
   points: state.points,
   diag: state.diag,
-}))
+})
 
-// Export action hooks with shallow comparison
-export { useSettingsActions } from './settingsStore'
-export { usePhotoActions } from './photoStore'
-export { useUIActions } from './uiStore'
-export { useWorkspaceActions } from './workspaceStore'
+// Use these only when you need ALL values from a store
+export const useSettings = (): SettingsWithComputed => 
+  useSettingsStore(settingsSelector, shallow)
+
+export const usePhoto = (): PhotoState => 
+  usePhotoStore(photoSelector, shallow)
+
+export const useUI = (): UIState => 
+  useUIStore(uiSelector, shallow)
+
+export const useWorkspaceState = (): WorkspaceState => 
+  useWorkspaceStore(workspaceSelector, shallow)

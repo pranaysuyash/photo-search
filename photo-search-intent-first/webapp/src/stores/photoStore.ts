@@ -69,14 +69,14 @@ export const useFavOnly = () => usePhotoStore((state) => state.favOnly)
 export const useTopK = () => usePhotoStore((state) => state.topK)
 export const useTagFilter = () => usePhotoStore((state) => state.tags.tagFilter)
 export const useAllTags = () => usePhotoStore((state) => state.tags.allTags)
-export const useTags = () => usePhotoStore((state) => state.tags)
+export const useTags = () => usePhotoStore((state) => state.tags, shallow)
 export const useSavedSearches = () => usePhotoStore((state) => state.saved)
 export const useCollections = () => usePhotoStore((state) => state.collections)
 export const useSmartCollections = () => usePhotoStore((state) => state.smart)
 export const useLibrary = () => usePhotoStore((state) => state.library)
 
-// Actions selectors - use shallow comparison
-export const usePhotoActions = () => usePhotoStore((state) => ({
+// Stable actions selector
+const photoActionsSelector = (state: any) => ({
   setResults: state.setResults,
   setSearchId: state.setSearchId,
   setQuery: state.setQuery,
@@ -91,4 +91,7 @@ export const usePhotoActions = () => usePhotoStore((state) => ({
   setSmart: state.setSmart,
   setLibrary: state.setLibrary,
   resetSearch: state.resetSearch,
-}), shallow)
+})
+
+// Actions selectors - use shallow comparison
+export const usePhotoActions = () => usePhotoStore(photoActionsSelector, shallow)

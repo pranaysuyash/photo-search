@@ -27,7 +27,7 @@ import {
   useSettings,
   usePhoto,
   useUI,
-  useWorkspace,
+  useWorkspaceState,
   useSettingsActions,
   usePhotoActions,
   useUIActions,
@@ -41,7 +41,7 @@ export default function App() {
   const settings = useSettings()
   const photo = usePhoto()
   const ui = useUI()
-  const workspace = useWorkspace()
+  const workspace = useWorkspaceState()
   
   // Store actions
   const settingsActions = useSettingsActions()
