@@ -360,8 +360,16 @@ export default function App() {
       {/* Collections - Refactored Component */}
       <div className="mt-6">
         <Collections 
+          dir={dir}
+          engine={engine}
           collections={collections}
           onLoadCollections={loadCollectionsUI}
+          onOpen={(name: string) => {
+            const paths = collections?.[name] || [];
+            photoActions.setResults(paths.map((p) => ({ path: p, score: 0 })));
+            uiActions.setViewMode("grid");
+            uiActions.setNote(`${paths.length} in ${name}`);
+          }}
         />
       </div>
 

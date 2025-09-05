@@ -8,8 +8,8 @@ Legend: [x] done • [>] in progress • [ ] planned • (opt) optional
 - [>] Long‑ops progress UI (index/OCR/metadata/fast) with indeterminate bar + notes
 - [ ] Safe delete to OS trash + Undo (session)
 - [ ] Move to collection (add/remove)
-- [ ] Ratings (⭐1–5) + rating filters
-- [ ] Keyboard shortcut help overlay (cheat sheet)
+- [x] Ratings (⭐1–5) + rating filters
+- [x] Keyboard shortcut help overlay (cheat sheet)
 - [ ] Timeline view (date clusters + quick scrubbing)
 
 ## Recently Delivered
@@ -133,10 +133,10 @@ Legend: [x] done • [>] in progress • [ ] planned • (opt) optional
 - [>] Long‑ops progress UI (indeterminate + notes)
 - [ ] Safe delete + Undo
 - [ ] Move to collection
-- [ ] Shortcut help overlay
+- [x] Shortcut help overlay
 
 ### Sprint B (next)
-- [ ] Ratings + filters
+- [x] Ratings + filters
 - [ ] Timeline view (date clusters)
 - [ ] Grid overlay info toggle
 - [ ] Progressive image loading tiers
@@ -157,4 +157,3 @@ Legend: [x] done • [>] in progress • [ ] planned • (opt) optional
 ## Notes
 - Private by default; on‑device first. Cloud items are optional and off by default.
 - Maintain graceful fallbacks and clear user control for heavy features.
-

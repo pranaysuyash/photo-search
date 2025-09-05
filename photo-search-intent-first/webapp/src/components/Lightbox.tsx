@@ -75,6 +75,11 @@ export function Lightbox({
     else resetZoom()
   }
 
+  // Focus the dialog on open for accessibility
+  useEffect(() => {
+    containerRef.current?.focus()
+  }, [path])
+
   // Load metadata when info opens or path changes
   useEffect(() => {
     let cancelled = false
@@ -95,8 +100,20 @@ export function Lightbox({
   }, [showInfo, dir, path])
 
   return (
-    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center" onClick={onClose}>
-      <div className="relative max-w-6xl w-full p-4" onClick={e=>e.stopPropagation()} ref={containerRef}>
+    <div
+      className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center"
+      onClick={onClose}
+      onKeyDown={(e)=>{ if(e.key==='Escape'){ e.stopPropagation(); onClose() } }}
+    >
+      <div
+        className="relative max-w-6xl w-full p-4"
+        onClick={e=>e.stopPropagation()}
+        ref={containerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={path}
+        tabIndex={-1}
+      >
         <div className="flex items-center justify-between mb-2 text-white">
           <div className="truncate text-sm">{path}</div>
           <div className="flex gap-2">

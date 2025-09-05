@@ -1186,7 +1186,6 @@ def api_diagnostics(dir: str, provider: Optional[str] = None, hf_token: Optional
                 cnt = 0
                 try:
                     import json
-import time
                     if p.exists():
                         data = json.loads(p.read_text())
                         cnt = len(data.get("paths", []))
@@ -1512,17 +1511,40 @@ def api_autotag(dir: str, provider: str = "local", min_len: int = 4, max_tags_pe
 
 
 @app.post("/delete")
-def api_delete(dir: str, paths: list[str]) -> dict[str, object]:
-    """Move files to a local trash folder inside the index dir for safe undo."""
+def api_delete(dir: str, paths: list[str], os_trash: bool = False) -> dict[str, object]:
+    """Delete files either to OS Trash (if enabled) or to a local trash folder for undo."""
     folder = Path(dir)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
     store = IndexStore(folder, index_key=None)
     store.load()
+    if os_trash:
+        # Try to use OS trash via send2trash; fall back to app trash on failure
+        try:
+            from send2trash import send2trash  # type: ignore
+            moved = 0
+            for p in paths:
+                sp = Path(p)
+                try:
+                    sp_res = sp.resolve(); folder_res = folder.resolve()
+                    if not str(sp_res).startswith(str(folder_res)):
+                        continue
+                except Exception:
+                    continue
+                try:
+                    send2trash(str(sp))
+                    moved += 1
+                except Exception:
+                    continue
+            # No undo for OS trash path
+            return {"ok": True, "moved": moved, "undoable": False, "os_trash": True}
+        except Exception:
+            # Fall through to app-managed trash if send2trash is unavailable
+            pass
     trash_root = store.index_dir / 'trash'
     ts = str(int(time.time()))
     dest_root = trash_root / ts
-    moved: list[dict[str,str]] = []
+    moved_list: list[dict[str,str]] = []
     os.makedirs(dest_root, exist_ok=True)
     for p in paths:
         sp = Path(p)
@@ -1537,16 +1559,16 @@ def api_delete(dir: str, paths: list[str]) -> dict[str, object]:
         dst.parent.mkdir(parents=True, exist_ok=True)
         try:
             import shutil as _sh; _sh.move(str(sp), str(dst))
-            moved.append({"src": str(sp), "dst": str(dst)})
+            moved_list.append({"src": str(sp), "dst": str(dst)})
         except Exception:
             continue
     global _last_delete
-    _last_delete = {"dir": str(folder), "batch": moved, "ts": ts}
+    _last_delete = {"dir": str(folder), "batch": moved_list, "ts": ts}
     try:
         (trash_root / 'last.json').write_text(json.dumps(_last_delete, indent=2), encoding='utf-8')
     except Exception:
         pass
-    return {"ok": True, "moved": len(moved)}
+    return {"ok": True, "moved": len(moved_list), "undoable": True, "os_trash": False}
 
 
 @app.post("/undo_delete")

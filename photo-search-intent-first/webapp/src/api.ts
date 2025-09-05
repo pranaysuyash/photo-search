@@ -175,6 +175,12 @@ export async function apiWorkspaceRemove(path: string) {
   )
 }
 
+export async function apiMetadataDetail(dir: string, path: string) {
+  const r = await fetch(`${API_BASE}/metadata/detail?dir=${encodeURIComponent(dir)}&path=${encodeURIComponent(path)}`)
+  if (!r.ok) throw new Error(await r.text())
+  return r.json() as Promise<{ meta: any }>
+}
+
 export async function apiSearchWorkspace(
   dir: string,
   query: string,
@@ -215,12 +221,7 @@ export function thumbFaceUrl(dir: string, provider: string, path: string, emb: n
   return `${API_BASE}/thumb_face?${qs.toString()}`
 }
 
-export async function apiMetadataDetail(dir: string, path: string) {
-  const qs = new URLSearchParams({ dir, path })
-  const r = await fetch(`${API_BASE}/metadata/detail?${qs.toString()}`)
-  if (!r.ok) throw new Error(await r.text())
-  return r.json() as Promise<{ ok: boolean; meta: any }>
-}
+// (duplicate removed)
 
 export async function apiOpen(dir: string, path: string) {
   return post<{ ok: boolean }>('/open', { dir, path })
@@ -361,13 +362,13 @@ export async function apiTodo() {
   return r.json() as Promise<{ text: string }>
 }
 
-export async function apiDelete(dir: string, paths: string[]) {
+export async function apiDelete(dir: string, paths: string[], useOsTrash?: boolean) {
   const r = await fetch(`${API_BASE}/delete`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ dir, paths }),
+    body: JSON.stringify({ dir, paths, os_trash: !!useOsTrash }),
   })
   if (!r.ok) throw new Error(await r.text())
-  return r.json() as Promise<{ ok: boolean; moved: number }>
+  return r.json() as Promise<{ ok: boolean; moved: number; undoable?: boolean; os_trash?: boolean }>
 }
 
 export async function apiUndoDelete(dir: string) {

@@ -1,7 +1,7 @@
-import { create } from 'zustand'
-import { subscribeWithSelector, persist } from 'zustand/middleware'
-import { shallow } from 'zustand/shallow'
-import { SettingsState, SettingsActions } from './types'
+import { create } from "zustand";
+import { subscribeWithSelector, persist } from "zustand/middleware";
+import { shallow } from "zustand/shallow";
+import { SettingsState, SettingsActions } from "./types";
 
 interface SettingsStore extends SettingsState, SettingsActions {}
 
@@ -9,24 +9,25 @@ export const useSettingsStore = create<SettingsStore>()(
   persist(
     subscribeWithSelector((set, get) => ({
       // Initial state
-      dir: '',
-      engine: 'local',
-      hfToken: '',
-      openaiKey: '',
+      dir: "",
+      engine: "local",
+      hfToken: "",
+      openaiKey: "",
       useFast: false,
-      fastKind: '',
+      fastKind: "",
       useCaps: false,
-      vlmModel: 'Qwen/Qwen2-VL-2B-Instruct',
+      vlmModel: "Qwen/Qwen2-VL-2B-Instruct",
       useOcr: false,
       hasText: false,
-      
+      useOsTrash: false,
+
       // EXIF filters
-      camera: '',
-      isoMin: '',
-      isoMax: '',
-      fMin: '',
-      fMax: '',
-      place: '',
+      camera: "",
+      isoMin: "",
+      isoMax: "",
+      fMin: "",
+      fMax: "",
+      place: "",
 
       // Actions
       setDir: (dir) => set({ dir }),
@@ -39,6 +40,7 @@ export const useSettingsStore = create<SettingsStore>()(
       setVlmModel: (vlmModel) => set({ vlmModel }),
       setUseOcr: (useOcr) => set({ useOcr }),
       setHasText: (hasText) => set({ hasText }),
+      setUseOsTrash: (useOsTrash) => set({ useOsTrash }),
       setCamera: (camera) => set({ camera }),
       setIsoMin: (isoMin) => set({ isoMin }),
       setIsoMax: (isoMax) => set({ isoMax }),
@@ -47,7 +49,7 @@ export const useSettingsStore = create<SettingsStore>()(
       setPlace: (place) => set({ place }),
     })),
     {
-      name: 'photo-search-settings', // unique name for localStorage key
+      name: "photo-search-settings", // unique name for localStorage key
       // Only persist non-sensitive settings
       partialize: (state) => ({
         dir: state.dir,
@@ -58,6 +60,7 @@ export const useSettingsStore = create<SettingsStore>()(
         vlmModel: state.vlmModel,
         useOcr: state.useOcr,
         hasText: state.hasText,
+        useOsTrash: state.useOsTrash,
         camera: state.camera,
         isoMin: state.isoMin,
         isoMax: state.isoMax,
@@ -69,45 +72,51 @@ export const useSettingsStore = create<SettingsStore>()(
       }),
     }
   )
-)
+);
 
 // Selectors for optimized subscriptions
-export const useDir = () => useSettingsStore((state) => state.dir)
-export const useEngine = () => useSettingsStore((state) => state.engine)
-export const useHfToken = () => useSettingsStore((state) => state.hfToken)
-export const useOpenaiKey = () => useSettingsStore((state) => state.openaiKey)
-export const useFastIndexEnabled = () => useSettingsStore((state) => state.useFast)
-export const useFastKind = () => useSettingsStore((state) => state.fastKind)
-export const useCaptionsEnabled = () => useSettingsStore((state) => state.useCaps)
-export const useVlmModel = () => useSettingsStore((state) => state.vlmModel)
-export const useOcrEnabled = () => useSettingsStore((state) => state.useOcr)
-export const useHasText = () => useSettingsStore((state) => state.hasText)
-export const useCamera = () => useSettingsStore((state) => state.camera)
-export const useIsoMin = () => useSettingsStore((state) => state.isoMin)
-export const useIsoMax = () => useSettingsStore((state) => state.isoMax)
-export const useFMin = () => useSettingsStore((state) => state.fMin)
-export const useFMax = () => useSettingsStore((state) => state.fMax)
-export const usePlace = () => useSettingsStore((state) => state.place)
+export const useDir = () => useSettingsStore((state) => state.dir);
+export const useEngine = () => useSettingsStore((state) => state.engine);
+export const useHfToken = () => useSettingsStore((state) => state.hfToken);
+export const useOpenaiKey = () => useSettingsStore((state) => state.openaiKey);
+export const useFastIndexEnabled = () =>
+  useSettingsStore((state) => state.useFast);
+export const useFastKind = () => useSettingsStore((state) => state.fastKind);
+export const useCaptionsEnabled = () =>
+  useSettingsStore((state) => state.useCaps);
+export const useVlmModel = () => useSettingsStore((state) => state.vlmModel);
+export const useOcrEnabled = () => useSettingsStore((state) => state.useOcr);
+export const useHasText = () => useSettingsStore((state) => state.hasText);
+export const useOsTrashEnabled = () => useSettingsStore((state) => state.useOsTrash);
+export const useCamera = () => useSettingsStore((state) => state.camera);
+export const useIsoMin = () => useSettingsStore((state) => state.isoMin);
+export const useIsoMax = () => useSettingsStore((state) => state.isoMax);
+export const useFMin = () => useSettingsStore((state) => state.fMin);
+export const useFMax = () => useSettingsStore((state) => state.fMax);
+export const usePlace = () => useSettingsStore((state) => state.place);
 
 // Computed selectors
 export const useNeedsHf = () => {
-  const engine = useSettingsStore((state) => state.engine)
-  return engine.startsWith('hf')
-}
+  const engine = useSettingsStore((state) => state.engine);
+  return engine.startsWith("hf");
+};
 export const useNeedsOAI = () => {
-  const engine = useSettingsStore((state) => state.engine)
-  return engine === 'openai'
-}
+  const engine = useSettingsStore((state) => state.engine);
+  return engine === "openai";
+};
 
 // EXIF filters combined
-export const useExifFilters = () => useSettingsStore((state) => ({
-  camera: state.camera,
-  isoMin: state.isoMin,
-  isoMax: state.isoMax,
-  fMin: state.fMin,
-  fMax: state.fMax,
-  place: state.place,
-}))
+export const useExifFilters = () =>
+  useSettingsStore(
+    (state) => ({
+      camera: state.camera,
+      isoMin: state.isoMin,
+      isoMax: state.isoMax,
+      fMin: state.fMin,
+      fMax: state.fMax,
+      place: state.place,
+    })
+  );
 
 // Stable actions selector
 const settingsActionsSelector = (state: any) => ({
@@ -121,13 +130,14 @@ const settingsActionsSelector = (state: any) => ({
   setVlmModel: state.setVlmModel,
   setUseOcr: state.setUseOcr,
   setHasText: state.setHasText,
+  setUseOsTrash: state.setUseOsTrash,
   setCamera: state.setCamera,
   setIsoMin: state.setIsoMin,
   setIsoMax: state.setIsoMax,
   setFMin: state.setFMin,
   setFMax: state.setFMax,
   setPlace: state.setPlace,
-})
+});
 
 // Actions selector - use shallow comparison
 export const useSettingsActions = () => useSettingsStore(settingsActionsSelector)

@@ -16,6 +16,7 @@ export default function JustifiedResults({
   focusIndex = null,
   onLayout,
   ratingMap,
+  showInfoOverlay,
 }: {
   dir: string
   engine: string
@@ -29,6 +30,7 @@ export default function JustifiedResults({
   focusIndex?: number | null
   onLayout?: (rows: number[][]) => void
   ratingMap?: Record<string, number>
+  showInfoOverlay?: boolean
 }) {
   const contentRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState<number>(0)
@@ -170,6 +172,7 @@ export default function JustifiedResults({
                 const w = Math.floor(h * r)
                 const isSel = selected.has(it.path)
                 const isFocus = focusIndex !== null && globalIdx === focusIndex
+                const base = it.path.split('/').pop() || it.path
                 return (
                   <div
                     key={it.path}
@@ -190,6 +193,14 @@ export default function JustifiedResults({
                       className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
                       loading="lazy"
                     />
+                    {showInfoOverlay && (
+                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent text-white px-1.5 py-1 text-[10px] flex items-center justify-between">
+                        <span className="truncate mr-2" title={base}>{base}</span>
+                        {typeof it.score === 'number' && (
+                          <span className="bg-white/20 rounded px-1">{it.score.toFixed(2)}</span>
+                        )}
+                      </div>
+                    )}
                     {/* Rating overlay */}
                     {ratingMap && typeof ratingMap[it.path] === 'number' && ratingMap[it.path]! > 0 && (
                       <div className="absolute bottom-1 left-1 px-1 py-0.5 rounded bg-black/50 text-yellow-300 text-[10px] flex items-center gap-0.5">

@@ -53,3 +53,12 @@ export const useHasNote = () => {
   const note = useUIStore((state) => state.note)
   return Boolean(note)
 }
+
+// Stable computed selectors - avoid object returns without shallow
+export const useUIState = () => useUIStore((state) => ({
+  busy: state.busy,
+  note: state.note,
+  viewMode: state.viewMode,
+  showWelcome: state.showWelcome,
+  showHelp: state.showHelp,
+}))

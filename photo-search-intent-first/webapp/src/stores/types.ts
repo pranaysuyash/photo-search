@@ -66,6 +66,7 @@ export interface SettingsState {
   vlmModel: string
   useOcr: boolean
   hasText: boolean
+  useOsTrash: boolean
   
   // EXIF filters
   camera: string
@@ -87,6 +88,7 @@ export interface SettingsActions {
   setVlmModel: (model: string) => void
   setUseOcr: (useOcr: boolean) => void
   setHasText: (hasText: boolean) => void
+  setUseOsTrash: (useOsTrash: boolean) => void
   setCamera: (camera: string) => void
   setIsoMin: (iso: string) => void
   setIsoMax: (iso: string) => void

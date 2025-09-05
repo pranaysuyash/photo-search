@@ -1,0 +1,59 @@
+name: Frontend Tests
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ "**" ]
+
+jobs:
+  webapps:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Classic deps
+        working-directory: photo-search-classic/webapp
+        run: npm ci
+
+      - name: Install Intent-First deps
+        working-directory: photo-search-intent-first/webapp
+        run: npm ci
+
+      - name: Run tests (classic)
+        working-directory: photo-search-classic/webapp
+        run: npm test --silent
+
+      - name: Run tests (intent-first)
+        working-directory: photo-search-intent-first/webapp
+        run: npm test --silent
+
+      - name: Coverage (classic)
+        working-directory: photo-search-classic/webapp
+        run: npm run -s test:coverage
+
+      - name: Coverage (intent-first)
+        working-directory: photo-search-intent-first/webapp
+        run: npm run -s test:coverage
+
+      - name: Upload coverage (classic)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-classic
+          path: photo-search-classic/webapp/coverage
+
+      - name: Upload coverage (intent-first)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-intent-first
+          path: photo-search-intent-first/webapp/coverage
+

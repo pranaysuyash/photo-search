@@ -8,8 +8,10 @@ export {
   useFastIndexEnabled, 
   useFastKind, 
   useCaptionsEnabled, 
+  useVlmModel,
   useOcrEnabled, 
   useHasText, 
+  useOsTrashEnabled,
   usePlace,
   useCamera,
   useIsoMin,
@@ -61,7 +63,7 @@ import { useSettingsStore } from './settingsStore'
 import { usePhotoStore } from './photoStore'
 import { useUIStore } from './uiStore'
 import { useWorkspaceStore } from './workspaceStore'
-import { shallow } from 'zustand/shallow'
+// import { shallow } from 'zustand/shallow'  // Unused for now
 import { 
   SettingsState, 
   PhotoState, 
@@ -87,6 +89,7 @@ const settingsSelector = (state: any): SettingsWithComputed => ({
   vlmModel: state.vlmModel,
   useOcr: state.useOcr,
   hasText: state.hasText,
+  useOsTrash: state.useOsTrash,
   camera: state.camera,
   isoMin: state.isoMin,
   isoMax: state.isoMax,
