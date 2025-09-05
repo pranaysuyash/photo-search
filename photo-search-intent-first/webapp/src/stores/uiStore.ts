@@ -45,5 +45,11 @@ const uiActionsSelector = (state: any) => ({
 export const useUIActions = () => useUIStore(uiActionsSelector)
 
 // Computed selectors
-export const useIsBusy = () => useUIStore((state) => Boolean(state.busy))
-export const useHasNote = () => useUIStore((state) => Boolean(state.note))
+export const useIsBusy = () => {
+  const busy = useUIStore((state) => state.busy)
+  return Boolean(busy)
+}
+export const useHasNote = () => {
+  const note = useUIStore((state) => state.note)
+  return Boolean(note)
+}

@@ -90,8 +90,14 @@ export const useFMax = () => useSettingsStore((state) => state.fMax)
 export const usePlace = () => useSettingsStore((state) => state.place)
 
 // Computed selectors
-export const useNeedsHf = () => useSettingsStore((state) => state.engine.startsWith('hf'))
-export const useNeedsOAI = () => useSettingsStore((state) => state.engine === 'openai')
+export const useNeedsHf = () => {
+  const engine = useSettingsStore((state) => state.engine)
+  return engine.startsWith('hf')
+}
+export const useNeedsOAI = () => {
+  const engine = useSettingsStore((state) => state.engine)
+  return engine === 'openai'
+}
 
 // EXIF filters combined
 export const useExifFilters = () => useSettingsStore((state) => ({

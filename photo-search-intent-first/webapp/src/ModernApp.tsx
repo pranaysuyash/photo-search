@@ -186,6 +186,17 @@ export default function ModernApp() {
   const searchInputRef = useRef<HTMLInputElement>(null)
   const [suggestOpen, setSuggestOpen] = useState(false)
   const [meta, setMeta] = useState<{ cameras: string[]; places?: string[] }>({ cameras: [], places: [] })
+  const [ratingMin, setRatingMin] = useState(0)
+  const ratingMap = useMemo(() => {
+    const m: Record<string, number> = {}
+    const tm = (tags as any)?.tagsMap || {}
+    for (const p of Object.keys(tm)) {
+      const arr: string[] = tm[p] || []
+      const rt = arr.find((t) => /^rating:[1-5]$/.test(t))
+      if (rt) m[p] = parseInt(rt.split(":")[1], 10)
+    }
+    return m
+  }, [tags])
   // Initialize theme from localStorage
   useEffect(() => {
     try {
@@ -326,7 +337,11 @@ export default function ModernApp() {
           ...(ppl.length === 1 ? { person: ppl[0] } : ppl.length > 1 ? { persons: ppl } : {}),
         } as any)
       }
-      photoActions.setResults(r.results || [])
+      let res = r.results || []
+      if (ratingMin > 0) {
+        res = res.filter((it) => (ratingMap[it.path] || 0) >= ratingMin)
+      }
+      photoActions.setResults(res)
       photoActions.setSearchId(r.search_id || '')
       uiActions.setNote(`Found ${r.results?.length || 0} results.`)
       await Promise.all([loadFav(), loadSaved(), loadTags(), loadDiag()])
@@ -809,6 +824,16 @@ export default function ModernApp() {
         ))}
       </div>
 
+      {/* Rating filter */}
+      <div className="flex items-center gap-1 mt-2 text-sm">
+        <span>Min rating:</span>
+        {[0,1,2,3,4,5].map((n)=> (
+          <button key={n} type="button" className={`px-2 py-0.5 rounded ${ratingMin===n?'bg-blue-600 text-white':'bg-gray-200'}`} onClick={()=> setRatingMin(n)}>
+            {n===0? 'Any' : `${'★'.repeat(n)}`}
+          </button>
+        ))}
+      </div>
+
       {selected.size > 0 && (
         <div className="flex items-center justify-between mt-4 p-3 bg-blue-50 rounded-lg">
           <span className="text-sm text-blue-900">
@@ -921,6 +946,7 @@ export default function ModernApp() {
                 scrollContainerRef={scrollContainerRef}
                 focusIndex={focusIdx ?? undefined}
                 onLayout={(rows)=> setLayoutRows(rows)}
+                ratingMap={ratingMap}
               />
             </div>
           )}

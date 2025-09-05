@@ -50,17 +50,33 @@ export const usePoints = () => useWorkspaceStore((state) => state.points)
 export const useDiag = () => useWorkspaceStore((state) => state.diag)
 
 // Computed selectors
-export const useHasPersons = () => useWorkspaceStore((state) => state.persons.length > 0)
-export const useHasWorkspace = () => useWorkspaceStore((state) => state.workspace.length > 0)
-export const useHasClusters = () => useWorkspaceStore((state) => state.clusters.length > 0)
-export const useHasGroups = () => useWorkspaceStore((state) => state.groups.length > 0)
-export const useHasPoints = () => useWorkspaceStore((state) => state.points.length > 0)
+export const useHasPersons = () => {
+  const persons = useWorkspaceStore((state) => state.persons)
+  return persons.length > 0
+}
+export const useHasWorkspace = () => {
+  const workspace = useWorkspaceStore((state) => state.workspace)
+  return workspace.length > 0
+}
+export const useHasClusters = () => {
+  const clusters = useWorkspaceStore((state) => state.clusters)
+  return clusters.length > 0
+}
+export const useHasGroups = () => {
+  const groups = useWorkspaceStore((state) => state.groups)
+  return groups.length > 0
+}
+export const useHasPoints = () => {
+  const points = useWorkspaceStore((state) => state.points)
+  return points.length > 0
+}
 
 // Fast index status from diagnostics
-export const useFastIndexStatus = () => useWorkspaceStore((state) => {
-  const firstEngine = state.diag?.engines?.[0]
+export const useFastIndexStatus = () => {
+  const diag = useWorkspaceStore((state) => state.diag)
+  const firstEngine = diag?.engines?.[0]
   return firstEngine?.fast || undefined
-})
+}
 
 // Stable actions selector
 const workspaceActionsSelector = (state: any) => ({

@@ -15,6 +15,7 @@ export default function JustifiedResults({
   onOpen,
   focusIndex = null,
   onLayout,
+  ratingMap,
 }: {
   dir: string
   engine: string
@@ -27,6 +28,7 @@ export default function JustifiedResults({
   onOpen: (path: string) => void
   focusIndex?: number | null
   onLayout?: (rows: number[][]) => void
+  ratingMap?: Record<string, number>
 }) {
   const contentRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState<number>(0)
@@ -188,6 +190,15 @@ export default function JustifiedResults({
                       className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
                       loading="lazy"
                     />
+                    {/* Rating overlay */}
+                    {ratingMap && typeof ratingMap[it.path] === 'number' && ratingMap[it.path]! > 0 && (
+                      <div className="absolute bottom-1 left-1 px-1 py-0.5 rounded bg-black/50 text-yellow-300 text-[10px] flex items-center gap-0.5">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                          <path d="M12 .587l3.668 7.431 8.2 1.193-5.934 5.787 1.401 8.168L12 18.896l-7.335 3.87 1.401-8.168L.132 9.211l8.2-1.193z"/>
+                        </svg>
+                        <span>{ratingMap[it.path]}</span>
+                      </div>
+                    )}
                     {typeof it.score === 'number' && (
                       <div className="absolute top-2 left-2 text-xs bg-white/80 rounded px-1">{it.score.toFixed(2)}</div>
                     )}
