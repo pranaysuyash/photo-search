@@ -177,7 +177,8 @@ export default function ModernApp() {
   const [showFilters, setShowFilters] = useState(false)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
-  const [modal, setModal] = useState<null | { kind: 'export' | 'tag' | 'folder' | 'likeplus' | 'save' }>(null)
+  const [modal, setModal] = useState<null | { kind: 'export' | 'tag' | 'folder' | 'likeplus' | 'save' | 'collect' }>(null)
+  const [showShortcuts, setShowShortcuts] = useState(false)
   const [detailIdx, setDetailIdx] = useState<number | null>(null)
   const [focusIdx, setFocusIdx] = useState<number | null>(null)
   const [layoutRows, setLayoutRows] = useState<number[][]>([])
@@ -476,6 +477,7 @@ export default function ModernApp() {
       const t = e.target as HTMLElement
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || (t as any).isContentEditable)) return
       if (e.key === '/') { e.preventDefault(); searchInputRef.current?.focus(); return }
+      if (e.key === '?' || (e.shiftKey && e.key === '/')) { e.preventDefault(); setShowShortcuts(true); return }
       if (selectedView !== 'results') return
       const hasResults = (results?.length || 0) > 0
       if (!hasResults) return
@@ -838,6 +840,12 @@ export default function ModernApp() {
               </button>
             )}
             <button type="button"
+              className="flex items-center gap-1 px-3 py-1 text-sm text-blue-700 hover:bg-blue-100 rounded-md transition-colors"
+              onClick={() => setModal({ kind: 'collect' })}
+            >
+              <FolderOpen className="w-4 h-4" /> Add to Collection
+            </button>
+            <button type="button"
               className="flex items-center gap-1 px-3 py-1 text-sm text-red-700 hover:bg-red-100 rounded-md transition-colors"
               onClick={async () => {
                 if (selected.size === 0) return
@@ -1173,6 +1181,24 @@ export default function ModernApp() {
             </div>
           </div>
         )}
+        {modal?.kind === 'collect' && (
+          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
+            <div className="bg-white rounded-lg p-4 w-full max-w-md">
+              <div className="font-semibold mb-2">Add to Collection</div>
+              <form onSubmit={async (e)=>{ e.preventDefault(); const form = e.target as HTMLFormElement; const name = (form.elements.namedItem('name') as HTMLInputElement).value.trim(); if(!name) return; try{ const { apiSetCollection, apiGetCollections } = await import('./api'); await apiSetCollection(dir, name, Array.from(selected)); const r = await apiGetCollections(dir); photoActions.setCollections(r.collections||{}); uiActions.setNote(`Added ${selected.size} to ${name}`) } catch(e:any){ uiActions.setNote(e.message) } setModal(null) }}>
+                <label className="block text-sm mb-1" htmlFor="col-name">Collection</label>
+                <input id="col-name" name="name" list="collections-list" className="w-full border rounded px-2 py-1" placeholder="Type or choose…" />
+                <datalist id="collections-list">
+                  {Object.keys(collections||{}).map(n => (<option key={n} value={n}>{n}</option>))}
+                </datalist>
+                <div className="mt-3 flex justify-end gap-2">
+                  <button type="button" className="px-3 py-1 rounded border" onClick={()=>setModal(null)}>Cancel</button>
+                  <button type="submit" className="px-3 py-1 rounded bg-blue-600 text-white">Add</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* Lightbox */}
         {detailIdx !== null && results && results[detailIdx] && (
@@ -1191,6 +1217,32 @@ export default function ModernApp() {
             }}
             onMoreLikeThis={async ()=> { try{ const { apiSearchLike } = await import('./api'); const p = results && detailIdx !== null ? results[detailIdx]?.path : undefined; if (!p) return; uiActions.setBusy('Searching similar…'); const r = await apiSearchLike(dir, p, engine, topK); photoActions.setResults(r.results||[]); setSelectedView('results'); } catch(e:any){ uiActions.setNote(e.message) } finally { uiActions.setBusy('') } }}
           />
+        )}
+
+        {/* Shortcuts overlay */}
+        {showShortcuts && (
+          <div className="fixed inset-0 z-[1060] bg-black/50 flex items-center justify-center" onClick={()=>setShowShortcuts(false)}>
+            <div className="bg-white dark:bg-gray-900 rounded-lg shadow p-5 w-full max-w-lg text-sm" onClick={e=>e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="font-semibold">Keyboard Shortcuts</div>
+                <button type="button" className="px-2 py-1 border rounded" onClick={()=>setShowShortcuts(false)}>Close</button>
+              </div>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                <div><span className="font-mono">/</span> Focus search</div>
+                <div><span className="font-mono">?</span> Shortcuts help</div>
+                <div><span className="font-mono">←/→</span> Move focus</div>
+                <div><span className="font-mono">↑/↓</span> Row up/down</div>
+                <div><span className="font-mono">Home/End</span> Start/end</div>
+                <div><span className="font-mono">PgUp/PgDn</span> Jump rows</div>
+                <div><span className="font-mono">Space</span> Select focused</div>
+                <div><span className="font-mono">A</span> Select all</div>
+                <div><span className="font-mono">C</span> Clear selection</div>
+                <div><span className="font-mono">Enter</span> Open lightbox</div>
+                <div><span className="font-mono">F</span> Favorite</div>
+                <div><span className="font-mono">Esc</span> Close panel/lightbox</div>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Global progress overlay */}
