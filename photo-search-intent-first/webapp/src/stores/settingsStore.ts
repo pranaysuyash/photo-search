@@ -76,11 +76,11 @@ export const useDir = () => useSettingsStore((state) => state.dir)
 export const useEngine = () => useSettingsStore((state) => state.engine)
 export const useHfToken = () => useSettingsStore((state) => state.hfToken)
 export const useOpenaiKey = () => useSettingsStore((state) => state.openaiKey)
-export const useUseFast = () => useSettingsStore((state) => state.useFast)
+export const useFastIndexEnabled = () => useSettingsStore((state) => state.useFast)
 export const useFastKind = () => useSettingsStore((state) => state.fastKind)
-export const useUseCaps = () => useSettingsStore((state) => state.useCaps)
+export const useCaptionsEnabled = () => useSettingsStore((state) => state.useCaps)
 export const useVlmModel = () => useSettingsStore((state) => state.vlmModel)
-export const useUseOcr = () => useSettingsStore((state) => state.useOcr)
+export const useOcrEnabled = () => useSettingsStore((state) => state.useOcr)
 export const useHasText = () => useSettingsStore((state) => state.hasText)
 export const useCamera = () => useSettingsStore((state) => state.camera)
 export const useIsoMin = () => useSettingsStore((state) => state.isoMin)
@@ -103,8 +103,8 @@ export const useExifFilters = () => useSettingsStore((state) => ({
   place: state.place,
 }))
 
-// Actions selector - use shallow comparison
-export const useSettingsActions = () => useSettingsStore((state) => ({
+// Stable actions selector
+const settingsActionsSelector = (state: any) => ({
   setDir: state.setDir,
   setEngine: state.setEngine,
   setHfToken: state.setHfToken,
@@ -121,4 +121,7 @@ export const useSettingsActions = () => useSettingsStore((state) => ({
   setFMin: state.setFMin,
   setFMax: state.setFMax,
   setPlace: state.setPlace,
-}), shallow)
+})
+
+// Actions selector - use shallow comparison
+export const useSettingsActions = () => useSettingsStore(settingsActionsSelector, shallow)

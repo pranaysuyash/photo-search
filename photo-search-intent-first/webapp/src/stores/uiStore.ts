@@ -31,15 +31,18 @@ export const useViewMode = () => useUIStore((state) => state.viewMode)
 export const useShowWelcome = () => useUIStore((state) => state.showWelcome)
 export const useShowHelp = () => useUIStore((state) => state.showHelp)
 
-// Actions selector - use shallow comparison
-export const useUIActions = () => useUIStore((state) => ({
+// Stable actions selector
+const uiActionsSelector = (state: any) => ({
   setBusy: state.setBusy,
   setNote: state.setNote,
   setViewMode: state.setViewMode,
   setShowWelcome: state.setShowWelcome,
   setShowHelp: state.setShowHelp,
   clearBusy: state.clearBusy,
-}), shallow)
+})
+
+// Actions selector - use shallow comparison
+export const useUIActions = () => useUIStore(uiActionsSelector, shallow)
 
 // Computed selectors
 export const useIsBusy = () => useUIStore((state) => Boolean(state.busy))

@@ -354,3 +354,9 @@ export async function apiTripsList(dir: string) {
   if (!r.ok) throw new Error(await r.text())
   return r.json() as Promise<{ trips: { id: string; count: number; place?: string; start_ts?: number; end_ts?: number; paths: string[] }[] }>
 }
+
+export async function apiTodo() {
+  const r = await fetch(`${API_BASE}/todo`)
+  if (!r.ok) throw new Error(await r.text())
+  return r.json() as Promise<{ text: string }>
+}

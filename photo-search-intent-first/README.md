@@ -46,6 +46,12 @@ UI
 - Multi-folder workspace: add/remove folders under “More folders”, toggle cross-folder search, and run workspace‑wide build and fast‑search actions.
 - Collections & Favorites: star results; manage and export collections from Browse.
 
+Modern UI (Preview)
+- A modern, sidebar‑based UI is available as a preview alongside the classic intent‑first UI.
+- To enable it, open the web app with `?ui=modern` appended to the URL, e.g. `http://localhost:5173/?ui=modern` (during dev) or the served API URL with the same query.
+- It uses the same backend APIs and Zustand stores, adds a justified‑style responsive grid, quick filters, selection actions (export/tag), and a consolidated top bar.
+- Indexing and advanced actions are accessible from the top‑right Settings button (Index, Fast index build, OCR, Metadata, or set folder).
+
 Help & Troubleshooting
 - Private by default: On-device engine keeps your photos on your computer.
 - Cloud engines: When selected, images/queries go to that provider (HF/OpenAI). Keys are used in‑session only and not saved.
