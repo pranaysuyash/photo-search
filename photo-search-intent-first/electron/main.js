@@ -1,4 +1,5 @@
-const { app, BrowserWindow, dialog, Menu } = require('electron')
+const { app, BrowserWindow, dialog, Menu, ipcMain } = require('electron')
+const isDev = process.env.NODE_ENV === 'development'
 const path = require('path')
 const { spawn } = require('child_process')
 const { autoUpdater } = require('electron-updater')
@@ -38,7 +39,8 @@ function createWindow() {
     height: 800,
     webPreferences: {
       nodeIntegration: false,
-      contextIsolation: true
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js')
     },
     show: false // Don't show until page is loaded
   })
@@ -105,6 +107,20 @@ async function manageLicense() {
     dialog.showErrorBox('Error', e.message)
   }
 }
+
+// IPC handler for folder selection
+ipcMain.handle('select-folder', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Select Photo Folder',
+    properties: ['openDirectory'],
+    buttonLabel: 'Select Folder'
+  })
+  
+  if (!result.canceled && result.filePaths.length > 0) {
+    return result.filePaths[0]
+  }
+  return null
+})
 
 async function checkForUpdates(userTriggered = false) {
   try {

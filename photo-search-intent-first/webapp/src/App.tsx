@@ -183,8 +183,8 @@ function InfiniteSentinel({
   libLoading,
   libHasMore,
   onLoadMore,
-  stableSetLibOffset,
-  stableSetLibLoading,
+  setLibOffset,
+  setLibLoading,
   scrollContainerRef,
 }: {
   selectedView: string;
@@ -193,8 +193,8 @@ function InfiniteSentinel({
   libLoading: boolean;
   libHasMore: boolean;
   onLoadMore: (limit: number, offset: number) => Promise<void>;
-  stableSetLibOffset: React.Dispatch<React.SetStateAction<number>>;
-  stableSetLibLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  setLibOffset: React.Dispatch<React.SetStateAction<number>>;
+  setLibLoading: React.Dispatch<React.SetStateAction<boolean>>;
   scrollContainerRef: React.RefObject<HTMLDivElement>;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -206,13 +206,13 @@ function InfiniteSentinel({
         for (const e of entries) {
           if (e.isIntersecting && selectedView === "library" && !libLoading && libHasMore) {
             // Prevent immediate re-triggering by setting loading state first
-            stableSetLibLoading(true);
-            stableSetLibOffset(prev => {
+            setLibLoading(true);
+            setLibOffset(prev => {
               const next = prev + libLimit;
               // Load more with the next offset
               onLoadMore(libLimit, next).finally(() => {
                 // Only set loading to false after the operation completes
-                stableSetLibLoading(false);
+                setLibLoading(false);
               });
               return next;
             });
@@ -230,8 +230,8 @@ function InfiniteSentinel({
     libLoading,
     libHasMore,
     onLoadMore,
-    stableSetLibOffset,
-    stableSetLibLoading,
+    setLibOffset,
+    setLibLoading,
     scrollContainerRef,
   ]);
   return (
@@ -244,7 +244,7 @@ function InfiniteSentinel({
   );
 }
 
-export default function ModernApp() {
+export default function App() {
   // Safety check to prevent infinite loops on initial render
   const [isMounted, setIsMounted] = useState(false);
   
@@ -371,15 +371,6 @@ export default function ModernApp() {
   const [libOffset, setLibOffset] = useState(0);
   const [libLoading, setLibLoading] = useState(false);
   const libLimit = 120;
-
-  // Stable setters to prevent infinite loops
-  const stableSetLibOffset = useCallback((offset: number | ((prev: number) => number)) => {
-    setLibOffset(offset);
-  }, []);
-
-  const stableSetLibLoading = useCallback((loading: boolean | ((prev: boolean) => boolean)) => {
-    setLibLoading(loading);
-  }, []);
 
   // Derived list to show: search results or library - memoized to prevent recreation
   const items: { path: string; score?: number }[] = useMemo(() => {
@@ -789,7 +780,7 @@ export default function ModernApp() {
     loadTags();
     loadDiag();
     loadFaces();
-    stableSetLibOffset(0);
+    setLibOffset(0);
     loadLibrary(libLimit, 0);
     loadMetadata();
   }, [
@@ -801,7 +792,6 @@ export default function ModernApp() {
     loadFaces,
     loadLibrary,
     loadMetadata,
-    stableSetLibOffset,
   ]);
 
   // Infinite scroll sentinel moved to top-level component
@@ -1012,8 +1002,8 @@ export default function ModernApp() {
         libLoading={libLoading}
         libHasMore={libHasMore}
         onLoadMore={loadLibrary}
-        stableSetLibOffset={stableSetLibOffset}
-        stableSetLibLoading={stableSetLibLoading}
+        setLibOffset={setLibOffset}
+        setLibLoading={setLibLoading}
         scrollContainerRef={scrollContainerRef}
       />
     </div>
@@ -1131,9 +1121,25 @@ export default function ModernApp() {
         <button
           type="button"
           className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-          onClick={() => {
-            const p = window.prompt("Photo folder path:");
-            if (p) settingsActions.setDir(p);
+          onClick={async () => {
+            try {
+              // Use Electron IPC to select folder
+              if (window.electronAPI && window.electronAPI.selectFolder) {
+                const folderPath = await window.electronAPI.selectFolder();
+                if (folderPath) {
+                  settingsActions.setDir(folderPath);
+                }
+              } else {
+                // Fallback to prompt if IPC not available (development mode)
+                const p = window.prompt("Photo folder path:");
+                if (p) settingsActions.setDir(p);
+              }
+            } catch (error) {
+              console.error('Failed to select folder:', error);
+              // Fallback to prompt on error
+              const p = window.prompt("Photo folder path:");
+              if (p) settingsActions.setDir(p);
+            }
           }}
         >
           <Upload className="w-4 h-4" />
