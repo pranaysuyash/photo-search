@@ -23,14 +23,39 @@ export const usePhotoStore = create<PhotoStore>()(
     collections: {},
     smart: {},
     library: [],
+    libHasMore: true,
 
     // Actions
-    setResults: (results) => set({ results }),
-    setSearchId: (searchId) => set({ searchId }),
-    setQuery: (query) => set({ query }),
-    setTopK: (topK) => set({ topK }),
-    setFavorites: (fav) => set({ fav }),
-    setFavOnly: (favOnly) => set({ favOnly }),
+    setResults: (results) => {
+      console.log('🔄 PHOTO STORE: setResults called with', results?.length, 'results')
+      console.trace('setResults stack trace:')
+      set({ results })
+    },
+    setSearchId: (searchId) => {
+      console.log('🔄 PHOTO STORE: setSearchId called with', searchId)
+      console.trace('setSearchId stack trace:')
+      set({ searchId })
+    },
+    setQuery: (query) => {
+      console.log('🔄 PHOTO STORE: setQuery called with', query)
+      console.trace('setQuery stack trace:')
+      set({ query })
+    },
+    setTopK: (topK) => {
+      console.log('🔄 PHOTO STORE: setTopK called with', topK)
+      console.trace('setTopK stack trace:')
+      set({ topK })
+    },
+    setFavorites: (fav) => {
+      console.log('🔄 PHOTO STORE: setFavorites called with', fav?.length, 'favorites')
+      console.trace('setFavorites stack trace:')
+      set({ fav })
+    },
+    setFavOnly: (favOnly) => {
+      console.log('🔄 PHOTO STORE: setFavOnly called with', favOnly)
+      console.trace('setFavOnly stack trace:')
+      set({ favOnly })
+    },
     
     setAllTags: (allTags) =>
       set((state) => ({
@@ -51,6 +76,10 @@ export const usePhotoStore = create<PhotoStore>()(
     setCollections: (collections) => set({ collections }),
     setSmart: (smart) => set({ smart }),
     setLibrary: (library) => set({ library }),
+    setLibHasMore: (libHasMore) => set({ libHasMore }),
+    appendLibrary: (paths) => set((state) => ({
+      library: [...state.library, ...paths],
+    })),
     
     resetSearch: () => set({
       results: [],
@@ -70,10 +99,12 @@ export const useTopK = () => usePhotoStore((state) => state.topK)
 export const useTagFilter = () => usePhotoStore((state) => state.tags.tagFilter)
 export const useAllTags = () => usePhotoStore((state) => state.tags.allTags)
 export const useTags = () => usePhotoStore((state) => state.tags)
+export const useTagsMap = () => usePhotoStore((state) => state.tags.tagsMap)
 export const useSavedSearches = () => usePhotoStore((state) => state.saved)
 export const useCollections = () => usePhotoStore((state) => state.collections)
 export const useSmartCollections = () => usePhotoStore((state) => state.smart)
 export const useLibrary = () => usePhotoStore((state) => state.library)
+export const useLibHasMore = () => usePhotoStore((state) => state.libHasMore)
 
 // Stable actions selector
 const photoActionsSelector = (state: any) => ({
@@ -90,6 +121,8 @@ const photoActionsSelector = (state: any) => ({
   setCollections: state.setCollections,
   setSmart: state.setSmart,
   setLibrary: state.setLibrary,
+  setLibHasMore: state.setLibHasMore,
+  appendLibrary: state.appendLibrary,
   resetSearch: state.resetSearch,
 })
 

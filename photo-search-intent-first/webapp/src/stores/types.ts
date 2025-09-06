@@ -17,6 +17,7 @@ export interface PhotoState {
   collections: Record<string, string[]>
   smart: Record<string, any>
   library: string[]
+  libHasMore: boolean
 }
 
 export interface PhotoActions {
@@ -33,6 +34,8 @@ export interface PhotoActions {
   setCollections: (collections: Record<string, string[]>) => void
   setSmart: (smart: Record<string, any>) => void
   setLibrary: (library: string[]) => void
+  setLibHasMore: (hasMore: boolean) => void
+  appendLibrary: (paths: string[]) => void
   resetSearch: () => void
 }
 

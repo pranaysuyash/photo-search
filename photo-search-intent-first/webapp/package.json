@@ -16,6 +16,7 @@
     "lucide-react": "^0.453.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-scan": "^0.4.3",
     "react-window": "^2.0.2",
     "zustand": "^5.0.8"
   },

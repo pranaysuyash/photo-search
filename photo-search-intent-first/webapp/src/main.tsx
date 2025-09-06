@@ -1,18 +1,20 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
-import ModernApp from './ModernApp'
 import TestApp from './debug/TestApp'
+import { SimpleStoreProvider } from './stores/SimpleStore'
 import './styles.css'
 
 function selectApp() {
   const params = new URLSearchParams(window.location.search)
   const ui = params.get('ui') ?? (import.meta as any).env?.VITE_UI ?? 'modern'
-  // Default to modern; allow forcing classic via ?ui=classic
+  // Default to App (formerly ModernApp); allow forcing test via ?ui=test
   if (ui === 'test') return <TestApp />
-  return ui === 'classic' ? <App /> : <ModernApp />
+  return <App />
 }
 
 createRoot(document.getElementById('root')!).render(
-  selectApp()
+  <SimpleStoreProvider>
+    {selectApp()}
+  </SimpleStoreProvider>
 )

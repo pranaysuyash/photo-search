@@ -23,8 +23,9 @@ function checkAPIRunning(port = 8000) {
 
 function startAPI() {
   const cwd = path.resolve(__dirname, '..')
+  const pythonPath = path.join(cwd, '.venv', 'bin', 'python')
   const args = ['-m', 'uvicorn', 'api.server:app', '--host', '127.0.0.1', '--port', '8000']
-  apiProc = spawn(process.platform === 'win32' ? 'python' : 'python3', args, { cwd, stdio: 'inherit' })
+  apiProc = spawn(pythonPath, args, { cwd, stdio: 'inherit' })
   
   apiProc.on('exit', (code, signal) => {
     console.log(`API process exited with code ${code} and signal ${signal}`)
@@ -42,11 +43,13 @@ function createWindow() {
     show: false // Don't show until page is loaded
   })
   
-  mainWindow.loadURL('http://127.0.0.1:8000/app/')
+  mainWindow.loadURL('http://127.0.0.1:5173/')
   
   mainWindow.webContents.on('did-finish-load', () => {
     console.log('Page finished loading')
     mainWindow.show()
+    // Open DevTools immediately to see errors
+    mainWindow.webContents.openDevTools()
   })
   
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
