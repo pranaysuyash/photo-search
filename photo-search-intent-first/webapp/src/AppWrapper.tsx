@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import ProUI from './components/ProUI';
 import ModernApp from './components/ModernApp';
 import App from './App';
 import './styles-modern.css';
+import './styles-pro.css';
 
 /**
- * AppWrapper component that allows switching between the old and new UI
- * Set USE_MODERN_UI to true to use the new modern components
+ * AppWrapper component that allows switching between UIs
+ * Set UI_MODE to control which UI to use
  */
-const USE_MODERN_UI = true; // Toggle this to switch between UIs
+const UI_MODE: 'pro' | 'modern' | 'classic' = 'pro'; // Use the new professional UI
 
 const AppWrapper: React.FC = () => {
   const [darkMode, setDarkMode] = useState(() => {
@@ -34,7 +36,16 @@ const AppWrapper: React.FC = () => {
     setDarkMode(prev => !prev);
   };
 
-  if (USE_MODERN_UI) {
+  if (UI_MODE === 'pro') {
+    return (
+      <ProUI 
+        darkMode={darkMode}
+        onDarkModeToggle={handleDarkModeToggle}
+      />
+    );
+  }
+
+  if (UI_MODE === 'modern') {
     return (
       <ModernApp 
         darkMode={darkMode}

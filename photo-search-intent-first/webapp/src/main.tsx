@@ -12,6 +12,7 @@ function selectApp() {
   // Default to App (formerly ModernApp); allow forcing test via ?ui=test
   if (ui === 'test') return <TestApp />
   if (ui === 'new') return <AppWrapper />
+  // Use the original App by default - it has all the features!
   return <App />
 }
 

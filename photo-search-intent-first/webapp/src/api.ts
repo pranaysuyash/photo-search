@@ -1,6 +1,6 @@
 export type SearchResult = { path: string; score: number }
 
-const API_BASE = (import.meta as any).env?.VITE_API_BASE || (typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:8000')
+const API_BASE = (import.meta as any).env?.VITE_API_BASE || 'http://127.0.0.1:5001'
 
 async function post<T>(path: string, body: any): Promise<T> {
   const r = await fetch(`${API_BASE}${path}`, {

@@ -86,12 +86,19 @@ const ModernApp: React.FC<ModernAppProps> = ({
   const [libraryPath, setLibraryPath] = useState<string | null>(null);
   const [showFolderModal, setShowFolderModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [inputPath, setInputPath] = useState('');
 
   // Load initial data
   useEffect(() => {
     loadWorkspace();
-    loadLibrary();
   }, []);
+
+  // Load library when path changes
+  useEffect(() => {
+    if (libraryPath) {
+      loadLibrary();
+    }
+  }, [libraryPath]);
 
   // Filter photos based on search query
   useEffect(() => {
@@ -123,10 +130,13 @@ const ModernApp: React.FC<ModernAppProps> = ({
 
   const loadWorkspace = async () => {
     try {
+      console.log('Loading workspace...');
       const workspace = await apiWorkspaceList();
-      if (workspace.folders && workspace.folders.length > 0) {
-        setLibraryPath(workspace.folders[0]);
-      }
+      console.log('Workspace loaded:', workspace);
+      // Don't auto-select a folder, let user choose
+      // if (workspace.folders && workspace.folders.length > 0) {
+      //   setLibraryPath(workspace.folders[0]);
+      // }
     } catch (err) {
       console.error('Failed to load workspace:', err);
     }
@@ -197,14 +207,16 @@ const ModernApp: React.FC<ModernAppProps> = ({
   };
 
   const handleAddPath = async (path: string) => {
+    console.log('Adding path:', path);
     try {
-      await apiWorkspaceAdd(path);
+      const result = await apiWorkspaceAdd(path);
+      console.log('Workspace add result:', result);
       setLibraryPath(path);
-      await loadLibrary();
       setShowFolderModal(false);
       showNotification('success', 'Library path updated');
     } catch (err) {
-      showNotification('error', 'Failed to add library path');
+      console.error('Failed to add path:', err);
+      showNotification('error', `Failed to add library path: ${err}`);
     }
   };
 
@@ -403,32 +415,59 @@ const ModernApp: React.FC<ModernAppProps> = ({
                 Choose a folder containing your photos
               </p>
               
+              {/* Native folder picker for Electron */}
+              {(window as any).electronAPI && (
+                <button
+                  onClick={async () => {
+                    try {
+                      const selectedPath = await (window as any).electronAPI.selectFolder();
+                      if (selectedPath) {
+                        setInputPath(selectedPath);
+                      }
+                    } catch (err) {
+                      console.error('Failed to select folder:', err);
+                    }
+                  }}
+                  className="w-full mb-4 px-4 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all flex items-center justify-center gap-2"
+                >
+                  <FolderOpen className="w-5 h-5" />
+                  Browse for Folder
+                </button>
+              )}
+              
               <input
                 type="text"
+                value={inputPath}
+                onChange={(e) => setInputPath(e.target.value)}
                 placeholder="/path/to/photos"
                 className="w-full px-4 py-3 bg-gray-100 dark:bg-gray-700 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    const input = e.currentTarget;
-                    if (input.value) {
-                      handleAddPath(input.value);
-                    }
+                  if (e.key === 'Enter' && inputPath) {
+                    handleAddPath(inputPath);
                   }
                 }}
+                onPaste={(e) => {
+                  // Ensure paste works properly
+                  e.stopPropagation();
+                }}
+                autoFocus
               />
               
               <div className="flex gap-3 mt-6">
                 <button
-                  onClick={() => setShowFolderModal(false)}
+                  onClick={() => {
+                    setShowFolderModal(false);
+                    setInputPath('');
+                  }}
                   className="flex-1 px-4 py-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={() => {
-                    const input = document.querySelector('input[type="text"]') as HTMLInputElement;
-                    if (input?.value) {
-                      handleAddPath(input.value);
+                    if (inputPath) {
+                      handleAddPath(inputPath);
+                      setInputPath('');
                     }
                   }}
                   className="flex-1 px-4 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors"

@@ -9,7 +9,7 @@ const http = require('http')
 let apiProc = null
 let mainWindow = null
 
-function checkAPIRunning(port = 8000) {
+function checkAPIRunning(port = 5001) {
   return new Promise((resolve) => {
     const req = http.get(`http://127.0.0.1:${port}/docs`, (res) => {
       resolve(res.statusCode === 200)
@@ -25,7 +25,7 @@ function checkAPIRunning(port = 8000) {
 function startAPI() {
   const cwd = path.resolve(__dirname, '..')
   const pythonPath = path.join(cwd, '.venv', 'bin', 'python')
-  const args = ['-m', 'uvicorn', 'api.server:app', '--host', '127.0.0.1', '--port', '8000']
+  const args = ['-m', 'uvicorn', 'api.server:app', '--host', '127.0.0.1', '--port', '5001']
   apiProc = spawn(pythonPath, args, { cwd, stdio: 'inherit' })
   
   apiProc.on('exit', (code, signal) => {
@@ -45,7 +45,8 @@ function createWindow() {
     show: false // Don't show until page is loaded
   })
   
-  mainWindow.loadURL('http://127.0.0.1:5173/')
+  // Load the new modern UI by default in Electron
+  mainWindow.loadURL('http://127.0.0.1:5173/?ui=new')
   
   mainWindow.webContents.on('did-finish-load', () => {
     console.log('Page finished loading')
