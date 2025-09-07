@@ -45,8 +45,8 @@ function createWindow() {
     show: false // Don't show until page is loaded
   })
   
-  // Load the new modern UI by default in Electron
-  mainWindow.loadURL('http://127.0.0.1:5173/?ui=new')
+  // Load the original UI - it has more features integrated!
+  mainWindow.loadURL('http://127.0.0.1:5173/')
   
   mainWindow.webContents.on('did-finish-load', () => {
     console.log('Page finished loading')

@@ -366,6 +366,10 @@ export async function apiTodo() {
   return r.json() as Promise<{ text: string }>
 }
 
+export async function apiAutotag(dir: string, provider: string) {
+  return post<{ tags: Record<string, string[]> }>('/autotag', { dir, provider })
+}
+
 export async function apiDelete(dir: string, paths: string[], useOsTrash?: boolean) {
   const r = await fetch(`${API_BASE}/delete`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
