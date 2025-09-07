@@ -113,16 +113,20 @@ export async function apiMap(dir: string) {
   return r.json() as Promise<{ points: { lat: number; lon: number }[] }>
 }
 
-export async function apiDiagnostics(dir: string, provider?: string) {
+export async function apiDiagnostics(dir: string, provider?: string, openaiKey?: string, hfToken?: string) {
   const qs = new URLSearchParams({ dir })
   if (provider) qs.set('provider', provider)
+  if (hfToken) qs.set('hf_token', hfToken)
+  if (openaiKey) qs.set('openai_key', openaiKey)
   const r = await fetch(`${API_BASE}/diagnostics?${qs.toString()}`)
   if (!r.ok) throw new Error(await r.text())
   return r.json() as Promise<{ folder: string; engines: { key: string; index_dir: string; count: number; fast?: { annoy: boolean; faiss: boolean; hnsw: boolean } }[]; free_gb: number; os: string }>
 }
 
-export async function apiLibrary(dir: string, provider: string, limit = 120, offset = 0) {
+export async function apiLibrary(dir: string, provider: string, limit = 120, offset = 0, opts?: { hfToken?: string; openaiKey?: string }) {
   const qs = new URLSearchParams({ dir, provider, limit: String(limit), offset: String(offset) })
+  if (opts?.hfToken) qs.set('hf_token', opts.hfToken)
+  if (opts?.openaiKey) qs.set('openai_key', opts.openaiKey)
   const r = await fetch(`${API_BASE}/library?${qs.toString()}`)
   if (!r.ok) throw new Error(await r.text())
   return r.json() as Promise<{ total: number; offset: number; limit: number; paths: string[] }>

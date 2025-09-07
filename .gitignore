@@ -101,6 +101,15 @@ celerybeat.pid
 
 # Environments
 .env
+# Common env file variants
+.env.local
+.env.development
+.env.production
+.env.test
+**/.env
+# Ignore any env* but allow example templates
+.env.*
+!.env.example
 .venv
 env/
 venv/

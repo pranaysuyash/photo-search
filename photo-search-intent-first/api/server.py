@@ -6,6 +6,7 @@ from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 from adapters.provider_factory import get_provider
 from usecases.index_photos import index_photos
@@ -62,6 +63,28 @@ if _static is not None:
         return RedirectResponse(url="/app/")
 
 
+# Load .env file (if present) so OPENAI_API_KEY/HF_API_TOKEN are available when not passed explicitly
+def _load_env_file() -> None:
+    try:
+        repo_root = Path(__file__).resolve().parents[2]
+        env_path = repo_root / ".env"
+        if not env_path.exists():
+            return
+        for raw in env_path.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            key = k.strip()
+            val = v.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = val
+    except Exception:
+        # Non-fatal; continue without .env values
+        pass
+
+_load_env_file()
+
 @app.get("/todo")
 def api_todo() -> Dict[str, Any]:
     """Return the repository TODO.md contents for in-app Tasks view."""
@@ -81,13 +104,20 @@ def _emb(provider: str, hf_token: Optional[str], openai_key: Optional[str], st_m
     return get_provider(provider, hf_token=hf_token, openai_api_key=openai_key, st_model=st_model, tf_model=tf_model, hf_model=hf_model)
 
 
+class IndexRequest(BaseModel):
+    dir: str
+    provider: str = "local"
+    batch_size: int = 32
+    hf_token: Optional[str] = None
+    openai_key: Optional[str] = None
+
 @app.post("/index")
-def api_index(dir: str, provider: str = "local", batch_size: int = 32, hf_token: Optional[str] = None, openai_key: Optional[str] = None) -> Dict[str, Any]:
-    folder = Path(dir)
+def api_index(req: IndexRequest) -> Dict[str, Any]:
+    folder = Path(req.dir)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
-    emb = _emb(provider, hf_token, openai_key)
-    new_c, upd_c, total = index_photos(folder, batch_size=batch_size, embedder=emb)
+    emb = _emb(req.provider, req.hf_token, req.openai_key)
+    new_c, upd_c, total = index_photos(folder, batch_size=req.batch_size, embedder=emb)
     return {"new": new_c, "updated": upd_c, "total": total}
 
 
@@ -1222,19 +1252,22 @@ def api_workspace_list() -> Dict[str, Any]:
     return {"folders": load_workspace()}
 
 
+class WorkspacePath(BaseModel):
+    path: str
+
 @app.post("/workspace/add")
-def api_workspace_add(path: str) -> Dict[str, Any]:
+def api_workspace_add(data: WorkspacePath) -> Dict[str, Any]:
     ws = load_workspace()
-    if path not in ws:
-        ws.append(path)
+    if data.path not in ws:
+        ws.append(data.path)
         save_workspace(ws)
     return {"folders": ws}
 
 
 @app.post("/workspace/remove")
-def api_workspace_remove(path: str) -> Dict[str, Any]:
+def api_workspace_remove(data: WorkspacePath) -> Dict[str, Any]:
     ws = load_workspace()
-    ws = [p for p in ws if p != path]
+    ws = [p for p in ws if p != data.path]
     save_workspace(ws)
     return {"folders": ws}
 

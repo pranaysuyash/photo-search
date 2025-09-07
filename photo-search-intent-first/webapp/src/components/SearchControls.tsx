@@ -79,6 +79,7 @@ export default function SearchControls({
           </label>
           <input
             id="ps_dir"
+            name="ps_dir"
             value={dir}
             onChange={(e) => settingsActions.setDir(e.target.value)}
             placeholder="/path/to/photos"
@@ -91,6 +92,7 @@ export default function SearchControls({
           </label>
           <select
             id="ps_engine"
+            name="ps_engine"
             value={engine}
             onChange={(e) => settingsActions.setEngine(e.target.value)}
             className="w-full border rounded px-3 py-2"
@@ -107,6 +109,7 @@ export default function SearchControls({
             </label>
             <input
               id="ps_camera"
+              name="ps_camera"
               value={camera}
               onChange={(e) => settingsActions.setCamera(e.target.value)}
               placeholder="e.g., iPhone"
@@ -117,6 +120,7 @@ export default function SearchControls({
             </label>
             <input
               id="ps_iso_min"
+              name="ps_iso_min"
               value={isoMin}
               onChange={(e) => settingsActions.setIsoMin(e.target.value)}
               placeholder="min"
@@ -125,6 +129,7 @@ export default function SearchControls({
             <span>to</span>
             <input
               id="ps_iso_max"
+              name="ps_iso_max"
               value={isoMax}
               onChange={(e) => settingsActions.setIsoMax(e.target.value)}
               placeholder="max"
@@ -135,6 +140,7 @@ export default function SearchControls({
             </label>
             <input
               id="ps_fmin"
+              name="ps_fmin"
               value={fMin}
               onChange={(e) => settingsActions.setFMin(e.target.value)}
               placeholder="min"
@@ -143,6 +149,7 @@ export default function SearchControls({
             <span>to</span>
             <input
               id="ps_fmax"
+              name="ps_fmax"
               value={fMax}
               onChange={(e) => settingsActions.setFMax(e.target.value)}
               placeholder="max"
@@ -156,6 +163,7 @@ export default function SearchControls({
           </label>
           <input
             id="ps_query"
+            name="ps_query"
             value={query}
             onChange={(e) => searchActions.setQuery(e.target.value)}
             placeholder="friends on beach"
@@ -217,6 +225,7 @@ export default function SearchControls({
         <div className="text-sm text-gray-700">Top‑K</div>
         <input
           id="ps_topk"
+          name="ps_topk"
           type="number"
           min={1}
           max={200}
@@ -229,6 +238,7 @@ export default function SearchControls({
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
+            name="ps_fav_only"
             checked={favOnly}
             onChange={(e) => searchActions.setFavOnly(e.target.checked)}
           />{" "}
@@ -237,6 +247,7 @@ export default function SearchControls({
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
+            name="ps_use_caps"
             checked={useCaps}
             onChange={(e) => settingsActions.setUseCaps(e.target.checked)}
           />{" "}
@@ -245,6 +256,7 @@ export default function SearchControls({
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
+            name="ps_use_ocr"
             checked={useOcr}
             onChange={(e) => settingsActions.setUseOcr(e.target.checked)}
           />{" "}
@@ -253,6 +265,7 @@ export default function SearchControls({
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
+            name="ps_has_text"
             checked={hasText}
             onChange={(e) => settingsActions.setHasText(e.target.checked)}
           />{" "}
@@ -264,6 +277,7 @@ export default function SearchControls({
           </label>
           <input
             id="ps_place"
+            name="ps_place"
             value={place}
             onChange={(e) => settingsActions.setPlace(e.target.value)}
             placeholder="e.g., San Francisco"
@@ -272,6 +286,8 @@ export default function SearchControls({
         </div>
         <div className="text-sm">Filter tags (comma):</div>
         <input
+          id="ps_tag_filter"
+          name="ps_tag_filter"
           value={tagFilter}
           onChange={(e) => searchActions.setTagFilter(e.target.value)}
           placeholder="e.g., beach,friends"
@@ -311,6 +327,7 @@ export default function SearchControls({
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
+            name="ps_use_fast"
             checked={useFast}
             onChange={(e) => settingsActions.setUseFast(e.target.checked)}
           />{" "}
@@ -323,6 +340,8 @@ export default function SearchControls({
           const an = st?.annoy ?? true;
           return (
             <select
+              id="ps_fast_kind"
+              name="ps_fast_kind"
               value={fastKind}
               onChange={(e) =>
                 settingsActions.setFastKind(
@@ -347,6 +366,7 @@ export default function SearchControls({
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
+            name="ps_ws_toggle"
             checked={wsToggle}
             onChange={(e) => workspaceActions.setWsToggle(e.target.checked)}
           />{" "}
@@ -358,6 +378,7 @@ export default function SearchControls({
           </label>
           <select
             id="ps_view"
+            name="ps_view"
             value={viewMode}
             onChange={(e) =>
               uiActions.setViewMode(e.target.value as "grid" | "film")

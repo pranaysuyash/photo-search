@@ -68,7 +68,7 @@ interface SimpleStore {
 const initialState: SimpleStore = {
   settings: {
     dir: '',
-    engine: 'openai',
+    engine: 'local',
     hfToken: '',
     openaiKey: '',
     useFast: false,
@@ -132,8 +132,11 @@ export const SimpleStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setState(prev => ({ ...prev, settings: { ...prev.settings, ...settings } }))
   }, [])
 
-  const setPhoto = useCallback((photo: Partial<SimplePhoto>) => {
-    setState(prev => ({ ...prev, photo: { ...prev.photo, ...photo } }))
+  const setPhoto = useCallback((photo: Partial<SimplePhoto> | ((prev: SimpleStore) => Partial<SimplePhoto>)) => {
+    setState(prev => ({
+      ...prev,
+      photo: { ...prev.photo, ...(typeof photo === 'function' ? photo(prev) : photo) },
+    }))
   }, [])
 
   const setUI = useCallback((ui: Partial<SimpleUI>) => {
@@ -209,7 +212,7 @@ export const useDiag = () => useSimpleStore().state.workspace.diag
 // Action hooks
 export const useSettingsActions = () => {
   const { setSettings } = useSimpleStore()
-  return {
+  return React.useMemo(() => ({
     setDir: (dir: string) => setSettings({ dir }),
     setEngine: (engine: string) => setSettings({ engine }),
     setHfToken: (hfToken: string) => setSettings({ hfToken }),
@@ -227,48 +230,45 @@ export const useSettingsActions = () => {
     setFMin: (fMin: number) => setSettings({ fMin }),
     setFMax: (fMax: number) => setSettings({ fMax }),
     setPlace: (place: string) => setSettings({ place }),
-  }
+  }), [setSettings])
 }
 
 export const usePhotoActions = () => {
   const { setPhoto } = useSimpleStore()
-  return {
+  return React.useMemo(() => ({
     setResults: (results: any[]) => setPhoto({ results }),
     setSearchId: (searchId: string) => setPhoto({ searchId }),
     setQuery: (query: string) => setPhoto({ query }),
     setTopK: (topK: number) => setPhoto({ topK }),
     setFavorites: (fav: string[]) => setPhoto({ fav }),
     setFavOnly: (favOnly: boolean) => setPhoto({ favOnly }),
-    setAllTags: (allTags: string[]) => setPhoto({ tags: { ...useSimpleStore().state.photo.tags, allTags } }),
-    setTagsMap: (tagsMap: Record<string, string[]>) => setPhoto({ tags: { ...useSimpleStore().state.photo.tags, tagsMap } }),
-    setTagFilter: (tagFilter: string) => setPhoto({ tags: { ...useSimpleStore().state.photo.tags, tagFilter } }),
+    setAllTags: (allTags: string[]) => setPhoto(prev => ({ tags: { ...prev.photo.tags, allTags } })),
+    setTagsMap: (tagsMap: Record<string, string[]>) => setPhoto(prev => ({ tags: { ...prev.photo.tags, tagsMap } })),
+    setTagFilter: (tagFilter: string) => setPhoto(prev => ({ tags: { ...prev.photo.tags, tagFilter } })),
     setSaved: (saved: any[]) => setPhoto({ saved }),
     setCollections: (collections: Record<string, string[]>) => setPhoto({ collections }),
     setSmart: (smart: Record<string, any>) => setPhoto({ smart }),
     setLibrary: (library: string[]) => setPhoto({ library }),
     setLibHasMore: (libHasMore: boolean) => setPhoto({ libHasMore }),
-    appendLibrary: (paths: string[]) => {
-      const current = useSimpleStore().state.photo.library
-      setPhoto({ library: [...current, ...paths] })
-    },
+    appendLibrary: (paths: string[]) => setPhoto(prev => ({ library: [...prev.photo.library, ...paths] })),
     resetSearch: () => setPhoto({ results: [], searchId: '', query: '' }),
-  }
+  }), [setPhoto])
 }
 
 export const useUIActions = () => {
   const { setUI } = useSimpleStore()
-  return {
+  return React.useMemo(() => ({
     setBusy: (busy: string) => setUI({ busy }),
     setNote: (note: string) => setUI({ note }),
     setViewMode: (viewMode: 'grid' | 'film') => setUI({ viewMode }),
     setShowWelcome: (showWelcome: boolean) => setUI({ showWelcome }),
     setShowHelp: (showHelp: boolean) => setUI({ showHelp }),
-  }
+  }), [setUI])
 }
 
 export const useWorkspaceActions = () => {
   const { setWorkspace } = useSimpleStore()
-  return {
+  return React.useMemo(() => ({
     setWorkspace: (workspace: string) => setWorkspace({ workspace }),
     setWsToggle: (wsToggle: boolean) => setWorkspace({ wsToggle }),
     setPersons: (persons: any[]) => setWorkspace({ persons }),
@@ -276,5 +276,5 @@ export const useWorkspaceActions = () => {
     setGroups: (groups: any[]) => setWorkspace({ groups }),
     setPoints: (points: any[]) => setWorkspace({ points }),
     setDiag: (diag: any) => setWorkspace({ diag }),
-  }
+  }), [setWorkspace])
 }
