@@ -1346,6 +1346,16 @@ export default function App() {
               <Download className="w-4 h-4" />
               Export
             </button>
+            {/* Feature-flagged: Sharing v1 (stubbed UI) */}
+            {(import.meta as any).env?.VITE_FF_SHARING_V1 === '1' && (
+              <button
+                type="button"
+                className="flex items-center gap-1 px-3 py-1 text-sm text-blue-700 hover:bg-blue-100 rounded-md transition-colors"
+                onClick={() => setModal({ kind: "share" as any })}
+              >
+                <IconSearch className="w-4 h-4" /> Share
+              </button>
+            )}
             <button
               type="button"
               className="flex items-center gap-1 px-3 py-1 text-sm text-blue-700 hover:bg-blue-100 rounded-md transition-colors"
@@ -1866,43 +1876,72 @@ export default function App() {
             <FocusTrap onEscape={()=> setModal(null)}>
             <div className="bg-white rounded-lg p-4 w-full max-w-md" role="dialog" aria-modal="true">
               <div className="font-semibold mb-2">Export Selected</div>
-              <div className="text-sm text-gray-600 mb-2">
-                Choose destination folder
-              </div>
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
                   const form = e.target as HTMLFormElement;
-                  const dest = (
-                    form.elements.namedItem("dest") as HTMLInputElement
-                  ).value.trim();
-                  if (dest) {
-                    exportSelected(dest);
-                    setModal(null);
-                  }
+                  const dest = (form.elements.namedItem('dest') as HTMLInputElement).value.trim();
+                  if (!dest) return;
+                  // Read preset + toggles (UI-level; backend currently supports strip_exif and overwrite)
+                  const _preset = (form.elements.namedItem('preset') as RadioNodeList)?.value || 'web';
+                  const stripAll = (form.elements.namedItem('strip_all') as HTMLInputElement)?.checked || false;
+                  const overwrite = (form.elements.namedItem('overwrite') as HTMLInputElement)?.checked || false;
+                  // Execute export (resize/quality handled in a later backend iteration)
+                  (async () => {
+                    try {
+                      const paths = Array.from(selected);
+                      const r = await apiExport(dir!, paths, dest, 'copy', stripAll, overwrite)
+                      uiActions.setNote(`Exported ${r.copied}, skipped ${r.skipped}, errors ${r.errors} → ${r.dest}`)
+                    } catch (e) {
+                      uiActions.setNote(e instanceof Error ? e.message : 'Export failed')
+                    }
+                  })();
+                  setModal(null);
                 }}
               >
-                <input
-                  name="dest"
-                  className="w-full border rounded px-2 py-1"
-                  placeholder="/absolute/path"
-                />
-                <div className="mt-3 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    className="px-3 py-1 rounded border"
-                    onClick={() => setModal(null)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-3 py-1 rounded bg-blue-600 text-white"
-                  >
-                    Export
-                  </button>
+                <div className="grid gap-3">
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Destination</label>
+                    <input name="dest" className="w-full border rounded px-2 py-1" placeholder="/absolute/path" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium mb-1">Preset</div>
+                    <div className="flex gap-3 text-sm">
+                      <label className="flex items-center gap-1"><input type="radio" name="preset" value="web" defaultChecked /> Web</label>
+                      <label className="flex items-center gap-1"><input type="radio" name="preset" value="email" /> Email</label>
+                      <label className="flex items-center gap-1"><input type="radio" name="preset" value="print" /> Print</label>
+                      <label className="flex items-center gap-1"><input type="radio" name="preset" value="custom" /> Custom</label>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium mb-1">Privacy</div>
+                    <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="strip_all" /> Strip all EXIF/IPTC</label>
+                    <label className="flex items-center gap-2 text-sm opacity-60" title="Planned: requires backend support"><input type="checkbox" disabled /> Strip GPS only</label>
+                    <label className="flex items-center gap-2 text-sm opacity-60" title="Planned: requires backend support"><input type="checkbox" disabled /> Keep copyright only</label>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium mb-1">Options</div>
+                    <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="overwrite" /> Overwrite existing files</label>
+                  </div>
+                </div>
+                <div className="mt-4 flex justify-end gap-2">
+                  <button type="button" className="px-3 py-1 rounded border" onClick={() => setModal(null)}>Cancel</button>
+                  <button type="submit" className="px-3 py-1 rounded bg-blue-600 text-white">Export</button>
                 </div>
               </form>
+            </div>
+            </FocusTrap>
+          </div>
+        )}
+        {modal?.kind === ("share" as any) && (
+          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center" onKeyDown={(e)=>{ if(e.key==='Escape') setModal(null) }}>
+            <FocusTrap onEscape={()=> setModal(null)}>
+            <div className="bg-white rounded-lg p-4 w-full max-w-md" role="dialog" aria-modal="true">
+              <div className="font-semibold mb-2">Share (v1)</div>
+              <div className="text-sm text-gray-600 mb-3">Feature gated. This is a preview stub for Sharing v1 (expiring links + presets).</div>
+              <div className="flex justify-end gap-2">
+                <button type="button" className="px-3 py-1 rounded border" onClick={() => setModal(null)}>Close</button>
+              </div>
             </div>
             </FocusTrap>
           </div>

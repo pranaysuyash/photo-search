@@ -20,6 +20,8 @@ export const useSettingsStore = create<SettingsStore>()(
       useOcr: false,
       hasText: false,
       useOsTrash: false,
+      // UI toggles
+      showExplain: false,
 
       // EXIF filters
       camera: "",
@@ -41,6 +43,7 @@ export const useSettingsStore = create<SettingsStore>()(
       setUseOcr: (useOcr) => set({ useOcr }),
       setHasText: (hasText) => set({ hasText }),
       setUseOsTrash: (useOsTrash) => set({ useOsTrash }),
+      setShowExplain: (showExplain) => set({ showExplain }),
       setCamera: (camera) => set({ camera }),
       setIsoMin: (isoMin) => set({ isoMin }),
       setIsoMax: (isoMax) => set({ isoMax }),
@@ -61,6 +64,7 @@ export const useSettingsStore = create<SettingsStore>()(
         useOcr: state.useOcr,
         hasText: state.hasText,
         useOsTrash: state.useOsTrash,
+        showExplain: state.showExplain,
         camera: state.camera,
         isoMin: state.isoMin,
         isoMax: state.isoMax,
@@ -88,6 +92,7 @@ export const useVlmModel = () => useSettingsStore((state) => state.vlmModel);
 export const useOcrEnabled = () => useSettingsStore((state) => state.useOcr);
 export const useHasText = () => useSettingsStore((state) => state.hasText);
 export const useOsTrashEnabled = () => useSettingsStore((state) => state.useOsTrash);
+export const useShowExplain = () => useSettingsStore((state) => state.showExplain);
 export const useCamera = () => useSettingsStore((state) => state.camera);
 export const useIsoMin = () => useSettingsStore((state) => state.isoMin);
 export const useIsoMax = () => useSettingsStore((state) => state.isoMax);
@@ -131,6 +136,7 @@ const settingsActionsSelector = (state: any) => ({
   setUseOcr: state.setUseOcr,
   setHasText: state.setHasText,
   setUseOsTrash: state.setUseOsTrash,
+  setShowExplain: state.setShowExplain,
   setCamera: state.setCamera,
   setIsoMin: state.setIsoMin,
   setIsoMax: state.setIsoMax,

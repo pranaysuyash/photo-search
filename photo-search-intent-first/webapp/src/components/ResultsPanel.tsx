@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ResultsGrid } from './ResultsGrid'
 import { Lightbox } from './Lightbox'
 import { NoResultsEmpty } from './ui/EmptyState'
-import { useDir, useEngine } from '../stores/settingsStore'
+import { useDir, useEngine, useCaptionsEnabled, useHasText, useOcrEnabled, usePlace, useShowExplain, useSettingsActions } from '../stores/settingsStore'
 import { useSearchResults, useFavorites, useSearchQuery } from '../stores/photoStore'
 import { useBusy } from '../stores/uiStore'
 import { apiOpen, apiSetFavorite } from '../api'
@@ -14,6 +14,12 @@ export default function ResultsPanel() {
   const results = useSearchResults()
   const favorites = useFavorites()
   const query = useSearchQuery()
+  const useCaps = useCaptionsEnabled()
+  const hasText = useHasText()
+  const useOcr = useOcrEnabled()
+  const place = usePlace()
+  const showExplain = useShowExplain()
+  const settingsActions = useSettingsActions()
 
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [detailIdx, setDetailIdx] = useState<number|null>(null)
@@ -79,6 +85,13 @@ export default function ResultsPanel() {
         <h2 className="font-semibold">Results</h2>
         <div className="flex gap-2 text-sm">
           <div className="text-gray-700">{results.length} found</div>
+          <button
+            onClick={() => settingsActions.setShowExplain(!showExplain)}
+            className={`rounded px-2 py-1 ${showExplain ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+            title="Toggle explainability chips"
+          >
+            {showExplain ? 'Hide Explain' : 'Show Explain'}
+          </button>
           <button onClick={selectAll} className="bg-gray-200 rounded px-2 py-1">Select all</button>
           <button onClick={clearSelection} className="bg-gray-200 rounded px-2 py-1">Clear</button>
           <button onClick={async()=>{ const sel = Object.entries(selected).filter(([,v])=>v).map(([p])=>p); if(sel.length===0){ alert('Select photos first'); return } let added=0; for (const p of sel) { try{ await apiSetFavorite(dir, p, !favorites.includes(p)); added++ } catch{} } }} className="bg-pink-600 text-white rounded px-2 py-1">♥ Favorite selected</button>
@@ -96,6 +109,13 @@ export default function ResultsPanel() {
           onToggleSelect={toggleSelect}
           onOpen={openDetailByPath}
           showScore
+          explainChips={showExplain ? {
+            caption: !!useCaps,
+            ocr: !!(useOcr || hasText),
+            geo: !!place,
+            time: false, // placeholder (date range not globally tracked yet)
+            faces: false, // placeholder (person filters not globally tracked yet)
+          } : undefined}
         />
       )}
 
@@ -120,4 +140,3 @@ export default function ResultsPanel() {
     </div>
   )
 }
-
