@@ -43,8 +43,8 @@ We have successfully analyzed the photo-search-intent-first API infrastructure a
 ## Comprehensive Documentation Created
 
 ### 📋 Analysis Documents
-1. **[API_INTENT_FIRST_ANALYSIS.md](photo-search-intent-first/docs/API_INTENT_FIRST_ANALYSIS.md)** - Complete Intent-First analysis with performance bottlenecks and missing functionality
-2. **[API_DOCUMENTATION_INTENT_FIRST.md](photo-search-intent-first/docs/API_DOCUMENTATION_INTENT_FIRST.md)** - User-centric API documentation following Intent-First principles
+1. **[API_INTENT_FIRST_ANALYSIS.md](intent-first/API_INTENT_FIRST_ANALYSIS.md)** - Complete Intent-First analysis with performance bottlenecks and missing functionality
+2. **[API_DOCUMENTATION_INTENT_FIRST.md](intent-first/API_DOCUMENTATION_INTENT_FIRST.md)** - User-centric API documentation following Intent-First principles
 3. **[API_IMPLEMENTATION_GUIDE.md](API_IMPLEMENTATION_GUIDE.md)** - Production-ready implementation code for all optimizations
 
 ### 🔧 Implementation Artifacts
