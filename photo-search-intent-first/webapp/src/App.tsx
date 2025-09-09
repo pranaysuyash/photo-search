@@ -3027,7 +3027,12 @@ export default function App() {
                 case "index_photos": {
                   // Kick off indexing and surface progress UI
                   setSelectedView("library");
-                  doIndex();
+                  if (!dir) {
+                    // If no directory yet, prompt to select one first
+                    setModal({ kind: "folder" });
+                  } else {
+                    doIndex();
+                  }
                   break;
                 }
                 case "first_search": {
