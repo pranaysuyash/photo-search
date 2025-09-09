@@ -3,10 +3,10 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
-    "test:web:classic": "npm --prefix photo-search-classic/webapp run test",
+    "test:web:classic": "npm --prefix archive/photo-search-classic/webapp run test",
     "test:web:if": "npm --prefix photo-search-intent-first/webapp run test",
     "test:web": "npm run -s test:web:classic && npm run -s test:web:if",
-    "coverage:web:classic": "npm --prefix photo-search-classic/webapp run test:coverage",
+    "coverage:web:classic": "npm --prefix archive/photo-search-classic/webapp run test:coverage",
     "coverage:web:if": "npm --prefix photo-search-intent-first/webapp run test:coverage",
     "coverage:web": "npm run -s coverage:web:classic && npm run -s coverage:web:if"
   },

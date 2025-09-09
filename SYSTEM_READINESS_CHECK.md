@@ -34,13 +34,13 @@ This document evaluates the readiness of both Photo Search implementations for t
 ## 2. Classic Application Status
 
 ### API Server
-- **Location**: `photo-search-classic/api/server.py`
+- **Location**: `archive/photo-search-classic/api/server.py`
 - **Status**: ✅ Available with FastAPI implementation
 - **Endpoints**: Index, Search, Collections, Tags, Saved Searches, etc.
 
 ### Web Application
 - **Framework**: React + TypeScript + Vite + Tailwind CSS
-- **Location**: `photo-search-classic/webapp/`
+- **Location**: `archive/photo-search-classic/webapp/`
 - **Build Status**: ⚠️ Needs to be built (missing `dist/` directory)
 - **Source Code**: ✅ Available (`src/App.tsx`, `src/api.ts`)
 

@@ -462,7 +462,13 @@ export default function App() {
   });
   // Event-based onboarding completion helper with prerequisites
   const completeOnboardingStep = useCallback(
-    (step: "select_directory" | "index_photos" | "first_search" | "explore_features") => {
+    (
+      step:
+        | "select_directory"
+        | "index_photos"
+        | "first_search"
+        | "explore_features"
+    ) => {
       const prereq: Record<string, string[]> = {
         select_directory: [],
         index_photos: ["select_directory"],
@@ -928,7 +934,9 @@ export default function App() {
   // Actions
   const doIndex = useCallback(async () => {
     // Don't block UI - just show a small notification
-    uiActions.setNote("Indexing started in background. You can continue using the app.");
+    uiActions.setNote(
+      "Indexing started in background. You can continue using the app."
+    );
     setIsIndexing(true);
 
     // Create a job for indexing
@@ -959,9 +967,9 @@ export default function App() {
         needsHf ? hfToken : undefined,
         needsOAI ? openaiKey : undefined
       );
-      
+
       if (refreshInterval) clearInterval(refreshInterval); // Stop refreshing
-      
+
       uiActions.setNote(
         `Indexing complete! New: ${r.new}, Updated: ${r.updated}, Total: ${r.total}`
       );
@@ -1796,631 +1804,679 @@ export default function App() {
         ) : (location.pathname || "").startsWith("/mobile-test") ? (
           <MobilePWATest />
         ) : (
-        <div className="flex h-screen bg-white dark:bg-gray-950 dark:text-gray-100">
-          <OfflineIndicator />
-          {showWelcome && (
-            <Welcome
-              onStartDemo={async () => {
-                // Set demo photos directory and close welcome
-                const demoPath =
-                  "/Users/pranay/Projects/adhoc_projects/photo-search/e2e_data";
-                settingsActions.setDir(demoPath);
-                uiActions.setShowWelcome(false);
+          <div className="flex h-screen bg-white dark:bg-gray-950 dark:text-gray-100">
+            <OfflineIndicator />
+            {showWelcome && (
+              <Welcome
+                onStartDemo={async () => {
+                  // Set demo photos directory and close welcome
+                  const demoPath =
+                    "/Users/pranay/Projects/adhoc_projects/photo-search/e2e_data";
+                  settingsActions.setDir(demoPath);
+                  uiActions.setShowWelcome(false);
 
-                // Add demo path to workspace and index it
+                  // Add demo path to workspace and index it
+                  try {
+                    await apiWorkspaceAdd(demoPath);
+                    await doIndex();
+                  } catch (error) {
+                    console.error("Failed to add demo path or index:", error);
+                    uiActions.setNote(
+                      error instanceof Error
+                        ? error.message
+                        : "Failed to setup demo"
+                    );
+                  }
+                }}
+                onSelectFolder={() => {
+                  setModal({ kind: "folder" });
+                  uiActions.setShowWelcome(false);
+                }}
+                onClose={() => uiActions.setShowWelcome(false)}
+              />
+            )}
+
+            {/* First-run setup */}
+            <FirstRunSetup
+              open={!dir && showOnboarding}
+              onClose={() => {
+                setShowOnboarding(false);
+                localStorage.setItem("hasSeenOnboarding", "true");
+              }}
+              onQuickStart={async (paths) => {
                 try {
-                  await apiWorkspaceAdd(demoPath);
-                  await doIndex();
-                } catch (error) {
-                  console.error("Failed to add demo path or index:", error);
+                  // Add each path to workspace; set first as current dir; index each
+                  const existing: string[] = [];
+                  for (const p of paths) {
+                    try {
+                      const st = await fetch(`${API_BASE}/scan_count`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify([p]),
+                      });
+                      if (st.ok) {
+                        const js = await st.json();
+                        if (js.items?.[0]?.exists) existing.push(p);
+                      }
+                    } catch {}
+                  }
+                  if (existing.length === 0) {
+                    setShowOnboarding(false);
+                    localStorage.setItem("hasSeenOnboarding", "true");
+                    return;
+                  }
+                  settingsActions.setDir(existing[0]);
+                  // Kick off background indexing without blocking
+                  for (const p of existing) {
+                    try {
+                      await apiWorkspaceAdd(p);
+                    } catch {}
+                    (async () => {
+                      try {
+                        await apiIndex(
+                          p,
+                          engine,
+                          24,
+                          needsHf ? hfToken : undefined,
+                          needsOAI ? openaiKey : undefined
+                        );
+                      } catch {}
+                    })();
+                  }
+                  setShowOnboarding(false);
+                  localStorage.setItem("hasSeenOnboarding", "true");
+                } catch (e) {
                   uiActions.setNote(
-                    error instanceof Error
-                      ? error.message
-                      : "Failed to setup demo"
+                    e instanceof Error ? e.message : "Quick start failed"
                   );
                 }
               }}
-              onSelectFolder={() => {
+              onCustom={() => {
                 setModal({ kind: "folder" });
-                uiActions.setShowWelcome(false);
+                setShowOnboarding(false);
+                localStorage.setItem("hasSeenOnboarding", "true");
               }}
-              onClose={() => uiActions.setShowWelcome(false)}
-            />
-          )}
-
-          {/* First-run setup */}
-          <FirstRunSetup
-            open={!dir && showOnboarding}
-            onClose={() => {
-              setShowOnboarding(false);
-              localStorage.setItem("hasSeenOnboarding", "true");
-            }}
-            onQuickStart={async (paths) => {
-              try {
-                // Add each path to workspace; set first as current dir; index each
-                const existing: string[] = [];
-                for (const p of paths) {
-                  try {
-                    const st = await fetch(`${API_BASE}/scan_count`, {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify([p]),
-                    });
-                    if (st.ok) {
-                      const js = await st.json();
-                      if (js.items?.[0]?.exists) existing.push(p);
-                    }
-                  } catch {}
-                }
-                if (existing.length === 0) {
-                  setShowOnboarding(false);
-                  localStorage.setItem("hasSeenOnboarding", "true");
-                  return;
-                }
-                settingsActions.setDir(existing[0]);
-                // Kick off background indexing without blocking
-                for (const p of existing) {
-                  try {
-                    await apiWorkspaceAdd(p);
-                  } catch {}
-                  (async () => {
-                    try {
-                      await apiIndex(
-                        p,
-                        engine,
-                        24,
-                        needsHf ? hfToken : undefined,
-                        needsOAI ? openaiKey : undefined
-                      );
-                    } catch {}
-                  })();
+              onDemo={async () => {
+                try {
+                  const demoPath =
+                    "/Users/pranay/Projects/adhoc_projects/photo-search/e2e_data";
+                  settingsActions.setDir(demoPath);
+                  await apiWorkspaceAdd(demoPath);
+                  await doIndex();
+                } catch (e) {
+                  uiActions.setNote(
+                    e instanceof Error ? e.message : "Demo setup failed"
+                  );
                 }
                 setShowOnboarding(false);
                 localStorage.setItem("hasSeenOnboarding", "true");
-              } catch (e) {
-                uiActions.setNote(
-                  e instanceof Error ? e.message : "Quick start failed"
-                );
-              }
-            }}
-            onCustom={() => {
-              setModal({ kind: "folder" });
-              setShowOnboarding(false);
-              localStorage.setItem("hasSeenOnboarding", "true");
-            }}
-            onDemo={async () => {
-              try {
-                const demoPath =
-                  "/Users/pranay/Projects/adhoc_projects/photo-search/e2e_data";
-                settingsActions.setDir(demoPath);
-                await apiWorkspaceAdd(demoPath);
-                await doIndex();
-              } catch (e) {
-                uiActions.setNote(
-                  e instanceof Error ? e.message : "Demo setup failed"
-                );
-              }
-              setShowOnboarding(false);
-              localStorage.setItem("hasSeenOnboarding", "true");
-            }}
-            onTour={() => {
-              setShowHelpModal(true);
-            }}
-          />
-          <Sidebar
-            selectedView={selectedView}
-            onViewChange={(view: string) => setSelectedView(view as View)}
-            library={library}
-            favorites={fav}
-            collections={Object.keys(collections || {})}
-            clusters={clusters}
-            savedSearches={savedSearches}
-            smart={Object.keys(smart || {})}
-            trips={trips}
-            isOpen={isMobileMenuOpen}
-            onClose={() => setIsMobileMenuOpen(false)}
-          />
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <TopBar
-              searchText={searchText}
-              setSearchText={setSearchText}
-              onSearch={doSearchImmediate}
-              clusters={clusters}
-              allTags={allTags}
-              meta={meta}
-              diag={diag}
-              busy={!!busy}
-              gridSize={gridSize}
-              setGridSize={setGridSize}
-              selectedView={selectedView as ViewType}
-              setSelectedView={(view: string) => setSelectedView(view as View)}
-              currentFilter={currentFilter}
-              setCurrentFilter={setCurrentFilter}
-              ratingMin={ratingMin}
-              setRatingMin={setRatingMin}
-              setModal={(modal: { kind: string } | null) =>
-                setModal(modal as any)
-              }
-              setIsMobileMenuOpen={setIsMobileMenuOpen}
-              setShowFilters={setShowFilters}
-              selected={selected}
-              setSelected={setSelected}
-              dir={dir}
-              engine={engine}
-              topK={topK}
-              useOsTrash={useOsTrash}
-              showInfoOverlay={showInfoOverlay}
-              onToggleInfoOverlay={() =>
-                settingsActions.setShowInfoOverlay
-                  ? settingsActions.setShowInfoOverlay(!showInfoOverlay)
-                  : undefined
-              }
-              resultView={resultView as "grid" | "timeline"}
-              onChangeResultView={(view) =>
-                settingsActions.setResultView?.(view)
-              }
-              timelineBucket={timelineBucket}
-              onChangeTimelineBucket={(b) =>
-                settingsActions.setTimelineBucket?.(b)
-              }
-              photoActions={photoActions}
-              uiActions={uiActions}
-              toastTimerRef={toastTimerRef}
-              setToast={setToast}
-              isIndexing={isIndexing}
-              onIndex={doIndex}
-              activeJobs={jobs.filter((j) => j.status === "running").length}
-              onOpenJobs={() => setModal({ kind: "jobs" as any })}
-              progressPct={indexPct}
-              etaSeconds={indexEta}
-              paused={indexPaused}
-              tooltip={indexTip}
-              ocrReady={ocrReady}
-              onPause={async () => {
-                try {
-                  const { apiIndexPause } = await import("./api");
-                  await apiIndexPause(dir);
-                } catch {}
               }}
-              onResume={async () => {
-                try {
-                  const { apiIndexResume } = await import("./api");
-                  await apiIndexResume(dir);
-                } catch {}
+              onTour={() => {
+                setShowHelpModal(true);
               }}
-              onOpenThemeModal={() => setShowThemeModal(true)}
             />
-            {/* Small hint near top bar */}
-            {showHelpHint && (
-              <div className="px-4 pt-2">
-                <div className="sticky top-0 z-20 bg-yellow-50 text-yellow-800 border border-yellow-200 rounded px-3 py-1 text-xs flex items-center justify-between">
-                  <span>
-                    Press <span className="font-mono">?</span> for help and
-                    shortcuts
-                  </span>
-                  <button
-                    type="button"
-                    className="text-yellow-800 hover:text-yellow-900"
-                    aria-label="Dismiss help hint"
-                    onClick={() => {
-                      setShowHelpHint(false);
-                      try {
-                        localStorage.setItem("ps_hint_help_seen", "1");
-                      } catch {}
-                    }}
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
-            )}
-            <div className="flex-1 overflow-auto" ref={scrollContainerRef}>
-              {selectedView === "results" && (
-                <SectionErrorBoundary sectionName="Search Results">
-                  <div className="p-4">
-                    {/* Results context toolbar */}
-                    {results &&
-                      results.length > 0 &&
-                      (searchText || "").trim() && (
-                        <div className="mb-2 flex items-center justify-between">
-                          <div className="text-sm text-gray-600">
-                            {results.length} results
-                          </div>
-                          <button
-                            type="button"
-                            className="chip"
-                            title="Save this search as a Smart Collection"
-                            onClick={async () => {
-                              const name = (
-                                prompt(
-                                  "Save current search as Smart (name):"
-                                ) || ""
-                              ).trim();
-                              if (!name) return;
-                              try {
-                                const tags = (tagFilter || "")
-                                  .split(",")
-                                  .map((s) => s.trim())
-                                  .filter(Boolean);
-                                const rules: any = {
-                                  query: (searchText || "").trim(),
-                                  favoritesOnly: favOnly,
-                                  tags,
-                                  useCaptions: useCaps,
-                                  useOcr,
-                                  hasText,
-                                  camera: camera || undefined,
-                                  isoMin: isoMin || undefined,
-                                  isoMax: isoMax || undefined,
-                                  fMin: fMin || undefined,
-                                  fMax: fMax || undefined,
-                                  place: place || undefined,
-                                };
-                                const ppl = (persons || []).filter(Boolean);
-                                if (ppl.length === 1) rules.person = ppl[0];
-                                else if (ppl.length > 1) rules.persons = ppl;
-                                const { apiSetSmart, apiGetSmart } =
-                                  await import("./api");
-                                await apiSetSmart(dir, name, rules);
-                                try {
-                                  const r = await apiGetSmart(dir);
-                                  photoActions.setSmart(r.smart || {});
-                                } catch {}
-                                uiActions.setNote(
-                                  `Saved smart collection: ${name}`
-                                );
-                              } catch (e: any) {
-                                uiActions.setNote(
-                                  e?.message ||
-                                    "Failed to save smart collection"
-                                );
-                              }
-                            }}
-                          >
-                            Save as Smart Collection
-                          </button>
-                        </div>
-                      )}
-                    {results && results.length === 0 && searchText ? (
-                      <div className="flex flex-col items-center justify-center min-h-[400px]">
-                        <EnhancedEmptyState
-                          type="no-results"
-                          searchQuery={searchText}
-                          onAction={() => {
-                            setSearchText("");
-                            photoActions.setQuery("");
-                          }}
-                          onOpenFilters={() => setShowFilters(true)}
-                          onOpenAdvanced={() =>
-                            setModal({ kind: "advanced" as any })
-                          }
-                          onClearSearch={() => {
-                            // Clear common filters
-                            if (favOnly) photoActions.setFavOnly(false);
-                            if (tagFilter) photoActions.setTagFilter("");
-                            setDateFrom("");
-                            setDateTo("");
-                            settingsActions.setPlace("");
-                            settingsActions.setCamera("");
-                            settingsActions.setIsoMin(0);
-                            settingsActions.setIsoMax(0);
-                            settingsActions.setFMin(0);
-                            settingsActions.setFMax(0);
-                            settingsActions.setHasText(false);
-                            workspaceActions.setPersons([]);
-                          }}
-                          hasActiveFilters={hasAnyFilters}
-                          sampleQueries={[
-                            "golden hour",
-                            "city skyline",
-                            "family dinner",
-                            "blue car",
-                          ]}
-                          onRunSample={(q) => doSearchImmediate(q)}
-                          onOpenHelp={() => setShowHelpModal(true)}
-                        />
-                        <SampleSearchSuggestions onSearch={doSearchImmediate} />
-                      </div>
-                    ) : resultView === "grid" ? (
-                      <JustifiedResults
-                        dir={dir}
-                        engine={engine}
-                        items={(results || []).map((r) => ({
-                          path: r.path,
-                          score: r.score,
-                        }))}
-                        selected={selected}
-                        onToggleSelect={toggleSelect}
-                        onOpen={(p) => openDetailByPath(p)}
-                        scrollContainerRef={scrollContainerRef}
-                        focusIndex={focusIdx ?? undefined}
-                        onLayout={(rows) =>
-                          setLayoutRows((prev) =>
-                            rowsEqual(prev, rows) ? prev : rows
-                          )
-                        }
-                        ratingMap={ratingMap}
-                        showInfoOverlay={showInfoOverlay}
-                      />
-                    ) : (
-                      <TimelineResults
-                        dir={dir}
-                        engine={engine}
-                        items={(results || []).map((r) => ({
-                          path: r.path,
-                          score: r.score,
-                        }))}
-                        selected={selected}
-                        onToggleSelect={toggleSelect}
-                        onOpen={(p) => openDetailByPath(p)}
-                        showInfoOverlay={showInfoOverlay}
-                        bucket={timelineBucket}
-                      />
-                    )}
+            <Sidebar
+              selectedView={selectedView}
+              onViewChange={(view: string) => setSelectedView(view as View)}
+              library={library}
+              favorites={fav}
+              collections={Object.keys(collections || {})}
+              clusters={clusters}
+              savedSearches={savedSearches}
+              smart={Object.keys(smart || {})}
+              trips={trips}
+              isOpen={isMobileMenuOpen}
+              onClose={() => setIsMobileMenuOpen(false)}
+            />
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <TopBar
+                searchText={searchText}
+                setSearchText={setSearchText}
+                onSearch={doSearchImmediate}
+                clusters={clusters}
+                allTags={allTags}
+                meta={meta}
+                diag={diag}
+                busy={!!busy}
+                gridSize={gridSize}
+                setGridSize={setGridSize}
+                selectedView={selectedView as ViewType}
+                setSelectedView={(view: string) =>
+                  setSelectedView(view as View)
+                }
+                currentFilter={currentFilter}
+                setCurrentFilter={setCurrentFilter}
+                ratingMin={ratingMin}
+                setRatingMin={setRatingMin}
+                setModal={(modal: { kind: string } | null) =>
+                  setModal(modal as any)
+                }
+                setIsMobileMenuOpen={setIsMobileMenuOpen}
+                setShowFilters={setShowFilters}
+                selected={selected}
+                setSelected={setSelected}
+                dir={dir}
+                engine={engine}
+                topK={topK}
+                useOsTrash={useOsTrash}
+                showInfoOverlay={showInfoOverlay}
+                onToggleInfoOverlay={() =>
+                  settingsActions.setShowInfoOverlay
+                    ? settingsActions.setShowInfoOverlay(!showInfoOverlay)
+                    : undefined
+                }
+                resultView={resultView as "grid" | "timeline"}
+                onChangeResultView={(view) =>
+                  settingsActions.setResultView?.(view)
+                }
+                timelineBucket={timelineBucket}
+                onChangeTimelineBucket={(b) =>
+                  settingsActions.setTimelineBucket?.(b)
+                }
+                photoActions={photoActions}
+                uiActions={uiActions}
+                toastTimerRef={toastTimerRef}
+                setToast={setToast}
+                isIndexing={isIndexing}
+                onIndex={doIndex}
+                activeJobs={jobs.filter((j) => j.status === "running").length}
+                onOpenJobs={() => setModal({ kind: "jobs" as any })}
+                progressPct={indexPct}
+                etaSeconds={indexEta}
+                paused={indexPaused}
+                tooltip={indexTip}
+                ocrReady={ocrReady}
+                onPause={async () => {
+                  try {
+                    const { apiIndexPause } = await import("./api");
+                    await apiIndexPause(dir);
+                  } catch {}
+                }}
+                onResume={async () => {
+                  try {
+                    const { apiIndexResume } = await import("./api");
+                    await apiIndexResume(dir);
+                  } catch {}
+                }}
+                onOpenThemeModal={() => setShowThemeModal(true)}
+              />
+              {/* Small hint near top bar */}
+              {showHelpHint && (
+                <div className="px-4 pt-2">
+                  <div className="sticky top-0 z-20 bg-yellow-50 text-yellow-800 border border-yellow-200 rounded px-3 py-1 text-xs flex items-center justify-between">
+                    <span>
+                      Press <span className="font-mono">?</span> for help and
+                      shortcuts
+                    </span>
+                    <button
+                      type="button"
+                      className="text-yellow-800 hover:text-yellow-900"
+                      aria-label="Dismiss help hint"
+                      onClick={() => {
+                        setShowHelpHint(false);
+                        try {
+                          localStorage.setItem("ps_hint_help_seen", "1");
+                        } catch {}
+                      }}
+                    >
+                      ×
+                    </button>
                   </div>
-                </SectionErrorBoundary>
-              )}
-              {selectedView === "library" && (
-                <SectionErrorBoundary sectionName="Library">
-                  <LibraryView />
-                </SectionErrorBoundary>
-              )}
-              {selectedView === "people" && (
-                <div className="p-4">
-                  <PeopleView
-                    dir={dir}
-                    engine={engine}
-                    clusters={clusters || []}
-                    persons={persons}
-                    setPersons={workspaceActions.setPersons}
-                    busy={busy}
-                    setBusy={uiActions.setBusy}
-                    setNote={uiActions.setNote}
-                    onLoadFaces={loadFaces}
-                    onOpenPhotos={(photos) => {
-                      // Convert paths to search results and switch to results view
-                      photoActions.setResults(
-                        photos.map((path) => ({ path, score: 0 }))
-                      );
-                      setSelectedView("results");
-                      uiActions.setNote(
-                        `Viewing ${photos.length} photos from face cluster`
-                      );
-                    }}
-                  />
                 </div>
               )}
-              {selectedView === "map" && (
-                <div className="p-4">
-                  <MapView points={points || []} onLoadMap={loadMap} />
-                </div>
-              )}
-              {selectedView === "collections" && (
-                <div className="p-4">
-                  <Collections
-                    dir={dir}
-                    engine={engine}
-                    collections={collections}
-                    onLoadCollections={async () => {
-                      const { apiGetCollections } = await import("./api");
-                      const r = await apiGetCollections(dir);
-                      photoActions.setCollections(r.collections || {});
-                    }}
-                    onOpen={(name: string) => {
-                      const paths = collections?.[name] || [];
-                      photoActions.setResults(
-                        paths.map((p) => ({ path: p, score: 0 }))
-                      );
-                      setSelectedView("results");
-                      uiActions.setNote(`${paths.length} in ${name}`);
-                    }}
-                    onDelete={async (name: string) => {
-                      try {
-                        const { apiDeleteCollection, apiGetCollections } =
-                          await import("./api");
-                        await apiDeleteCollection(dir, name);
+              <div className="flex-1 overflow-auto" ref={scrollContainerRef}>
+                {selectedView === "results" && (
+                  <SectionErrorBoundary sectionName="Search Results">
+                    <div className="p-4">
+                      {/* Results context toolbar */}
+                      {results &&
+                        results.length > 0 &&
+                        (searchText || "").trim() && (
+                          <div className="mb-2 flex items-center justify-between">
+                            <div className="text-sm text-gray-600">
+                              {results.length} results
+                            </div>
+                            <button
+                              type="button"
+                              className="chip"
+                              title="Save this search as a Smart Collection"
+                              onClick={async () => {
+                                const name = (
+                                  prompt(
+                                    "Save current search as Smart (name):"
+                                  ) || ""
+                                ).trim();
+                                if (!name) return;
+                                try {
+                                  const tags = (tagFilter || "")
+                                    .split(",")
+                                    .map((s) => s.trim())
+                                    .filter(Boolean);
+                                  const rules: any = {
+                                    query: (searchText || "").trim(),
+                                    favoritesOnly: favOnly,
+                                    tags,
+                                    useCaptions: useCaps,
+                                    useOcr,
+                                    hasText,
+                                    camera: camera || undefined,
+                                    isoMin: isoMin || undefined,
+                                    isoMax: isoMax || undefined,
+                                    fMin: fMin || undefined,
+                                    fMax: fMax || undefined,
+                                    place: place || undefined,
+                                  };
+                                  const ppl = (persons || []).filter(Boolean);
+                                  if (ppl.length === 1) rules.person = ppl[0];
+                                  else if (ppl.length > 1) rules.persons = ppl;
+                                  const { apiSetSmart, apiGetSmart } =
+                                    await import("./api");
+                                  await apiSetSmart(dir, name, rules);
+                                  try {
+                                    const r = await apiGetSmart(dir);
+                                    photoActions.setSmart(r.smart || {});
+                                  } catch {}
+                                  uiActions.setNote(
+                                    `Saved smart collection: ${name}`
+                                  );
+                                } catch (e: any) {
+                                  uiActions.setNote(
+                                    e?.message ||
+                                      "Failed to save smart collection"
+                                  );
+                                }
+                              }}
+                            >
+                              Save as Smart Collection
+                            </button>
+                          </div>
+                        )}
+                      {results && results.length === 0 && searchText ? (
+                        <div className="flex flex-col items-center justify-center min-h-[400px]">
+                          <EnhancedEmptyState
+                            type="no-results"
+                            searchQuery={searchText}
+                            onAction={() => {
+                              setSearchText("");
+                              photoActions.setQuery("");
+                            }}
+                            onOpenFilters={() => setShowFilters(true)}
+                            onOpenAdvanced={() =>
+                              setModal({ kind: "advanced" as any })
+                            }
+                            onClearSearch={() => {
+                              // Clear common filters
+                              if (favOnly) photoActions.setFavOnly(false);
+                              if (tagFilter) photoActions.setTagFilter("");
+                              setDateFrom("");
+                              setDateTo("");
+                              settingsActions.setPlace("");
+                              settingsActions.setCamera("");
+                              settingsActions.setIsoMin(0);
+                              settingsActions.setIsoMax(0);
+                              settingsActions.setFMin(0);
+                              settingsActions.setFMax(0);
+                              settingsActions.setHasText(false);
+                              workspaceActions.setPersons([]);
+                            }}
+                            hasActiveFilters={hasAnyFilters}
+                            sampleQueries={[
+                              "golden hour",
+                              "city skyline",
+                              "family dinner",
+                              "blue car",
+                            ]}
+                            onRunSample={(q) => doSearchImmediate(q)}
+                            onOpenHelp={() => setShowHelpModal(true)}
+                          />
+                          <SampleSearchSuggestions
+                            onSearch={doSearchImmediate}
+                          />
+                        </div>
+                      ) : resultView === "grid" ? (
+                        <JustifiedResults
+                          dir={dir}
+                          engine={engine}
+                          items={(results || []).map((r) => ({
+                            path: r.path,
+                            score: r.score,
+                          }))}
+                          selected={selected}
+                          onToggleSelect={toggleSelect}
+                          onOpen={(p) => openDetailByPath(p)}
+                          scrollContainerRef={scrollContainerRef}
+                          focusIndex={focusIdx ?? undefined}
+                          onLayout={(rows) =>
+                            setLayoutRows((prev) =>
+                              rowsEqual(prev, rows) ? prev : rows
+                            )
+                          }
+                          ratingMap={ratingMap}
+                          showInfoOverlay={showInfoOverlay}
+                        />
+                      ) : (
+                        <TimelineResults
+                          dir={dir}
+                          engine={engine}
+                          items={(results || []).map((r) => ({
+                            path: r.path,
+                            score: r.score,
+                          }))}
+                          selected={selected}
+                          onToggleSelect={toggleSelect}
+                          onOpen={(p) => openDetailByPath(p)}
+                          showInfoOverlay={showInfoOverlay}
+                          bucket={timelineBucket}
+                        />
+                      )}
+                    </div>
+                  </SectionErrorBoundary>
+                )}
+                {selectedView === "library" && (
+                  <SectionErrorBoundary sectionName="Library">
+                    <LibraryView />
+                  </SectionErrorBoundary>
+                )}
+                {selectedView === "people" && (
+                  <div className="p-4">
+                    <PeopleView
+                      dir={dir}
+                      engine={engine}
+                      clusters={clusters || []}
+                      persons={persons}
+                      setPersons={workspaceActions.setPersons}
+                      busy={busy}
+                      setBusy={uiActions.setBusy}
+                      setNote={uiActions.setNote}
+                      onLoadFaces={loadFaces}
+                      onOpenPhotos={(photos) => {
+                        // Convert paths to search results and switch to results view
+                        photoActions.setResults(
+                          photos.map((path) => ({ path, score: 0 }))
+                        );
+                        setSelectedView("results");
+                        uiActions.setNote(
+                          `Viewing ${photos.length} photos from face cluster`
+                        );
+                      }}
+                    />
+                  </div>
+                )}
+                {selectedView === "map" && (
+                  <div className="p-4">
+                    <MapView points={points || []} onLoadMap={loadMap} />
+                  </div>
+                )}
+                {selectedView === "collections" && (
+                  <div className="p-4">
+                    <Collections
+                      dir={dir}
+                      engine={engine}
+                      collections={collections}
+                      onLoadCollections={async () => {
+                        const { apiGetCollections } = await import("./api");
                         const r = await apiGetCollections(dir);
                         photoActions.setCollections(r.collections || {});
-                        setToast({ message: `Deleted collection ${name}` });
-                      } catch (e) {
-                        uiActions.setNote(
-                          e instanceof Error ? e.message : "Delete failed"
+                      }}
+                      onOpen={(name: string) => {
+                        const paths = collections?.[name] || [];
+                        photoActions.setResults(
+                          paths.map((p) => ({ path: p, score: 0 }))
                         );
-                      }
-                    }}
-                  />
-                </div>
-              )}
-              {selectedView === "saved" && (
-                <div className="p-4">
-                  <SavedSearches
-                    saved={saved}
-                    onRun={(_name: string, q: string, k?: number) => {
-                      setSearchText(q);
-                      if (k) photoActions.setTopK(k);
-                      doSearchImmediate(q);
-                    }}
-                    onDelete={async (name: string) => {
-                      try {
-                        const { apiDeleteSaved, apiGetSaved } = await import(
-                          "./api"
-                        );
-                        await apiDeleteSaved(dir, name);
-                        const r = await apiGetSaved(dir);
-                        photoActions.setSaved(r.saved || []);
-                      } catch (e) {
-                        uiActions.setNote(
-                          e instanceof Error ? e.message : "Delete failed"
-                        );
-                      }
-                    }}
-                  />
-                  <div className="mt-4 bg-white border rounded p-3">
-                    <div className="flex items-center justify-between">
-                      <h2 className="font-semibold">Presets</h2>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          className="px-2 py-1 rounded border"
-                          onClick={loadPresets}
-                        >
-                          Refresh
-                        </button>
-                        <button
-                          type="button"
-                          className="px-2 py-1 rounded border"
-                          onClick={() => {
-                            try {
-                              const data = JSON.stringify(
-                                presets || [],
-                                null,
-                                2
-                              );
-                              const blob = new Blob([data], {
-                                type: "application/json",
-                              });
-                              const url = URL.createObjectURL(blob);
-                              const a = document.createElement("a");
-                              a.href = url;
-                              a.download = "photo-search-presets.json";
-                              document.body.appendChild(a);
-                              a.click();
-                              document.body.removeChild(a);
-                              URL.revokeObjectURL(url);
-                            } catch {}
-                          }}
-                        >
-                          Export
-                        </button>
-                        <label className="px-2 py-1 rounded border cursor-pointer">
-                          Import
-                          <input
-                            type="file"
-                            accept="application/json"
-                            className="hidden"
-                            onChange={async (e) => {
-                              const file = e.target.files?.[0];
-                              if (!file) return;
-                              try {
-                                const txt = await file.text();
-                                const arr = JSON.parse(txt);
-                                if (Array.isArray(arr)) {
-                                  const { apiAddPreset } = await import(
-                                    "./api"
-                                  );
-                                  for (const it of arr) {
-                                    if (
-                                      it &&
-                                      typeof it.name === "string" &&
-                                      typeof it.query === "string"
-                                    ) {
-                                      await apiAddPreset(
-                                        dir,
-                                        it.name,
-                                        it.query
-                                      );
-                                    }
-                                  }
-                                  await loadPresets();
-                                  setToast({
-                                    message: `Imported ${arr.length} preset(s)`,
-                                  });
-                                } else {
-                                  uiActions.setNote("Invalid JSON format");
-                                }
-                              } catch {
-                                uiActions.setNote("Import failed");
-                              } finally {
-                                e.currentTarget.value = "";
-                              }
-                            }}
-                          />
-                        </label>
-                      </div>
-                    </div>
-                    {presets.length === 0 ? (
-                      <div className="text-sm text-gray-600 mt-2">
-                        No presets yet. Use Advanced Search to create one.
-                      </div>
-                    ) : (
-                      <div className="mt-2 divide-y">
-                        {presets.map((p) => (
-                          <div
-                            key={p.name}
-                            className="py-2 flex items-center justify-between gap-3"
+                        setSelectedView("results");
+                        uiActions.setNote(`${paths.length} in ${name}`);
+                      }}
+                      onDelete={async (name: string) => {
+                        try {
+                          const { apiDeleteCollection, apiGetCollections } =
+                            await import("./api");
+                          await apiDeleteCollection(dir, name);
+                          const r = await apiGetCollections(dir);
+                          photoActions.setCollections(r.collections || {});
+                          setToast({ message: `Deleted collection ${name}` });
+                        } catch (e) {
+                          uiActions.setNote(
+                            e instanceof Error ? e.message : "Delete failed"
+                          );
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+                {selectedView === "saved" && (
+                  <div className="p-4">
+                    <SavedSearches
+                      saved={saved}
+                      onRun={(_name: string, q: string, k?: number) => {
+                        setSearchText(q);
+                        if (k) photoActions.setTopK(k);
+                        doSearchImmediate(q);
+                      }}
+                      onDelete={async (name: string) => {
+                        try {
+                          const { apiDeleteSaved, apiGetSaved } = await import(
+                            "./api"
+                          );
+                          await apiDeleteSaved(dir, name);
+                          const r = await apiGetSaved(dir);
+                          photoActions.setSaved(r.saved || []);
+                        } catch (e) {
+                          uiActions.setNote(
+                            e instanceof Error ? e.message : "Delete failed"
+                          );
+                        }
+                      }}
+                    />
+                    <div className="mt-4 bg-white border rounded p-3">
+                      <div className="flex items-center justify-between">
+                        <h2 className="font-semibold">Presets</h2>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="px-2 py-1 rounded border"
+                            onClick={loadPresets}
                           >
-                            <div className="min-w-0">
-                              <div
-                                className="font-medium truncate"
-                                title={p.name}
-                              >
-                                {p.name}
-                              </div>
-                              <div
-                                className="text-xs text-gray-600 truncate"
-                                title={p.query}
-                              >
-                                {p.query}
-                              </div>
-                            </div>
-                            <div className="flex gap-2 shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSearchText(p.query);
-                                  doSearch(p.query);
-                                }}
-                                className="px-2 py-1 rounded bg-blue-600 text-white text-sm"
-                              >
-                                Run
-                              </button>
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  try {
-                                    const { apiDeletePreset } = await import(
+                            Refresh
+                          </button>
+                          <button
+                            type="button"
+                            className="px-2 py-1 rounded border"
+                            onClick={() => {
+                              try {
+                                const data = JSON.stringify(
+                                  presets || [],
+                                  null,
+                                  2
+                                );
+                                const blob = new Blob([data], {
+                                  type: "application/json",
+                                });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement("a");
+                                a.href = url;
+                                a.download = "photo-search-presets.json";
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                                URL.revokeObjectURL(url);
+                              } catch {}
+                            }}
+                          >
+                            Export
+                          </button>
+                          <label className="px-2 py-1 rounded border cursor-pointer">
+                            Import
+                            <input
+                              type="file"
+                              accept="application/json"
+                              className="hidden"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                try {
+                                  const txt = await file.text();
+                                  const arr = JSON.parse(txt);
+                                  if (Array.isArray(arr)) {
+                                    const { apiAddPreset } = await import(
                                       "./api"
                                     );
-                                    await apiDeletePreset(dir, p.name);
+                                    for (const it of arr) {
+                                      if (
+                                        it &&
+                                        typeof it.name === "string" &&
+                                        typeof it.query === "string"
+                                      ) {
+                                        await apiAddPreset(
+                                          dir,
+                                          it.name,
+                                          it.query
+                                        );
+                                      }
+                                    }
                                     await loadPresets();
-                                  } catch {}
-                                }}
-                                className="px-2 py-1 rounded bg-red-600 text-white text-sm"
-                              >
-                                Delete
-                              </button>
+                                    setToast({
+                                      message: `Imported ${arr.length} preset(s)`,
+                                    });
+                                  } else {
+                                    uiActions.setNote("Invalid JSON format");
+                                  }
+                                } catch {
+                                  uiActions.setNote("Import failed");
+                                } finally {
+                                  e.currentTarget.value = "";
+                                }
+                              }}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                      {presets.length === 0 ? (
+                        <div className="text-sm text-gray-600 mt-2">
+                          No presets yet. Use Advanced Search to create one.
+                        </div>
+                      ) : (
+                        <div className="mt-2 divide-y">
+                          {presets.map((p) => (
+                            <div
+                              key={p.name}
+                              className="py-2 flex items-center justify-between gap-3"
+                            >
+                              <div className="min-w-0">
+                                <div
+                                  className="font-medium truncate"
+                                  title={p.name}
+                                >
+                                  {p.name}
+                                </div>
+                                <div
+                                  className="text-xs text-gray-600 truncate"
+                                  title={p.query}
+                                >
+                                  {p.query}
+                                </div>
+                              </div>
+                              <div className="flex gap-2 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSearchText(p.query);
+                                    doSearch(p.query);
+                                  }}
+                                  className="px-2 py-1 rounded bg-blue-600 text-white text-sm"
+                                >
+                                  Run
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    try {
+                                      const { apiDeletePreset } = await import(
+                                        "./api"
+                                      );
+                                      await apiDeletePreset(dir, p.name);
+                                      await loadPresets();
+                                    } catch {}
+                                  }}
+                                  className="px-2 py-1 rounded bg-red-600 text-white text-sm"
+                                >
+                                  Delete
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-              {selectedView === "memories" && (
-                <div className="p-4 space-y-4">
-                  <div className="bg-white border rounded p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="font-semibold">Recent Favorites</div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    {fav.length === 0 ? (
-                      <div className="text-sm text-gray-600 mt-2">
-                        No favorites yet.
-                      </div>
-                    ) : (
-                      <div className="mt-2 grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-2">
-                        {fav.slice(0, 24).map((p) => (
-                          <img
-                            key={p}
-                            src={thumbUrl(dir, engine, p, 196)}
-                            alt={basename(p)}
-                            className="w-full h-24 object-cover rounded"
-                          />
-                        ))}
-                      </div>
-                    )}
                   </div>
-                  <div>
+                )}
+                {selectedView === "memories" && (
+                  <div className="p-4 space-y-4">
+                    <div className="bg-white border rounded p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="font-semibold">Recent Favorites</div>
+                      </div>
+                      {fav.length === 0 ? (
+                        <div className="text-sm text-gray-600 mt-2">
+                          No favorites yet.
+                        </div>
+                      ) : (
+                        <div className="mt-2 grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-2">
+                          {fav.slice(0, 24).map((p) => (
+                            <img
+                              key={p}
+                              src={thumbUrl(dir, engine, p, 196)}
+                              alt={basename(p)}
+                              className="w-full h-24 object-cover rounded"
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <TripsView
+                        dir={dir}
+                        engine={engine}
+                        setBusy={uiActions.setBusy}
+                        setNote={uiActions.setNote}
+                        setResults={photoActions.setResults}
+                      />
+                    </div>
+                  </div>
+                )}
+                {selectedView === "tasks" && (
+                  <div className="p-4">
+                    <TasksView />
+                  </div>
+                )}
+                {selectedView === "smart" && (
+                  <div className="p-4">
+                    <SmartCollections
+                      dir={dir}
+                      engine={engine}
+                      topK={topK}
+                      smart={smart}
+                      setSmart={photoActions.setSmart}
+                      setResults={photoActions.setResults}
+                      setSearchId={photoActions.setSearchId}
+                      setNote={uiActions.setNote}
+                      query={query}
+                      favOnly={favOnly}
+                      tagFilter={tagFilter}
+                      useCaps={useCaps}
+                      useOcr={useOcr}
+                      hasText={hasText}
+                      camera={camera}
+                      isoMin={String(isoMin || "")}
+                      isoMax={String(isoMax || "")}
+                      fMin={String(fMin || "")}
+                      fMax={String(fMax || "")}
+                      place={place}
+                      persons={persons}
+                    />
+                  </div>
+                )}
+                {selectedView === "trips" && (
+                  <div className="p-4">
                     <TripsView
                       dir={dir}
                       engine={engine}
@@ -2429,680 +2485,645 @@ export default function App() {
                       setResults={photoActions.setResults}
                     />
                   </div>
-                </div>
-              )}
-              {selectedView === "tasks" && (
-                <div className="p-4">
-                  <TasksView />
-                </div>
-              )}
-              {selectedView === "smart" && (
-                <div className="p-4">
-                  <SmartCollections
-                    dir={dir}
-                    engine={engine}
-                    topK={topK}
-                    smart={smart}
-                    setSmart={photoActions.setSmart}
-                    setResults={photoActions.setResults}
-                    setSearchId={photoActions.setSearchId}
-                    setNote={uiActions.setNote}
-                    query={query}
-                    favOnly={favOnly}
-                    tagFilter={tagFilter}
-                    useCaps={useCaps}
-                    useOcr={useOcr}
-                    hasText={hasText}
-                    camera={camera}
-                    isoMin={String(isoMin || "")}
-                    isoMax={String(isoMax || "")}
-                    fMin={String(fMin || "")}
-                    fMax={String(fMax || "")}
-                    place={place}
-                    persons={persons}
-                  />
-                </div>
-              )}
-              {selectedView === "trips" && (
-                <div className="p-4">
-                  <TripsView
-                    dir={dir}
-                    engine={engine}
-                    setBusy={uiActions.setBusy}
-                    setNote={uiActions.setNote}
-                    setResults={photoActions.setResults}
-                  />
-                </div>
-              )}
-              {selectedView === "videos" && (
-                <div className="p-4">
-                  <VideoManager currentDir={dir} provider={engine} />
-                </div>
-              )}
-            </div>
-            <StatsBar items={items} note={note} diag={diag} engine={engine} />
-
-            {/* Filters panel */}
-            <FilterPanel
-              show={showFilters}
-              onClose={() => setShowFilters(false)}
-              onApply={() => {
-                setShowFilters(false);
-                doSearchImmediate(searchText);
-              }}
-              favOnly={favOnly}
-              setFavOnly={photoActions.setFavOnly}
-              tagFilter={tagFilter}
-              setTagFilter={photoActions.setTagFilter}
-              camera={camera}
-              setCamera={settingsActions.setCamera}
-              isoMin={String(isoMin || "")}
-              setIsoMin={(value: string) =>
-                settingsActions.setIsoMin(parseFloat(value) || 0)
-              }
-              isoMax={String(isoMax || "")}
-              setIsoMax={(value: string) =>
-                settingsActions.setIsoMax(parseFloat(value) || 0)
-              }
-              dateFrom={dateFrom}
-              setDateFrom={setDateFrom}
-              dateTo={dateTo}
-              setDateTo={setDateTo}
-              fMin={String(fMin || "")}
-              setFMin={(value: string) =>
-                settingsActions.setFMin(parseFloat(value) || 0)
-              }
-              fMax={String(fMax || "")}
-              setFMax={(value: string) =>
-                settingsActions.setFMax(parseFloat(value) || 0)
-              }
-              place={place}
-              setPlace={settingsActions.setPlace}
-              useCaps={useCaps}
-              setUseCaps={settingsActions.setUseCaps}
-              useOcr={useOcr}
-              setUseOcr={settingsActions.setUseOcr}
-              hasText={hasText}
-              setHasText={settingsActions.setHasText}
-            />
-            {modal?.kind === ("shareManage" as any) && (
-              <div
-                className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") setModal(null);
-                }}
-              >
-                <FocusTrap onEscape={() => setModal(null)}>
-                  <div
-                    className="bg-white rounded-lg p-4 w-full max-w-2xl"
-                    role="dialog"
-                    aria-modal="true"
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="font-semibold">Manage Shares</div>
-                      <button
-                        type="button"
-                        className="px-2 py-1 border rounded"
-                        onClick={() => setModal(null)}
-                      >
-                        Close
-                      </button>
-                    </div>
-                    <ShareManager dir={dir} />
+                )}
+                {selectedView === "videos" && (
+                  <div className="p-4">
+                    <VideoManager currentDir={dir} provider={engine} />
                   </div>
-                </FocusTrap>
+                )}
               </div>
-            )}
+              <StatsBar items={items} note={note} diag={diag} engine={engine} />
 
-            {/* Modals */}
-            {modal?.kind === "export" && (
-              <ExportModal
-                selected={selected}
-                dir={dir}
-                onClose={() => setModal(null)}
-                uiActions={uiActions}
-              />
-            )}
-            {modal?.kind === "enhanced-share" && (
-              <EnhancedSharingModal
-                selected={selected}
-                dir={dir}
-                onClose={() => setModal(null)}
-                uiActions={uiActions}
-              />
-            )}
-            {modal?.kind === ("share" as any) && (
-              <div
-                className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") setModal(null);
+              {/* Filters panel */}
+              <FilterPanel
+                show={showFilters}
+                onClose={() => setShowFilters(false)}
+                onApply={() => {
+                  setShowFilters(false);
+                  doSearchImmediate(searchText);
                 }}
-              >
-                <FocusTrap onEscape={() => setModal(null)}>
-                  <div
-                    className="bg-white rounded-lg p-4 w-full max-w-md"
-                    role="dialog"
-                    aria-modal="true"
-                  >
-                    <div className="font-semibold mb-2">Share (v1)</div>
-                    <form
-                      onSubmit={async (e) => {
-                        e.preventDefault();
-                        if (!dir) return;
-                        const sel = Array.from(selected);
-                        if (sel.length === 0) {
-                          alert("Select photos to share");
-                          return;
-                        }
-                        const f = e.target as HTMLFormElement;
-                        const expiry = parseInt(
-                          (f.elements.namedItem("expiry") as HTMLInputElement)
-                            .value || "24",
-                          10
-                        );
-                        const pw = (
-                          f.elements.namedItem("pw") as HTMLInputElement
-                        ).value.trim();
-                        const viewOnly = (
-                          f.elements.namedItem("viewonly") as HTMLInputElement
-                        ).checked;
-                        try {
-                          const { apiCreateShare } = await import("./api");
-                          const r = await apiCreateShare(dir, engine, sel, {
-                            expiryHours: Number.isNaN(expiry) ? 24 : expiry,
-                            password: pw || undefined,
-                            viewOnly,
-                          });
-                          await navigator.clipboard.writeText(
-                            window.location.origin + r.url
-                          );
-                          uiActions.setNote("Share link copied to clipboard");
-                        } catch (err) {
-                          uiActions.setNote(
-                            err instanceof Error ? err.message : "Share failed"
-                          );
-                        }
-                        setModal(null);
-                      }}
+                favOnly={favOnly}
+                setFavOnly={photoActions.setFavOnly}
+                tagFilter={tagFilter}
+                setTagFilter={photoActions.setTagFilter}
+                camera={camera}
+                setCamera={settingsActions.setCamera}
+                isoMin={String(isoMin || "")}
+                setIsoMin={(value: string) =>
+                  settingsActions.setIsoMin(parseFloat(value) || 0)
+                }
+                isoMax={String(isoMax || "")}
+                setIsoMax={(value: string) =>
+                  settingsActions.setIsoMax(parseFloat(value) || 0)
+                }
+                dateFrom={dateFrom}
+                setDateFrom={setDateFrom}
+                dateTo={dateTo}
+                setDateTo={setDateTo}
+                fMin={String(fMin || "")}
+                setFMin={(value: string) =>
+                  settingsActions.setFMin(parseFloat(value) || 0)
+                }
+                fMax={String(fMax || "")}
+                setFMax={(value: string) =>
+                  settingsActions.setFMax(parseFloat(value) || 0)
+                }
+                place={place}
+                setPlace={settingsActions.setPlace}
+                useCaps={useCaps}
+                setUseCaps={settingsActions.setUseCaps}
+                useOcr={useOcr}
+                setUseOcr={settingsActions.setUseOcr}
+                hasText={hasText}
+                setHasText={settingsActions.setHasText}
+              />
+              {modal?.kind === ("shareManage" as any) && (
+                <div
+                  className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") setModal(null);
+                  }}
+                >
+                  <FocusTrap onEscape={() => setModal(null)}>
+                    <div
+                      className="bg-white rounded-lg p-4 w-full max-w-2xl"
+                      role="dialog"
+                      aria-modal="true"
                     >
-                      <div className="grid gap-3">
-                        <div>
-                          <label
-                            className="block text-sm text-gray-600 mb-1"
-                            htmlFor="expiry-input"
-                          >
-                            Expiry (hours)
-                          </label>
-                          <input
-                            id="expiry-input"
-                            name="expiry"
-                            type="number"
-                            min={1}
-                            defaultValue={24}
-                            className="w-full border rounded px-2 py-1"
-                          />
-                        </div>
-                        <div>
-                          <label
-                            className="block text-sm text-gray-600 mb-1"
-                            htmlFor="pw-input"
-                          >
-                            Password (optional)
-                          </label>
-                          <input
-                            id="pw-input"
-                            name="pw"
-                            type="password"
-                            className="w-full border rounded px-2 py-1"
-                            placeholder="••••••"
-                          />
-                        </div>
-                        <label className="flex items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            name="viewonly"
-                            defaultChecked
-                          />{" "}
-                          View-only (disable downloads)
-                        </label>
-                      </div>
-                      <div className="mt-4 flex justify-end gap-2">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="font-semibold">Manage Shares</div>
                         <button
                           type="button"
-                          className="px-3 py-1 rounded border"
+                          className="px-2 py-1 border rounded"
                           onClick={() => setModal(null)}
-                          aria-label="Cancel sharing"
                         >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          className="px-3 py-1 rounded bg-blue-600 text-white"
-                          aria-label="Create shareable link"
-                        >
-                          Create Link
+                          Close
                         </button>
                       </div>
-                    </form>
-                  </div>
-                </FocusTrap>
-              </div>
-            )}
-            {modal?.kind === "tag" && (
-              <TagModal
-                onClose={() => setModal(null)}
-                onTagSelected={tagSelected}
-              />
-            )}
-            {modal?.kind === "folder" && (
-              <FolderModal
-                dir={dir}
-                useOsTrash={useOsTrash}
-                useFast={useFast}
-                fastKind={fastKind}
-                useCaps={useCaps}
-                useOcr={useOcr}
-                hasText={hasText}
-                highContrast={highContrast}
-                onClose={() => setModal(null)}
-                settingsActions={
-                  {
-                    ...settingsActions,
-                    setHighContrast: () => {}, // Dummy implementation
-                  } as any
-                }
-                uiActions={uiActions}
-                doIndex={doIndex}
-                prepareFast={(kind: string) =>
-                  prepareFast(kind as "annoy" | "faiss" | "hnsw")
-                }
-                buildOCR={buildOCR}
-                buildMetadata={buildMetadata}
-              />
-            )}
-            {modal?.kind === "likeplus" && (
-              <LikePlusModal
-                selected={selected}
-                dir={dir}
-                engine={engine}
-                topK={topK}
-                onClose={() => setModal(null)}
-                setSelectedView={(view: string) =>
-                  setSelectedView(view as View)
-                }
-                photoActions={photoActions}
-                uiActions={uiActions}
-              />
-            )}
-            {modal?.kind === "save" && (
-              <SaveModal
-                dir={dir}
-                searchText={searchText}
-                query={query}
-                topK={topK}
-                onClose={() => setModal(null)}
-                setSelectedView={(view: string) =>
-                  setSelectedView(view as View)
-                }
-                photoActions={photoActions}
-                uiActions={uiActions}
-              />
-            )}
-            {modal?.kind === "collect" && (
-              <CollectionModal
-                selected={selected}
-                dir={dir}
-                collections={collections}
-                onClose={() => setModal(null)}
-                setToast={setToast}
-                photoActions={photoActions}
-                uiActions={uiActions}
-              />
-            )}
-            {modal?.kind === "removeCollect" && (
-              <RemoveCollectionModal
-                selected={selected}
-                dir={dir}
-                collections={collections}
-                onClose={() => setModal(null)}
-                setToast={setToast}
-                photoActions={photoActions}
-                uiActions={uiActions}
-              />
-            )}
+                      <ShareManager dir={dir} />
+                    </div>
+                  </FocusTrap>
+                </div>
+              )}
 
-            {/* Lightbox */}
-            {detailIdx !== null &&
-              results &&
-              results[detailIdx] &&
-              (VideoService.isVideoFile(results[detailIdx].path) ? (
-                <VideoLightbox
-                  videoPath={results[detailIdx].path}
-                  videoUrl={`/api/media/${encodeURIComponent(
-                    results[detailIdx].path
-                  )}`}
-                  onPrevious={() => navDetail(-1)}
-                  onNext={() => navDetail(1)}
-                  onClose={() => setDetailIdx(null)}
+              {/* Modals */}
+              {modal?.kind === "export" && (
+                <ExportModal
+                  selected={selected}
+                  dir={dir}
+                  onClose={() => setModal(null)}
+                  uiActions={uiActions}
                 />
-              ) : (
-                <Lightbox
+              )}
+              {modal?.kind === "enhanced-share" && (
+                <EnhancedSharingModal
+                  selected={selected}
+                  dir={dir}
+                  onClose={() => setModal(null)}
+                  uiActions={uiActions}
+                />
+              )}
+              {modal?.kind === ("share" as any) && (
+                <div
+                  className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") setModal(null);
+                  }}
+                >
+                  <FocusTrap onEscape={() => setModal(null)}>
+                    <div
+                      className="bg-white rounded-lg p-4 w-full max-w-md"
+                      role="dialog"
+                      aria-modal="true"
+                    >
+                      <div className="font-semibold mb-2">Share (v1)</div>
+                      <form
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          if (!dir) return;
+                          const sel = Array.from(selected);
+                          if (sel.length === 0) {
+                            alert("Select photos to share");
+                            return;
+                          }
+                          const f = e.target as HTMLFormElement;
+                          const expiry = parseInt(
+                            (f.elements.namedItem("expiry") as HTMLInputElement)
+                              .value || "24",
+                            10
+                          );
+                          const pw = (
+                            f.elements.namedItem("pw") as HTMLInputElement
+                          ).value.trim();
+                          const viewOnly = (
+                            f.elements.namedItem("viewonly") as HTMLInputElement
+                          ).checked;
+                          try {
+                            const { apiCreateShare } = await import("./api");
+                            const r = await apiCreateShare(dir, engine, sel, {
+                              expiryHours: Number.isNaN(expiry) ? 24 : expiry,
+                              password: pw || undefined,
+                              viewOnly,
+                            });
+                            await navigator.clipboard.writeText(
+                              window.location.origin + r.url
+                            );
+                            uiActions.setNote("Share link copied to clipboard");
+                          } catch (err) {
+                            uiActions.setNote(
+                              err instanceof Error
+                                ? err.message
+                                : "Share failed"
+                            );
+                          }
+                          setModal(null);
+                        }}
+                      >
+                        <div className="grid gap-3">
+                          <div>
+                            <label
+                              className="block text-sm text-gray-600 mb-1"
+                              htmlFor="expiry-input"
+                            >
+                              Expiry (hours)
+                            </label>
+                            <input
+                              id="expiry-input"
+                              name="expiry"
+                              type="number"
+                              min={1}
+                              defaultValue={24}
+                              className="w-full border rounded px-2 py-1"
+                            />
+                          </div>
+                          <div>
+                            <label
+                              className="block text-sm text-gray-600 mb-1"
+                              htmlFor="pw-input"
+                            >
+                              Password (optional)
+                            </label>
+                            <input
+                              id="pw-input"
+                              name="pw"
+                              type="password"
+                              className="w-full border rounded px-2 py-1"
+                              placeholder="••••••"
+                            />
+                          </div>
+                          <label className="flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              name="viewonly"
+                              defaultChecked
+                            />{" "}
+                            View-only (disable downloads)
+                          </label>
+                        </div>
+                        <div className="mt-4 flex justify-end gap-2">
+                          <button
+                            type="button"
+                            className="px-3 py-1 rounded border"
+                            onClick={() => setModal(null)}
+                            aria-label="Cancel sharing"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            className="px-3 py-1 rounded bg-blue-600 text-white"
+                            aria-label="Create shareable link"
+                          >
+                            Create Link
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </FocusTrap>
+                </div>
+              )}
+              {modal?.kind === "tag" && (
+                <TagModal
+                  onClose={() => setModal(null)}
+                  onTagSelected={tagSelected}
+                />
+              )}
+              {modal?.kind === "folder" && (
+                <FolderModal
+                  dir={dir}
+                  useOsTrash={useOsTrash}
+                  useFast={useFast}
+                  fastKind={fastKind}
+                  useCaps={useCaps}
+                  useOcr={useOcr}
+                  hasText={hasText}
+                  highContrast={highContrast}
+                  onClose={() => setModal(null)}
+                  settingsActions={
+                    {
+                      ...settingsActions,
+                      setHighContrast: () => {}, // Dummy implementation
+                    } as any
+                  }
+                  uiActions={uiActions}
+                  doIndex={doIndex}
+                  prepareFast={(kind: string) =>
+                    prepareFast(kind as "annoy" | "faiss" | "hnsw")
+                  }
+                  buildOCR={buildOCR}
+                  buildMetadata={buildMetadata}
+                />
+              )}
+              {modal?.kind === "likeplus" && (
+                <LikePlusModal
+                  selected={selected}
                   dir={dir}
                   engine={engine}
-                  path={results[detailIdx].path}
-                  onPrev={() => navDetail(-1)}
-                  onNext={() => navDetail(1)}
-                  onClose={() => setDetailIdx(null)}
-                  onReveal={async () => {
-                    try {
-                      const { apiOpen } = await import("./api");
-                      const p =
-                        results && detailIdx !== null
-                          ? results[detailIdx]?.path
-                          : undefined;
-                      if (p) await apiOpen(dir, p);
-                    } catch {}
-                  }}
-                  onFavorite={async () => {
-                    try {
-                      const p =
-                        results && detailIdx !== null
-                          ? results[detailIdx]?.path
-                          : undefined;
-                      if (p) {
-                        await apiSetFavorite(dir, p, !fav.includes(p));
-                        await loadFav();
-                      }
-                    } catch {}
-                  }}
-                  onMoreLikeThis={async () => {
-                    try {
-                      const { apiSearchLike } = await import("./api");
-                      const p =
-                        results && detailIdx !== null
-                          ? results[detailIdx]?.path
-                          : undefined;
-                      if (!p) return;
-                      uiActions.setBusy("Searching similar…");
-                      const r = await apiSearchLike(dir, p, engine, topK);
-                      photoActions.setResults(r.results || []);
-                      setSelectedView("results");
-                    } catch (e) {
-                      uiActions.setNote(
-                        e instanceof Error ? e.message : "Search failed"
-                      );
-                    } finally {
-                      uiActions.setBusy("");
-                    }
-                  }}
-                />
-              ))}
-
-            {/* Floating Jobs button + drawer */}
-            <button
-              type="button"
-              onClick={() => setModal({ kind: "jobs" as any })}
-              className="fixed bottom-4 right-4 bg-blue-600 text-white rounded-full shadow px-4 py-2"
-              title="Open Jobs"
-              aria-label="Open the jobs panel"
-            >
-              Jobs
-            </button>
-
-            {modal?.kind === ("jobs" as any) && (
-              <JobsDrawer open={true} onClose={() => setModal(null)} />
-            )}
-            {modal?.kind === ("advanced" as any) && (
-              <AdvancedSearchModal
-                open={true}
-                onClose={() => setModal(null)}
-                onApply={(q) => {
-                  setSearchText(q);
-                  doSearch(q);
-                  setModal(null);
-                }}
-                onSave={async (n, q) => {
-                  try {
-                    const { apiAddPreset } = await import("./api");
-                    await apiAddPreset(dir, n, q);
-                    setToast({ message: `Saved preset ${n}` });
-                    await loadPresets();
-                  } catch (e) {
-                    uiActions.setNote(
-                      e instanceof Error ? e.message : "Save failed"
-                    );
+                  topK={topK}
+                  onClose={() => setModal(null)}
+                  setSelectedView={(view: string) =>
+                    setSelectedView(view as View)
                   }
-                }}
-                allTags={allTags || []}
-                cameras={meta?.cameras || []}
-                people={(clusters || [])
-                  .filter((c) => c.name)
-                  .map((c) => String(c.name))}
-              />
-            )}
+                  photoActions={photoActions}
+                  uiActions={uiActions}
+                />
+              )}
+              {modal?.kind === "save" && (
+                <SaveModal
+                  dir={dir}
+                  searchText={searchText}
+                  query={query}
+                  topK={topK}
+                  onClose={() => setModal(null)}
+                  setSelectedView={(view: string) =>
+                    setSelectedView(view as View)
+                  }
+                  photoActions={photoActions}
+                  uiActions={uiActions}
+                />
+              )}
+              {modal?.kind === "collect" && (
+                <CollectionModal
+                  selected={selected}
+                  dir={dir}
+                  collections={collections}
+                  onClose={() => setModal(null)}
+                  setToast={setToast}
+                  photoActions={photoActions}
+                  uiActions={uiActions}
+                />
+              )}
+              {modal?.kind === "removeCollect" && (
+                <RemoveCollectionModal
+                  selected={selected}
+                  dir={dir}
+                  collections={collections}
+                  onClose={() => setModal(null)}
+                  setToast={setToast}
+                  photoActions={photoActions}
+                  uiActions={uiActions}
+                />
+              )}
 
-            {/* Help Modal */}
-            <HelpModal
-              isOpen={showHelpModal}
-              onClose={() => setShowHelpModal(false)}
-              initialSection="getting-started"
-            />
-
-            {/* Theme Settings Modal */}
-            <ThemeSettingsModal
-              isOpen={showThemeModal}
-              onClose={() => setShowThemeModal(false)}
-            />
-
-            {/* Global progress overlay */}
-            {!!busy && (
-              <div
-                className="fixed inset-0 z-[1050] bg-black/40 flex items-center justify-center"
-                role="status"
-                aria-live="polite"
-              >
-                <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-6 w-full max-w-sm">
-                  <LoadingSpinner
-                    size="lg"
-                    message={busy}
-                    className="text-center"
+              {/* Lightbox */}
+              {detailIdx !== null &&
+                results &&
+                results[detailIdx] &&
+                (VideoService.isVideoFile(results[detailIdx].path) ? (
+                  <VideoLightbox
+                    videoPath={results[detailIdx].path}
+                    videoUrl={`/api/media/${encodeURIComponent(
+                      results[detailIdx].path
+                    )}`}
+                    onPrevious={() => navDetail(-1)}
+                    onNext={() => navDetail(1)}
+                    onClose={() => setDetailIdx(null)}
                   />
-                  {note && (
-                    <p className="mt-3 text-sm text-gray-600 dark:text-gray-300 text-center">
-                      {note}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-            {toast && (
-              <div
-                className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[1070]"
-                role="status"
-                aria-live="polite"
-              >
-                <div className="flex items-center gap-3 bg-gray-900 text-white px-4 py-2 rounded shadow">
-                  <span className="text-sm">{toast.message}</span>
-                  {toast.actionLabel && toast.onAction && (
-                    <button
-                      type="button"
-                      className="text-sm underline"
-                      onClick={toast.onAction}
-                    >
-                      {toast.actionLabel}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    aria-label="Close notification"
-                    className="ml-1"
-                    onClick={() => {
-                      setToast(null);
-                      if (toastTimerRef.current) {
-                        window.clearTimeout(toastTimerRef.current);
-                        toastTimerRef.current = null;
+                ) : (
+                  <Lightbox
+                    dir={dir}
+                    engine={engine}
+                    path={results[detailIdx].path}
+                    onPrev={() => navDetail(-1)}
+                    onNext={() => navDetail(1)}
+                    onClose={() => setDetailIdx(null)}
+                    onReveal={async () => {
+                      try {
+                        const { apiOpen } = await import("./api");
+                        const p =
+                          results && detailIdx !== null
+                            ? results[detailIdx]?.path
+                            : undefined;
+                        if (p) await apiOpen(dir, p);
+                      } catch {}
+                    }}
+                    onFavorite={async () => {
+                      try {
+                        const p =
+                          results && detailIdx !== null
+                            ? results[detailIdx]?.path
+                            : undefined;
+                        if (p) {
+                          await apiSetFavorite(dir, p, !fav.includes(p));
+                          await loadFav();
+                        }
+                      } catch {}
+                    }}
+                    onMoreLikeThis={async () => {
+                      try {
+                        const { apiSearchLike } = await import("./api");
+                        const p =
+                          results && detailIdx !== null
+                            ? results[detailIdx]?.path
+                            : undefined;
+                        if (!p) return;
+                        uiActions.setBusy("Searching similar…");
+                        const r = await apiSearchLike(dir, p, engine, topK);
+                        photoActions.setResults(r.results || []);
+                        setSelectedView("results");
+                      } catch (e) {
+                        uiActions.setNote(
+                          e instanceof Error ? e.message : "Search failed"
+                        );
+                      } finally {
+                        uiActions.setBusy("");
                       }
                     }}
-                  >
-                    ×
-                  </button>
+                  />
+                ))}
+
+              {/* Floating Jobs button + drawer */}
+              <button
+                type="button"
+                onClick={() => setModal({ kind: "jobs" as any })}
+                className="fixed bottom-4 right-4 bg-blue-600 text-white rounded-full shadow px-4 py-2"
+                title="Open Jobs"
+                aria-label="Open the jobs panel"
+              >
+                Jobs
+              </button>
+
+              {modal?.kind === ("jobs" as any) && (
+                <JobsDrawer open={true} onClose={() => setModal(null)} />
+              )}
+              {modal?.kind === ("advanced" as any) && (
+                <AdvancedSearchModal
+                  open={true}
+                  onClose={() => setModal(null)}
+                  onApply={(q) => {
+                    setSearchText(q);
+                    doSearch(q);
+                    setModal(null);
+                  }}
+                  onSave={async (n, q) => {
+                    try {
+                      const { apiAddPreset } = await import("./api");
+                      await apiAddPreset(dir, n, q);
+                      setToast({ message: `Saved preset ${n}` });
+                      await loadPresets();
+                    } catch (e) {
+                      uiActions.setNote(
+                        e instanceof Error ? e.message : "Save failed"
+                      );
+                    }
+                  }}
+                  allTags={allTags || []}
+                  cameras={meta?.cameras || []}
+                  people={(clusters || [])
+                    .filter((c) => c.name)
+                    .map((c) => String(c.name))}
+                />
+              )}
+
+              {/* Help Modal */}
+              <HelpModal
+                isOpen={showHelpModal}
+                onClose={() => setShowHelpModal(false)}
+                initialSection="getting-started"
+              />
+
+              {/* Theme Settings Modal */}
+              <ThemeSettingsModal
+                isOpen={showThemeModal}
+                onClose={() => setShowThemeModal(false)}
+              />
+
+              {/* Global progress overlay */}
+              {!!busy && (
+                <div
+                  className="fixed inset-0 z-[1050] bg-black/40 flex items-center justify-center"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-6 w-full max-w-sm">
+                    <LoadingSpinner
+                      size="lg"
+                      message={busy}
+                      className="text-center"
+                    />
+                    {note && (
+                      <p className="mt-3 text-sm text-gray-600 dark:text-gray-300 text-center">
+                        {note}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+              {toast && (
+                <div
+                  className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[1070]"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <div className="flex items-center gap-3 bg-gray-900 text-white px-4 py-2 rounded shadow">
+                    <span className="text-sm">{toast.message}</span>
+                    {toast.actionLabel && toast.onAction && (
+                      <button
+                        type="button"
+                        className="text-sm underline"
+                        onClick={toast.onAction}
+                      >
+                        {toast.actionLabel}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      aria-label="Close notification"
+                      className="ml-1"
+                      onClick={() => {
+                        setToast(null);
+                        if (toastTimerRef.current) {
+                          window.clearTimeout(toastTimerRef.current);
+                          toastTimerRef.current = null;
+                        }
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+              )}
 
-            {/* Status Bar */}
-            <StatusBar
-              photoCount={library?.length || 0}
-              indexedCount={library?.length || 0}
-              searchProvider={engine}
-              isIndexing={isIndexing}
-              isConnected={true}
-              currentDirectory={dir}
-              activeJobs={jobs.filter((j) => j.status === "running").length}
-            />
+              {/* Status Bar */}
+              <StatusBar
+                photoCount={library?.length || 0}
+                indexedCount={library?.length || 0}
+                searchProvider={engine}
+                isIndexing={isIndexing}
+                isConnected={true}
+                currentDirectory={dir}
+                activeJobs={jobs.filter((j) => j.status === "running").length}
+              />
 
-            {/* Jobs Center */}
-            <JobsCenter
-              jobs={jobs}
-              onPause={(jobId) => {
-                setJobs((prev) =>
-                  prev.map((j) =>
-                    j.id === jobId ? { ...j, status: "paused" as const } : j
-                  )
-                );
-              }}
-              onResume={(jobId) => {
-                setJobs((prev) =>
-                  prev.map((j) =>
-                    j.id === jobId ? { ...j, status: "running" as const } : j
-                  )
-                );
-              }}
-              onCancel={(jobId) => {
-                setJobs((prev) =>
-                  prev.map((j) =>
-                    j.id === jobId ? { ...j, status: "cancelled" as const } : j
-                  )
-                );
-              }}
-              onRetry={(jobId) => {
-                setJobs((prev) =>
-                  prev.map((j) =>
-                    j.id === jobId ? { ...j, status: "queued" as const } : j
-                  )
-                );
-              }}
-              onClear={(jobId) => {
-                setJobs((prev) => prev.filter((j) => j.id !== jobId));
-              }}
-              onClearAll={() => {
-                setJobs((prev) =>
-                  prev.filter(
-                    (j) => j.status === "running" || j.status === "queued"
-                  )
-                );
-              }}
-            />
+              {/* Jobs Center */}
+              <JobsCenter
+                jobs={jobs}
+                onPause={(jobId) => {
+                  setJobs((prev) =>
+                    prev.map((j) =>
+                      j.id === jobId ? { ...j, status: "paused" as const } : j
+                    )
+                  );
+                }}
+                onResume={(jobId) => {
+                  setJobs((prev) =>
+                    prev.map((j) =>
+                      j.id === jobId ? { ...j, status: "running" as const } : j
+                    )
+                  );
+                }}
+                onCancel={(jobId) => {
+                  setJobs((prev) =>
+                    prev.map((j) =>
+                      j.id === jobId
+                        ? { ...j, status: "cancelled" as const }
+                        : j
+                    )
+                  );
+                }}
+                onRetry={(jobId) => {
+                  setJobs((prev) =>
+                    prev.map((j) =>
+                      j.id === jobId ? { ...j, status: "queued" as const } : j
+                    )
+                  );
+                }}
+                onClear={(jobId) => {
+                  setJobs((prev) => prev.filter((j) => j.id !== jobId));
+                }}
+                onClearAll={() => {
+                  setJobs((prev) =>
+                    prev.filter(
+                      (j) => j.status === "running" || j.status === "queued"
+                    )
+                  );
+                }}
+              />
 
-            {/* Bottom Navigation */}
-            <BottomNavigation
-              activeTab={bottomNavTab}
-              onTabChange={(tab) => {
-                setBottomNavTab(tab);
-                // Map bottom nav tabs to main views
-                switch (tab) {
-                  case "home":
-                    setSelectedView("library");
-                    break;
-                  case "search":
-                    setSelectedView("results");
-                    break;
-                  case "favorites":
-                    setSelectedView("results");
-                    photoActions.setFavOnly(true);
-                    break;
-                  case "settings":
-                    setSelectedView("tasks");
-                    break;
-                }
-              }}
-              onShowFilters={() => setShowFilters(true)}
-              onShowUpload={() => setModal({ kind: "folder" })}
-              onShowLibrary={() => setModal({ kind: "folder" })}
-              showSecondaryActions={true}
-            />
-          </div>
-
-          {/* Progressive Onboarding Components */}
-          <ContextualHelp
-            isVisible={showContextualHelp}
-            onDismiss={() => setShowContextualHelp(false)}
-            context={
-              selectedView as
-                | "search"
-                | "library"
-                | "results"
-                | "settings"
-                | "collections"
-            }
-            userActions={userActions}
-          />
-
-          <OnboardingChecklist
-            isVisible={showOnboardingChecklist}
-            onComplete={() => {
-              setShowOnboardingChecklist(false);
-              // Mark onboarding as complete
-              try {
-                localStorage.setItem("onboardingComplete", "true");
-              } catch {}
-            }}
-            completedSteps={onboardingSteps}
-            inProgressStepId={isIndexing ? "index_photos" : undefined}
-            onStepComplete={() => { /* no-op: completion is event-based */ }}
-            onStepAction={(step) => {
-              // Navigate to the appropriate task/page and keep current completion behavior
-              switch (step) {
-                case "select_directory": {
-                  // Open the folder picker and ensure we're on Library
-                  setSelectedView("library");
-                  setModal({ kind: "folder" });
-                  break;
-                }
-                case "index_photos": {
-                  // Kick off indexing and surface progress UI
-                  setSelectedView("library");
-                  if (!dir) {
-                    // If no directory yet, prompt to select one first
-                    setModal({ kind: "folder" });
-                  } else {
-                    doIndex();
+              {/* Bottom Navigation */}
+              <BottomNavigation
+                activeTab={bottomNavTab}
+                onTabChange={(tab) => {
+                  setBottomNavTab(tab);
+                  // Map bottom nav tabs to main views
+                  switch (tab) {
+                    case "home":
+                      setSelectedView("library");
+                      break;
+                    case "search":
+                      setSelectedView("results");
+                      break;
+                    case "favorites":
+                      setSelectedView("results");
+                      photoActions.setFavOnly(true);
+                      break;
+                    case "settings":
+                      setSelectedView("tasks");
+                      break;
                   }
-                  break;
-                }
-                case "first_search": {
-                  // Jump to search view; hint with a helpful toast
-                  setSelectedView("results");
-                  setToast({
-                    message: "Try searching: beach sunset, birthday cake, mountain hike",
-                  });
-                  break;
-                }
-                case "explore_features": {
-                  // Take users to Collections to explore features
-                  setSelectedView("collections" as any);
-                  setToast({ message: "Explore collections, favorites, and sharing" });
-                  break;
-                }
+                }}
+                onShowFilters={() => setShowFilters(true)}
+                onShowUpload={() => setModal({ kind: "folder" })}
+                onShowLibrary={() => setModal({ kind: "folder" })}
+                showSecondaryActions={true}
+              />
+            </div>
+
+            {/* Progressive Onboarding Components */}
+            <ContextualHelp
+              isVisible={showContextualHelp}
+              onDismiss={() => setShowContextualHelp(false)}
+              context={
+                selectedView as
+                  | "search"
+                  | "library"
+                  | "results"
+                  | "settings"
+                  | "collections"
               }
-            }}
-          />
+              userActions={userActions}
+            />
 
-          {/* Removed blocking GuidedIndexingFlow - indexing now runs in background */}
+            <OnboardingChecklist
+              isVisible={showOnboardingChecklist}
+              onComplete={() => {
+                setShowOnboardingChecklist(false);
+                // Mark onboarding as complete
+                try {
+                  localStorage.setItem("onboardingComplete", "true");
+                } catch {}
+              }}
+              completedSteps={onboardingSteps}
+              inProgressStepId={isIndexing ? "index_photos" : undefined}
+              onStepComplete={() => {
+                /* no-op: completion is event-based */
+              }}
+              onStepAction={(step) => {
+                // Navigate to the appropriate task/page and keep current completion behavior
+                switch (step) {
+                  case "select_directory": {
+                    // Open the folder picker and ensure we're on Library
+                    setSelectedView("library");
+                    setModal({ kind: "folder" });
+                    break;
+                  }
+                  case "index_photos": {
+                    // Kick off indexing and surface progress UI
+                    setSelectedView("library");
+                    if (!dir) {
+                      // If no directory yet, prompt to select one first
+                      setModal({ kind: "folder" });
+                    } else {
+                      doIndex();
+                    }
+                    break;
+                  }
+                  case "first_search": {
+                    // Jump to search view; hint with a helpful toast
+                    setSelectedView("results");
+                    setToast({
+                      message:
+                        "Try searching: beach sunset, birthday cake, mountain hike",
+                    });
+                    break;
+                  }
+                  case "explore_features": {
+                    // Take users to Collections to explore features
+                    setSelectedView("collections" as any);
+                    setToast({
+                      message: "Explore collections, favorites, and sharing",
+                    });
+                    break;
+                  }
+                }
+              }}
+            />
 
-          {/* Performance Monitor for development */}
-          <PerformanceMonitor />
-        </div>
+            {/* Removed blocking GuidedIndexingFlow - indexing now runs in background */}
+
+            {/* Performance Monitor for development */}
+            <PerformanceMonitor />
+          </div>
         )}
       </ThemeProvider>
     </ErrorBoundary>

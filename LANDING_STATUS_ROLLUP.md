@@ -83,7 +83,7 @@
 ## Cross‑References (Context)
 - Intent‑first audits and roadmaps (scope and future claims):
   - `photo-search-intent-first/FEATURE_AUDIT_AND_ROADMAP.md:1`
-  - `INTENT_FIRST_FEATURE_AUDIT.md:1`
+  - `photo-search-intent-first/docs/INTENT_FIRST_FEATURE_AUDIT.md:1`
   - `photo-search-intent-first/photo-app-master-features.md:1`
   - `photo-search-intent-first/ISSUES.md:1`
   - `TODO.md:1`

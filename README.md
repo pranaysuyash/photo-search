@@ -60,7 +60,7 @@ Package + Entry Point
 
 Testing Without Downloading Models
 - Each folder contains a dummy smoke test that validates indexing and search logic without network/model downloads:
-  - Classic: `PYTHONPATH=photo-search-classic python3 photo-search-classic/tests/smoke_dummy.py`
+  - Classic: `PYTHONPATH=archive/photo-search-classic python3 archive/photo-search-classic/tests/smoke_dummy.py`
   - Intent-First: `PYTHONPATH=photo-search-intent-first python3 photo-search-intent-first/tests/smoke_dummy.py`
 
 See `DIFFERENCES.md` for a comparison of the two approaches.

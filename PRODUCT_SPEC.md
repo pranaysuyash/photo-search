@@ -14,14 +14,14 @@ This document captures the product vision, current capabilities, APIs, frontends
 
 ## Codebase Split
 - Classic app
-  - Streamlit (legacy UI): `photo-search-classic/app.py`
-  - Backend (FastAPI): `photo-search-classic/api/server.py`
-  - React Frontend (Vite + Tailwind + TS): `photo-search-classic/webapp` → builds to `photo-search-classic/api/web`
-  - Electron wrapper: `photo-search-classic/electron`
-  - Engine/store: `photo-search-classic/engine.py`
-  - Providers: `photo-search-classic/providers.py`
-  - Storage: `photo-search-classic/storage.py`
-  - Thumbs/EXIF/Dupes/Analytics: `photo-search-classic/thumbs.py`, `exif.py`, `dupes.py`, `analytics.py`
+  - Streamlit (legacy UI): `archive/photo-search-classic/app.py`
+  - Backend (FastAPI): `archive/photo-search-classic/api/server.py`
+  - React Frontend (Vite + Tailwind + TS): `archive/photo-search-classic/webapp` → builds to `archive/photo-search-classic/api/web`
+  - Electron wrapper: `archive/photo-search-classic/electron`
+  - Engine/store: `archive/photo-search-classic/engine.py`
+  - Providers: `archive/photo-search-classic/providers.py`
+  - Storage: `archive/photo-search-classic/storage.py`
+  - Thumbs/EXIF/Dupes/Analytics: `archive/photo-search-classic/thumbs.py`, `exif.py`, `dupes.py`, `analytics.py`
 
 - Intent‑First app
   - Streamlit (legacy UI): `photo-search-intent-first/ui/app.py`
@@ -91,7 +91,7 @@ This document captures the product vision, current capabilities, APIs, frontends
 
 ## Public APIs (summary)
 
-### Classic – `photo-search-classic/api/server.py`
+### Classic – `archive/photo-search-classic/api/server.py`
 - POST `/index` {dir, provider, batch_size}
 - POST `/search` {dir, provider, query, top_k, favorites_only?, tags?, date_from?, date_to?}
 - GET `/favorites` ?dir=…
@@ -164,7 +164,7 @@ This document captures the product vision, current capabilities, APIs, frontends
   - Electron: `cd ../electron && npm i && npm run dev`
 - Classic
   - Backend: `uvicorn photo-search-classic.api.server:app --port 8001 --reload`
-  - React: `cd photo-search-classic/webapp && npm i && npm run build`
+  - React: `cd archive/photo-search-classic/webapp && npm i && npm run build`
   - Electron: `cd ../electron && npm i && npm run dev`
 - Optional keys: `OPENAI_API_KEY`, `HF_API_TOKEN`
 
@@ -218,4 +218,3 @@ This document captures the product vision, current capabilities, APIs, frontends
 - On‑device engines keep all photos and embeddings local.
 - Cloud engines (HF/OpenAI) are explicit opt‑in; API keys are entered by the user; results/keys are not persisted beyond the session unless the user chooses to save them.
 - Index folders (.photo_index) remain within the user’s photo folders, portable and private.
-

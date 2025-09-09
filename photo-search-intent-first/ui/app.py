@@ -196,7 +196,7 @@ with st.sidebar:
             else:
                 st.info("DIFFERENCES.md not found.")
         if st.checkbox("Show intent handbook (summary)"):
-            hb = repo_root / "intent_first_handbook.md"
+            hb = PROJECT_ROOT / "docs" / "intent_first_handbook.md"
             if hb.exists():
                 # Show first ~120 lines to keep it light
                 lines = hb.read_text(encoding="utf-8", errors="ignore").splitlines()

@@ -16,9 +16,9 @@ This document aligns the two implementations (Classic vs Intent‑First), captur
 - Analytics/Feedback: Log searches and positive feedback, apply small ranking boosts
 
 References
-- Classic API: `photo-search-classic/api/server.py:1`
+- Classic API: `archive/photo-search-classic/api/server.py:1`
 - Intent‑First API: `photo-search-intent-first/api/server.py:1`
-- Classic React app: `photo-search-classic/webapp/src/App.tsx:1`
+- Classic React app: `archive/photo-search-classic/webapp/src/App.tsx:1`
 - Intent‑First React app: `photo-search-intent-first/webapp/src/App.tsx:1`
 
 

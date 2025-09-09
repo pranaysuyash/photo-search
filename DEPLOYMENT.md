@@ -35,12 +35,12 @@ Notes
 Local (without Docker)
 - Classic
   - API: `uvicorn photo-search-classic.api.server:app --port 8001 --reload`
-  - Web: `cd photo-search-classic/webapp && npm i && npm run build` (served by the API)
+- Web: `cd archive/photo-search-classic/webapp && npm i && npm run build` (served by the API)
 - Intent‑First
   - API: `uvicorn photo-search-intent-first.api.server:app --port 8000 --reload`
   - Web: `cd photo-search-intent-first/webapp && npm i && npm run build` (served by the API)
 
 
 Desktop Packaging (electron-builder)
-- Classic: `cd photo-search-classic/electron && npm i && npm run build:ui && npm run dist` → artifacts in `dist/`
+- Classic: `cd archive/photo-search-classic/electron && npm i && npm run build:ui && npm run dist` → artifacts in `dist/`
 - Intent‑First: `cd photo-search-intent-first/electron && npm i && npm run build:ui && npm run dist` → artifacts in `dist/`

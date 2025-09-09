@@ -46,7 +46,7 @@ Docs & Tests
 - [ ] Privacy & engine guidance — Both (planned)
 
 Files to compare
-- Classic API: `photo-search-classic/api/server.py:1`
+- Classic API: `archive/photo-search-classic/api/server.py:1`
 - Intent‑First API: `photo-search-intent-first/api/server.py:1`
-- Classic App: `photo-search-classic/webapp/src/App.tsx:1`
+- Classic App: `archive/photo-search-classic/webapp/src/App.tsx:1`
 - Intent‑First App: `photo-search-intent-first/webapp/src/App.tsx:1`

@@ -8,7 +8,7 @@ Photo Search is a semantic photo search application that allows users to find ph
 
 The project implements two distinct architectural approaches:
 
-1. **Classic Approach** (`photo-search-classic`) - A straightforward implementation with a single engine module
+1. **Classic Approach** (`archive/photo-search-classic`) - A straightforward implementation with a single engine module
 2. **Intent-First Approach** (`photo-search-intent-first`) - A more sophisticated implementation using layered architecture with explicit intent documentation
 
 ## Main Technologies
@@ -24,7 +24,7 @@ The project implements two distinct architectural approaches:
 
 ```
 photo-search/
-├── photo-search-classic/           # Classic implementation
+├── archive/photo-search-classic/   # Classic implementation (archived)
 │   ├── adapters/                   # Data adapters
 │   ├── api/                        # FastAPI server
 │   │   └── web/                    # React frontend build

@@ -7,7 +7,7 @@ Codex has been actively working on implementing several of the high-priority fea
 ## ✅ Recently Completed Features
 
 ### 1. Enhanced Welcome Wizard and Help System (Classic Version)
-**File**: `photo-search-classic/app.py`
+**File**: `archive/photo-search-classic/app.py`
 **Changes**: ~60 lines added
 
 **Implementation Details**:
