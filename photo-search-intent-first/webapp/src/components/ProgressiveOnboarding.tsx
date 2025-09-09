@@ -228,6 +228,8 @@ interface OnboardingChecklistProps {
   onComplete: () => void;
   completedSteps: string[];
   onStepComplete: (step: string) => void;
+  // Optional: trigger a navigation or task for a given step
+  onStepAction?: (step: string) => void;
 }
 
 export function OnboardingChecklist({
@@ -235,6 +237,7 @@ export function OnboardingChecklist({
   onComplete,
   completedSteps,
   onStepComplete,
+  onStepAction,
 }: OnboardingChecklistProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -381,7 +384,11 @@ export function OnboardingChecklist({
                         {!isCompleted && isNext && (
                           <button
                             type="button"
-                            onClick={() => onStepComplete(step.id)}
+                            onClick={() =>
+                              onStepAction
+                                ? onStepAction(step.id)
+                                : onStepComplete(step.id)
+                            }
                             className="mt-2 px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
                           >
                             {step.action}

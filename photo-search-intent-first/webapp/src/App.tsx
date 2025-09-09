@@ -3015,6 +3015,48 @@ export default function App() {
                 return prev;
               });
             }}
+            onStepAction={(step) => {
+              // Navigate to the appropriate task/page and keep current completion behavior
+              switch (step) {
+                case "select_directory": {
+                  // Open the folder picker and ensure we're on Library
+                  setSelectedView("library");
+                  setModal({ kind: "folder" });
+                  break;
+                }
+                case "index_photos": {
+                  // Kick off indexing and surface progress UI
+                  setSelectedView("library");
+                  doIndex();
+                  break;
+                }
+                case "first_search": {
+                  // Jump to search view; hint with a helpful toast
+                  setSelectedView("results");
+                  setToast({
+                    message: "Try searching: beach sunset, birthday cake, mountain hike",
+                  });
+                  break;
+                }
+                case "explore_features": {
+                  // Take users to Collections to explore features
+                  setSelectedView("collections" as any);
+                  setToast({ message: "Explore collections, favorites, and sharing" });
+                  break;
+                }
+              }
+              // Preserve existing behavior of marking the step complete
+              setOnboardingSteps((prev) => {
+                if (!prev.includes(step)) {
+                  const newSteps = [...prev, step];
+                  try {
+                    localStorage.setItem("onboardingSteps", JSON.stringify(newSteps));
+                  } catch {}
+                  return newSteps;
+                }
+                return prev;
+              });
+            }}
           />
 
           {/* Guided Indexing Flow */}

@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect, memo } from 'react';
-import { Search as IconSearch, Clock, TrendingUp } from 'lucide-react';
+import { Search as IconSearch, Clock, TrendingUp, History } from 'lucide-react';
 import { searchHistoryService, type SearchSuggestion } from '../services/SearchHistoryService';
 import { useSearchDebounce } from '../hooks/useDebounce';
+import { SearchHistoryPanel } from './SearchHistoryPanel';
 
 interface SearchBarProps {
   searchText: string;
@@ -23,7 +24,7 @@ type SuggestionItem = {
   type?: 'history' | 'metadata' | 'popular';
 };
 
-export const SearchBar = memo<SearchBarProps>(({ 
+export const SearchBar = memo<SearchBarProps>(({
   searchText,
   setSearchText,
   onSearch,
@@ -33,8 +34,9 @@ export const SearchBar = memo<SearchBarProps>(({
 }) => {
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [historySuggestions, setHistorySuggestions] = useState<SearchSuggestion[]>([]);
+  const [showHistoryPanel, setShowHistoryPanel] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Debounce search suggestions loading
   const debouncedSearchText = useSearchDebounce(searchText, 150);
 
@@ -75,7 +77,7 @@ export const SearchBar = memo<SearchBarProps>(({
             cat: histSugg.type === 'history' ? 'Recent' : 'Similar',
             label: histSugg.query,
             icon: histSugg.type === 'history' ? Clock : TrendingUp,
-            subtitle: histSugg.metadata?.lastUsed 
+            subtitle: histSugg.metadata?.lastUsed
               ? `${histSugg.metadata.useCount || 1} times, ${formatRelativeTime(histSugg.metadata.lastUsed)}`
               : undefined,
             type: 'history'
@@ -88,51 +90,51 @@ export const SearchBar = memo<SearchBarProps>(({
     const ppl = (clusters || [])
       .map((c) => c.name)
       .filter(Boolean) as string[];
-    
+
     for (const p of ppl) {
       if (!q || p.toLowerCase().includes(q)) {
-        suggestions.push({ 
-          cat: "People", 
+        suggestions.push({
+          cat: "People",
           label: p,
           type: 'metadata'
         });
       }
     }
-    
+
     for (const t of allTags || []) {
       if (!q || t.toLowerCase().includes(q)) {
-        suggestions.push({ 
-          cat: "Tag", 
+        suggestions.push({
+          cat: "Tag",
           label: t,
           type: 'metadata'
         });
       }
     }
-    
+
     for (const c of meta.cameras || []) {
       if (!q || c.toLowerCase().includes(q)) {
-        suggestions.push({ 
-          cat: "Camera", 
+        suggestions.push({
+          cat: "Camera",
           label: c,
           type: 'metadata'
         });
       }
     }
-    
+
     for (const pl of meta.places || []) {
       if (!q || String(pl).toLowerCase().includes(q)) {
-        suggestions.push({ 
-          cat: "Place", 
+        suggestions.push({
+          cat: "Place",
           label: String(pl),
           type: 'metadata'
         });
       }
     }
-    
+
     // Prioritize history suggestions and limit total
     const historySuggs = suggestions.filter(s => s.type === 'history').slice(0, 8);
     const metaSuggs = suggestions.filter(s => s.type === 'metadata').slice(0, 12);
-    
+
     return [...historySuggs, ...metaSuggs].slice(0, 20);
   };
 
@@ -189,6 +191,14 @@ export const SearchBar = memo<SearchBarProps>(({
           ref={searchInputRef}
           className="search-input"
         />
+        <button
+          type="button"
+          onClick={() => setShowHistoryPanel(true)}
+          className="history-button"
+          title="View search history"
+        >
+          <History className="history-icon" />
+        </button>
         {warnings.length > 0 && (
           <div className="ml-2 text-red-600 text-xs" title={warnings.join('\n')} aria-label="Query warnings">
             !
@@ -250,6 +260,15 @@ export const SearchBar = memo<SearchBarProps>(({
             ))
           )}
         </div>
+      )}
+      {showHistoryPanel && (
+        <SearchHistoryPanel
+          onSearch={(query) => {
+            setSearchText(query);
+            handleSearch(query);
+          }}
+          onClose={() => setShowHistoryPanel(false)}
+        />
       )}
     </div>
   );

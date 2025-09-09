@@ -89,21 +89,45 @@ export async function apiSearch(
   }
 
   try {
-    const result = await post<{ search_id: string; results: SearchResult[] }>(
-      '/search',
-      {
-        dir, provider, query, top_k: topK,
-        hf_token: opts?.hfToken, openai_key: opts?.openaiKey,
-        favorites_only: opts?.favoritesOnly, tags: opts?.tags,
-        date_from: opts?.dateFrom, date_to: opts?.dateTo,
-        use_fast: opts?.useFast, fast_kind: opts?.fastKind, use_captions: opts?.useCaptions, use_ocr: opts?.useOcr,
-        camera: opts?.camera, iso_min: opts?.isoMin, iso_max: opts?.isoMax, f_min: opts?.fMin, f_max: opts?.fMax,
-        flash: opts?.flash, wb: opts?.wb, metering: opts?.metering,
-        alt_min: opts?.altMin, alt_max: opts?.altMax, heading_min: opts?.headingMin, heading_max: opts?.headingMax,
-        place: opts?.place, has_text: opts?.hasText, person: opts?.person, persons: opts?.persons,
-        sharp_only: opts?.sharpOnly, exclude_underexp: opts?.excludeUnder, exclude_overexp: opts?.excludeOver,
-      },
-    )
+    // Build query parameters instead of JSON body to match backend expectations
+    const qs = new URLSearchParams({ 
+      dir, query, provider, 
+      top_k: String(topK) 
+    })
+    
+    if (opts?.hfToken) qs.set('hf_token', opts.hfToken)
+    if (opts?.openaiKey) qs.set('openai_key', opts.openaiKey)
+    if (opts?.favoritesOnly) qs.set('favorites_only', 'true')
+    if (opts?.tags) qs.set('tags', opts.tags.join(','))
+    if (opts?.dateFrom !== undefined) qs.set('date_from', String(opts.dateFrom))
+    if (opts?.dateTo !== undefined) qs.set('date_to', String(opts.dateTo))
+    if (opts?.useFast) qs.set('use_fast', 'true')
+    if (opts?.fastKind) qs.set('fast_kind', opts.fastKind)
+    if (opts?.useCaptions) qs.set('use_captions', 'true')
+    if (opts?.useOcr) qs.set('use_ocr', 'true')
+    if (opts?.camera) qs.set('camera', opts.camera)
+    if (opts?.isoMin !== undefined) qs.set('iso_min', String(opts.isoMin))
+    if (opts?.isoMax !== undefined) qs.set('iso_max', String(opts.isoMax))
+    if (opts?.fMin !== undefined) qs.set('f_min', String(opts.fMin))
+    if (opts?.fMax !== undefined) qs.set('f_max', String(opts.fMax))
+    if (opts?.flash) qs.set('flash', opts.flash)
+    if (opts?.wb) qs.set('wb', opts.wb)
+    if (opts?.metering) qs.set('metering', opts.metering)
+    if (opts?.altMin !== undefined) qs.set('alt_min', String(opts.altMin))
+    if (opts?.altMax !== undefined) qs.set('alt_max', String(opts.altMax))
+    if (opts?.headingMin !== undefined) qs.set('heading_min', String(opts.headingMin))
+    if (opts?.headingMax !== undefined) qs.set('heading_max', String(opts.headingMax))
+    if (opts?.place) qs.set('place', opts.place)
+    if (opts?.hasText) qs.set('has_text', 'true')
+    if (opts?.person) qs.set('person', opts.person)
+    if (opts?.persons) qs.set('persons', opts.persons.join(','))
+    if (opts?.sharpOnly) qs.set('sharp_only', 'true')
+    if (opts?.excludeUnder) qs.set('exclude_underexp', 'true')
+    if (opts?.excludeOver) qs.set('exclude_overexp', 'true')
+    
+    const r = await fetch(`${API_BASE}/search?${qs.toString()}`)
+    if (!r.ok) throw new Error(await r.text())
+    const result = await r.json() as { search_id: string; results: SearchResult[] }
 
     // Save search to history after successful search
     try {
