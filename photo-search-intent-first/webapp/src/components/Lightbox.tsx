@@ -1,5 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { thumbUrl, apiMetadataDetail } from '../api'
+import { ImageEditor } from '../modules/ImageEditor'
+import { FaceVerificationPanel } from './FaceVerificationPanel'
+import { QualityOverlay } from './QualityOverlay'
+import { TouchGestureService, useTouchGestures } from '../services/TouchGestureService'
 
 export function Lightbox({
   dir,
@@ -27,6 +31,40 @@ export function Lightbox({
   const [showInfo, setShowInfo] = useState(false)
   const [infoLoading, setInfoLoading] = useState(false)
   const [info, setInfo] = useState<any>(null)
+  const [showEditor, setShowEditor] = useState(false)
+  const [editedImagePath, setEditedImagePath] = useState<string>(path)
+  const [showQuality, setShowQuality] = useState(false)
+  const [showFacePanel, setShowFacePanel] = useState(false)
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null)
+  const [isSwiping, setIsSwiping] = useState(false)
+  
+  // Enhanced touch gesture handling
+  const touchGestureService = useTouchGestures(containerRef, {
+    minSwipeDistance: 50,
+    maxSwipeTime: 300,
+    maxScale: 5,
+    minScale: 0.5,
+    doubleTapZoom: 2,
+    enablePullToRefresh: false
+  })
+
+  // Set up gesture callbacks
+  useEffect(() => {
+    if (!touchGestureService) return
+
+    touchGestureService
+      .onSwipe((direction) => {
+        if (direction.left) onNext()
+        else if (direction.right) onPrev()
+      })
+      .onPinch((newScale, centerX, centerY) => {
+        zoom(newScale - scale, centerX, centerY)
+      })
+      .onDoubleTap((x, y) => {
+        if (scale === 1) zoom(1, x, y)
+        else resetZoom()
+      })
+  }, [touchGestureService, onPrev, onNext, scale])
 
   function zoom(delta: number, cx?: number, cy?: number) {
     const prev = scale
@@ -75,6 +113,55 @@ export function Lightbox({
     else resetZoom()
   }
 
+  // Touch/swipe gesture handlers for mobile navigation
+  function onTouchStart(e: React.TouchEvent) {
+    if (e.touches.length === 1) {
+      const touch = e.touches[0]
+      setTouchStart({ x: touch.clientX, y: touch.clientY })
+      setIsSwiping(false)
+    }
+  }
+
+  function onTouchMove(e: React.TouchEvent) {
+    if (!touchStart || e.touches.length !== 1) return
+    
+    const touch = e.touches[0]
+    const deltaX = touch.clientX - touchStart.x
+    const deltaY = touch.clientY - touchStart.y
+    const absDeltaX = Math.abs(deltaX)
+    const absDeltaY = Math.abs(deltaY)
+    
+    // Determine if horizontal swipe (ignore vertical swipes)
+    if (absDeltaX > absDeltaY && absDeltaX > 30) {
+      setIsSwiping(true)
+    }
+  }
+
+  function onTouchEnd(e: React.TouchEvent) {
+    if (!touchStart || !isSwiping) {
+      setTouchStart(null)
+      setIsSwiping(false)
+      return
+    }
+    
+    const touch = e.changedTouches[0]
+    const deltaX = touch.clientX - touchStart.x
+    const minSwipeDistance = 50 // Minimum distance for a valid swipe
+    
+    if (Math.abs(deltaX) > minSwipeDistance) {
+      if (deltaX > 0) {
+        // Swipe right - go to previous image
+        onPrev()
+      } else {
+        // Swipe left - go to next image
+        onNext()
+      }
+    }
+    
+    setTouchStart(null)
+    setIsSwiping(false)
+  }
+
   // Focus the dialog on open for accessibility
   useEffect(() => {
     containerRef.current?.focus()
@@ -120,6 +207,8 @@ export function Lightbox({
             <button type="button" onClick={onPrev} className="bg-white/20 rounded px-2 py-1">◀</button>
             <button type="button" onClick={onNext} className="bg-white/20 rounded px-2 py-1">▶</button>
             <button type="button" onClick={()=> setShowInfo(v=>!v)} className={`rounded px-2 py-1 ${showInfo ? 'bg-blue-600 text-white' : 'bg-white/20'}`}>Info</button>
+            <button type="button" onClick={()=> setShowQuality(v=>!v)} className={`rounded px-2 py-1 ${showQuality ? 'bg-green-600 text-white' : 'bg-white/20'}`}>Quality</button>
+            <button type="button" onClick={()=> setShowFacePanel(v=>!v)} className={`rounded px-2 py-1 ${showFacePanel ? 'bg-purple-600 text-white' : 'bg-white/20'}`}>Faces</button>
             <button type="button" onClick={onClose} className="bg-white text-black rounded px-2 py-1">Close</button>
           </div>
         </div>
@@ -131,6 +220,9 @@ export function Lightbox({
           onMouseUp={onMouseUp}
           onMouseLeave={onMouseLeave}
           onDoubleClick={onDblClick}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
           style={{ cursor: scale>1 && panning ? 'grabbing' : scale>1 ? 'grab' : 'default' }}
         >
           <img
@@ -141,6 +233,7 @@ export function Lightbox({
             alt={path}
             draggable={false}
           />
+          <QualityOverlay imagePath={path} show={showQuality} />
         </div>
         <div className="mt-3 flex flex-wrap gap-2 items-center">
           <div className="flex items-center gap-2 bg-white/10 rounded p-1">
@@ -150,6 +243,7 @@ export function Lightbox({
             <button type="button" onClick={resetZoom} className="px-2 py-1 bg-white/20 text-white rounded">Reset</button>
           </div>
           <button type="button" onClick={onReveal} className="px-3 py-1 bg-gray-200 rounded">Reveal in Finder/Explorer</button>
+          <button type="button" onClick={() => setShowEditor(true)} className="px-3 py-1 bg-green-600 text-white rounded">✏️ Edit</button>
           <button type="button" onClick={onFavorite} className="px-3 py-1 bg-pink-600 text-white rounded">♥ Favorite</button>
           {onMoreLikeThis && (
             <button type="button" onClick={onMoreLikeThis} className="px-3 py-1 bg-blue-600 text-white rounded">More like this</button>
@@ -182,6 +276,33 @@ export function Lightbox({
               <div className="text-sm text-gray-600">No metadata.</div>
             )}
           </div>
+        )}
+
+        {showFacePanel && (
+          <div className="mt-3 bg-white text-gray-900 rounded p-3">
+            <FaceVerificationPanel
+              imagePath={path}
+              detectedFaces={info?.faces || []}
+              knownPeople={new Map()}
+              onVerify={(clusterId, verified) => {
+                console.log('Face verified:', clusterId, verified)
+              }}
+              onCreateNew={(name) => {
+                console.log('New person created:', name)
+              }}
+            />
+          </div>
+        )}
+
+        {showEditor && (
+          <ImageEditor
+            imagePath={path}
+            onSave={(editedPath) => {
+              setEditedImagePath(editedPath)
+              setShowEditor(false)
+            }}
+            onClose={() => setShowEditor(false)}
+          />
         )}
       </div>
     </div>

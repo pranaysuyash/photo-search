@@ -1,5 +1,5 @@
-import React from 'react'
-import { apiBuildFaces, apiFacesName, thumbFaceUrl } from '../api'
+import React, { useState } from 'react'
+import { apiBuildFaces, apiFacesName, apiGetFacePhotos, apiMergeFaceClusters, apiSplitFaceCluster, thumbFaceUrl, thumbUrl } from '../api'
 
 interface PeopleViewProps {
   dir: string
@@ -11,11 +11,79 @@ interface PeopleViewProps {
   setBusy: (busy: string) => void
   setNote: (note: string) => void
   onLoadFaces: () => void
+  onOpenPhotos?: (photos: string[]) => void
 }
 
 export default function PeopleView({
-  dir, engine, clusters, persons, setPersons, busy, setBusy, setNote, onLoadFaces
+  dir, engine, clusters, persons, setPersons, busy, setBusy, setNote, onLoadFaces, onOpenPhotos
 }: PeopleViewProps) {
+  const [selectedClusterId, setSelectedClusterId] = useState<string | null>(null)
+  const [clusterPhotos, setClusterPhotos] = useState<string[]>([])
+  const [showClusterPhotos, setShowClusterPhotos] = useState(false)
+
+  const viewClusterPhotos = async (clusterId: string) => {
+    try {
+      setBusy('Loading photos...')
+      const result = await apiGetFacePhotos(dir, clusterId)
+      setClusterPhotos(result.photos)
+      setSelectedClusterId(clusterId)
+      setShowClusterPhotos(true)
+      setBusy('')
+      setNote(`Found ${result.photos.length} photos in cluster`)
+    } catch (e: any) {
+      setBusy('')
+      setNote(e.message)
+    }
+  }
+
+  const mergeClusters = async (sourceId: string, targetId: string) => {
+    try {
+      setBusy('Merging clusters...')
+      await apiMergeFaceClusters(dir, sourceId, targetId)
+      setBusy('')
+      setNote('Clusters merged successfully')
+      await onLoadFaces()
+    } catch (e: any) {
+      setBusy('')
+      setNote(e.message)
+    }
+  }
+
+  if (showClusterPhotos && selectedClusterId) {
+    return (
+      <div className="bg-white border rounded p-3">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold">Photos in Cluster</h3>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setShowClusterPhotos(false)}
+              className="bg-gray-200 rounded px-3 py-1 text-sm"
+            >
+              Back
+            </button>
+            <button 
+              onClick={() => onOpenPhotos?.(clusterPhotos)}
+              className="bg-blue-600 text-white rounded px-3 py-1 text-sm"
+            >
+              View All ({clusterPhotos.length})
+            </button>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+          {clusterPhotos.map((photo, index) => (
+            <img 
+              key={index}
+              src={thumbUrl(dir, engine, photo, 196)}
+              alt={`Photo ${index + 1}`}
+              className="w-full h-24 object-cover rounded cursor-pointer hover:ring-2 hover:ring-blue-500"
+              onClick={() => onOpenPhotos?.([photo])}
+            />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="bg-white border rounded p-3">
       <div className="flex items-center justify-between">
@@ -40,9 +108,17 @@ export default function PeopleView({
                   <img key={i} src={thumbFaceUrl(dir, engine, p, emb, 196)} className="w-full h-16 object-cover rounded" />
                 ))}
               </div>
-              <div className="mt-2 flex gap-2">
-                <button onClick={()=>{ const nm = c.name || ''; if(!nm) return; const next = persons.includes(nm) ? persons.filter((x:string)=>x!==nm) : [...persons, nm]; setPersons(next) }} disabled={!c.name} className={`px-2 py-1 rounded ${c.name && persons.includes(c.name) ? 'bg-blue-700 text-white' : (c.name ? 'bg-blue-600 text-white' : 'bg-gray-200')}`}>{c.name && persons.includes(c.name) ? 'Remove' : 'Add'}</button>
-                <button onClick={async()=>{ const n = prompt('Name this person as…', c.name||'')||''; if(!n.trim()) return; try{ await apiFacesName(dir, String(c.id), n.trim()); await onLoadFaces() } catch{} }} className="px-2 py-1 rounded bg-gray-200">Name</button>
+              <div className="mt-2 flex flex-col gap-2">
+                <div className="flex gap-1">
+                  <button onClick={()=>{ const nm = c.name || ''; if(!nm) return; const next = persons.includes(nm) ? persons.filter((x:string)=>x!==nm) : [...persons, nm]; setPersons(next) }} disabled={!c.name} className={`px-2 py-1 rounded text-xs ${c.name && persons.includes(c.name) ? 'bg-blue-700 text-white' : (c.name ? 'bg-blue-600 text-white' : 'bg-gray-200')}`}>{c.name && persons.includes(c.name) ? 'Remove' : 'Add'}</button>
+                  <button onClick={async()=>{ const n = prompt('Name this person as…', c.name||'')||''; if(!n.trim()) return; try{ await apiFacesName(dir, String(c.id), n.trim()); await onLoadFaces() } catch{} }} className="px-2 py-1 rounded bg-gray-200 text-xs">Name</button>
+                </div>
+                <button 
+                  onClick={() => viewClusterPhotos(c.id)}
+                  className="px-2 py-1 rounded bg-green-600 text-white text-xs w-full"
+                >
+                  View Photos ({c.size})
+                </button>
               </div>
             </div>
           ))}

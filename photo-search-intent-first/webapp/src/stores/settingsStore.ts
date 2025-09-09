@@ -5,6 +5,92 @@ import { SettingsState, SettingsActions } from "./types";
 
 interface SettingsStore extends SettingsState, SettingsActions {}
 
+// Theme types
+export type ThemeMode = "light" | "dark" | "auto";
+export type ColorScheme =
+  | "blue"
+  | "green"
+  | "purple"
+  | "orange"
+  | "gray"
+  | "custom";
+export type Density = "compact" | "normal" | "spacious";
+
+export interface ThemeState {
+  themeMode: ThemeMode;
+  colorScheme: ColorScheme;
+  density: Density;
+  customColors?: {
+    primary: string;
+    secondary: string;
+    accent: string;
+  };
+}
+
+export interface ThemeActions {
+  setThemeMode: (mode: ThemeMode) => void;
+  setColorScheme: (scheme: ColorScheme) => void;
+  setDensity: (density: Density) => void;
+  setCustomColors: (colors?: {
+    primary: string;
+    secondary: string;
+    accent: string;
+  }) => void;
+  resetTheme: () => void;
+}
+
+// Separate theme store
+interface ThemeStore extends ThemeState, ThemeActions {}
+
+export const useThemeStore = create<ThemeStore>()(
+  persist(
+    subscribeWithSelector((set, get) => ({
+      // Initial theme state
+      themeMode: "auto" as ThemeMode,
+      colorScheme: "blue" as ColorScheme,
+      density: "normal" as Density,
+      customColors: undefined,
+
+      // Theme actions
+      setThemeMode: (themeMode) => set({ themeMode }),
+      setColorScheme: (colorScheme) => set({ colorScheme }),
+      setDensity: (density) => set({ density }),
+      setCustomColors: (customColors) => set({ customColors }),
+      resetTheme: () =>
+        set({
+          themeMode: "auto",
+          colorScheme: "blue",
+          density: "normal",
+          customColors: undefined,
+        }),
+    })),
+    {
+      name: "photo-search-theme",
+      partialize: (state) => ({
+        themeMode: state.themeMode,
+        colorScheme: state.colorScheme,
+        density: state.density,
+        customColors: state.customColors,
+      }),
+    }
+  )
+);
+
+// Theme selectors
+export const useThemeMode = () => useThemeStore((state) => state.themeMode);
+export const useColorScheme = () => useThemeStore((state) => state.colorScheme);
+export const useDensity = () => useThemeStore((state) => state.density);
+export const useCustomColors = () =>
+  useThemeStore((state) => state.customColors);
+export const useThemeActions = () =>
+  useThemeStore((state) => ({
+    setThemeMode: state.setThemeMode,
+    setColorScheme: state.setColorScheme,
+    setDensity: state.setDensity,
+    setCustomColors: state.setCustomColors,
+    resetTheme: state.resetTheme,
+  }));
+
 export const useSettingsStore = create<SettingsStore>()(
   persist(
     subscribeWithSelector((set, get) => ({
@@ -22,6 +108,8 @@ export const useSettingsStore = create<SettingsStore>()(
       useOsTrash: false,
       // UI toggles
       showExplain: false,
+      showInfoOverlay: false,
+      highContrast: false,
 
       // EXIF filters
       camera: "",
@@ -44,6 +132,8 @@ export const useSettingsStore = create<SettingsStore>()(
       setHasText: (hasText) => set({ hasText }),
       setUseOsTrash: (useOsTrash) => set({ useOsTrash }),
       setShowExplain: (showExplain) => set({ showExplain }),
+      setShowInfoOverlay: (showInfoOverlay) => set({ showInfoOverlay }),
+      setHighContrast: (highContrast) => set({ highContrast }),
       setCamera: (camera) => set({ camera }),
       setIsoMin: (isoMin) => set({ isoMin }),
       setIsoMax: (isoMax) => set({ isoMax }),
@@ -65,6 +155,7 @@ export const useSettingsStore = create<SettingsStore>()(
         hasText: state.hasText,
         useOsTrash: state.useOsTrash,
         showExplain: state.showExplain,
+        showInfoOverlay: state.showInfoOverlay,
         camera: state.camera,
         isoMin: state.isoMin,
         isoMax: state.isoMax,
@@ -91,8 +182,14 @@ export const useCaptionsEnabled = () =>
 export const useVlmModel = () => useSettingsStore((state) => state.vlmModel);
 export const useOcrEnabled = () => useSettingsStore((state) => state.useOcr);
 export const useHasText = () => useSettingsStore((state) => state.hasText);
-export const useOsTrashEnabled = () => useSettingsStore((state) => state.useOsTrash);
-export const useShowExplain = () => useSettingsStore((state) => state.showExplain);
+export const useOsTrashEnabled = () =>
+  useSettingsStore((state) => state.useOsTrash);
+export const useShowExplain = () =>
+  useSettingsStore((state) => state.showExplain);
+export const useShowInfoOverlay = () =>
+  useSettingsStore((state) => state.showInfoOverlay);
+export const useHighContrast = () =>
+  useSettingsStore((state) => state.highContrast);
 export const useCamera = () => useSettingsStore((state) => state.camera);
 export const useIsoMin = () => useSettingsStore((state) => state.isoMin);
 export const useIsoMax = () => useSettingsStore((state) => state.isoMax);
@@ -112,16 +209,14 @@ export const useNeedsOAI = () => {
 
 // EXIF filters combined
 export const useExifFilters = () =>
-  useSettingsStore(
-    (state) => ({
-      camera: state.camera,
-      isoMin: state.isoMin,
-      isoMax: state.isoMax,
-      fMin: state.fMin,
-      fMax: state.fMax,
-      place: state.place,
-    })
-  );
+  useSettingsStore((state) => ({
+    camera: state.camera,
+    isoMin: state.isoMin,
+    isoMax: state.isoMax,
+    fMin: state.fMin,
+    fMax: state.fMax,
+    place: state.place,
+  }));
 
 // Stable actions selector
 const settingsActionsSelector = (state: any) => ({
@@ -137,6 +232,8 @@ const settingsActionsSelector = (state: any) => ({
   setHasText: state.setHasText,
   setUseOsTrash: state.setUseOsTrash,
   setShowExplain: state.setShowExplain,
+  setShowInfoOverlay: state.setShowInfoOverlay,
+  setHighContrast: state.setHighContrast,
   setCamera: state.setCamera,
   setIsoMin: state.setIsoMin,
   setIsoMax: state.setIsoMax,
@@ -146,4 +243,5 @@ const settingsActionsSelector = (state: any) => ({
 });
 
 // Actions selector - use shallow comparison
-export const useSettingsActions = () => useSettingsStore(settingsActionsSelector)
+export const useSettingsActions = () =>
+  useSettingsStore(settingsActionsSelector);

@@ -13,9 +13,9 @@ document.body.appendChild(container);
 try {
   const root = createRoot(container);
   root.render(
-    &lt;SimpleStoreProvider&gt;
-      &lt;App /&gt;
-    &lt;/SimpleStoreProvider&gt;
+    <SimpleStoreProvider>
+      <App />
+    </SimpleStoreProvider>
   );
   console.log('✓ App component rendered successfully');
 } catch (error) {

@@ -11,6 +11,8 @@
     "coverage:web": "npm run -s coverage:web:classic && npm run -s coverage:web:if"
   },
   "devDependencies": {
-    "react-scan": "^0.4.3"
+    "react-scan": "^0.4.3",
+    "rollup-plugin-visualizer": "^6.0.3",
+    "vite-plugin-compression": "^0.5.1"
   }
 }

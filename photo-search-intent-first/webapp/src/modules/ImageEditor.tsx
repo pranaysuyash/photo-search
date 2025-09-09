@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { getAPI } from '../services/PhotoVaultAPI';
 import { 
   RotateCw, Flip, Crop, Maximize, Download, 
-  Save, X, Check, ArrowUp, ArrowDown, ArrowLeft, ArrowRight 
+  Save, X, Check, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
+  Sun, Contrast, Palette
 } from 'lucide-react';
 
 interface ImageEditorProps {
@@ -13,6 +14,7 @@ interface ImageEditorProps {
 
 export function ImageEditor({ imagePath, onClose, onSave }: ImageEditorProps) {
   const [editedPath, setEditedPath] = useState(imagePath);
+  const [originalPath, setOriginalPath] = useState(imagePath);
   const [rotation, setRotation] = useState(0);
   const [flipH, setFlipH] = useState(false);
   const [flipV, setFlipV] = useState(false);
@@ -23,9 +25,35 @@ export function ImageEditor({ imagePath, onClose, onSave }: ImageEditorProps) {
   const [processing, setProcessing] = useState(false);
   const [history, setHistory] = useState<string[]>([imagePath]);
   const [historyIndex, setHistoryIndex] = useState(0);
+  const [showBeforeAfter, setShowBeforeAfter] = useState(false);
+  const [adjustments, setAdjustments] = useState({
+    brightness: 100,
+    contrast: 100,
+    saturation: 100
+  });
   
   const api = getAPI();
   const imageRef = useRef<HTMLImageElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Apply image adjustments using canvas
+  const applyAdjustments = (img: HTMLImageElement) => {
+    if (!canvasRef.current) return;
+    
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    
+    ctx.filter = `
+      brightness(${adjustments.brightness}%) 
+      contrast(${adjustments.contrast}%) 
+      saturate(${adjustments.saturation}%)
+    `;
+    ctx.drawImage(img, 0, 0);
+  };
 
   const applyRotation = async (degrees: number) => {
     setProcessing(true);
@@ -96,6 +124,22 @@ export function ImageEditor({ imagePath, onClose, onSave }: ImageEditorProps) {
     }
   };
 
+  const applyAdjustmentsToImage = async () => {
+    if (adjustments.brightness === 100 && adjustments.contrast === 100 && adjustments.saturation === 100) {
+      return;
+    }
+    
+    setProcessing(true);
+    try {
+      // For now, we'll just show a message since the backend doesn't support adjustments yet
+      alert('Adjustments would be applied here. In a full implementation, this would process the image with the selected adjustments.');
+    } catch (error) {
+      console.error('Failed to apply adjustments:', error);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const addToHistory = (path: string) => {
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push(path);
@@ -115,6 +159,17 @@ export function ImageEditor({ imagePath, onClose, onSave }: ImageEditorProps) {
       setHistoryIndex(historyIndex + 1);
       setEditedPath(history[historyIndex + 1]);
     }
+  };
+
+  const revertToOriginal = () => {
+    setEditedPath(originalPath);
+    setHistory([originalPath]);
+    setHistoryIndex(0);
+    setAdjustments({
+      brightness: 100,
+      contrast: 100,
+      saturation: 100
+    });
   };
 
   const handleSave = () => {
@@ -175,6 +230,16 @@ export function ImageEditor({ imagePath, onClose, onSave }: ImageEditorProps) {
         </div>
 
         <div className="toolbar-group">
+          <button 
+            onClick={() => setShowBeforeAfter(!showBeforeAfter)}
+            className="toolbar-btn"
+            title="Before/After Toggle"
+          >
+            <span>Before/After</span>
+          </button>
+        </div>
+
+        <div className="toolbar-group">
           <select 
             value={upscaleScale}
             onChange={(e) => setUpscaleScale(Number(e.target.value) as 2 | 4)}
@@ -219,6 +284,9 @@ export function ImageEditor({ imagePath, onClose, onSave }: ImageEditorProps) {
         </div>
 
         <div className="toolbar-group ml-auto">
+          <button onClick={revertToOriginal} className="toolbar-btn" title="Revert to Original">
+            Revert
+          </button>
           <button onClick={exportImage} className="toolbar-btn">
             <Download className="w-4 h-4" />
             Export
@@ -235,6 +303,56 @@ export function ImageEditor({ imagePath, onClose, onSave }: ImageEditorProps) {
         </div>
       </div>
 
+      {/* Adjustment Controls */}
+      <div className="adjustment-panel">
+        <div className="adjustment-control">
+          <Sun className="w-4 h-4" />
+          <label>Brightness</label>
+          <input
+            type="range"
+            min="0"
+            max="200"
+            value={adjustments.brightness}
+            onChange={(e) => setAdjustments({...adjustments, brightness: parseInt(e.target.value)})}
+            className="adjustment-slider"
+          />
+          <span>{adjustments.brightness}%</span>
+        </div>
+        <div className="adjustment-control">
+          <Contrast className="w-4 h-4" />
+          <label>Contrast</label>
+          <input
+            type="range"
+            min="0"
+            max="200"
+            value={adjustments.contrast}
+            onChange={(e) => setAdjustments({...adjustments, contrast: parseInt(e.target.value)})}
+            className="adjustment-slider"
+          />
+          <span>{adjustments.contrast}%</span>
+        </div>
+        <div className="adjustment-control">
+          <Palette className="w-4 h-4" />
+          <label>Saturation</label>
+          <input
+            type="range"
+            min="0"
+            max="200"
+            value={adjustments.saturation}
+            onChange={(e) => setAdjustments({...adjustments, saturation: parseInt(e.target.value)})}
+            className="adjustment-slider"
+          />
+          <span>{adjustments.saturation}%</span>
+        </div>
+        <button 
+          onClick={applyAdjustmentsToImage}
+          disabled={processing}
+          className="btn btn-secondary"
+        >
+          Apply Adjustments
+        </button>
+      </div>
+
       <div className="editor-canvas">
         {processing && (
           <div className="processing-overlay">
@@ -244,14 +362,37 @@ export function ImageEditor({ imagePath, onClose, onSave }: ImageEditorProps) {
         )}
         
         <div className="image-container">
-          <img 
-            ref={imageRef}
-            src={api.getThumbnailUrl(editedPath)}
-            alt="Editing"
-            style={{
-              transform: `rotate(${rotation}deg) ${flipH ? 'scaleX(-1)' : ''} ${flipV ? 'scaleY(-1)' : ''}`
-            }}
-          />
+          {showBeforeAfter ? (
+            <div className="before-after-container">
+              <div className="before-after-panel">
+                <h3>Before</h3>
+                <img 
+                  src={api.getThumbnailUrl(originalPath)}
+                  alt="Original"
+                />
+              </div>
+              <div className="before-after-panel">
+                <h3>After</h3>
+                <img 
+                  src={api.getThumbnailUrl(editedPath)}
+                  alt="Edited"
+                />
+              </div>
+            </div>
+          ) : (
+            <>
+              <img 
+                ref={imageRef}
+                src={api.getThumbnailUrl(editedPath)}
+                alt="Editing"
+                style={{
+                  transform: `rotate(${rotation}deg) ${flipH ? 'scaleX(-1)' : ''} ${flipV ? 'scaleY(-1)' : ''}`,
+                  filter: `brightness(${adjustments.brightness}%) contrast(${adjustments.contrast}%) saturate(${adjustments.saturation}%)`
+                }}
+              />
+              <canvas ref={canvasRef} style={{ display: 'none' }} />
+            </>
+          )}
           
           {cropMode && (
             <div 
@@ -293,6 +434,7 @@ export function ImageEditor({ imagePath, onClose, onSave }: ImageEditorProps) {
           padding: 1rem;
           background: var(--bg-secondary);
           border-bottom: 1px solid var(--border-subtle);
+          flex-wrap: wrap;
         }
 
         .toolbar-group {
@@ -339,6 +481,31 @@ export function ImageEditor({ imagePath, onClose, onSave }: ImageEditorProps) {
           border-radius: var(--radius-md);
         }
 
+        .adjustment-panel {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          padding: 0.5rem 1rem;
+          background: var(--bg-secondary);
+          border-bottom: 1px solid var(--border-subtle);
+          flex-wrap: wrap;
+        }
+
+        .adjustment-control {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+
+        .adjustment-control label {
+          font-size: 0.875rem;
+          white-space: nowrap;
+        }
+
+        .adjustment-slider {
+          width: 100px;
+        }
+
         .editor-canvas {
           flex: 1;
           display: flex;
@@ -366,6 +533,29 @@ export function ImageEditor({ imagePath, onClose, onSave }: ImageEditorProps) {
           position: relative;
           max-width: 90%;
           max-height: 90%;
+        }
+
+        .before-after-container {
+          display: flex;
+          gap: 2rem;
+          max-width: 100%;
+          max-height: 100%;
+        }
+
+        .before-after-panel {
+          flex: 1;
+          text-align: center;
+        }
+
+        .before-after-panel h3 {
+          margin-bottom: 0.5rem;
+          color: white;
+        }
+
+        .before-after-panel img {
+          max-width: 100%;
+          max-height: 80vh;
+          object-fit: contain;
         }
 
         .image-container img {
@@ -407,6 +597,27 @@ export function ImageEditor({ imagePath, onClose, onSave }: ImageEditorProps) {
 
         @keyframes spin {
           to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+          .editor-toolbar {
+            flex-direction: column;
+            align-items: stretch;
+          }
+          
+          .toolbar-group {
+            flex-wrap: wrap;
+            justify-content: center;
+          }
+          
+          .adjustment-panel {
+            flex-direction: column;
+            align-items: stretch;
+          }
+          
+          .adjustment-control {
+            justify-content: space-between;
+          }
         }
       `}</style>
     </div>

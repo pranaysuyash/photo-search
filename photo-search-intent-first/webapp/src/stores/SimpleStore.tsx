@@ -19,6 +19,10 @@ interface SimpleSettings {
   fMin: number
   fMax: number
   place: string
+  showInfoOverlay: boolean
+  resultView: 'grid' | 'film' | 'timeline'
+  timelineBucket: 'day' | 'week' | 'month'
+  includeVideos: boolean
 }
 
 interface SimplePhoto {
@@ -84,6 +88,10 @@ const initialState: SimpleStore = {
     fMin: 0.7,
     fMax: 32,
     place: '',
+    showInfoOverlay: false,
+    resultView: 'grid',
+    timelineBucket: 'day',
+    includeVideos: true,
   },
   photo: {
     results: [],
@@ -173,6 +181,10 @@ export const useIsoMax = () => useSimpleStore().state.settings.isoMax
 export const useFMin = () => useSimpleStore().state.settings.fMin
 export const useFMax = () => useSimpleStore().state.settings.fMax
 export const usePlace = () => useSimpleStore().state.settings.place
+export const useShowInfoOverlay = () => useSimpleStore().state.settings.showInfoOverlay
+export const useResultViewSetting = () => useSimpleStore().state.settings.resultView
+export const useTimelineBucketSetting = () => useSimpleStore().state.settings.timelineBucket
+export const useIncludeVideosSetting = () => useSimpleStore().state.settings.includeVideos
 export const useCaptionsEnabled = () => useSimpleStore().state.settings.useCaps
 export const useOcrEnabled = () => useSimpleStore().state.settings.useOcr
 export const useHasText = () => useSimpleStore().state.settings.hasText
@@ -230,6 +242,10 @@ export const useSettingsActions = () => {
     setFMin: (fMin: number) => setSettings({ fMin }),
     setFMax: (fMax: number) => setSettings({ fMax }),
     setPlace: (place: string) => setSettings({ place }),
+    setShowInfoOverlay: (showInfoOverlay: boolean) => setSettings({ showInfoOverlay }),
+    setResultView: (resultView: 'grid'|'film'|'timeline') => setSettings({ resultView }),
+    setTimelineBucket: (timelineBucket: 'day'|'week'|'month') => setSettings({ timelineBucket }),
+    setIncludeVideos: (includeVideos: boolean) => setSettings({ includeVideos }),
   }), [setSettings])
 }
 

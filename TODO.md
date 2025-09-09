@@ -6,11 +6,18 @@ Legend: [x] done • [>] in progress • [ ] planned • (opt) optional
 
 ## Top Priorities (Now)
 - [>] Long‑ops progress UI (index/OCR/metadata/fast) with indeterminate bar + notes
+- [ ] Index chip: show indexed count + coverage inline under count
+- [ ] Index chip hover: multi‑line card (processed N/D • indexed X • target T • coverage P% • drift D • ETA • last index time)
+- [ ] Humanized ETA in tooltip (e.g., 2m 30s) + show rate (items/s)
+- [ ] OCR pill hover: show OCR text count and CTA to build/update OCR when not ready
+- [ ] One‑click “Extract text (OCR)” from OCR hover (calls /ocr/build and updates status)
+- [ ] Quick video filters: preset dropdown (e.g., Videos > 30s, slow‑mo, timelapse)
 - [ ] Safe delete to OS trash + Undo (session)
 - [ ] Move to collection (add/remove)
 - [x] Ratings (⭐1–5) + rating filters
 - [x] Keyboard shortcut help overlay (cheat sheet)
 - [ ] Timeline view (date clusters + quick scrubbing)
+ - [>] API/Client contract alignment (JSON body for POST endpoints)
 
 ## Recently Delivered
 - [x] Modern UI shell + sidebar + multi‑views (Library/Results/People/Map/Collections/Smart/Trips/Saved/Memories/Tasks)
@@ -47,10 +54,11 @@ Legend: [x] done • [>] in progress • [ ] planned • (opt) optional
 
 ## Grid & Views
 - [x] Justified rows + virtualization
-- [ ] Grid overlay info (score/EXIF chips toggle)
-- [ ] Grid micro‑animations
+ - [x] Grid overlay info (toggle: filename + score + EXIF chips)
+- [ ] Grid micro-animations
 - [ ] Mosaic/Woven variants (opt)
 - [ ] Timeline view with auto clustering by date
+  - [>] Basic timeline view added (group by day, lazy EXIF load)
 
 ## Lightbox
 - [x] Zoom/pan + double‑click zoom
@@ -104,6 +112,81 @@ Legend: [x] done • [>] in progress • [ ] planned • (opt) optional
 - [ ] Progressive image loading tiers (thumb/med/full)
 - [ ] Cache controls (limits, clear)
 
+## Navigation & Routing
+- [x] HashRouter deep links (#/library, #/search, #/people, #/collections, #/settings)
+- [x] URL state for search query (`q`) with back/forward integration
+- [ ] Encode filters in URL (tags, favOnly, dates, people, place)
+- [ ] Route-aware view components (post-App.tsx refactor)
+- [ ] Deep link to people/collections detail (ids in URL; open view)
+
+## API/Client Contract Alignment Checklist
+- [x] /index (already JSON model)
+- [x] /search
+- [x] /search_workspace
+- [x] /captions/build
+- [x] /faces/build
+- [x] /faces/name
+- [x] /trips/build
+- [x] /search_like
+- [x] /search_like_plus
+- [x] /ocr/build
+- [x] /ocr/snippets
+- [x] /fast/build
+- [x] /favorites (POST)
+- [x] /tags (POST)
+- [x] /saved (POST)
+- [x] /saved/delete
+- [x] /collections
+- [x] /collections/delete
+- [x] /smart_collections
+- [x] /smart_collections/delete
+- [x] /smart_collections/resolve
+- [x] /feedback
+- [x] /analytics/log
+- [x] /lookalikes/resolve
+- [x] /open
+- [x] /edit/ops
+- [x] /edit/upscale
+- [x] /export
+- [x] /share
+- [x] /share/revoke
+- [x] /workspace/add
+- [x] /workspace/remove
+- [x] /metadata/build
+- [x] /autotag
+- [x] /delete
+- [x] /undo_delete
+
+## Sharing & Export
+- [x] Share link creation (expiry/password/view‑only)
+- [x] Share list + revoke
+- [x] Email share via mailto (prefill subject/body)
+- [x] Social share intents (open platform share URLs)
+- [x] Minimal share viewer (server HTML + React route)
+- [ ] Share viewer: paging for large sets
+- [ ] Share viewer: optional download/open on non‑view‑only
+- [ ] Share viewer: responsive grid + captions
+- [ ] Analytics: log share_created/share_open/share_revoked
+
+## Onboarding & Help
+- [x] First‑run modal with Quick Start, Custom, Demo
+- [x] “Start Tour” opens Help → Getting Started
+- [x] “?” shortcuts overlay available from Help
+- [ ] Step‑by‑step guided tour overlays (progressive onboarding)
+- [ ] Track TTFV metric (first successful search)
+
+## Empty States (Intent‑First)
+- [x] No directory: Select Folder, Demo, Start Tour, Help, sample queries
+- [x] No photos: helpful copy + Help
+- [x] No results: suggestions + Filters/Advanced/Clear filters + sample queries + Help
+- [ ] Personalize sample queries from library (tags, cameras, places)
+
+## Filters & Quick Actions
+- [x] Filters panel: Clear all filters
+- [x] Top bar: Clear filter tokens chip (query cleanup)
+- [ ] Show active filters count/badge near Filters
+- [ ] Encode filters in URL (tags/fav/dates/people/place) for deep‑links
+
 ## UX & Accessibility
 - [x] Keyboard navigation (arrows/Home/End/PageUp/PageDown; A/C/Space/F/Enter; “/” focus)
 - [ ] Shortcut overlay (cheat sheet)
@@ -138,7 +221,7 @@ Legend: [x] done • [>] in progress • [ ] planned • (opt) optional
 ### Sprint B (next)
 - [x] Ratings + filters
 - [ ] Timeline view (date clusters)
-- [ ] Grid overlay info toggle
+ - [x] Grid overlay info toggle
 - [ ] Progressive image loading tiers
 
 ### Sprint C (later)

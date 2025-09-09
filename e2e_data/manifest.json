@@ -1,0 +1,98 @@
+{
+  "dog.png": {
+    "size": 1931,
+    "mtime": 1756724011
+  },
+  "advay invite.png": {
+    "size": 3499879,
+    "mtime": 1756814447
+  },
+  "headshot vs 2.png": {
+    "size": 2614485,
+    "mtime": 1756814433
+  },
+  "advay.png": {
+    "size": 178831,
+    "mtime": 1756814348
+  },
+  "507054.jpg": {
+    "size": 192495,
+    "mtime": 1756814348
+  },
+  "friends.png": {
+    "size": 2038,
+    "mtime": 1756724011
+  },
+  "beach.png": {
+    "size": 1946,
+    "mtime": 1756724011
+  },
+  "Screenshot 2025-07-31 at 3.42.13\u202fPM.png": {
+    "size": 112921,
+    "mtime": 1756814386
+  },
+  "WhatsApp Image 2025-08-27 at 16.09.26.jpeg": {
+    "size": 277847,
+    "mtime": 1756814416
+  },
+  "Screenshot 2025-08-01 at 11.43.01\u202fPM.png": {
+    "size": 312372,
+    "mtime": 1756814386
+  },
+  "pranaysuyash_a_view_of_the_desert_from_the_mountain_top_shows_1a515ade-406e-46d5-9af0-0d22821ab3aa_3.png": {
+    "size": 1888341,
+    "mtime": 1756814422
+  },
+  "Screenshot 2025-08-28 at 11.16.12\u202fAM.png": {
+    "size": 181493,
+    "mtime": 1756814386
+  },
+  "tea.png": {
+    "size": 1701,
+    "mtime": 1756724011
+  },
+  "image_batteries.png": {
+    "size": 2562002,
+    "mtime": 1756814386
+  },
+  ".photo_index/clip-ViT-B-32/analytics.jsonl": {
+    "size": 261,
+    "mtime": 1757359228
+  },
+  ".photo_index/clip-ViT-B-32/paths.json": {
+    "size": 391,
+    "mtime": 1756729197
+  },
+  ".photo_index/clip-ViT-B-32/embeddings.npy": {
+    "size": 8320,
+    "mtime": 1756729197
+  },
+  ".photo_index/clip-ViT-B-32/thumbs/19f73a5ada824c68cb6ff2d2773aeec50bc38af7.jpg": {
+    "size": 1489,
+    "mtime": 1757359229
+  },
+  ".photo_index/hfapi-sentence-transformers_clip-ViT-B-32/paths.json": {
+    "size": 27,
+    "mtime": 1756816505
+  },
+  ".photo_index/hf-openai_clip-vit-base-patch32/paths.json": {
+    "size": 1579,
+    "mtime": 1757242311
+  },
+  ".photo_index/hf-openai_clip-vit-base-patch32/embeddings.npy": {
+    "size": 28800,
+    "mtime": 1757242311
+  },
+  ".photo_index/openai-cap-gpt-4o-mini-emb-text-embedding-3-small/paths.json": {
+    "size": 1579,
+    "mtime": 1756816723
+  },
+  ".photo_index/openai-cap-gpt-4o-mini-emb-text-embedding-3-small/embeddings.npy": {
+    "size": 86144,
+    "mtime": 1756816723
+  },
+  ".photo_index/hfcap-Salesforce_blip-image-captioning-large-emb-sentence-transformers_all-MiniLM-L6-v2/paths.json": {
+    "size": 27,
+    "mtime": 1756816507
+  }
+}

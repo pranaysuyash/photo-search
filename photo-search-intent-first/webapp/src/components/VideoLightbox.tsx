@@ -33,6 +33,8 @@ export function VideoLightbox({
   const [buffered, setBuffered] = useState(0);
   const [showInfo, setShowInfo] = useState(false);
   const [keyframes, setKeyframes] = useState<string[]>([]);
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
+  const [isSwiping, setIsSwiping] = useState(false);
   
   const controlsTimeout = useRef<NodeJS.Timeout>();
 
@@ -177,6 +179,55 @@ export function VideoLightbox({
     }
   };
 
+  // Touch/swipe gesture handlers for mobile navigation
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      setTouchStart({ x: touch.clientX, y: touch.clientY });
+      setIsSwiping(false);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!touchStart || e.touches.length !== 1) return;
+    
+    const touch = e.touches[0];
+    const deltaX = touch.clientX - touchStart.x;
+    const deltaY = touch.clientY - touchStart.y;
+    const absDeltaX = Math.abs(deltaX);
+    const absDeltaY = Math.abs(deltaY);
+    
+    // Determine if horizontal swipe (ignore vertical swipes)
+    if (absDeltaX > absDeltaY && absDeltaX > 30) {
+      setIsSwiping(true);
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!touchStart || !isSwiping) {
+      setTouchStart(null);
+      setIsSwiping(false);
+      return;
+    }
+    
+    const touch = e.changedTouches[0];
+    const deltaX = touch.clientX - touchStart.x;
+    const minSwipeDistance = 50; // Minimum distance for a valid swipe
+    
+    if (Math.abs(deltaX) > minSwipeDistance) {
+      if (deltaX > 0) {
+        // Swipe right - go to previous video
+        if (onPrevious) onPrevious();
+      } else {
+        // Swipe left - go to next video
+        if (onNext) onNext();
+      }
+    }
+    
+    setTouchStart(null);
+    setIsSwiping(false);
+  };
+
   const formatTime = (seconds: number): string => {
     return VideoService.formatDuration(seconds);
   };
@@ -188,6 +239,9 @@ export function VideoLightbox({
       className="video-lightbox"
       onMouseMove={handleMouseMove}
       onKeyDown={handleKeyDown}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
       tabIndex={0}
     >
       <div className="video-container">

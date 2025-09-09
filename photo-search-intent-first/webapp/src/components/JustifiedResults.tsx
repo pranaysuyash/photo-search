@@ -1,23 +1,21 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { thumbUrl } from '../api'
+import React, { useEffect, useMemo, useRef, useState, memo } from 'react'
+import { thumbUrl, apiMetadataDetail } from '../api'
+import { VideoService } from '../services/VideoService'
+import { Play, Heart, Download, Share2 } from 'lucide-react'
+import LazyImage from './LazyImage'
+import { imageLoadingService } from '../services/ImageLoadingService'
 
 type Item = { path: string; score?: number }
 
-export default function JustifiedResults({
-  dir,
-  engine,
-  items,
-  gap = 8,
-  targetRowHeight = 196,
-  scrollContainerRef,
-  selected,
-  onToggleSelect,
-  onOpen,
-  focusIndex = null,
-  onLayout,
-  ratingMap,
-  showInfoOverlay,
-}: {
+interface TouchState {
+  startX: number
+  startY: number
+  startTime: number
+  isLongPress: boolean
+  longPressTimer: number | null
+}
+
+const JustifiedResults = memo<{
   dir: string
   engine: string
   items: Item[]
@@ -31,11 +29,28 @@ export default function JustifiedResults({
   onLayout?: (rows: number[][]) => void
   ratingMap?: Record<string, number>
   showInfoOverlay?: boolean
-}) {
+}>(({
+  dir,
+  engine,
+  items,
+  gap = 8,
+  targetRowHeight = 196,
+  scrollContainerRef,
+  selected,
+  onToggleSelect,
+  onOpen,
+  focusIndex = null,
+  onLayout,
+  ratingMap,
+  showInfoOverlay,
+}) => {
   const contentRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState<number>(0)
   const [ratios, setRatios] = useState<Record<string, number>>({})
+  const [showTouchOverlay, setShowTouchOverlay] = useState<string | null>(null)
+  const [touchState, setTouchState] = useState<Record<string, TouchState>>({})
   const defaultRatio = 4 / 3
+  const [metaCache, setMetaCache] = useState<Record<string, any>>({})
 
   // Observe container width
   useEffect(() => {
@@ -108,6 +123,107 @@ export default function JustifiedResults({
     if (onLayout) onLayout(rowIndices)
   }, [rowIndices, onLayout])
 
+  // Touch gesture handlers for mobile-friendly interactions
+  const handleTouchStart = (path: string, e: React.TouchEvent) => {
+    const touch = e.touches[0]
+    const now = Date.now()
+    
+    // Clear any existing timer for this item
+    if (touchState[path]?.longPressTimer) {
+      clearTimeout(touchState[path].longPressTimer)
+    }
+
+    // Set up new touch state
+    const newTouchState: TouchState = {
+      startX: touch.clientX,
+      startY: touch.clientY,
+      startTime: now,
+      isLongPress: false,
+      longPressTimer: window.setTimeout(() => {
+        setTouchState(prev => ({
+          ...prev,
+          [path]: { ...prev[path], isLongPress: true }
+        }))
+        setShowTouchOverlay(path)
+      }, 500) // 500ms for long press
+    }
+
+    setTouchState(prev => ({ ...prev, [path]: newTouchState }))
+  }
+
+  const handleTouchMove = (path: string, e: React.TouchEvent) => {
+    const touch = e.touches[0]
+    const state = touchState[path]
+    if (!state) return
+
+    const deltaX = Math.abs(touch.clientX - state.startX)
+    const deltaY = Math.abs(touch.clientY - state.startY)
+    
+    // If moved too much, cancel long press
+    if (deltaX > 10 || deltaY > 10) {
+      if (state.longPressTimer) {
+        clearTimeout(state.longPressTimer)
+        setTouchState(prev => ({
+          ...prev,
+          [path]: { ...prev[path], longPressTimer: null }
+        }))
+      }
+    }
+  }
+
+  const handleTouchEnd = (path: string, e: React.TouchEvent) => {
+    const state = touchState[path]
+    if (!state) return
+
+    // Clear long press timer
+    if (state.longPressTimer) {
+      clearTimeout(state.longPressTimer)
+    }
+
+    const endTime = Date.now()
+    const duration = endTime - state.startTime
+
+    // Handle different touch gestures
+    if (state.isLongPress) {
+      // Long press - keep overlay open
+      return
+    } else if (duration < 200) {
+      // Quick tap - toggle selection
+      onToggleSelect(path)
+    }
+
+    // Clean up touch state
+    setTimeout(() => {
+      setTouchState(prev => {
+        const newState = { ...prev }
+        delete newState[path]
+        return newState
+      })
+    }, 100)
+  }
+
+  const handleTouchOverlayAction = (path: string, action: 'open' | 'favorite' | 'share' | 'download') => {
+    setShowTouchOverlay(null)
+    
+    switch (action) {
+      case 'open':
+        onOpen(path)
+        break
+      case 'favorite':
+        // This would need to be passed as a prop from parent
+        console.log('Favorite:', path)
+        break
+      case 'share':
+        // This would need to be passed as a prop from parent
+        console.log('Share:', path)
+        break
+      case 'download':
+        // This would need to be passed as a prop from parent
+        console.log('Download:', path)
+        break
+    }
+  }
+
   // Virtualize rows based on scroll position
   const [scrollTop, setScrollTop] = useState(0)
   const viewportH = scrollContainerRef.current?.clientHeight || 0
@@ -144,6 +260,56 @@ export default function JustifiedResults({
     return Math.min(i + 5, rows.length)
   }, [offsets, rows, scrollTop, viewportH, start])
 
+  // Preload images for next rows for better UX
+  useEffect(() => {
+    const nextRowsItems = rows.slice(end, end + 3).flatMap(row => 
+      row.items.map(item => thumbUrl(dir, engine, item.path, 256))
+    );
+    if (nextRowsItems.length > 0) {
+      imageLoadingService.preloadImages(nextRowsItems, 'low');
+    }
+  }, [end, rows, dir, engine]);
+
+  // Fetch EXIF metadata for visible items when overlay is enabled
+  useEffect(() => {
+    if (!showInfoOverlay) return
+    const visible: string[] = []
+    rows.slice(start, end).forEach((row, localIdx) => {
+      row.items.forEach((it) => {
+        visible.push(it.path)
+      })
+    })
+    const missing = visible.filter((p) => !metaCache[p])
+    if (missing.length === 0) return
+    const toFetch = missing.slice(0, 16) // cap concurrent fetches
+    let cancelled = false
+    Promise.all(
+      toFetch.map(async (p) => {
+        try {
+          const r = await apiMetadataDetail(dir, p)
+          if (!cancelled && r && r.meta) {
+            setMetaCache((m) => (m[p] ? m : { ...m, [p]: r.meta }))
+          }
+        } catch {
+          // ignore
+        }
+      })
+    )
+    return () => { cancelled = true }
+  }, [showInfoOverlay, rows, start, end, dir, metaCache])
+
+  // Initial batch prefetch for overlay chips
+  useEffect(() => {
+    if (!showInfoOverlay) return
+    const first = items.slice(0, 48).map(it => it.path).filter(p => !metaCache[p])
+    if (first.length === 0) return
+    let cancelled = false
+    Promise.all(first.slice(0, 24).map(async (p) => {
+      try { const r = await apiMetadataDetail(dir, p); if (!cancelled && r && r.meta) setMetaCache(m=> (m[p]?m:{...m, [p]: r.meta})) } catch {}
+    }))
+    return () => { cancelled = true }
+  }, [showInfoOverlay, items, dir])
+
   const activeId = focusIndex !== null ? `photo-${focusIndex}` : undefined
   return (
     <div
@@ -176,10 +342,13 @@ export default function JustifiedResults({
                 return (
                   <div
                     key={it.path}
-                    className={`relative group cursor-pointer rounded-lg overflow-hidden transition-all duration-200 hover:shadow ${isSel ? 'ring-2 ring-blue-500' : ''} ${isFocus ? 'outline outline-2 outline-indigo-500' : ''}`}
+                    className={`relative group cursor-pointer rounded-lg overflow-hidden transition-all duration-200 hover:shadow ${isSel ? 'ring-2 ring-blue-500' : ''} ${isFocus ? 'outline outline-2 outline-indigo-500' : ''} ${touchState[it.path] ? 'scale-95' : ''}`}
                     style={{ width: w, height: h }}
                     onClick={() => onToggleSelect(it.path)}
                     onDoubleClick={() => onOpen(it.path)}
+                    onTouchStart={(e) => handleTouchStart(it.path, e)}
+                    onTouchMove={(e) => handleTouchMove(it.path, e)}
+                    onTouchEnd={(e) => handleTouchEnd(it.path, e)}
                     title={it.path}
                     data-photo-idx={globalIdx}
                     id={`photo-${globalIdx}`}
@@ -187,18 +356,38 @@ export default function JustifiedResults({
                     aria-selected={isSel}
                     tabIndex={isFocus ? 0 : -1}
                   >
-                    <img
+                    <LazyImage
                       src={thumbUrl(dir, engine, it.path, 256)}
                       alt={it.path}
                       className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
-                      loading="lazy"
+                      enableProgressiveLoading={true}
                     />
+                    {/* Video indicator */}
+                    {VideoService.isVideoFile(it.path) && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-colors">
+                        <div className="w-12 h-12 bg-black/60 rounded-full flex items-center justify-center">
+                          <Play className="w-6 h-6 text-white ml-1" />
+                        </div>
+                      </div>
+                    )}
                     {showInfoOverlay && (
                       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent text-white px-1.5 py-1 text-[10px] flex items-center justify-between">
                         <span className="truncate mr-2" title={base}>{base}</span>
-                        {typeof it.score === 'number' && (
-                          <span className="bg-white/20 rounded px-1">{it.score.toFixed(2)}</span>
-                        )}
+                        <div className="flex items-center gap-1">
+                          {(() => {
+                            const meta = metaCache[it.path]
+                            const chips: string[] = []
+                            if (meta) {
+                              if (meta.camera) chips.push(String(meta.camera))
+                              if (typeof meta.fnumber === 'number') chips.push(`f/${meta.fnumber}`)
+                              if (typeof meta.iso === 'number') chips.push(`ISO ${meta.iso}`)
+                            }
+                            if (typeof it.score === 'number') chips.push(it.score.toFixed(2))
+                            return chips.slice(0, 3).map((c, idx) => (
+                              <span key={idx} className="bg-white/20 rounded px-1 whitespace-nowrap">{c}</span>
+                            ))
+                          })()}
+                        </div>
                       </div>
                     )}
                     {/* Rating overlay */}
@@ -210,14 +399,109 @@ export default function JustifiedResults({
                         <span>{ratingMap[it.path]}</span>
                       </div>
                     )}
-                    {typeof it.score === 'number' && (
-                      <div className="absolute top-2 left-2 text-xs bg-white/80 rounded px-1">{it.score.toFixed(2)}</div>
-                    )}
+                    {/* score chip handled in bottom overlay when showInfoOverlay is enabled */}
                     {isSel && (
                       <div className="absolute top-2 right-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
                         <svg className="w-4 h-4 text-white" viewBox="0 0 20 20" fill="currentColor">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
+                      </div>
+                    )}
+                    {/* Touch overlay for mobile interactions */}
+                    {showTouchOverlay === it.path && (
+                      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center gap-3" onClick={() => setShowTouchOverlay(null)}>
+                        <div className="text-white text-sm font-medium mb-2">Quick Actions</div>
+                        <div className="flex gap-3">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleTouchOverlayAction(it.path, 'open')
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                handleTouchOverlayAction(it.path, 'open')
+                              }
+                            }}
+                            className="w-12 h-12 bg-blue-500 hover:bg-blue-600 rounded-full flex items-center justify-center text-white transition-colors"
+                            title="Open"
+                          >
+                            <Play className="w-5 h-5 ml-0.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleTouchOverlayAction(it.path, 'favorite')
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                handleTouchOverlayAction(it.path, 'favorite')
+                              }
+                            }}
+                            className="w-12 h-12 bg-pink-500 hover:bg-pink-600 rounded-full flex items-center justify-center text-white transition-colors"
+                            title="Favorite"
+                          >
+                            <Heart className="w-5 h-5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleTouchOverlayAction(it.path, 'share')
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                handleTouchOverlayAction(it.path, 'share')
+                              }
+                            }}
+                            className="w-12 h-12 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center text-white transition-colors"
+                            title="Share"
+                          >
+                            <Share2 className="w-5 h-5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleTouchOverlayAction(it.path, 'download')
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                handleTouchOverlayAction(it.path, 'download')
+                              }
+                            }}
+                            className="w-12 h-12 bg-purple-500 hover:bg-purple-600 rounded-full flex items-center justify-center text-white transition-colors"
+                            title="Download"
+                          >
+                            <Download className="w-5 h-5" />
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setShowTouchOverlay(null)
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setShowTouchOverlay(null)
+                            }
+                          }}
+                          className="mt-4 text-white/70 hover:text-white text-xs"
+                        >
+                          Tap anywhere to close
+                        </button>
                       </div>
                     )}
                   </div>
@@ -229,4 +513,8 @@ export default function JustifiedResults({
       })}
     </div>
   )
-}
+});
+
+JustifiedResults.displayName = 'JustifiedResults';
+
+export default JustifiedResults;

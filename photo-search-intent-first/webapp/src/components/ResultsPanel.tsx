@@ -3,6 +3,7 @@ import { ResultsGrid } from './ResultsGrid'
 import { Lightbox } from './Lightbox'
 import { NoResultsEmpty } from './ui/EmptyState'
 import { useDir, useEngine, useCaptionsEnabled, useHasText, useOcrEnabled, usePlace, useShowExplain, useSettingsActions } from '../stores/settingsStore'
+import { apiLogEvent } from '../api'
 import { useSearchResults, useFavorites, useSearchQuery } from '../stores/photoStore'
 import { useBusy } from '../stores/uiStore'
 import { apiOpen, apiSetFavorite } from '../api'
@@ -86,7 +87,28 @@ export default function ResultsPanel() {
         <div className="flex gap-2 text-sm">
           <div className="text-gray-700">{results.length} found</div>
           <button
-            onClick={() => settingsActions.setShowExplain(!showExplain)}
+            onClick={() => {
+              const next = !showExplain
+              settingsActions.setShowExplain(next)
+              // If turning on explain chips, sample FPS for ~1s and log
+              if (next) {
+                try {
+                  const t0 = performance.now()
+                  let frames = 0
+                  let raf = 0
+                  const loop = () => { frames++; raf = requestAnimationFrame(() => {
+                    if (performance.now() - t0 < 1000) loop();
+                    else {
+                      cancelAnimationFrame(raf)
+                      const dt = performance.now() - t0
+                      const fps = Math.round((frames / dt) * 1000)
+                      if (dir) apiLogEvent(dir, 'fps_sample', { fps, frames, dt_ms: Math.round(dt), explain_on: true, results: results.length }).catch(()=>{})
+                    }
+                  }) }
+                  loop()
+                } catch {}
+              }
+            }}
             className={`rounded px-2 py-1 ${showExplain ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
             title="Toggle explainability chips"
           >

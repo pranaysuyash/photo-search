@@ -10,7 +10,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:noop": "echo 'No tests yet' && exit 0"
+    "test:noop": "echo 'No tests yet' && exit 0",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
+    "analyze": "npm run build && node analyze-bundle.js",
+    "build:analyze": "vite build --mode analyze"
   },
   "dependencies": {
     "@floating-ui/react": "^0.27.16",
@@ -19,11 +24,13 @@
     "lucide-react": "^0.453.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-router-dom": "^6.23.1",
     "react-scan": "^0.4.3",
     "react-window": "^2.0.2",
     "zustand": "^5.0.8"
   },
   "devDependencies": {
+    "@playwright/test": "^1.55.0",
     "@testing-library/jest-dom": "^6.4.8",
     "@testing-library/react": "^14.3.1",
     "@types/node": "^24.3.1",

@@ -1,46 +1,145 @@
-<!doctype html>
-<html lang="en" class="scroll-smooth">
+<!DOCTYPE html>
+<htm    <meta property="og:url" content="https://photosearch.app/" />
+    <meta
+      property="og:image"
+      content="https://photosearch.app/landing/assets/hero_poster.png"
+    />
+    <meta property="og:image:alt" content="Photo Search demo" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      property="twitter:title"
+      content="Photo Search – Private, Fast, Intent‑First"
+    />
+    <meta
+      property="twitter:description"
+      content="Find any photo fast with natural language. Local‑first privacy."
+    />
+    <meta
+      property="twitter:image"
+      content="https://photosearch.app/landing/assets/hero_poster.png"
+    />
+    <link rel="canonical" href="https://photosearch.app/" />croll-smooth">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Photo Search – Private, Fast, Intent‑First</title>
-    <meta name="description" content="Find any photo fast with natural language. Local‑first privacy, optional AI add‑ons. macOS, Windows, Web." />
+    <meta
+      name="description"
+      content="Find any photo fast with natural language. Local‑first privacy, optional AI add‑ons. macOS, Windows, Web."
+    />
     <!-- Open Graph / Twitter cards (replace og:url and image with absolute URLs in production) -->
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Photo Search – Private, Fast, Intent‑First" />
-    <meta property="og:description" content="Find any photo fast with natural language. Local‑first privacy." />
+    <meta
+      property="og:title"
+      content="Photo Search – Private, Fast, Intent‑First"
+    />
+    <meta
+      property="og:description"
+      content="Find any photo fast with natural language. Local‑first privacy."
+    />
     <meta property="og:url" content="https://yourdomain.com/" />
-    <meta property="og:image" content="/landing/assets/hero_poster.svg" />
+    <meta
+      property="og:image"
+      content="https://yourdomain.com/landing/assets/hero_poster.svg"
+    />
     <meta property="og:image:alt" content="Photo Search demo" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Photo Search – Private, Fast, Intent‑First" />
-    <meta name="twitter:description" content="Find any photo fast with natural language. Local‑first privacy." />
-    <meta name="twitter:image" content="/landing/assets/hero_poster.svg" />
+    <meta
+      name="twitter:title"
+      content="Photo Search – Private, Fast, Intent‑First"
+    />
+    <meta
+      name="twitter:description"
+      content="Find any photo fast with natural language. Local‑first privacy."
+    />
+    <meta
+      name="twitter:image"
+      content="https://yourdomain.com/landing/assets/hero_poster.svg"
+    />
+    <link rel="canonical" href="https://yourdomain.com/" />
+    <!-- JSON-LD for SoftwareApplication (SEO boost) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Photo Search",
+        "operatingSystem": "macOS, Windows",
+        "applicationCategory": "MultimediaApplication",
+        "offers": [
+          {
+            "@type": "Offer",
+            "price": "49",
+            "priceCurrency": "USD",
+            "description": "Local license"
+          },
+          {
+            "@type": "Offer",
+            "price": "89",
+            "priceCurrency": "USD",
+            "description": "Local + AI add-ons"
+          }
+        ]
+      }
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       // Tailwind dark mode via class strategy
       try {
-        const saved = localStorage.getItem('ps_theme');
-        if (saved === 'dark') document.documentElement.classList.add('dark');
+        const saved = localStorage.getItem("ps_theme");
+        if (saved === "dark") document.documentElement.classList.add("dark");
       } catch {}
     </script>
     <style>
       .bg-grid {
-        background-image: linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px);
+        background-image: linear-gradient(
+            rgba(0, 0, 0, 0.05) 1px,
+            transparent 1px
+          ),
+          linear-gradient(90deg, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
         background-size: 24px 24px;
       }
-      .glass { backdrop-filter: saturate(180%) blur(12px); }
+      .glass {
+        backdrop-filter: saturate(180%) blur(12px);
+      }
     </style>
   </head>
   <body class="bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100">
+    <!-- Skip to content link (accessibility) -->
+    <a
+      href="#main"
+      class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-indigo-600 text-white px-4 py-2 rounded"
+      >Skip to content</a
+    >
     <!-- Decorative background -->
-    <div class="fixed inset-0 -z-10 bg-gradient-to-b from-indigo-100/60 via-white to-white dark:from-indigo-900/20 dark:via-gray-950 dark:to-gray-950"></div>
-    <div class="fixed inset-x-0 top-[-10rem] -z-10 transform-gpu overflow-hidden blur-3xl">
-      <div class="relative left-1/2 -z-10 aspect-[1155/678] w-[36rem] -translate-x-1/2 bg-gradient-to-tr from-indigo-400 to-purple-400 opacity-30 dark:from-indigo-600 dark:to-purple-700" style="clip-path: polygon(74% 44%, 100% 68%, 88% 100%, 60% 91%, 30% 100%, 0 76%, 9% 44%, 28% 28%, 49% 26%, 66% 32%);"></div>
+    <div
+      class="fixed inset-0 -z-10 bg-gradient-to-b from-indigo-100/60 via-white to-white dark:from-indigo-900/20 dark:via-gray-950 dark:to-gray-950"
+    ></div>
+    <div
+      class="fixed inset-x-0 top-[-10rem] -z-10 transform-gpu overflow-hidden blur-3xl"
+    >
+      <div
+        class="relative left-1/2 -z-10 aspect-[1155/678] w-[36rem] -translate-x-1/2 bg-gradient-to-tr from-indigo-400 to-purple-400 opacity-30 dark:from-indigo-600 dark:to-purple-700"
+        style="
+          clip-path: polygon(
+            74% 44%,
+            100% 68%,
+            88% 100%,
+            60% 91%,
+            30% 100%,
+            0 76%,
+            9% 44%,
+            28% 28%,
+            49% 26%,
+            66% 32%
+          );
+        "
+      ></div>
     </div>
 
     <header class="sticky top-0 z-40">
-      <div class="glass bg-white/70 dark:bg-gray-900/60 border-b border-gray-200/60 dark:border-gray-800">
+      <div
+        class="glass bg-white/70 dark:bg-gray-900/60 border-b border-gray-200/60 dark:border-gray-800"
+      >
         <div class="max-w-7xl mx-auto px-4">
           <nav class="flex items-center justify-between py-3">
             <a href="#" class="flex items-center gap-2 text-lg font-semibold">
@@ -51,9 +150,25 @@
               <a href="#how" class="hover:text-indigo-600">How it works</a>
               <a href="#pricing" class="hover:text-indigo-600">Pricing</a>
               <a href="#faq" class="hover:text-indigo-600">FAQ</a>
-              <a href="/app/?ui=modern" class="px-3 py-1.5 rounded-md bg-indigo-600 text-white shadow hover:bg-indigo-500">Try Modern UI</a>
-              <a href="/app/" class="px-3 py-1.5 rounded-md bg-gray-900 text-white shadow hover:bg-gray-800">Classic UI</a>
-              <button id="theme-toggle" class="px-2 py-1 rounded border border-gray-200 dark:border-gray-800" title="Toggle theme">🌗</button>
+              <a
+                href="../photo-search-intent-first/api/web/index.html"
+                class="px-3 py-1.5 rounded-md bg-indigo-600 text-white shadow hover:bg-indigo-500"
+                >Try Modern UI</a
+              >
+              <!-- Classic UI link - uncomment when packaged version is ready
+              <a
+                href="../photo-search-classic/webapp/index.html"
+                class="px-3 py-1.5 rounded-md bg-gray-900 text-white shadow hover:bg-gray-800"
+                >Classic UI</a
+              -->
+              <button
+                id="theme-toggle"
+                class="px-2 py-1 rounded border border-gray-200 dark:border-gray-800"
+                title="Toggle theme"
+                aria-label="Toggle dark and light mode"
+              >
+                🌗
+              </button>
             </div>
           </nav>
         </div>
@@ -66,44 +181,109 @@
         <div class="max-w-7xl mx-auto px-4 pt-12 sm:pt-16">
           <div class="grid lg:grid-cols-2 gap-10 items-center">
             <div>
-              <div class="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs text-indigo-700 dark:bg-indigo-950/40 dark:border-indigo-900 dark:text-indigo-300">Private by default • Works offline</div>
-              <h1 class="mt-4 text-4xl sm:text-5xl font-extrabold leading-tight">
+              <div
+                class="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs text-indigo-700 dark:bg-indigo-950/40 dark:border-indigo-900 dark:text-indigo-300"
+              >
+                Private by default • Works offline
+              </div>
+              <h1
+                class="mt-4 text-4xl sm:text-5xl font-extrabold leading-tight"
+              >
                 Find any photo fast
-                <span class="block bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">just describe it.</span>
+                <span
+                  class="block bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent"
+                  >just describe it.</span
+                >
               </h1>
-              <p class="mt-4 text-gray-600 dark:text-gray-300 text-lg">Local‑first photo search with AI. Type <span class="font-mono">friends on the beach at sunset</span> and get it instantly — no scrolling.</p>
+              <p class="mt-4 text-gray-600 dark:text-gray-300 text-lg">
+                Local‑first photo search with AI. Type
+                <span class="font-mono">friends on the beach at sunset</span>
+                and get it instantly — no scrolling.
+              </p>
               <div class="mt-6 flex flex-wrap gap-3">
-                <a id="download-mac" href="#" class="group inline-flex items-center gap-2 px-5 py-2.5 rounded-md bg-indigo-600 text-white shadow hover:bg-indigo-500">
+                <a
+                  id="download-mac"
+                  href="#"
+                  class="group inline-flex items-center gap-2 px-5 py-2.5 rounded-md bg-indigo-600 text-white shadow hover:bg-indigo-500"
+                  aria-label="Download for macOS"
+                >
                   <span>Download for macOS</span>
                 </a>
-                <a id="download-win" href="#" class="group inline-flex items-center gap-2 px-5 py-2.5 rounded-md bg-gray-900 text-white shadow hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700">
+                <a
+                  id="download-win"
+                  href="#"
+                  class="group inline-flex items-center gap-2 px-5 py-2.5 rounded-md bg-gray-900 text-white shadow hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700"
+                  aria-label="Download for Windows"
+                >
                   <span>Download for Windows</span>
                 </a>
-                <a href="#pricing" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-md border border-gray-200 text-gray-900 hover:bg-gray-50 dark:text-gray-100 dark:border-gray-800 dark:hover:bg-gray-900">Pricing</a>
+                <a
+                  href="#pricing"
+                  class="inline-flex items-center gap-2 px-5 py-2.5 rounded-md border border-gray-200 text-gray-900 hover:bg-gray-50 dark:text-gray-100 dark:border-gray-800 dark:hover:bg-gray-900"
+                  aria-label="View pricing details"
+                  >Pricing</a
+                >
               </div>
-              <div class="mt-3 text-xs text-gray-500">Replace download links with release URLs (S3/Drive) when ready.</div>
-              <div class="mt-6 flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-                <span class="inline-flex items-center gap-2"><span class="text-green-600">●</span> macOS + Windows</span>
-                <span class="inline-flex items-center gap-2"><span class="text-green-600">●</span> Web Demo</span>
-                <span class="inline-flex items-center gap-2"><span class="text-green-600">●</span> No account required</span>
+              <div class="mt-3 text-xs text-gray-500">
+                Download links will be available soon.
+              </div>
+              <div
+                class="mt-6 flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400"
+              >
+                <span class="inline-flex items-center gap-2"
+                  ><span class="text-green-600">●</span> macOS + Windows</span
+                >
+                <span class="inline-flex items-center gap-2"
+                  ><span class="text-green-600">●</span> Web Demo</span
+                >
+                <span class="inline-flex items-center gap-2"
+                  ><span class="text-green-600">●</span> No account
+                  required</span
+                >
               </div>
             </div>
             <!-- Visual -->
             <div class="relative">
-              <div class="rounded-xl border border-gray-200 bg-white/70 shadow-xl backdrop-blur-lg p-3 dark:bg-gray-900/70 dark:border-gray-800">
-                <div class="aspect-video rounded-lg bg-grid border border-gray-100 dark:border-gray-800 flex items-center justify-center text-gray-500 dark:text-gray-400">
+              <div
+                class="rounded-xl border border-gray-200 bg-white/70 shadow-xl backdrop-blur-lg p-3 dark:bg-gray-900/70 dark:border-gray-800"
+              >
+                <div
+                  class="aspect-video rounded-lg bg-grid border border-gray-100 dark:border-gray-800 flex items-center justify-center text-gray-500 dark:text-gray-400"
+                >
                   <div class="text-center">
                     <div class="text-sm mb-2">Product demo video</div>
                     <div class="inline-flex gap-2">
-                      <a href="#demo" class="px-3 py-1 rounded-md bg-gray-900 text-white text-xs hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700">Play</a>
-                      <a href="../photo-search-intent-first/webapp/index.html" class="px-3 py-1 rounded-md border text-xs">Open Web Demo</a>
+                      <a
+                        href="#demo"
+                        class="px-3 py-1 rounded-md bg-gray-900 text-white text-xs hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700"
+                        aria-label="Play product demo video"
+                        >Play</a
+                      >
+                      <a
+                        href="../photo-search-intent-first/api/web/index.html"
+                        class="px-3 py-1 rounded-md border text-xs"
+                        aria-label="Open the web demo in a new tab"
+                        >Open Web Demo</a
+                      >
                     </div>
                   </div>
                 </div>
                 <div class="mt-3 grid grid-cols-3 gap-2">
-                  <div class="h-20 rounded-md bg-gray-100 border border-gray-100 dark:bg-gray-800 dark:border-gray-800 flex items-center justify-center text-xs text-gray-500">Search</div>
-                  <div class="h-20 rounded-md bg-gray-100 border border-gray-100 dark:bg-gray-800 dark:border-gray-800 flex items-center justify-center text-xs text-gray-500">People</div>
-                  <div class="h-20 rounded-md bg-gray-100 border border-gray-100 dark:bg-gray-800 dark:border-gray-800 flex items-center justify-center text-xs text-gray-500">Map</div>
+                  <div
+                    class="h-20 rounded-md bg-gray-100 border border-gray-100 dark:bg-gray-800 dark:border-gray-800 flex items-center justify-center text-xs text-gray-500"
+                  >
+                    Search
+                  </div>
+                  <div
+                    class="h-20 rounded-md bg-gray-100 border border-gray-100 dark:bg-gray-800 dark:border-gray-800 flex items-center justify-center text-xs text-gray-500"
+                  >
+                    People
+                  </div>
+                  <div
+                    class="h-20 rounded-md bg-gray-100 border border-gray-100 dark:bg-gray-800 dark:border-gray-800 flex items-center justify-center text-xs text-gray-500"
+                  >
+                    Map
+                  </div>
                 </div>
               </div>
             </div>
@@ -114,16 +294,25 @@
       <!-- Demo video -->
       <section id="demo" class="mt-16">
         <div class="max-w-7xl mx-auto px-4">
-          <div class="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6 dark:bg-gray-900 dark:border-gray-800">
+          <div
+            class="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6 dark:bg-gray-900 dark:border-gray-800"
+          >
             <h2 class="text-xl font-semibold mb-3">Watch a quick demo</h2>
-            <div class="aspect-video rounded-lg overflow-hidden border border-gray-100 dark:border-gray-800 bg-black">
-              <!-- Replace assets/hero.mp4 with your real video; poster is a placeholder SVG -->
-              <video controls poster="./assets/hero_poster.svg" class="w-full h-full">
+            <div
+              class="aspect-video rounded-lg overflow-hidden border border-gray-100 dark:border-gray-800 bg-black"
+            >
+              <video
+                controls
+                poster="./assets/hero_poster.png"
+                class="w-full h-full"
+              >
                 <source src="./assets/hero.mp4" type="video/mp4" />
                 Your browser does not support the video tag.
               </video>
             </div>
-            <div class="text-xs text-gray-500 mt-2">Drop your demo at <code>landing/assets/hero.mp4</code> and update the poster if needed.</div>
+            <div class="text-xs text-gray-500 mt-2">
+              Product demo video will be available soon.
+            </div>
           </div>
         </div>
       </section>
@@ -131,9 +320,12 @@
       <!-- Logos / trust strip (placeholder) -->
       <section class="mt-12">
         <div class="max-w-7xl mx-auto px-4">
-          <div class="flex flex-wrap items-center justify-center gap-6 text-xs text-gray-500 dark:text-gray-400">
+          <div
+            class="flex flex-wrap items-center justify-center gap-6 text-xs text-gray-500 dark:text-gray-400"
+          >
             <span>Private by default</span>
             <span>Works offline</span>
+            <span>No subscription (Local)</span>
             <span>FAISS • HNSW • Annoy</span>
             <span>EasyOCR</span>
             <span>InsightFace</span>
@@ -145,31 +337,102 @@
       <section id="features" class="mt-16">
         <div class="max-w-7xl mx-auto px-4">
           <h2 class="text-2xl font-bold">What’s inside</h2>
-          <p class="text-gray-600 dark:text-gray-300 mt-1">A modern, private photo search and management toolkit.</p>
+          <p class="text-gray-600 dark:text-gray-300 mt-1">
+            A modern, private photo search and management toolkit.
+          </p>
           <div class="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm hover:shadow-md transition dark:bg-gray-900 dark:border-gray-800">
-              <div class="text-lg font-semibold mb-1">Natural language search</div>
-              <div class="text-sm text-gray-600 dark:text-gray-300">CLIP embeddings power semantic search over your local photos.</div>
+            <div
+              class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm hover:shadow-md transition dark:bg-gray-900 dark:border-gray-800"
+            >
+              <div class="text-lg font-semibold mb-1">
+                Natural language search
+              </div>
+              <div class="text-sm text-gray-600 dark:text-gray-300">
+                CLIP embeddings power semantic search over your local photos.
+              </div>
             </div>
-            <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm hover:shadow-md transition dark:bg-gray-900 dark:border-gray-800">
-              <div class="text-lg font-semibold mb-1">Fast on big libraries</div>
-              <div class="text-sm text-gray-600 dark:text-gray-300">Optional FAISS, HNSW, or Annoy for lightning‑fast results.</div>
+            <div
+              class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm hover:shadow-md transition dark:bg-gray-900 dark:border-gray-800"
+            >
+              <div class="text-lg font-semibold mb-1">
+                Fast on big libraries
+              </div>
+              <div class="text-sm text-gray-600 dark:text-gray-300">
+                Optional FAISS, HNSW, or Annoy for lightning‑fast results.
+              </div>
             </div>
-            <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm hover:shadow-md transition dark:bg-gray-900 dark:border-gray-800">
+            <div
+              class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm hover:shadow-md transition dark:bg-gray-900 dark:border-gray-800"
+            >
               <div class="text-lg font-semibold mb-1">OCR & text search</div>
-              <div class="text-sm text-gray-600 dark:text-gray-300">Search screenshots, documents, and signs with EasyOCR (local).</div>
+              <div class="text-sm text-gray-600 dark:text-gray-300">
+                Search screenshots, documents, and signs with EasyOCR (local).
+              </div>
             </div>
-            <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm hover:shadow-md transition dark:bg-gray-900 dark:border-gray-800">
-              <div class="text-lg font-semibold mb-1">People & pets</div>
-              <div class="text-sm text-gray-600 dark:text-gray-300">On‑device face clustering with naming and person filters.</div>
+            <div
+              class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm hover:shadow-md transition dark:bg-gray-900 dark:border-gray-800"
+            >
+              <div class="text-lg font-semibold mb-1">
+                People (local engine)
+              </div>
+              <div class="text-sm text-gray-600 dark:text-gray-300">
+                On‑device face clustering with naming and person filters.
+              </div>
             </div>
-            <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm hover:shadow-md transition dark:bg-gray-900 dark:border-gray-800">
-              <div class="text-lg font-semibold mb-1">Map & timeline</div>
-              <div class="text-sm text-gray-600 dark:text-gray-300">Explore photos by place and time; offline reverse geocoding.</div>
+            <div
+              class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm hover:shadow-md transition dark:bg-gray-900 dark:border-gray-800"
+            >
+              <div class="text-lg font-semibold mb-1">
+                Map (Timeline coming soon)
+              </div>
+              <div class="text-sm text-gray-600 dark:text-gray-300">
+                Explore photos by place and time; offline reverse geocoding.
+              </div>
             </div>
-            <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm hover:shadow-md transition dark:bg-gray-900 dark:border-gray-800">
+            <div
+              class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm hover:shadow-md transition dark:bg-gray-900 dark:border-gray-800"
+            >
               <div class="text-lg font-semibold mb-1">Smart organization</div>
-              <div class="text-sm text-gray-600 dark:text-gray-300">Favorites, tags, saved searches, smart albums, duplicate cleanup.</div>
+              <div class="text-sm text-gray-600 dark:text-gray-300">
+                Favorites, tags, saved searches, smart albums, duplicate
+                detection (coming soon).
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- New Roadmap Section -->
+      <section id="roadmap" class="mt-16 bg-gray-50 dark:bg-gray-800 py-16">
+        <div class="max-w-7xl mx-auto px-4">
+          <h2 class="text-2xl font-bold mb-8">What’s coming next</h2>
+          <p class="text-gray-600 dark:text-gray-300 mb-8">
+            Based on user feedback and our roadmap.
+          </p>
+          <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div
+              class="p-4 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800"
+            >
+              <div class="font-semibold">Photo Editing</div>
+              <div class="text-sm text-gray-600 dark:text-gray-300">
+                Crop, rotate, and basic adjustments (non-destructive).
+              </div>
+            </div>
+            <div
+              class="p-4 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800"
+            >
+              <div class="font-semibold">Backup & Sync</div>
+              <div class="text-sm text-gray-600 dark:text-gray-300">
+                Local and cloud backup with incremental updates.
+              </div>
+            </div>
+            <div
+              class="p-4 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800"
+            >
+              <div class="font-semibold">Mobile & PWA</div>
+              <div class="text-sm text-gray-600 dark:text-gray-300">
+                Offline viewing and touch gestures.
+              </div>
             </div>
           </div>
         </div>
@@ -179,44 +442,96 @@
       <section id="shots" class="mt-16">
         <div class="max-w-7xl mx-auto px-4">
           <h2 class="text-2xl font-bold">Screenshots</h2>
-          <p class="text-gray-600 dark:text-gray-300 mt-1">Real UI moments from the app.</p>
+          <p class="text-gray-600 dark:text-gray-300 mt-1">
+            Real UI moments from the app.
+          </p>
           <div class="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            <a href="./assets/s1.svg" class="block rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800 hover:shadow-md transition" target="_blank" rel="noreferrer">
-              <img src="./assets/s1.svg" alt="Search screenshot" class="w-full h-auto" />
+            <a
+              href="./assets/s1.png"
+              class="block rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800 hover:shadow-md transition"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <img
+                src="./assets/s1.png"
+                alt="Search screenshot"
+                class="w-full h-auto"
+              />
             </a>
-            <a href="./assets/s2.svg" class="block rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800 hover:shadow-md transition" target="_blank" rel="noreferrer">
-              <img src="./assets/s2.svg" alt="People screenshot" class="w-full h-auto" />
+            <a
+              href="./assets/s2.png"
+              class="block rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800 hover:shadow-md transition"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <img
+                src="./assets/s2.png"
+                alt="People screenshot"
+                class="w-full h-auto"
+              />
             </a>
-            <a href="./assets/s3.svg" class="block rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800 hover:shadow-md transition" target="_blank" rel="noreferrer">
-              <img src="./assets/s3.svg" alt="Map screenshot" class="w-full h-auto" />
+            <a
+              href="./assets/s3.png"
+              class="block rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800 hover:shadow-md transition"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <img
+                src="./assets/s3.png"
+                alt="Map screenshot"
+                class="w-full h-auto"
+              />
             </a>
           </div>
-          <div class="text-xs text-gray-500 mt-2">Replace the placeholders in <code>landing/assets/</code> with real screenshots (PNG/JPG) keeping the same filenames, or update paths here.</div>
+          <div class="text-xs text-gray-500 mt-2">
+            Screenshots will be available soon.
+          </div>
         </div>
       </section>
 
       <!-- How it works -->
       <section id="how" class="mt-16">
         <div class="max-w-7xl mx-auto px-4">
-          <div class="rounded-2xl border border-gray-200 bg-white p-6 sm:p-8 dark:bg-gray-900 dark:border-gray-800">
+          <div
+            class="rounded-2xl border border-gray-200 bg-white p-6 sm:p-8 dark:bg-gray-900 dark:border-gray-800"
+          >
             <h3 class="text-xl font-semibold">How it works (Local‑first)</h3>
-            <p class="text-sm text-gray-600 dark:text-gray-300 mt-2">Your photos never leave your device unless you opt into a cloud engine. Everything below runs locally by default.</p>
+            <p class="text-sm text-gray-600 dark:text-gray-300 mt-2">
+              Your photos never leave your device unless you opt into a cloud
+              engine. Everything below runs locally by default.
+            </p>
             <div class="mt-6 grid md:grid-cols-4 gap-5">
-              <div class="p-4 rounded-xl bg-gray-50 border border-gray-100 dark:bg-gray-950 dark:border-gray-800">
+              <div
+                class="p-4 rounded-xl bg-gray-50 border border-gray-100 dark:bg-gray-950 dark:border-gray-800"
+              >
                 <div class="font-semibold">1. Import</div>
-                <div class="text-sm text-gray-600 dark:text-gray-300">Point to your folders — we scan supported formats.</div>
+                <div class="text-sm text-gray-600 dark:text-gray-300">
+                  Point to your folders — we scan supported formats.
+                </div>
               </div>
-              <div class="p-4 rounded-xl bg-gray-50 border border-gray-100 dark:bg-gray-950 dark:border-gray-800">
+              <div
+                class="p-4 rounded-xl bg-gray-50 border border-gray-100 dark:bg-gray-950 dark:border-gray-800"
+              >
                 <div class="font-semibold">2. Index</div>
-                <div class="text-sm text-gray-600 dark:text-gray-300">Create local embeddings + OCR + EXIF index per folder.</div>
+                <div class="text-sm text-gray-600 dark:text-gray-300">
+                  Create local embeddings + OCR + EXIF index per folder.
+                </div>
               </div>
-              <div class="p-4 rounded-xl bg-gray-50 border border-gray-100 dark:bg-gray-950 dark:border-gray-800">
+              <div
+                class="p-4 rounded-xl bg-gray-50 border border-gray-100 dark:bg-gray-950 dark:border-gray-800"
+              >
                 <div class="font-semibold">3. Search</div>
-                <div class="text-sm text-gray-600 dark:text-gray-300">Type what you remember; combine with people, place, date.</div>
+                <div class="text-sm text-gray-600 dark:text-gray-300">
+                  Type what you remember; combine with people, place, date.
+                </div>
               </div>
-              <div class="p-4 rounded-xl bg-gray-50 border border-gray-100 dark:bg-gray-950 dark:border-gray-800">
+              <div
+                class="p-4 rounded-xl bg-gray-50 border border-gray-100 dark:bg-gray-950 dark:border-gray-800"
+              >
                 <div class="font-semibold">4. Organize</div>
-                <div class="text-sm text-gray-600 dark:text-gray-300">Save as smart albums, tag, favorite, de‑dupe and export.</div>
+                <div class="text-sm text-gray-600 dark:text-gray-300">
+                  Save as smart albums, tag, favorite, clean up duplicates (coming soon), and export.
+                </div>
               </div>
             </div>
           </div>
@@ -228,17 +543,38 @@
         <div class="max-w-7xl mx-auto px-4">
           <h3 class="text-xl font-semibold">What early users say</h3>
           <div class="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            <figure class="rounded-xl border border-gray-200 bg-white p-5 dark:bg-gray-900 dark:border-gray-800">
-              <blockquote class="text-sm text-gray-700 dark:text-gray-300">“Found a 2014 trip photo in seconds by typing what I remembered. Wild.”</blockquote>
-              <figcaption class="mt-3 text-xs text-gray-500">— A., photographer</figcaption>
+            <figure
+              class="rounded-xl border border-gray-200 bg-white p-5 dark:bg-gray-900 dark:border-gray-800"
+            >
+              <blockquote class="text-sm text-gray-700 dark:text-gray-300">
+                “Found a 2014 trip photo in seconds by typing what I remembered.
+                Wild.”
+              </blockquote>
+              <figcaption class="mt-3 text-xs text-gray-500">
+                — A., photographer
+              </figcaption>
             </figure>
-            <figure class="rounded-xl border border-gray-200 bg-white p-5 dark:bg-gray-900 dark:border-gray-800">
-              <blockquote class="text-sm text-gray-700 dark:text-gray-300">“Love that everything is local. No account, no uploads — just works.”</blockquote>
-              <figcaption class="mt-3 text-xs text-gray-500">— M., privacy‑conscious user</figcaption>
+            <figure
+              class="rounded-xl border border-gray-200 bg-white p-5 dark:bg-gray-900 dark:border-gray-800"
+            >
+              <blockquote class="text-sm text-gray-700 dark:text-gray-300">
+                “Love that everything is local. No account, no uploads — just
+                works.”
+              </blockquote>
+              <figcaption class="mt-3 text-xs text-gray-500">
+                — M., privacy‑conscious user
+              </figcaption>
             </figure>
-            <figure class="rounded-xl border border-gray-200 bg-white p-5 dark:bg-gray-900 dark:border-gray-800">
-              <blockquote class="text-sm text-gray-700 dark:text-gray-300">“Duplicate cleanup + ‘more like this’ saved me hours culling a shoot.”</blockquote>
-              <figcaption class="mt-3 text-xs text-gray-500">— J., creator</figcaption>
+            <figure
+              class="rounded-xl border border-gray-200 bg-white p-5 dark:bg-gray-900 dark:border-gray-800"
+            >
+              <blockquote class="text-sm text-gray-700 dark:text-gray-300">
+                “Duplicate cleanup + ‘more like this’ saved me hours culling a
+                shoot.”
+              </blockquote>
+              <figcaption class="mt-3 text-xs text-gray-500">
+                — J., creator
+              </figcaption>
             </figure>
           </div>
         </div>
@@ -248,36 +584,69 @@
       <section id="pricing" class="mt-16">
         <div class="max-w-7xl mx-auto px-4">
           <h3 class="text-2xl font-bold">Simple pricing</h3>
-          <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">Pay once. Use forever on one device. Add AI only if you want.</p>
+          <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">
+            Pay once. Use forever on one device. Add AI only if you want.
+          </p>
           <div class="mt-6 grid md:grid-cols-2 gap-6">
-            <div class="relative rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:bg-gray-900 dark:border-gray-800">
+            <div
+              class="relative rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:bg-gray-900 dark:border-gray-800"
+            >
               <div class="text-sm font-medium text-indigo-600">Local</div>
               <div class="mt-1 text-3xl font-bold">$49</div>
-              <div class="text-sm text-gray-600 dark:text-gray-300">One‑time, per device</div>
-              <ul class="mt-4 space-y-2 text-sm text-gray-700 dark:text-gray-300">
+              <div class="text-sm text-gray-600 dark:text-gray-300">
+                One‑time, per device
+              </div>
+              <ul
+                class="mt-4 space-y-2 text-sm text-gray-700 dark:text-gray-300"
+              >
                 <li>Private, on‑device search</li>
                 <li>Fast indices (FAISS/HNSW/Annoy)</li>
-                <li>OCR, duplicates, smart albums</li>
+                <li>OCR, smart albums; duplicate detection (coming soon)</li>
                 <li>EXIF filters, map view</li>
                 <li>People (local engine)</li>
               </ul>
-              <a href="https://gum.co/your-product" class="mt-5 inline-flex items-center justify-center w-full px-4 py-2.5 rounded-md bg-gray-900 text-white hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700">Buy Local</a>
+              <a
+                href="https://gum.co/your-product"
+                class="mt-5 inline-flex items-center justify-center w-full px-4 py-2.5 rounded-md bg-gray-900 text-white hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700"
+                aria-label="Buy the Local version for $49"
+                >Buy Local</a
+              >
             </div>
-            <div class="relative rounded-2xl border-2 border-indigo-300 bg-white p-6 shadow-md dark:bg-gray-900 dark:border-indigo-700">
-              <div class="absolute -top-3 right-4 px-2 py-0.5 text-xs rounded-full bg-indigo-600 text-white">Most popular</div>
-              <div class="text-sm font-medium text-indigo-600">Local + AI Add‑ons</div>
+            <div
+              class="relative rounded-2xl border-2 border-indigo-300 bg-white p-6 shadow-md dark:bg-gray-900 dark:border-indigo-700"
+            >
+              <div
+                class="absolute -top-3 right-4 px-2 py-0.5 text-xs rounded-full bg-indigo-600 text-white"
+              >
+                Most popular
+              </div>
+              <div class="text-sm font-medium text-indigo-600">
+                Local + AI Add‑ons
+              </div>
               <div class="mt-1 text-3xl font-bold">$89</div>
-              <div class="text-sm text-gray-600 dark:text-gray-300">One‑time, per device</div>
-              <ul class="mt-4 space-y-2 text-sm text-gray-700 dark:text-gray-300">
+              <div class="text-sm text-gray-600 dark:text-gray-300">
+                One‑time, per device
+              </div>
+              <ul
+                class="mt-4 space-y-2 text-sm text-gray-700 dark:text-gray-300"
+              >
                 <li>Everything in Local</li>
                 <li>Cloud caption/embedding integrations (BYO keys)</li>
                 <li>Future AI helpers & refinements</li>
                 <li>Priority support, 1‑year updates</li>
               </ul>
-              <a href="https://gum.co/your-product" class="mt-5 inline-flex items-center justify-center w-full px-4 py-2.5 rounded-md bg-indigo-600 text-white hover:bg-indigo-500">Buy Local + AI</a>
+              <a
+                href="https://gum.co/your-product"
+                class="mt-5 inline-flex items-center justify-center w-full px-4 py-2.5 rounded-md bg-indigo-600 text-white hover:bg-indigo-500"
+                aria-label="Buy the Local + AI version for $89"
+                >Buy Local + AI</a
+              >
             </div>
           </div>
-          <div class="mt-3 text-xs text-gray-500">14‑day refund. Regional pricing supported. Keys are used only if you opt into AI add‑ons.</div>
+          <div class="mt-3 text-xs text-gray-500">
+            No refunds. Regional pricing supported. Keys are used only if you
+            opt into AI add-ons.
+          </div>
         </div>
       </section>
 
@@ -286,29 +655,107 @@
         <div class="max-w-7xl mx-auto px-4 grid lg:grid-cols-3 gap-8">
           <div>
             <h3 class="text-xl font-semibold">Questions?</h3>
-            <p class="text-sm text-gray-600 dark:text-gray-300 mt-2">We built Photo Search to be private, fast, and simple.</p>
-            <form class="mt-6 flex gap-2" action="#" method="post">
-              <input type="email" required placeholder="Your email for updates" class="flex-1 rounded-md border border-gray-200 px-3 py-2 text-sm dark:bg-gray-900 dark:border-gray-800" />
-              <button type="submit" class="px-4 py-2 rounded-md bg-gray-900 text-white text-sm hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700">Notify me</button>
+            <p class="text-sm text-gray-600 dark:text-gray-300 mt-2">
+              We built Photo Search to be private, fast, and simple.
+            </p>
+            <form
+              action="https://formspree.io/f/yourId"
+              method="POST"
+              class="mt-6 flex gap-2"
+            >
+              <label for="email-input" class="sr-only"
+                >Your email for updates</label
+              >
+              <input
+                type="email"
+                id="email-input"
+                name="email"
+                required
+                placeholder="Your email for updates"
+                class="flex-1 rounded-md border border-gray-200 px-3 py-2 text-sm dark:bg-gray-900 dark:border-gray-800"
+              />
+              <button
+                type="submit"
+                class="px-4 py-2 rounded-md bg-gray-900 text-white text-sm hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700"
+                aria-label="Submit your email for updates"
+              >
+                Notify me
+              </button>
+              <input type="hidden" name="source" value="landing" />
+              <input type="text" name="_gotcha" style="display: none" />
             </form>
-            <div class="text-xs text-gray-500 mt-2">We’ll send a few helpful updates. Unsubscribe anytime.</div>
+            <div class="text-xs text-gray-500 mt-2">
+              We’ll send a few helpful updates. Unsubscribe anytime.
+            </div>
           </div>
           <div class="lg:col-span-2 grid sm:grid-cols-2 gap-4">
-            <details class="rounded-lg border border-gray-200 p-4 open:bg-white dark:open:bg-gray-900 dark:border-gray-800">
-              <summary class="cursor-pointer font-medium">Do my photos ever leave my device?</summary>
-              <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">No. By default all indexing and search happens locally. If you enable a cloud engine (HF/OpenAI), captions/embeddings may be sent to that provider using your API key.</p>
+            <details
+              class="rounded-lg border border-gray-200 p-4 open:bg-white dark:open:bg-gray-900 dark:border-gray-800"
+            >
+              <summary class="cursor-pointer font-medium">
+                Do my photos ever leave my device?
+              </summary>
+              <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                No. By default all indexing and search happens locally. If you
+                enable a cloud engine (HF/OpenAI), captions/embeddings may be
+                sent to that provider using your API key.
+              </p>
             </details>
-            <details class="rounded-lg border border-gray-200 p-4 open:bg-white dark:open:bg-gray-900 dark:border-gray-800">
-              <summary class="cursor-pointer font-medium">How fast is it?</summary>
-              <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">Small libraries index quickly; larger sets run in the background. Fast search via FAISS/HNSW/Annoy returns results near‑instantly after preparation.</p>
+            <details
+              class="rounded-lg border border-gray-200 p-4 open:bg-white dark:open:bg-gray-900 dark:border-gray-800"
+            >
+              <summary class="cursor-pointer font-medium">
+                How fast is it?
+              </summary>
+              <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                Small libraries index quickly; larger sets run in the
+                background. Fast search via FAISS/HNSW/Annoy returns results
+                near‑instantly after preparation.
+              </p>
             </details>
-            <details class="rounded-lg border border-gray-200 p-4 open:bg-white dark:open:bg-gray-900 dark:border-gray-800">
-              <summary class="cursor-pointer font-medium">What platforms are supported?</summary>
-              <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">macOS and Windows for the desktop app; a minimal web demo is included. No account required.</p>
+            <details
+              class="rounded-lg border border-gray-200 p-4 open:bg-white dark:open:bg-gray-900 dark:border-gray-800"
+            >
+              <summary class="cursor-pointer font-medium">
+                What platforms are supported?
+              </summary>
+              <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                macOS and Windows for the desktop app; a minimal web demo is
+                included. No account required.
+              </p>
             </details>
-            <details class="rounded-lg border border-gray-200 p-4 open:bg-white dark:open:bg-gray-900 dark:border-gray-800">
-              <summary class="cursor-pointer font-medium">Refunds?</summary>
-              <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">14‑day refund, no questions asked. See Refunds for details.</p>
+            <details
+              class="rounded-lg border border-gray-200 p-4 open:bg-white dark:open:bg-gray-900 dark:border-gray-800"
+            >
+              <summary class="cursor-pointer font-medium">
+                How long does indexing take?
+              </summary>
+              <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                On modern laptops, 10k photos typically index in 5–15 minutes.
+                You can keep working while it runs.
+              </p>
+            </details>
+            <details
+              class="rounded-lg border border-gray-200 p-4 open:bg-white dark:open:bg-gray-900 dark:border-gray-800"
+            >
+              <summary class="cursor-pointer font-medium">
+                What formats are supported?
+              </summary>
+              <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                JPEG, PNG, WebP, TIFF, plus EXIF metadata. RAW and video are on
+                the roadmap.
+              </p>
+            </details>
+            <details
+              class="rounded-lg border border-gray-200 p-4 open:bg-white dark:open:bg-gray-900 dark:border-gray-800"
+            >
+              <summary class="cursor-pointer font-medium">
+                Do you store my keys?
+              </summary>
+              <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                Keys are session‑only by default. You can opt to save them
+                locally; change this anytime in Settings.
+              </p>
             </details>
           </div>
         </div>
@@ -316,7 +763,9 @@
     </main>
 
     <footer class="mt-16 border-top border-gray-200 dark:border-gray-800">
-      <div class="max-w-7xl mx-auto px-4 py-8 text-sm text-gray-600 dark:text-gray-400">
+      <div
+        class="max-w-7xl mx-auto px-4 py-8 text-sm text-gray-600 dark:text-gray-400"
+      >
         <div class="flex flex-wrap items-center gap-4">
           <a href="./tos.html" class="hover:underline">Terms</a>
           <a href="./privacy.html" class="hover:underline">Privacy</a>
@@ -328,15 +777,17 @@
 
     <script>
       // Replace with real links when installers are available.
-      document.getElementById('download-mac').href = '#';
-      document.getElementById('download-win').href = '#';
-      document.getElementById('year').textContent = new Date().getFullYear();
+      document.getElementById("download-mac").href = "#";
+      document.getElementById("download-win").href = "#";
+      document.getElementById("year").textContent = new Date().getFullYear();
       // Theme toggle
-      document.getElementById('theme-toggle')?.addEventListener('click', () => {
-        const el = document.documentElement
-        const dark = el.classList.toggle('dark')
-        try{ localStorage.setItem('ps_theme', dark ? 'dark' : 'light') }catch{}
-      })
+      document.getElementById("theme-toggle")?.addEventListener("click", () => {
+        const el = document.documentElement;
+        const dark = el.classList.toggle("dark");
+        try {
+          localStorage.setItem("ps_theme", dark ? "dark" : "light");
+        } catch {}
+      });
     </script>
   </body>
-  </html>
+</html>

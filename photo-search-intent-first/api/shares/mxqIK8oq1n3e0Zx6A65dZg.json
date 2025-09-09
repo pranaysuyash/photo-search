@@ -1,0 +1,14 @@
+{
+  "token": "mxqIK8oq1n3e0Zx6A65dZg",
+  "created": "2025-09-09T04:18:53.150912+00:00",
+  "expires": "2025-09-09T05:18:53.150928+00:00",
+  "dir": "/Users/pranay/Projects/adhoc_projects/photo-search/photo-search-intent-first/demo_photos",
+  "provider": "clip",
+  "paths": [
+    "/Users/pranay/Projects/adhoc_projects/photo-search/photo-search-intent-first/demo_photos/dog.png",
+    "/Users/pranay/Projects/adhoc_projects/photo-search/photo-search-intent-first/demo_photos/beach.png"
+  ],
+  "view_only": true,
+  "salt": null,
+  "pass_hash": null
+}

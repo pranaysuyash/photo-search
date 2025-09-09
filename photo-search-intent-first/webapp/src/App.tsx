@@ -5,6 +5,8 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { useDebouncedCallback } from "./hooks/useDebounce";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Search as IconSearch,
   Filter,
@@ -23,6 +25,7 @@ import {
   BookmarkPlus,
   Bookmark,
   ClipboardList,
+  Menu,
 } from "lucide-react";
 
 import {
@@ -57,7 +60,6 @@ import {
   useFastIndexEnabled,
   useFastKind,
   useCaptionsEnabled,
-  useVlmModel,
   useOcrEnabled,
   useOsTrashEnabled,
   useHasText,
@@ -69,6 +71,7 @@ import {
   useFMax,
   useNeedsHf,
   useNeedsOAI,
+  useShowInfoOverlay,
   // Individual photo hooks
   useSearchResults,
   useSearchQuery,
@@ -104,25 +107,81 @@ import {
   useUIActions,
   useWorkspaceActions,
 } from "./stores/useStores";
+import { useHighContrast } from "./stores/settingsStore";
+
+// Import action types
+import type {
+  SettingsActions,
+  PhotoActions,
+  UIActions,
+  WorkspaceActions,
+} from "./stores/types";
 
 // Reuse existing feature components
 import JustifiedResults from "./components/JustifiedResults";
 import { Lightbox } from "./components/Lightbox";
+import { VideoLightbox } from "./components/VideoLightbox";
+import { VideoService } from "./services/VideoService";
 import LibraryBrowser from "./components/LibraryBrowser";
 import PeopleView from "./components/PeopleView";
 import MapView from "./components/MapView";
 import Collections from "./components/Collections";
+import ShareViewer from "./components/ShareViewer";
 import SmartCollections from "./components/SmartCollections";
 import TripsView from "./components/TripsView";
 import SavedSearches from "./components/SavedSearches";
 import TasksView from "./components/TasksView";
-import type {
-  PhotoActions,
-  PhotoState,
-  SettingsActions,
-  UIActions,
-  WorkspaceActions,
-} from "./stores/types";
+import TimelineResults from "./components/TimelineResults";
+import JobsDrawer from "./components/JobsDrawer";
+import { Welcome } from "./components/Welcome";
+import { OnboardingModal } from "./components/OnboardingModal";
+import FirstRunSetup from "./components/modals/FirstRunSetup";
+import MobilePWATest from "./components/MobilePWATest";
+import {
+  EmptyState,
+  QuickActions,
+  SampleSearchSuggestions,
+  DemoLibraryToggle,
+} from "./components/EmptyStates";
+import { EnhancedEmptyState } from "./components/EnhancedEmptyState";
+import {
+  ContextualHelp,
+  OnboardingChecklist,
+} from "./components/ProgressiveOnboarding";
+import { GuidedIndexingFlow } from "./components/GuidedIndexingFlow";
+import { StatusBar } from "./components/StatusBar";
+import { JobsCenter, type Job } from "./components/JobsCenter";
+import { ShareManager } from "./modules/ShareManager";
+import { SearchBar } from "./components/SearchBar";
+import { FilterPanel } from "./components/FilterPanel";
+import { Sidebar } from "./components/Sidebar";
+import {
+  ErrorBoundary,
+  SectionErrorBoundary,
+} from "./components/ErrorBoundary";
+import { OfflineIndicator } from "./components/OfflineIndicator";
+import { LoadingSpinner, LoadingOverlay } from "./components/LoadingSpinner";
+import { TopBar } from "./components/TopBar";
+import { StatsBar } from "./components/StatsBar";
+import { BottomNavigation } from "./components/BottomNavigation";
+import { BatchOperations } from "./components/BatchOperations";
+import { VideoManager } from "./components/VideoManager";
+import PerformanceMonitor from "./components/PerformanceMonitor";
+import AdvancedSearchModal from "./components/modals/AdvancedSearchModal";
+import FolderPicker from "./components/FolderPicker";
+import {
+  ExportModal,
+  TagModal,
+  FolderModal,
+  LikePlusModal,
+  SaveModal,
+  CollectionModal,
+  RemoveCollectionModal,
+} from "./components/modals";
+import { HelpModal } from "./components/HelpModal";
+import { EnhancedSharingModal } from "./components/modals/EnhancedSharingModal";
+import { ThemeProvider } from "./components/ThemeProvider";
+import { ThemeSettingsModal } from "./components/ThemeSettingsModal";
 
 const basename = (p: string) => p.split("/").pop() || p;
 
@@ -137,45 +196,59 @@ type View =
   | "trips"
   | "saved"
   | "memories"
-  | "tasks";
+  | "tasks"
+  | "videos";
 type IconType = React.ComponentType<React.SVGProps<SVGSVGElement>>;
+type ViewType = "results" | "library" | "map" | "people" | "tasks" | "trips";
 
 // Minimal focus trap for modals
-function FocusTrap({ children, onEscape }: { children: React.ReactNode; onEscape?: () => void }) {
-  const rootRef = React.useRef<HTMLDivElement>(null)
+function FocusTrap({
+  children,
+  onEscape,
+}: {
+  children: React.ReactNode;
+  onEscape?: () => void;
+}) {
+  const rootRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
-    const root = rootRef.current
-    if (!root) return
+    const root = rootRef.current;
+    if (!root) return;
     const q = root.querySelectorAll<HTMLElement>(
       'a[href], button, textarea, input, select, [tabindex]:not([tabindex="-1"])'
-    )
-    const focusables = Array.from(q).filter(el => !el.hasAttribute('disabled'))
+    );
+    const focusables = Array.from(q).filter(
+      (el) => !el.hasAttribute("disabled")
+    );
     if (focusables.length > 0) {
-      const el = focusables.find(el => el.getAttribute('tabindex') !== '-1') || focusables[0]
-      el.focus()
+      const el =
+        focusables.find((el) => el.getAttribute("tabindex") !== "-1") ||
+        focusables[0];
+      el.focus();
     } else {
-      root.setAttribute('tabindex', '-1')
-      root.focus()
+      root.setAttribute("tabindex", "-1");
+      root.focus();
     }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation(); e.preventDefault(); onEscape && onEscape();
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        e.preventDefault();
+        onEscape && onEscape();
       }
-      if (e.key === 'Tab') {
-        if (focusables.length === 0) return
-        const idx = focusables.indexOf(document.activeElement as HTMLElement)
-        const dir = e.shiftKey ? -1 : 1
-        let next = idx + dir
-        if (next < 0) next = focusables.length - 1
-        if (next >= focusables.length) next = 0
-        e.preventDefault()
-        focusables[next].focus()
+      if (e.key === "Tab") {
+        if (focusables.length === 0) return;
+        const idx = focusables.indexOf(document.activeElement as HTMLElement);
+        const dir = e.shiftKey ? -1 : 1;
+        let next = idx + dir;
+        if (next < 0) next = focusables.length - 1;
+        if (next >= focusables.length) next = 0;
+        e.preventDefault();
+        focusables[next].focus();
       }
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onEscape])
-  return <div ref={rootRef}>{children}</div>
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onEscape]);
+  return <div ref={rootRef}>{children}</div>;
 }
 
 // Simple scroll-based loading component
@@ -189,10 +262,10 @@ function ScrollLoader({
   hasMore: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  
+
   useEffect(() => {
     if (!ref.current || isLoading || !hasMore) return;
-    
+
     const el = ref.current;
     const observer = new IntersectionObserver(
       (entries) => {
@@ -202,13 +275,16 @@ function ScrollLoader({
       },
       { threshold: 0.1 }
     );
-    
+
     observer.observe(el);
     return () => observer.disconnect();
   }, [isLoading, hasMore, onLoadMore]);
-  
+
   return (
-    <div ref={ref} className="h-8 w-full flex items-center justify-center text-xs text-gray-500">
+    <div
+      ref={ref}
+      className="h-8 w-full flex items-center justify-center text-xs text-gray-500"
+    >
       {isLoading ? "Loading…" : ""}
     </div>
   );
@@ -217,11 +293,12 @@ function ScrollLoader({
 export default function App() {
   // Safety check to prevent infinite loops on initial render
   const [isMounted, setIsMounted] = useState(false);
-  
+
   useEffect(() => {
     setIsMounted(true);
     return () => setIsMounted(false);
   }, []);
+
   // Individual hooks for settings
   const dir = useDir();
   const engine = useEngine();
@@ -252,8 +329,10 @@ export default function App() {
   const favOnly = useFavOnly();
   const topK = useTopK();
   const saved = useSavedSearches();
+  const savedSearches = saved; // alias for compatibility
   const collections = useCollections();
   const smart = useSmartCollections();
+  const trips: any[] = []; // TODO: implement trips
   const library = useLibrary();
   const libHasMore = useLibHasMore();
   const tagsMap = useTagsMap();
@@ -262,7 +341,7 @@ export default function App() {
   const busy = useBusy();
   const note = useNote();
   // const viewMode = useViewMode()
-  // const showWelcome = useShowWelcome()
+  const showWelcome = useShowWelcome();
   const showHelp = useShowHelp();
 
   // Individual hooks for workspace
@@ -275,52 +354,113 @@ export default function App() {
   const diag = useDiag();
 
   // Actions
-  const settingsActions = useSettingsActions() as SettingsActions;
-  const photoActions = usePhotoActions() as PhotoActions;
-  const uiActions = useUIActions() as UIActions;
-  const workspaceActions = useWorkspaceActions() as WorkspaceActions;
+  const settingsActions = useSettingsActions();
+  const photoActions = usePhotoActions();
+  const uiActions = useUIActions();
+  const workspaceActions = useWorkspaceActions();
 
   // Local UI state
   const [selectedView, setSelectedView] = useState<View>("library");
+  const location = useLocation();
+  const navigate = useNavigate();
   const [searchText, setSearchText] = useState("");
+
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [gridSize, setGridSize] = useState<GridSize>("medium");
+  const [resultView, setResultView] = useState<"grid" | "timeline">("grid");
+  const [timelineBucket, setTimelineBucket] = useState<
+    "day" | "week" | "month"
+  >("day");
   const [currentFilter, setCurrentFilter] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [modal, setModal] = useState<null | {
-    kind: "export" | "tag" | "folder" | "likeplus" | "save" | "collect" | "removeCollect";
+    kind:
+      | "export"
+      | "enhanced-share"
+      | "tag"
+      | "folder"
+      | "likeplus"
+      | "save"
+      | "collect"
+      | "removeCollect";
   }>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
   const [detailIdx, setDetailIdx] = useState<number | null>(null);
   const [focusIdx, setFocusIdx] = useState<number | null>(null);
   const [layoutRows, setLayoutRows] = useState<number[][]>([]);
   const layoutRowsRef = useRef(layoutRows);
-  
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [bottomNavTab, setBottomNavTab] = useState<
+    "home" | "search" | "favorites" | "settings"
+  >("home");
+
   useEffect(() => {
     layoutRowsRef.current = layoutRows;
   }, [layoutRows]);
-  
+
   // Helper function to compare layout rows
-  const rowsEqual = useCallback((a: number[][], b: number[][]) =>
-    a.length === b.length && a.every((r, i) => 
-      r.length === b[i].length && r.every((v, j) => v === b[i][j])
-    ), []);
+  const rowsEqual = useCallback(
+    (a: number[][], b: number[][]) =>
+      a.length === b.length &&
+      a.every(
+        (r, i) => r.length === b[i].length && r.every((v, j) => v === b[i][j])
+      ),
+    []
+  );
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  const [suggestOpen, setSuggestOpen] = useState(false);
   const [meta, setMeta] = useState<{ cameras: string[]; places?: string[] }>({
     cameras: [],
     places: [],
   });
+
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [isIndexing, setIsIndexing] = useState(false);
+  const [indexPct, setIndexPct] = useState<number | undefined>(undefined);
+  const [indexEta, setIndexEta] = useState<number | undefined>(undefined);
+  const [indexPaused, setIndexPaused] = useState<boolean>(false);
+  const [indexTip, setIndexTip] = useState<string | undefined>(undefined);
+  const [ocrReady, setOcrReady] = useState<boolean>(false);
   const [ratingMin, setRatingMin] = useState(0);
   const [toast, setToast] = useState<null | {
     message: string;
     actionLabel?: string;
     onAction?: () => void;
   }>(null);
-  const toastTimerRef = useRef<number | null>(null);
+  const [showThemeModal, setShowThemeModal] = useState(false);
+  const [showHelpHint, setShowHelpHint] = useState(() => {
+    try {
+      const seen = localStorage.getItem("ps_hint_help_seen");
+      return !seen;
+    } catch {
+      return true;
+    }
+  });
+  const [presets, setPresets] = useState<{ name: string; query: string }[]>([]);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Onboarding and user action tracking
+  const [userActions, setUserActions] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem("userActions");
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [onboardingSteps, setOnboardingSteps] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem("onboardingSteps");
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [showContextualHelp, setShowContextualHelp] = useState(false);
+  const [showOnboardingChecklist, setShowOnboardingChecklist] = useState(false);
   const ratingMap = useMemo(() => {
     const m: Record<string, number> = {};
     const tm = tagsMap || {};
@@ -338,8 +478,282 @@ export default function App() {
       if (pref === "dark") document.documentElement.classList.add("dark");
     } catch {}
   }, []);
+
+  const highContrast = useHighContrast();
+  const showInfoOverlay = useShowInfoOverlay();
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Skip when typing in inputs or contenteditable
+      const ae = document.activeElement as HTMLElement | null;
+      if (
+        ae &&
+        (ae.tagName === "INPUT" ||
+          ae.tagName === "TEXTAREA" ||
+          ae.isContentEditable)
+      )
+        return;
+      // Toggle info overlay (I)
+      if (e.key.toLowerCase() === "i") {
+        e.preventDefault();
+        settingsActions.setShowInfoOverlay &&
+          settingsActions.setShowInfoOverlay(!showInfoOverlay);
+        return;
+      }
+      // Open Advanced (A)
+      if (e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        setModal({ kind: "advanced" as any });
+        return;
+      }
+      // Help (?): toggle Help modal
+      if (e.key === "?") {
+        e.preventDefault();
+        setShowHelpModal((prev) => !prev);
+        return;
+      }
+      // Timeline jumps only when viewing results timeline
+      if (selectedView === "results" && (resultView as string) === "timeline") {
+        const dispatch = (kind: string) =>
+          window.dispatchEvent(
+            new CustomEvent("timeline-jump", { detail: { kind } })
+          );
+        if (e.key.toLowerCase() === "t") {
+          e.preventDefault();
+          dispatch("today");
+          return;
+        }
+        if (e.key.toLowerCase() === "m") {
+          e.preventDefault();
+          dispatch("this-month");
+          return;
+        }
+        if (e.key.toLowerCase() === "l") {
+          e.preventDefault();
+          dispatch("last-month");
+          return;
+        }
+        if (e.key.toLowerCase() === "o") {
+          e.preventDefault();
+          dispatch("oldest");
+          return;
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showInfoOverlay, settingsActions, selectedView, resultView]);
+
+  useEffect(() => {
+    const body = document.body;
+    if (highContrast) {
+      body.classList.add("high-contrast");
+    } else {
+      body.classList.remove("high-contrast");
+    }
+  }, [highContrast]);
+
+  // Determine if any filters are active (for no-results empty state)
+  const hasAnyFilters = useMemo(() => {
+    const anyExif = Boolean(
+      camera || isoMin || isoMax || fMin || fMax || place
+    );
+    const anyDate = Boolean(dateFrom && dateTo);
+    const anyPeople = Array.isArray(persons) && persons.length > 0;
+    const anyTags = Boolean(tagFilter && tagFilter.trim());
+    const anyQuality = ratingMin > 0 || hasText;
+    return Boolean(
+      favOnly || anyExif || anyDate || anyPeople || anyTags || anyQuality
+    );
+  }, [
+    camera,
+    isoMin,
+    isoMax,
+    fMin,
+    fMax,
+    place,
+    dateFrom,
+    dateTo,
+    persons,
+    tagFilter,
+    ratingMin,
+    hasText,
+    favOnly,
+  ]);
+
+  // Route -> view sync (HashRouter deep links)
+  useEffect(() => {
+    const path = location.pathname || "/library";
+    const seg = path.split("/").filter(Boolean)[0] || "library";
+    const nextView: View =
+      seg === "search"
+        ? "results"
+        : seg === "library"
+        ? "library"
+        : seg === "people"
+        ? "people"
+        : seg === "collections"
+        ? "collections"
+        : seg === "settings"
+        ? "tasks" // map settings to tasks/settings panel for now
+        : "library";
+    if (selectedView !== nextView) setSelectedView(nextView);
+  }, [location.pathname, selectedView]);
+
+  // view -> route sync (user clicks in sidebar)
+  useEffect(() => {
+    const curr = location.pathname || "";
+    const want =
+      selectedView === "results"
+        ? "/search"
+        : selectedView === "library"
+        ? "/library"
+        : selectedView === "people"
+        ? "/people"
+        : selectedView === "collections"
+        ? "/collections"
+        : "/settings";
+    if (curr !== want)
+      navigate({ pathname: want, search: location.search }, { replace: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedView, navigate, location.search]);
+
+  // Read search query + filters from URL for deep linking
+  useEffect(() => {
+    if (!isMounted) return;
+    const sp = new URLSearchParams(location.search);
+    const q = sp.get("q") || "";
+    if (q && q !== searchText) setSearchText(q);
+    // Parse optional filters from URL
+    try {
+      const fav = sp.get("fav");
+      if (fav === "1") photoActions.setFavOnly(true);
+      const tagsCSV = sp.get("tags") || "";
+      if (tagsCSV) photoActions.setTagFilter(tagsCSV);
+      const df = sp.get("date_from");
+      const dt = sp.get("date_to");
+      if (df) setDateFrom(df);
+      if (dt) setDateTo(dt);
+      const plc = sp.get("place");
+      if (plc) settingsActions.setPlace(plc);
+      const ht = sp.get("has_text");
+      if (ht === "1") settingsActions.setHasText(true);
+      const cam = sp.get("camera");
+      if (cam) settingsActions.setCamera(cam);
+      const isoMinP = sp.get("iso_min");
+      if (isoMinP) settingsActions.setIsoMin(parseFloat(isoMinP));
+      const isoMaxP = sp.get("iso_max");
+      if (isoMaxP) settingsActions.setIsoMax(parseFloat(isoMaxP));
+      const fmin = sp.get("f_min");
+      if (fmin) settingsActions.setFMin(parseFloat(fmin));
+      const fmax = sp.get("f_max");
+      if (fmax) settingsActions.setFMax(parseFloat(fmax));
+      const person = sp.get("person");
+      const personsCSV = sp.get("persons");
+      if (personsCSV)
+        workspaceActions.setPersons(
+          personsCSV
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        );
+      else if (person) workspaceActions.setPersons([person]);
+      const rv = sp.get("rv") as any;
+      if (rv && settingsActions.setResultView)
+        settingsActions.setResultView(rv);
+      const tb = sp.get("tb") as any;
+      if (tb && settingsActions.setTimelineBucket)
+        settingsActions.setTimelineBucket(tb);
+    } catch {}
+  }, [
+    location.search,
+    isMounted,
+    searchText,
+    photoActions,
+    settingsActions,
+    workspaceActions,
+  ]);
+
+  // Track user actions for contextual help
+  useEffect(() => {
+    if (searchText && searchText.trim()) {
+      setUserActions((prev) => {
+        if (!prev.includes("searched")) {
+          const newActions = [...prev, "searched"];
+          try {
+            localStorage.setItem("userActions", JSON.stringify(newActions));
+          } catch {}
+          return newActions;
+        }
+        return prev;
+      });
+    }
+  }, [searchText]);
+
+  useEffect(() => {
+    if (dir) {
+      setUserActions((prev) => {
+        if (!prev.includes("selected_directory")) {
+          const newActions = [...prev, "selected_directory"];
+          try {
+            localStorage.setItem("userActions", JSON.stringify(newActions));
+          } catch {}
+          return newActions;
+        }
+        return prev;
+      });
+    }
+  }, [dir]);
+
+  useEffect(() => {
+    if (library && library.length > 0) {
+      setUserActions((prev) => {
+        if (!prev.includes("indexed")) {
+          const newActions = [...prev, "indexed"];
+          try {
+            localStorage.setItem("userActions", JSON.stringify(newActions));
+          } catch {}
+          return newActions;
+        }
+        return prev;
+      });
+    }
+  }, [library]);
+
+  // Show contextual help based on context and user actions
+  useEffect(() => {
+    const shouldShowHelp = () => {
+      // Show help for first-time users
+      if (userActions.length === 0) return true;
+
+      // Show help when user hasn't searched yet but is on search view
+      if (selectedView === "results" && !userActions.includes("searched"))
+        return true;
+
+      // Show help when user has photos but hasn't searched
+      if (
+        selectedView === "library" &&
+        dir &&
+        !userActions.includes("searched")
+      )
+        return true;
+
+      return false;
+    };
+
+    setShowContextualHelp(shouldShowHelp());
+  }, [selectedView, userActions, dir]);
+
+  // Show onboarding checklist for new users
+  useEffect(() => {
+    const hasCompletedOnboarding = localStorage.getItem("onboardingComplete");
+    const shouldShowChecklist =
+      !hasCompletedOnboarding && dir && library && library.length > 0;
+
+    setShowOnboardingChecklist(shouldShowChecklist || false);
+  }, [dir, library]);
   const [libOffset, setLibOffset] = useState(0);
-  const [libLoading, setLibLoading] = useState(false);
   const libLimit = 120;
 
   // Derived list to show: search results or library - memoized to prevent recreation
@@ -363,6 +777,14 @@ export default function App() {
       photoActions.setSaved(r.saved || []);
     } catch {}
   }, [dir, photoActions]);
+  const loadPresets = useCallback(async () => {
+    if (!dir) return;
+    try {
+      const { apiGetPresets } = await import("./api");
+      const r = await apiGetPresets(dir);
+      setPresets(r.presets || []);
+    } catch {}
+  }, [dir]);
 
   const loadTags = useCallback(async () => {
     if (!dir) return;
@@ -376,7 +798,12 @@ export default function App() {
   const loadDiag = useCallback(async () => {
     if (!dir) return;
     try {
-      const r = await apiDiagnostics(dir, engine, needsOAI ? openaiKey : undefined, needsHf ? hfToken : undefined);
+      const r = await apiDiagnostics(
+        dir,
+        engine,
+        needsOAI ? openaiKey : undefined,
+        needsHf ? hfToken : undefined
+      );
       workspaceActions.setDiag(r);
     } catch {}
   }, [dir, engine, needsOAI, openaiKey, needsHf, hfToken, workspaceActions]);
@@ -401,11 +828,17 @@ export default function App() {
     async (limit = 120, offset = 0, append = false) => {
       try {
         if (!dir) return;
-        const r = await apiLibrary(dir, engine, limit, offset, { openaiKey: needsOAI ? openaiKey : undefined, hfToken: needsHf ? hfToken : undefined });
-        
+        const r = await apiLibrary(dir, engine, limit, offset, {
+          openaiKey: needsOAI ? openaiKey : undefined,
+          hfToken: needsHf ? hfToken : undefined,
+        });
+
         // Calculate if there are more pages to load
-        const hasMore = r.paths && r.paths.length === limit && (offset + r.paths.length) < r.total;
-        
+        const hasMore =
+          r.paths &&
+          r.paths.length === limit &&
+          offset + r.paths.length < r.total;
+
         if (append) {
           if (r.paths && r.paths.length > 0) {
             photoActions.appendLibrary(r.paths);
@@ -413,7 +846,7 @@ export default function App() {
         } else {
           photoActions.setLibrary(r.paths || []);
         }
-        
+
         photoActions.setLibHasMore(hasMore);
       } catch {}
     },
@@ -428,10 +861,48 @@ export default function App() {
     } catch {}
   }, [dir]);
 
+  // One-time OCR status check per directory
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (!dir) {
+        setOcrReady(false);
+        return;
+      }
+      try {
+        const { apiOcrStatus } = await import("./api");
+        const r = await apiOcrStatus(dir);
+        if (!cancelled) setOcrReady(!!r.ready);
+      } catch {
+        if (!cancelled) setOcrReady(false);
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [dir]);
+
   // Actions
   const doIndex = useCallback(async () => {
     uiActions.setBusy("Indexing…");
     uiActions.setNote("");
+    setIsIndexing(true);
+
+    // Create a job for indexing
+    const jobId = `index-${Date.now()}`;
+    const indexJob: Job = {
+      id: jobId,
+      type: "index",
+      title: "Indexing Photos",
+      description: `Analyzing photos in ${dir}`,
+      status: "running",
+      startTime: new Date(),
+      canCancel: true,
+      total: (library || []).length || undefined,
+    };
+    setJobs((prev) => [...prev, indexJob]);
+
     try {
       const r = await apiIndex(
         dir,
@@ -443,11 +914,41 @@ export default function App() {
       uiActions.setNote(
         `Indexed. New ${r.new}, Updated ${r.updated}, Total ${r.total}`
       );
+
+      // Update job to completed
+      setJobs((prev) =>
+        prev.map((j) =>
+          j.id === jobId
+            ? {
+                ...j,
+                status: "completed",
+                endTime: new Date(),
+                progress: r.total,
+              }
+            : j
+        )
+      );
+
       await loadLibrary(120, 0);
     } catch (e) {
       uiActions.setNote(e instanceof Error ? e.message : "Index failed");
+
+      // Update job to failed
+      setJobs((prev) =>
+        prev.map((j) =>
+          j.id === jobId
+            ? {
+                ...j,
+                status: "failed",
+                endTime: new Date(),
+                error: e instanceof Error ? e.message : "Index failed",
+              }
+            : j
+        )
+      );
     } finally {
       uiActions.setBusy("");
+      setIsIndexing(false);
     }
   }, [
     dir,
@@ -460,11 +961,36 @@ export default function App() {
     uiActions,
   ]);
 
-  const doSearch = useCallback(
+  const doSearchImmediate = useCallback(
     async (text?: string) => {
       const q = (text ?? searchText ?? "").trim();
       if (!q) return;
       photoActions.setQuery(q);
+      // Push URL state for deep linking including filters
+      try {
+        const sp = new URLSearchParams();
+        sp.set("q", q);
+        if (favOnly) sp.set("fav", "1");
+        if (tagFilter?.trim()) sp.set("tags", tagFilter);
+        if (dateFrom && dateTo) {
+          sp.set("date_from", dateFrom);
+          sp.set("date_to", dateTo);
+        }
+        if (place?.trim()) sp.set("place", place);
+        if (hasText) sp.set("has_text", "1");
+        if (camera?.trim()) sp.set("camera", camera);
+        if (isoMin) sp.set("iso_min", String(isoMin));
+        if (isoMax) sp.set("iso_max", String(isoMax));
+        if (fMin) sp.set("f_min", String(fMin));
+        if (fMax) sp.set("f_max", String(fMax));
+        const ppl = persons.filter(Boolean);
+        if (ppl.length === 1) sp.set("person", ppl[0]);
+        if (ppl.length > 1) sp.set("persons", ppl.join(","));
+        navigate(
+          { pathname: "/search", search: `?${sp.toString()}` },
+          { replace: false }
+        );
+      } catch {}
       uiActions.setBusy("Searching…");
       uiActions.setNote("");
       try {
@@ -508,10 +1034,10 @@ export default function App() {
             useCaptions: useCaps,
             useOcr,
             camera: camera || undefined,
-            isoMin: isoMin ? parseInt(isoMin, 10) : undefined,
-            isoMax: isoMax ? parseInt(isoMax, 10) : undefined,
-            fMin: fMin ? parseFloat(fMin) : undefined,
-            fMax: fMax ? parseFloat(fMax) : undefined,
+            isoMin: isoMin || undefined,
+            isoMax: isoMax || undefined,
+            fMin: fMin || undefined,
+            fMax: fMax || undefined,
             place: place || undefined,
             hasText: hasText || undefined,
             ...(ppl.length === 1
@@ -539,6 +1065,8 @@ export default function App() {
     [
       searchText,
       photoActions,
+      navigate,
+      location.search,
       uiActions,
       tagsMap,
       persons,
@@ -572,6 +1100,9 @@ export default function App() {
       loadDiag,
     ]
   );
+
+  // Debounced search for better performance
+  const doSearch = useDebouncedCallback(doSearchImmediate, 300);
 
   const prepareFast = useCallback(
     async (kind: "annoy" | "faiss" | "hnsw") => {
@@ -633,6 +1164,154 @@ export default function App() {
       uiActions.setBusy("");
     }
   }, [dir, engine, needsHf, hfToken, needsOAI, openaiKey, uiActions]);
+
+  // Poll analytics when busy to surface progress notes
+  useEffect(() => {
+    if (!busy || !dir) return;
+    let t: number;
+    let last = "";
+    const summarize = (e: {
+      type?: string;
+      updated?: number;
+      ok?: boolean;
+      kind?: string;
+      made?: number;
+      trips?: number;
+      copied?: number;
+      skipped?: number;
+    }) => {
+      switch (e?.type) {
+        case "ocr_build":
+          return `OCR updated ${e.updated}`;
+        case "captions_build":
+          return `Captions updated ${e.updated}`;
+        case "fast_build":
+          return `${String(e.kind).toUpperCase()} ${e.ok ? "ready" : "failed"}`;
+        case "thumbs_build":
+          return `Thumbs made ${e.made}`;
+        case "trips_build":
+          return `Trips ${e.trips}`;
+        case "metadata_build":
+          return `Metadata updated ${e.updated}`;
+        case "export":
+          return `Exported ${e.copied}, skipped ${e.skipped}`;
+        default:
+          return "";
+      }
+    };
+    const tick = async () => {
+      try {
+        const { apiAnalytics } = await import("./api");
+        const r = await apiAnalytics(dir, 10);
+        const ev = (r.events || []).slice(-1)[0];
+        if (ev && ev.time !== last) {
+          last = ev.time;
+          const msg = summarize(ev);
+          if (msg) uiActions.setNote(msg);
+        }
+      } catch {}
+      t = window.setTimeout(tick, 2000);
+    };
+    tick();
+    return () => {
+      if (t) window.clearTimeout(t);
+    };
+  }, [busy, dir, uiActions]);
+
+  // Poll index status for progress/ETA while indexing
+  useEffect(() => {
+    if (!isIndexing || !dir) {
+      setIndexPct(undefined);
+      setIndexEta(undefined);
+      setIndexPaused(false);
+      return;
+    }
+    let t: number | undefined;
+    let startTs: number | undefined;
+    const tick = async () => {
+      try {
+        const { apiIndexStatus } = await import("./api");
+        const s = await apiIndexStatus(
+          dir,
+          engine,
+          needsHf ? hfToken : undefined,
+          needsOAI ? openaiKey : undefined
+        );
+        // Compute progress based on insert/update subtotals when available
+        const insDone = Number(s.insert_done || 0);
+        const insTot = Number(s.insert_total || 0);
+        const updDone = Number(s.updated_done || 0);
+        const updTot = Number(s.updated_total || 0);
+        const num = insDone + updDone;
+        const den = Math.max(1, insTot + updTot);
+        const pct = Math.min(1, Math.max(0, num / den));
+        if (den > 1) setIndexPct(pct);
+        setIndexPaused(Boolean((s as any).paused) || s.state === "paused");
+        // Tooltip summary (processed • target/indexed/coverage • new/updated • eta)
+        const parts: string[] = [];
+        if (den > 1) parts.push(`processed ${num}/${den}`);
+        if (typeof (s as any).indexed === "number")
+          parts.push(`indexed ${(s as any).indexed}`);
+        if (typeof s.target === "number" && s.target > 0)
+          parts.push(`target ${s.target}`);
+        if (typeof (s as any).coverage === "number")
+          parts.push(`coverage ${Math.round((s as any).coverage * 100)}%`);
+        if (typeof (s as any).drift === "number" && (s as any).drift > 0)
+          parts.push(`drift ${(s as any).drift}`);
+        if (s.state === "complete") {
+          if (typeof s.new === "number") parts.push(`new ${s.new}`);
+          if (typeof s.updated === "number") parts.push(`updated ${s.updated}`);
+          if ((s as any).last_index_time)
+            parts.push(`at ${(s as any).last_index_time}`);
+        }
+        if (
+          typeof indexEta === "number" &&
+          isFinite(indexEta) &&
+          indexEta > 0
+        ) {
+          parts.push(`eta ~${Math.max(1, Math.ceil(indexEta / 60))}m`);
+        }
+        if (parts.length > 0) setIndexTip(parts.join(" • "));
+        // ETA: based on elapsed and rate
+        if (!startTs && s.start) {
+          startTs = Date.parse(s.start);
+        }
+        const now = Date.now();
+        const elapsed = startTs
+          ? Math.max(1, (now - startTs) / 1000)
+          : undefined;
+        if (elapsed && num > 5) {
+          const rate = num / elapsed; // items per second
+          const remaining = Math.max(0, den - num);
+          const eta = rate > 0 ? remaining / rate : undefined;
+          if (eta && isFinite(eta)) setIndexEta(eta);
+        }
+        if (s.state === "complete") {
+          setIndexPct(undefined);
+          setIndexEta(undefined);
+          setIndexPaused(false);
+        }
+      } catch {}
+      t = window.setTimeout(tick, 1000);
+    };
+    tick();
+    return () => {
+      if (t) window.clearTimeout(t);
+    };
+  }, [isIndexing, dir, engine, needsHf, hfToken, needsOAI, openaiKey]);
+
+  // Keep URL in sync with resultView/timelineBucket (when in results view)
+  useEffect(() => {
+    try {
+      const sp = new URLSearchParams(location.search);
+      sp.set("rv", resultView);
+      sp.set("tb", timelineBucket);
+      navigate(
+        { pathname: location.pathname, search: `?${sp.toString()}` },
+        { replace: true }
+      );
+    } catch {}
+  }, [resultView, timelineBucket]);
 
   const toggleSelect = useCallback((p: string) => {
     setSelected((prev) => {
@@ -739,7 +1418,7 @@ export default function App() {
   useEffect(() => {
     if (!isMounted) return;
     const next = query || "";
-    setSearchText(prev => (prev === next ? prev : next));
+    setSearchText((prev) => (prev === next ? prev : next));
   }, [query, isMounted]);
 
   useEffect(() => {
@@ -749,9 +1428,9 @@ export default function App() {
     loadTags();
     loadDiag();
     loadFaces();
-    setLibOffset(0);
     loadLibrary(libLimit, 0);
     loadMetadata();
+    loadPresets();
   }, [
     dir,
     loadFav,
@@ -761,6 +1440,7 @@ export default function App() {
     loadFaces,
     loadLibrary,
     loadMetadata,
+    loadPresets,
   ]);
 
   // Infinite scroll sentinel moved to top-level component
@@ -791,7 +1471,7 @@ export default function App() {
       if (showShortcuts || modal || showFilters) return;
       if (e.key === "/") {
         e.preventDefault();
-        searchInputRef.current?.focus();
+        // Focus search bar if needed
         return;
       }
       if (e.key === "?" || (e.shiftKey && e.key === "/")) {
@@ -905,7 +1585,7 @@ export default function App() {
       }
       if (e.key === "End") {
         e.preventDefault();
-        setFocusIdx(results!.length - 1);
+        setFocusIdx(results.length - 1);
         return;
       }
 
@@ -956,1190 +1636,1137 @@ export default function App() {
   }, [focusIdx]);
 
   // UI building blocks
-  const LibraryView = () => (
-    <div className="p-4">
-      <LibraryBrowser
-        dir={dir}
-        engine={engine}
-        library={library}
-        onLoadLibrary={loadLibrary}
-      />
-      {/* <InfiniteSentinel
-        selectedView={selectedView}
-        libOffset={libOffset}
-        libLimit={libLimit}
-        libLoading={libLoading}
-        libHasMore={libHasMore}
-        onLoadMore={loadLibrary}
-        setLibOffset={setLibOffset}
-        setLibLoading={setLibLoading}
-        scrollContainerRef={scrollContainerRef}
-      /> */}
-    </div>
-  );
+  const LibraryView = () => {
+    // Show empty state if no directory selected
+    if (!dir) {
+      return (
+        <div className="p-4">
+          <EnhancedEmptyState
+            type="no-directory"
+            onAction={() => setModal({ kind: "folder" })}
+            onDemoAction={async () => {
+              // Enable demo mode
+              const demoPath =
+                "/Users/pranay/Projects/adhoc_projects/photo-search/e2e_data";
+              settingsActions.setDir(demoPath);
 
-  const Sidebar = () => (
-    <div className="w-64 bg-gray-50 border-r border-gray-200 flex flex-col">
-      <div className="p-4 border-b border-gray-200">
-        <h1 className="text-xl font-bold text-gray-900">PhotoVault</h1>
-        <p className="text-sm text-gray-500">AI-Powered Photo Management</p>
-      </div>
-
-      <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
-        <div>
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-            Library
-          </h3>
-          <div className="space-y-1">
-            {(
-              [
-                {
-                  id: "library",
-                  label: "All Photos",
-                  icon: IconGrid,
-                  count: library?.length || 0,
-                },
-                { id: "results", label: "Search Results", icon: IconSearch },
-                { id: "map", label: "Map View", icon: IconMap },
-                { id: "people", label: "People", icon: Users },
-                { id: "collections", label: "Collections", icon: FolderOpen },
-                { id: "smart", label: "Smart Collections", icon: Star },
-                { id: "trips", label: "Trips", icon: Calendar },
-                { id: "saved", label: "Saved Searches", icon: Bookmark },
-                { id: "memories", label: "Memories", icon: Star },
-                { id: "tasks", label: "Tasks", icon: ClipboardList },
-              ] as { id: View; label: string; icon: IconType; count?: number }[]
-            ).map((item) => (
-              <button
-                type="button"
-                key={item.id}
-                onClick={() => setSelectedView(item.id)}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
-                  selectedView === item.id
-                    ? "bg-blue-500 text-white"
-                    : "text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <item.icon className="w-4 h-4" />
-                  <span>{item.label}</span>
-                </div>
-                {item.count ? (
-                  <span
-                    className={`text-xs px-2 py-1 rounded-full ${
-                      selectedView === item.id
-                        ? "bg-white/20"
-                        : "bg-gray-200 text-gray-600"
-                    }`}
-                  >
-                    {item.count}
-                  </span>
-                ) : null}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-            Quick Collections
-          </h3>
-          <div className="space-y-1">
-            {Object.entries(collections || {})
-              .slice(0, 5)
-              .map(([name, paths]) => (
-                <button
-                  type="button"
-                  key={name}
-                  onClick={() => setSelectedView("collections")}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full bg-blue-400`} />
-                    <span>{name}</span>
-                  </div>
-                  <span className="text-xs text-gray-500">{paths.length}</span>
-                </button>
-              ))}
-          </div>
-        </div>
-
-        <div>
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-            People
-          </h3>
-          <div className="space-y-1">
-            {(clusters || []).slice(0, 6).map((c) => (
-              <button
-                type="button"
-                key={c.id}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <Users className="w-4 h-4" />
-                  <span>{c.name || "Unnamed"}</span>
-                </div>
-                <span className="text-xs text-gray-500">{c.size}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </nav>
-
-      <div className="p-4 border-t border-gray-200">
-        <button
-          type="button"
-          className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-          onClick={async () => {
-            try {
-              // Use Electron IPC to select folder
-              if (window.electronAPI && window.electronAPI.selectFolder) {
-                const folderPath = await window.electronAPI.selectFolder();
-                if (folderPath) {
-                  settingsActions.setDir(folderPath);
-                }
-              } else {
-                // Fallback to prompt if IPC not available (development mode)
-                const p = window.prompt("Photo folder path:");
-                if (p) settingsActions.setDir(p);
-              }
-            } catch (error) {
-              console.error('Failed to select folder:', error);
-              // Fallback to prompt on error
-              const p = window.prompt("Photo folder path:");
-              if (p) settingsActions.setDir(p);
-            }
-          }}
-        >
-          <Upload className="w-4 h-4" />
-          <span>Select Folder</span>
-        </button>
-      </div>
-    </div>
-  );
-
-  const TopBar = () => (
-    <div className="bg-white border-b border-gray-200 p-4">
-      {/* Busy progress bar */}
-      {busy && (
-        <div className="h-1 w-full bg-blue-100 mb-2 overflow-hidden rounded">
-          <div className="h-full bg-blue-500 animate-pulse w-1/3"></div>
-        </div>
-      )}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4 flex-1 max-w-2xl">
-          <div className="relative flex-1">
-            <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Search by content, people, places…"
-              value={searchText}
-              onChange={(e) => {
-                setSearchText(e.target.value);
-                setSuggestOpen(true);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") doSearch(searchText);
-              }}
-              onFocus={() => setSuggestOpen(true)}
-              onBlur={() => setTimeout(() => setSuggestOpen(false), 120)}
-              ref={searchInputRef}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            {suggestOpen && (
-              <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded shadow max-h-64 overflow-auto text-sm">
-                {(() => {
-                  const q = searchText.toLowerCase();
-                  const ppl = (clusters || [])
-                    .map((c) => c.name)
-                    .filter(Boolean) as string[];
-                  const suggestions: { cat: string; label: string }[] = [];
-                  for (const p of ppl)
-                    if (!q || p.toLowerCase().includes(q))
-                      suggestions.push({ cat: "People", label: p });
-                  for (const t of allTags || [])
-                    if (!q || t.toLowerCase().includes(q))
-                      suggestions.push({ cat: "Tag", label: t });
-                  for (const c of meta.cameras || [])
-                    if (!q || c.toLowerCase().includes(q))
-                      suggestions.push({ cat: "Camera", label: c });
-                  for (const pl of meta.places || [])
-                    if (!q || String(pl).toLowerCase().includes(q))
-                      suggestions.push({ cat: "Place", label: String(pl) });
-                  const top = suggestions.slice(0, 20);
-                  if (top.length === 0)
-                    return (
-                      <div className="px-3 py-2 text-gray-500">
-                        No suggestions
-                      </div>
-                    );
-                  return top.map((s, i) => (
-                    <button
-                      type="button"
-                      key={`${s.cat}:${s.label}`}
-                      className="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-50"
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        setSearchText(s.label);
-                        setSuggestOpen(false);
-                        setTimeout(() => doSearch(s.label), 0);
-                      }}
-                    >
-                      <span className="truncate">
-                        <span className="text-gray-500 mr-2">{s.cat}:</span>
-                        {s.label}
-                      </span>
-                      <span className="text-xs text-gray-400">↵</span>
-                    </button>
-                  ));
-                })()}
-              </div>
-            )}
-          </div>
-
-          <button
-            type="button"
-            className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            onClick={() => setShowFilters((v) => !v)}
-          >
-            <Filter className="w-4 h-4" />
-            <span className="text-sm">Filters</span>
-          </button>
-          <button
-            type="button"
-            className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            onClick={() => setModal({ kind: "save" })}
-            title="Save search"
-          >
-            <BookmarkPlus className="w-4 h-4" />
-            <span className="text-sm">Save</span>
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="flex items-center bg-gray-100 rounded-lg p-1">
-            {(["small", "medium", "large"] as GridSize[]).map((s) => (
-              <button
-                type="button"
-                key={s}
-                onClick={() => setGridSize(s)}
-                className={`px-3 py-1 text-xs rounded-md transition-colors ${
-                  gridSize === s
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                {s.charAt(0).toUpperCase() + s.slice(1)}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-center bg-gray-100 rounded-lg p-1">
-            <button
-              type="button"
-              onClick={() => setSelectedView("results")}
-              className={`p-2 rounded-md transition-colors ${
-                selectedView === "results"
-                  ? "bg-white shadow-sm"
-                  : "hover:bg-gray-200"
-              }`}
-            >
-              <IconGrid className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedView("library")}
-              className={`p-2 rounded-md transition-colors ${
-                selectedView === "library"
-                  ? "bg-white shadow-sm"
-                  : "hover:bg-gray-200"
-              }`}
-            >
-              <IconList className="w-4 h-4" />
-            </button>
-          </div>
-
-          <button
-            type="button"
-            className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-            title="Settings & Indexing"
-            onClick={() => setModal({ kind: "folder" })}
-          >
-            <Settings className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-            title="Toggle theme"
-            onClick={() => {
+              // Index the demo photos
               try {
-                const c = document.documentElement.classList;
-                const dark = c.toggle("dark");
-                localStorage.setItem("ps_theme", dark ? "dark" : "light");
-              } catch {}
-            }}
-          >
-            <span aria-hidden>🌗</span>
-          </button>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2 mt-4">
-        {[
-          "All",
-          "Today",
-          "This Week",
-          "This Month",
-          "Favorites",
-          "People",
-          "Screenshots",
-        ].map((f) => (
-          <button
-            type="button"
-            key={f}
-            onClick={() => {
-              setCurrentFilter(f.toLowerCase());
-              if (f === "Favorites") {
-                photoActions.setFavOnly(true);
-                doSearch(searchText);
+                await doIndex();
+                uiActions.setNote(
+                  "Demo library loaded! Try searching for 'beach sunset' or 'family photos'"
+                );
+              } catch (error) {
+                console.error("Failed to setup demo:", error);
+                uiActions.setNote(
+                  error instanceof Error
+                    ? error.message
+                    : "Failed to setup demo"
+                );
               }
             }}
-            className={`px-3 py-1 text-sm rounded-full transition-colors ${
-              currentFilter === f.toLowerCase()
-                ? "bg-blue-500 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
-          >
-            {f}
-          </button>
-        ))}
-      </div>
-
-      {/* Rating filter */}
-      <div className="flex items-center gap-1 mt-2 text-sm">
-        <span>Min rating:</span>
-        {[0, 1, 2, 3, 4, 5].map((n) => (
-          <button
-            key={n}
-            type="button"
-            className={`px-2 py-0.5 rounded ${
-              ratingMin === n ? "bg-blue-600 text-white" : "bg-gray-200"
-            }`}
-            onClick={() => setRatingMin(n)}
-          >
-            {n === 0 ? "Any" : `${"★".repeat(n)}`}
-          </button>
-        ))}
-      </div>
-
-      {selected.size > 0 && (
-        <div className="flex items-center justify-between mt-4 p-3 bg-blue-50 rounded-lg">
-          <span className="text-sm text-blue-900">
-            {selected.size} photo{selected.size !== 1 ? "s" : ""} selected
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="flex items-center gap-1 px-3 py-1 text-sm text-blue-700 hover:bg-blue-100 rounded-md transition-colors"
-              onClick={() => setModal({ kind: "export" })}
-            >
-              <Download className="w-4 h-4" />
-              Export
-            </button>
-            {/* Feature-flagged: Sharing v1 (stubbed UI) */}
-            {(import.meta as any).env?.VITE_FF_SHARING_V1 === '1' && (
-              <button
-                type="button"
-                className="flex items-center gap-1 px-3 py-1 text-sm text-blue-700 hover:bg-blue-100 rounded-md transition-colors"
-                onClick={() => setModal({ kind: "share" as any })}
-              >
-                <IconSearch className="w-4 h-4" /> Share
-              </button>
-            )}
-            <button
-              type="button"
-              className="flex items-center gap-1 px-3 py-1 text-sm text-blue-700 hover:bg-blue-100 rounded-md transition-colors"
-              onClick={() => setModal({ kind: "tag" })}
-            >
-              <IconTag className="w-4 h-4" />
-              Tag
-            </button>
-            {selected.size === 1 && (
-              <button
-                type="button"
-                className="flex items-center gap-1 px-3 py-1 text-sm text-blue-700 hover:bg-blue-100 rounded-md transition-colors"
-                onClick={async () => {
-                  const p = Array.from(selected)[0];
-                  const { apiSearchLike } = await import("./api");
-                  uiActions.setBusy("Searching similar…");
-                  try {
-                    const r = await apiSearchLike(dir, p, engine, topK);
-                    photoActions.setResults(r.results || []);
-                    setSelectedView("results");
-                  } catch (e) {
-                    uiActions.setNote(
-                      e instanceof Error ? e.message : "Search failed"
-                    );
-                  } finally {
-                    uiActions.setBusy("");
-                  }
-                }}
-              >
-                <IconSearch className="w-4 h-4" /> Similar
-              </button>
-            )}
-            {selected.size === 1 && (
-              <button
-                type="button"
-                className="flex items-center gap-1 px-3 py-1 text-sm text-blue-700 hover:bg-blue-100 rounded-md transition-colors"
-                onClick={() => setModal({ kind: "likeplus" })}
-              >
-                <IconSearch className="w-4 h-4" /> Similar + Text
-              </button>
-            )}
-            <button
-              type="button"
-              className="flex items-center gap-1 px-3 py-1 text-sm text-blue-700 hover:bg-blue-100 rounded-md transition-colors"
-              onClick={() => setModal({ kind: "collect" })}
-            >
-              <FolderOpen className="w-4 h-4" /> Add to Collection
-            </button>
-            <button
-              type="button"
-              className="flex items-center gap-1 px-3 py-1 text-sm text-blue-700 hover:bg-blue-100 rounded-md transition-colors"
-              onClick={() => setModal({ kind: "removeCollect" as any })}
-            >
-              <FolderOpen className="w-4 h-4 rotate-180" /> Remove from
-              Collection
-            </button>
-            <button
-              type="button"
-              className="flex items-center gap-1 px-3 py-1 text-sm text-red-700 hover:bg-red-100 rounded-md transition-colors"
-              onClick={async () => {
-                if (selected.size === 0) return;
-                if (!confirm(`Move ${selected.size} item(s) to Trash?`)) return;
-                try {
-                  uiActions.setBusy("Deleting…");
-                  const r = await apiDelete(dir, Array.from(selected), useOsTrash);
-                  uiActions.setNote(`Moved ${r.moved} to ${useOsTrash ? 'OS Trash' : 'Trash'}`);
-                  setSelected(new Set());
-                  // Show Undo toast only when undoable (app trash)
-                  if (!useOsTrash) {
-                    if (toastTimerRef.current)
-                      window.clearTimeout(toastTimerRef.current);
-                    setToast({
-                      message: `Moved ${r.moved} to Trash`,
-                      actionLabel: "Undo",
-                      onAction: async () => {
-                        try {
-                          const u = await apiUndoDelete(dir);
-                          uiActions.setNote(`Restored ${u.restored}`);
-                        } catch {}
-                        setToast(null);
-                        if (toastTimerRef.current) {
-                          window.clearTimeout(toastTimerRef.current);
-                          toastTimerRef.current = null;
-                        }
-                      },
-                    });
-                    toastTimerRef.current = window.setTimeout(() => {
-                      setToast(null);
-                      toastTimerRef.current = null;
-                    }, 10000);
-                  } else {
-                    setToast({ message: `Moved ${r.moved} to OS Trash` });
-                  }
-                } catch (e) {
-                  uiActions.setNote(
-                    e instanceof Error ? e.message : "Delete failed"
-                  );
-                } finally {
-                  uiActions.setBusy("");
-                }
-              }}
-            >
-              <Trash2 className="w-4 h-4" />
-              Delete
-            </button>
-          </div>
+            onOpenHelp={() => setShowHelpModal(true)}
+            onStartTour={() => setShowHelpModal(true)}
+            sampleQueries={[
+              "beach sunset",
+              "birthday cake",
+              "mountain hike",
+              "red car",
+            ]}
+            onRunSample={(q) => doSearchImmediate(q)}
+          />
+          <QuickActions
+            onSelectDirectory={() => setModal({ kind: "folder" })}
+            onImport={() => {
+              /* TODO: Implement import */
+            }}
+            onHelp={() => setShowHelpModal(true)}
+          />
         </div>
-      )}
-    </div>
-  );
+      );
+    }
 
-  const StatsBar = () => {
-    const total = items.length;
-    const engineInfo = (diag?.engines || []).find((e) => e.key === engine);
-    const fastReady =
-      engineInfo?.fast &&
-      (engineInfo.fast.annoy || engineInfo.fast.faiss || engineInfo.fast.hnsw);
+    // Show empty state if directory has no photos
+    if (library && library.length === 0) {
+      return (
+        <div className="p-4">
+          <EnhancedEmptyState
+            type="no-photos"
+            onAction={() => setModal({ kind: "folder" })}
+            onOpenHelp={() => setShowHelpModal(true)}
+          />
+        </div>
+      );
+    }
+
     return (
-      <div className="bg-gray-50 border-t border-gray-200 p-4">
-        <div className="flex items-center justify-between text-sm text-gray-600">
-          <div className="flex items-center gap-6">
-            <span>{total} photos</span>
-            {note ? <span className="text-gray-800">{note}</span> : null}
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div
-                className={`w-2 h-2 ${
-                  engineInfo?.count ? "bg-green-500" : "bg-gray-300"
-                } rounded-full`}
-              ></div>
-              <span>AI Index {engineInfo?.count ? "Ready" : "Empty"}</span>
+      <div className="p-4">
+        <LibraryBrowser
+          dir={dir}
+          engine={engine}
+          library={library}
+          onLoadLibrary={loadLibrary}
+          selected={selected}
+          onToggleSelect={toggleSelect}
+          onOpen={(path) => {
+            // Open photo in lightbox/detail view
+            const results = [{ path, score: 0 }];
+            photoActions.setResults(results);
+            setDetailIdx(0);
+            setSelectedView("results");
+          }}
+          tagsMap={tagsMap}
+        />
+        {!searchText && (
+          <div className="mt-4">
+            <div className="text-sm text-gray-700 font-medium mb-2">
+              Try these searches
             </div>
-            <div className="flex items-center gap-2">
-              <div
-                className={`w-2 h-2 ${
-                  fastReady ? "bg-blue-500" : "bg-gray-300"
-                } rounded-full`}
-              ></div>
-              <span>Fast Index {fastReady ? "Ready" : "—"}</span>
-            </div>
+            <SampleSearchSuggestions onSearch={doSearchImmediate} />
           </div>
-        </div>
+        )}
       </div>
     );
   };
 
   return (
-    <div className="flex h-screen bg-white dark:bg-gray-950 dark:text-gray-100">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <TopBar />
-        <div className="flex-1 overflow-auto" ref={scrollContainerRef}>
-          {selectedView === "results" && (
-            <div className="p-4">
-              <JustifiedResults
-                dir={dir}
-                engine={engine}
-                items={(results || []).map((r) => ({
-                  path: r.path,
-                  score: r.score,
-                }))}
-                selected={selected}
-                onToggleSelect={toggleSelect}
-                onOpen={(p) => openDetailByPath(p)}
-                scrollContainerRef={scrollContainerRef}
-                focusIndex={focusIdx ?? undefined}
-                onLayout={(rows) => setLayoutRows(prev => rowsEqual(prev, rows) ? prev : rows)}
-                ratingMap={ratingMap}
-              />
-            </div>
+    <ErrorBoundary>
+      <ThemeProvider>
+        {/* Dedicated share viewer route (full screen, minimal chrome) */}
+        {(location.pathname || "").startsWith("/share/") ? (
+          <ShareViewer />
+        ) : (location.pathname || "").startsWith("/mobile-test") ? (
+          <MobilePWATest />
+        ) : (
+        <div className="flex h-screen bg-white dark:bg-gray-950 dark:text-gray-100">
+          <OfflineIndicator />
+          {showWelcome && (
+            <Welcome
+              onStartDemo={async () => {
+                // Set demo photos directory and close welcome
+                const demoPath =
+                  "/Users/pranay/Projects/adhoc_projects/photo-search/e2e_data";
+                settingsActions.setDir(demoPath);
+                uiActions.setShowWelcome(false);
+
+                // Add demo path to workspace and index it
+                try {
+                  await apiWorkspaceAdd(demoPath);
+                  await doIndex();
+                } catch (error) {
+                  console.error("Failed to add demo path or index:", error);
+                  uiActions.setNote(
+                    error instanceof Error
+                      ? error.message
+                      : "Failed to setup demo"
+                  );
+                }
+              }}
+              onSelectFolder={() => {
+                setModal({ kind: "folder" });
+                uiActions.setShowWelcome(false);
+              }}
+              onClose={() => uiActions.setShowWelcome(false)}
+            />
           )}
-          {selectedView === "library" && <LibraryView />}
-          {selectedView === "people" && (
-            <div className="p-4">
-              <PeopleView
-                dir={dir}
-                engine={engine}
-                clusters={clusters || []}
-                persons={persons}
-                setPersons={workspaceActions.setPersons}
-                busy={busy}
-                setBusy={uiActions.setBusy}
-                setNote={uiActions.setNote}
-                onLoadFaces={loadFaces}
-              />
-            </div>
-          )}
-          {selectedView === "map" && (
-            <div className="p-4">
-              <MapView points={points || []} onLoadMap={loadMap} />
-            </div>
-          )}
-          {selectedView === "collections" && (
-            <div className="p-4">
-              <Collections
-                dir={dir}
-                engine={engine}
-                collections={collections}
-                onLoadCollections={async () => {
-                  const { apiGetCollections } = await import("./api");
-                  const r = await apiGetCollections(dir);
-                  photoActions.setCollections(r.collections || {});
-                }}
-                onOpen={(name: string) => {
-                  const paths = collections?.[name] || [];
-                  photoActions.setResults(paths.map((p) => ({ path: p, score: 0 })));
-                  setSelectedView("results");
-                  uiActions.setNote(`${paths.length} in ${name}`);
-                }}
-                onDelete={async (name: string) => {
+
+          {/* First-run setup */}
+          <FirstRunSetup
+            open={!dir && showOnboarding}
+            onClose={() => {
+              setShowOnboarding(false);
+              localStorage.setItem("hasSeenOnboarding", "true");
+            }}
+            onQuickStart={async (paths) => {
+              try {
+                // Add each path to workspace; set first as current dir; index each
+                const existing: string[] = [];
+                for (const p of paths) {
                   try {
-                    const { apiDeleteCollection, apiGetCollections } = await import(
-                      "./api"
-                    );
-                    await apiDeleteCollection(dir, name);
-                    const r = await apiGetCollections(dir);
-                    photoActions.setCollections(r.collections || {});
-                    setToast({ message: `Deleted collection ${name}` });
-                  } catch (e) {
-                    uiActions.setNote(
-                      e instanceof Error ? e.message : "Delete failed"
-                    );
-                  }
-                }}
-              />
-            </div>
-          )}
-          {selectedView === "saved" && (
-            <div className="p-4">
-              <SavedSearches
-                saved={saved}
-                onRun={(name: string, q: string, k?: number) => {
-                  setSearchText(q);
-                  if (k) photoActions.setTopK(k);
-                  doSearch(q);
-                }}
-                onDelete={async (name: string) => {
+                    const st = await fetch("/scan_count", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify([p]),
+                    });
+                    if (st.ok) {
+                      const js = await st.json();
+                      if (js.items?.[0]?.exists) existing.push(p);
+                    }
+                  } catch {}
+                }
+                if (existing.length === 0) {
+                  setShowOnboarding(false);
+                  localStorage.setItem("hasSeenOnboarding", "true");
+                  return;
+                }
+                settingsActions.setDir(existing[0]);
+                // Kick off background indexing without blocking
+                for (const p of existing) {
                   try {
-                    const { apiDeleteSaved, apiGetSaved } = await import(
-                      "./api"
-                    );
-                    await apiDeleteSaved(dir, name);
-                    const r = await apiGetSaved(dir);
-                    photoActions.setSaved(r.saved || []);
-                  } catch (e) {
-                    uiActions.setNote(
-                      e instanceof Error ? e.message : "Delete failed"
-                    );
-                  }
-                }}
-              />
-            </div>
-          )}
-          {selectedView === "memories" && (
-            <div className="p-4 space-y-4">
-              <div className="bg-white border rounded p-3">
-                <div className="flex items-center justify-between">
-                  <div className="font-semibold">Recent Favorites</div>
+                    await apiWorkspaceAdd(p);
+                  } catch {}
+                  (async () => {
+                    try {
+                      await apiIndex(
+                        p,
+                        engine,
+                        24,
+                        needsHf ? hfToken : undefined,
+                        needsOAI ? openaiKey : undefined
+                      );
+                    } catch {}
+                  })();
+                }
+                setShowOnboarding(false);
+                localStorage.setItem("hasSeenOnboarding", "true");
+              } catch (e) {
+                uiActions.setNote(
+                  e instanceof Error ? e.message : "Quick start failed"
+                );
+              }
+            }}
+            onCustom={() => {
+              setModal({ kind: "folder" });
+              setShowOnboarding(false);
+              localStorage.setItem("hasSeenOnboarding", "true");
+            }}
+            onDemo={async () => {
+              try {
+                const demoPath =
+                  "/Users/pranay/Projects/adhoc_projects/photo-search/e2e_data";
+                settingsActions.setDir(demoPath);
+                await apiWorkspaceAdd(demoPath);
+                await doIndex();
+              } catch (e) {
+                uiActions.setNote(
+                  e instanceof Error ? e.message : "Demo setup failed"
+                );
+              }
+              setShowOnboarding(false);
+              localStorage.setItem("hasSeenOnboarding", "true");
+            }}
+            onTour={() => {
+              setShowHelpModal(true);
+            }}
+          />
+          <Sidebar
+            selectedView={selectedView}
+            onViewChange={(view: string) => setSelectedView(view as View)}
+            library={library}
+            favorites={fav}
+            collections={Object.keys(collections || {})}
+            clusters={clusters}
+            savedSearches={savedSearches}
+            smart={Object.keys(smart || {})}
+            trips={trips}
+            isOpen={isMobileMenuOpen}
+            onClose={() => setIsMobileMenuOpen(false)}
+          />
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <TopBar
+              searchText={searchText}
+              setSearchText={setSearchText}
+              onSearch={doSearchImmediate}
+              clusters={clusters}
+              allTags={allTags}
+              meta={meta}
+              diag={diag}
+              busy={!!busy}
+              gridSize={gridSize}
+              setGridSize={setGridSize}
+              selectedView={selectedView as ViewType}
+              setSelectedView={(view: string) => setSelectedView(view as View)}
+              currentFilter={currentFilter}
+              setCurrentFilter={setCurrentFilter}
+              ratingMin={ratingMin}
+              setRatingMin={setRatingMin}
+              setModal={(modal: { kind: string } | null) =>
+                setModal(modal as any)
+              }
+              setIsMobileMenuOpen={setIsMobileMenuOpen}
+              setShowFilters={setShowFilters}
+              selected={selected}
+              setSelected={setSelected}
+              dir={dir}
+              engine={engine}
+              topK={topK}
+              useOsTrash={useOsTrash}
+              showInfoOverlay={showInfoOverlay}
+              onToggleInfoOverlay={() =>
+                settingsActions.setShowInfoOverlay
+                  ? settingsActions.setShowInfoOverlay(!showInfoOverlay)
+                  : undefined
+              }
+              resultView={resultView as "grid" | "timeline"}
+              onChangeResultView={(view) =>
+                settingsActions.setResultView?.(view)
+              }
+              timelineBucket={timelineBucket}
+              onChangeTimelineBucket={(b) =>
+                settingsActions.setTimelineBucket?.(b)
+              }
+              photoActions={photoActions}
+              uiActions={uiActions}
+              toastTimerRef={toastTimerRef}
+              setToast={setToast}
+              isIndexing={isIndexing}
+              onIndex={doIndex}
+              activeJobs={jobs.filter((j) => j.status === "running").length}
+              onOpenJobs={() => setModal({ kind: "jobs" as any })}
+              progressPct={indexPct}
+              etaSeconds={indexEta}
+              paused={indexPaused}
+              tooltip={indexTip}
+              ocrReady={ocrReady}
+              onPause={async () => {
+                try {
+                  const { apiIndexPause } = await import("./api");
+                  await apiIndexPause(dir);
+                } catch {}
+              }}
+              onResume={async () => {
+                try {
+                  const { apiIndexResume } = await import("./api");
+                  await apiIndexResume(dir);
+                } catch {}
+              }}
+              onOpenThemeModal={() => setShowThemeModal(true)}
+            />
+            {/* Small hint near top bar */}
+            {showHelpHint && (
+              <div className="px-4 pt-2">
+                <div className="sticky top-0 z-20 bg-yellow-50 text-yellow-800 border border-yellow-200 rounded px-3 py-1 text-xs flex items-center justify-between">
+                  <span>
+                    Press <span className="font-mono">?</span> for help and
+                    shortcuts
+                  </span>
+                  <button
+                    type="button"
+                    className="text-yellow-800 hover:text-yellow-900"
+                    aria-label="Dismiss help hint"
+                    onClick={() => {
+                      setShowHelpHint(false);
+                      try {
+                        localStorage.setItem("ps_hint_help_seen", "1");
+                      } catch {}
+                    }}
+                  >
+                    ×
+                  </button>
                 </div>
-                {fav.length === 0 ? (
-                  <div className="text-sm text-gray-600 mt-2">
-                    No favorites yet.
-                  </div>
-                ) : (
-                  <div className="mt-2 grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-2">
-                    {fav.slice(0, 24).map((p) => (
-                      <img
-                        key={p}
-                        src={thumbUrl(dir, engine, p, 196)}
-                        alt={basename(p)}
-                        className="w-full h-24 object-cover rounded"
+              </div>
+            )}
+            <div className="flex-1 overflow-auto" ref={scrollContainerRef}>
+              {selectedView === "results" && (
+                <SectionErrorBoundary sectionName="Search Results">
+                  <div className="p-4">
+                    {/* Results context toolbar */}
+                    {results &&
+                      results.length > 0 &&
+                      (searchText || "").trim() && (
+                        <div className="mb-2 flex items-center justify-between">
+                          <div className="text-sm text-gray-600">
+                            {results.length} results
+                          </div>
+                          <button
+                            type="button"
+                            className="chip"
+                            title="Save this search as a Smart Collection"
+                            onClick={async () => {
+                              const name = (
+                                prompt(
+                                  "Save current search as Smart (name):"
+                                ) || ""
+                              ).trim();
+                              if (!name) return;
+                              try {
+                                const tags = (tagFilter || "")
+                                  .split(",")
+                                  .map((s) => s.trim())
+                                  .filter(Boolean);
+                                const rules: any = {
+                                  query: (searchText || "").trim(),
+                                  favoritesOnly: favOnly,
+                                  tags,
+                                  useCaptions: useCaps,
+                                  useOcr,
+                                  hasText,
+                                  camera: camera || undefined,
+                                  isoMin: isoMin || undefined,
+                                  isoMax: isoMax || undefined,
+                                  fMin: fMin || undefined,
+                                  fMax: fMax || undefined,
+                                  place: place || undefined,
+                                };
+                                const ppl = (persons || []).filter(Boolean);
+                                if (ppl.length === 1) rules.person = ppl[0];
+                                else if (ppl.length > 1) rules.persons = ppl;
+                                const { apiSetSmart, apiGetSmart } =
+                                  await import("./api");
+                                await apiSetSmart(dir, name, rules);
+                                try {
+                                  const r = await apiGetSmart(dir);
+                                  photoActions.setSmart(r.smart || {});
+                                } catch {}
+                                uiActions.setNote(
+                                  `Saved smart collection: ${name}`
+                                );
+                              } catch (e: any) {
+                                uiActions.setNote(
+                                  e?.message ||
+                                    "Failed to save smart collection"
+                                );
+                              }
+                            }}
+                          >
+                            Save as Smart Collection
+                          </button>
+                        </div>
+                      )}
+                    {results && results.length === 0 && searchText ? (
+                      <div className="flex flex-col items-center justify-center min-h-[400px]">
+                        <EnhancedEmptyState
+                          type="no-results"
+                          searchQuery={searchText}
+                          onAction={() => {
+                            setSearchText("");
+                            photoActions.setQuery("");
+                          }}
+                          onOpenFilters={() => setShowFilters(true)}
+                          onOpenAdvanced={() =>
+                            setModal({ kind: "advanced" as any })
+                          }
+                          onClearSearch={() => {
+                            // Clear common filters
+                            if (favOnly) photoActions.setFavOnly(false);
+                            if (tagFilter) photoActions.setTagFilter("");
+                            setDateFrom("");
+                            setDateTo("");
+                            settingsActions.setPlace("");
+                            settingsActions.setCamera("");
+                            settingsActions.setIsoMin(0);
+                            settingsActions.setIsoMax(0);
+                            settingsActions.setFMin(0);
+                            settingsActions.setFMax(0);
+                            settingsActions.setHasText(false);
+                            workspaceActions.setPersons([]);
+                          }}
+                          hasActiveFilters={hasAnyFilters}
+                          sampleQueries={[
+                            "golden hour",
+                            "city skyline",
+                            "family dinner",
+                            "blue car",
+                          ]}
+                          onRunSample={(q) => doSearchImmediate(q)}
+                          onOpenHelp={() => setShowHelpModal(true)}
+                        />
+                        <SampleSearchSuggestions onSearch={doSearchImmediate} />
+                      </div>
+                    ) : resultView === "grid" ? (
+                      <JustifiedResults
+                        dir={dir}
+                        engine={engine}
+                        items={(results || []).map((r) => ({
+                          path: r.path,
+                          score: r.score,
+                        }))}
+                        selected={selected}
+                        onToggleSelect={toggleSelect}
+                        onOpen={(p) => openDetailByPath(p)}
+                        scrollContainerRef={scrollContainerRef}
+                        focusIndex={focusIdx ?? undefined}
+                        onLayout={(rows) =>
+                          setLayoutRows((prev) =>
+                            rowsEqual(prev, rows) ? prev : rows
+                          )
+                        }
+                        ratingMap={ratingMap}
+                        showInfoOverlay={showInfoOverlay}
                       />
-                    ))}
+                    ) : (
+                      <TimelineResults
+                        dir={dir}
+                        engine={engine}
+                        items={(results || []).map((r) => ({
+                          path: r.path,
+                          score: r.score,
+                        }))}
+                        selected={selected}
+                        onToggleSelect={toggleSelect}
+                        onOpen={(p) => openDetailByPath(p)}
+                        showInfoOverlay={showInfoOverlay}
+                        bucket={timelineBucket}
+                      />
+                    )}
                   </div>
-                )}
-              </div>
-              <div>
-                <TripsView
-                  dir={dir}
-                  engine={engine}
-                  setBusy={uiActions.setBusy}
-                  setNote={uiActions.setNote}
-                  setResults={photoActions.setResults}
-                />
-              </div>
+                </SectionErrorBoundary>
+              )}
+              {selectedView === "library" && (
+                <SectionErrorBoundary sectionName="Library">
+                  <LibraryView />
+                </SectionErrorBoundary>
+              )}
+              {selectedView === "people" && (
+                <div className="p-4">
+                  <PeopleView
+                    dir={dir}
+                    engine={engine}
+                    clusters={clusters || []}
+                    persons={persons}
+                    setPersons={workspaceActions.setPersons}
+                    busy={busy}
+                    setBusy={uiActions.setBusy}
+                    setNote={uiActions.setNote}
+                    onLoadFaces={loadFaces}
+                    onOpenPhotos={(photos) => {
+                      // Convert paths to search results and switch to results view
+                      photoActions.setResults(
+                        photos.map((path) => ({ path, score: 0 }))
+                      );
+                      setSelectedView("results");
+                      uiActions.setNote(
+                        `Viewing ${photos.length} photos from face cluster`
+                      );
+                    }}
+                  />
+                </div>
+              )}
+              {selectedView === "map" && (
+                <div className="p-4">
+                  <MapView points={points || []} onLoadMap={loadMap} />
+                </div>
+              )}
+              {selectedView === "collections" && (
+                <div className="p-4">
+                  <Collections
+                    dir={dir}
+                    engine={engine}
+                    collections={collections}
+                    onLoadCollections={async () => {
+                      const { apiGetCollections } = await import("./api");
+                      const r = await apiGetCollections(dir);
+                      photoActions.setCollections(r.collections || {});
+                    }}
+                    onOpen={(name: string) => {
+                      const paths = collections?.[name] || [];
+                      photoActions.setResults(
+                        paths.map((p) => ({ path: p, score: 0 }))
+                      );
+                      setSelectedView("results");
+                      uiActions.setNote(`${paths.length} in ${name}`);
+                    }}
+                    onDelete={async (name: string) => {
+                      try {
+                        const { apiDeleteCollection, apiGetCollections } =
+                          await import("./api");
+                        await apiDeleteCollection(dir, name);
+                        const r = await apiGetCollections(dir);
+                        photoActions.setCollections(r.collections || {});
+                        setToast({ message: `Deleted collection ${name}` });
+                      } catch (e) {
+                        uiActions.setNote(
+                          e instanceof Error ? e.message : "Delete failed"
+                        );
+                      }
+                    }}
+                  />
+                </div>
+              )}
+              {selectedView === "saved" && (
+                <div className="p-4">
+                  <SavedSearches
+                    saved={saved}
+                    onRun={(_name: string, q: string, k?: number) => {
+                      setSearchText(q);
+                      if (k) photoActions.setTopK(k);
+                      doSearchImmediate(q);
+                    }}
+                    onDelete={async (name: string) => {
+                      try {
+                        const { apiDeleteSaved, apiGetSaved } = await import(
+                          "./api"
+                        );
+                        await apiDeleteSaved(dir, name);
+                        const r = await apiGetSaved(dir);
+                        photoActions.setSaved(r.saved || []);
+                      } catch (e) {
+                        uiActions.setNote(
+                          e instanceof Error ? e.message : "Delete failed"
+                        );
+                      }
+                    }}
+                  />
+                  <div className="mt-4 bg-white border rounded p-3">
+                    <div className="flex items-center justify-between">
+                      <h2 className="font-semibold">Presets</h2>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="px-2 py-1 rounded border"
+                          onClick={loadPresets}
+                        >
+                          Refresh
+                        </button>
+                        <button
+                          type="button"
+                          className="px-2 py-1 rounded border"
+                          onClick={() => {
+                            try {
+                              const data = JSON.stringify(
+                                presets || [],
+                                null,
+                                2
+                              );
+                              const blob = new Blob([data], {
+                                type: "application/json",
+                              });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement("a");
+                              a.href = url;
+                              a.download = "photo-search-presets.json";
+                              document.body.appendChild(a);
+                              a.click();
+                              document.body.removeChild(a);
+                              URL.revokeObjectURL(url);
+                            } catch {}
+                          }}
+                        >
+                          Export
+                        </button>
+                        <label className="px-2 py-1 rounded border cursor-pointer">
+                          Import
+                          <input
+                            type="file"
+                            accept="application/json"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              try {
+                                const txt = await file.text();
+                                const arr = JSON.parse(txt);
+                                if (Array.isArray(arr)) {
+                                  const { apiAddPreset } = await import(
+                                    "./api"
+                                  );
+                                  for (const it of arr) {
+                                    if (
+                                      it &&
+                                      typeof it.name === "string" &&
+                                      typeof it.query === "string"
+                                    ) {
+                                      await apiAddPreset(
+                                        dir,
+                                        it.name,
+                                        it.query
+                                      );
+                                    }
+                                  }
+                                  await loadPresets();
+                                  setToast({
+                                    message: `Imported ${arr.length} preset(s)`,
+                                  });
+                                } else {
+                                  uiActions.setNote("Invalid JSON format");
+                                }
+                              } catch {
+                                uiActions.setNote("Import failed");
+                              } finally {
+                                e.currentTarget.value = "";
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                    {presets.length === 0 ? (
+                      <div className="text-sm text-gray-600 mt-2">
+                        No presets yet. Use Advanced Search to create one.
+                      </div>
+                    ) : (
+                      <div className="mt-2 divide-y">
+                        {presets.map((p) => (
+                          <div
+                            key={p.name}
+                            className="py-2 flex items-center justify-between gap-3"
+                          >
+                            <div className="min-w-0">
+                              <div
+                                className="font-medium truncate"
+                                title={p.name}
+                              >
+                                {p.name}
+                              </div>
+                              <div
+                                className="text-xs text-gray-600 truncate"
+                                title={p.query}
+                              >
+                                {p.query}
+                              </div>
+                            </div>
+                            <div className="flex gap-2 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSearchText(p.query);
+                                  doSearch(p.query);
+                                }}
+                                className="px-2 py-1 rounded bg-blue-600 text-white text-sm"
+                              >
+                                Run
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    const { apiDeletePreset } = await import(
+                                      "./api"
+                                    );
+                                    await apiDeletePreset(dir, p.name);
+                                    await loadPresets();
+                                  } catch {}
+                                }}
+                                className="px-2 py-1 rounded bg-red-600 text-white text-sm"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              {selectedView === "memories" && (
+                <div className="p-4 space-y-4">
+                  <div className="bg-white border rounded p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="font-semibold">Recent Favorites</div>
+                    </div>
+                    {fav.length === 0 ? (
+                      <div className="text-sm text-gray-600 mt-2">
+                        No favorites yet.
+                      </div>
+                    ) : (
+                      <div className="mt-2 grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-2">
+                        {fav.slice(0, 24).map((p) => (
+                          <img
+                            key={p}
+                            src={thumbUrl(dir, engine, p, 196)}
+                            alt={basename(p)}
+                            className="w-full h-24 object-cover rounded"
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <TripsView
+                      dir={dir}
+                      engine={engine}
+                      setBusy={uiActions.setBusy}
+                      setNote={uiActions.setNote}
+                      setResults={photoActions.setResults}
+                    />
+                  </div>
+                </div>
+              )}
+              {selectedView === "tasks" && (
+                <div className="p-4">
+                  <TasksView />
+                </div>
+              )}
+              {selectedView === "smart" && (
+                <div className="p-4">
+                  <SmartCollections
+                    dir={dir}
+                    engine={engine}
+                    topK={topK}
+                    smart={smart}
+                    setSmart={photoActions.setSmart}
+                    setResults={photoActions.setResults}
+                    setSearchId={photoActions.setSearchId}
+                    setNote={uiActions.setNote}
+                    query={query}
+                    favOnly={favOnly}
+                    tagFilter={tagFilter}
+                    useCaps={useCaps}
+                    useOcr={useOcr}
+                    hasText={hasText}
+                    camera={camera}
+                    isoMin={String(isoMin || "")}
+                    isoMax={String(isoMax || "")}
+                    fMin={String(fMin || "")}
+                    fMax={String(fMax || "")}
+                    place={place}
+                    persons={persons}
+                  />
+                </div>
+              )}
+              {selectedView === "trips" && (
+                <div className="p-4">
+                  <TripsView
+                    dir={dir}
+                    engine={engine}
+                    setBusy={uiActions.setBusy}
+                    setNote={uiActions.setNote}
+                    setResults={photoActions.setResults}
+                  />
+                </div>
+              )}
+              {selectedView === "videos" && (
+                <div className="p-4">
+                  <VideoManager currentDir={dir} provider={engine} />
+                </div>
+              )}
             </div>
-          )}
-          {selectedView === "tasks" && (
-            <div className="p-4">
-              <TasksView />
-            </div>
-          )}
-          {selectedView === "smart" && (
-            <div className="p-4">
-              <SmartCollections
+            <StatsBar items={items} note={note} diag={diag} engine={engine} />
+
+            {/* Filters panel */}
+            <FilterPanel
+              show={showFilters}
+              onClose={() => setShowFilters(false)}
+              onApply={() => {
+                setShowFilters(false);
+                doSearchImmediate(searchText);
+              }}
+              favOnly={favOnly}
+              setFavOnly={photoActions.setFavOnly}
+              tagFilter={tagFilter}
+              setTagFilter={photoActions.setTagFilter}
+              camera={camera}
+              setCamera={settingsActions.setCamera}
+              isoMin={String(isoMin || "")}
+              setIsoMin={(value: string) =>
+                settingsActions.setIsoMin(parseFloat(value) || 0)
+              }
+              isoMax={String(isoMax || "")}
+              setIsoMax={(value: string) =>
+                settingsActions.setIsoMax(parseFloat(value) || 0)
+              }
+              dateFrom={dateFrom}
+              setDateFrom={setDateFrom}
+              dateTo={dateTo}
+              setDateTo={setDateTo}
+              fMin={String(fMin || "")}
+              setFMin={(value: string) =>
+                settingsActions.setFMin(parseFloat(value) || 0)
+              }
+              fMax={String(fMax || "")}
+              setFMax={(value: string) =>
+                settingsActions.setFMax(parseFloat(value) || 0)
+              }
+              place={place}
+              setPlace={settingsActions.setPlace}
+              useCaps={useCaps}
+              setUseCaps={settingsActions.setUseCaps}
+              useOcr={useOcr}
+              setUseOcr={settingsActions.setUseOcr}
+              hasText={hasText}
+              setHasText={settingsActions.setHasText}
+            />
+            {modal?.kind === ("shareManage" as any) && (
+              <div
+                className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") setModal(null);
+                }}
+              >
+                <FocusTrap onEscape={() => setModal(null)}>
+                  <div
+                    className="bg-white rounded-lg p-4 w-full max-w-2xl"
+                    role="dialog"
+                    aria-modal="true"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="font-semibold">Manage Shares</div>
+                      <button
+                        type="button"
+                        className="px-2 py-1 border rounded"
+                        onClick={() => setModal(null)}
+                      >
+                        Close
+                      </button>
+                    </div>
+                    <ShareManager dir={dir} />
+                  </div>
+                </FocusTrap>
+              </div>
+            )}
+
+            {/* Modals */}
+            {modal?.kind === "export" && (
+              <ExportModal
+                selected={selected}
                 dir={dir}
-                engine={engine}
-                topK={topK}
-                smart={smart}
-                setSmart={photoActions.setSmart}
-                setResults={photoActions.setResults}
-                setSearchId={photoActions.setSearchId}
-                setNote={uiActions.setNote}
-                query={query}
-                favOnly={favOnly}
-                tagFilter={tagFilter}
+                onClose={() => setModal(null)}
+                uiActions={uiActions}
+              />
+            )}
+            {modal?.kind === "enhanced-share" && (
+              <EnhancedSharingModal
+                selected={selected}
+                dir={dir}
+                onClose={() => setModal(null)}
+                uiActions={uiActions}
+              />
+            )}
+            {modal?.kind === ("share" as any) && (
+              <div
+                className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") setModal(null);
+                }}
+              >
+                <FocusTrap onEscape={() => setModal(null)}>
+                  <div
+                    className="bg-white rounded-lg p-4 w-full max-w-md"
+                    role="dialog"
+                    aria-modal="true"
+                  >
+                    <div className="font-semibold mb-2">Share (v1)</div>
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        if (!dir) return;
+                        const sel = Array.from(selected);
+                        if (sel.length === 0) {
+                          alert("Select photos to share");
+                          return;
+                        }
+                        const f = e.target as HTMLFormElement;
+                        const expiry = parseInt(
+                          (f.elements.namedItem("expiry") as HTMLInputElement)
+                            .value || "24",
+                          10
+                        );
+                        const pw = (
+                          f.elements.namedItem("pw") as HTMLInputElement
+                        ).value.trim();
+                        const viewOnly = (
+                          f.elements.namedItem("viewonly") as HTMLInputElement
+                        ).checked;
+                        try {
+                          const { apiCreateShare } = await import("./api");
+                          const r = await apiCreateShare(dir, engine, sel, {
+                            expiryHours: Number.isNaN(expiry) ? 24 : expiry,
+                            password: pw || undefined,
+                            viewOnly,
+                          });
+                          await navigator.clipboard.writeText(
+                            window.location.origin + r.url
+                          );
+                          uiActions.setNote("Share link copied to clipboard");
+                        } catch (err) {
+                          uiActions.setNote(
+                            err instanceof Error ? err.message : "Share failed"
+                          );
+                        }
+                        setModal(null);
+                      }}
+                    >
+                      <div className="grid gap-3">
+                        <div>
+                          <label
+                            className="block text-sm text-gray-600 mb-1"
+                            htmlFor="expiry-input"
+                          >
+                            Expiry (hours)
+                          </label>
+                          <input
+                            id="expiry-input"
+                            name="expiry"
+                            type="number"
+                            min={1}
+                            defaultValue={24}
+                            className="w-full border rounded px-2 py-1"
+                          />
+                        </div>
+                        <div>
+                          <label
+                            className="block text-sm text-gray-600 mb-1"
+                            htmlFor="pw-input"
+                          >
+                            Password (optional)
+                          </label>
+                          <input
+                            id="pw-input"
+                            name="pw"
+                            type="password"
+                            className="w-full border rounded px-2 py-1"
+                            placeholder="••••••"
+                          />
+                        </div>
+                        <label className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            name="viewonly"
+                            defaultChecked
+                          />{" "}
+                          View-only (disable downloads)
+                        </label>
+                      </div>
+                      <div className="mt-4 flex justify-end gap-2">
+                        <button
+                          type="button"
+                          className="px-3 py-1 rounded border"
+                          onClick={() => setModal(null)}
+                          aria-label="Cancel sharing"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-3 py-1 rounded bg-blue-600 text-white"
+                          aria-label="Create shareable link"
+                        >
+                          Create Link
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </FocusTrap>
+              </div>
+            )}
+            {modal?.kind === "tag" && (
+              <TagModal
+                onClose={() => setModal(null)}
+                onTagSelected={tagSelected}
+              />
+            )}
+            {modal?.kind === "folder" && (
+              <FolderModal
+                dir={dir}
+                useOsTrash={useOsTrash}
+                useFast={useFast}
+                fastKind={fastKind}
                 useCaps={useCaps}
                 useOcr={useOcr}
                 hasText={hasText}
-                camera={camera}
-                isoMin={isoMin}
-                isoMax={isoMax}
-                fMin={fMin}
-                fMax={fMax}
-                place={place}
-                persons={persons}
+                highContrast={highContrast}
+                onClose={() => setModal(null)}
+                settingsActions={
+                  {
+                    ...settingsActions,
+                    setHighContrast: () => {}, // Dummy implementation
+                  } as any
+                }
+                uiActions={uiActions}
+                doIndex={doIndex}
+                prepareFast={(kind: string) =>
+                  prepareFast(kind as "annoy" | "faiss" | "hnsw")
+                }
+                buildOCR={buildOCR}
+                buildMetadata={buildMetadata}
               />
-            </div>
-          )}
-          {selectedView === "trips" && (
-            <div className="p-4">
-              <TripsView
+            )}
+            {modal?.kind === "likeplus" && (
+              <LikePlusModal
+                selected={selected}
                 dir={dir}
                 engine={engine}
-                setBusy={uiActions.setBusy}
-                setNote={uiActions.setNote}
-                setResults={photoActions.setResults}
+                topK={topK}
+                onClose={() => setModal(null)}
+                setSelectedView={(view: string) =>
+                  setSelectedView(view as View)
+                }
+                photoActions={photoActions}
+                uiActions={uiActions}
               />
-            </div>
-          )}
-        </div>
-        <StatsBar />
+            )}
+            {modal?.kind === "save" && (
+              <SaveModal
+                dir={dir}
+                searchText={searchText}
+                query={query}
+                topK={topK}
+                onClose={() => setModal(null)}
+                setSelectedView={(view: string) =>
+                  setSelectedView(view as View)
+                }
+                photoActions={photoActions}
+                uiActions={uiActions}
+              />
+            )}
+            {modal?.kind === "collect" && (
+              <CollectionModal
+                selected={selected}
+                dir={dir}
+                collections={collections}
+                onClose={() => setModal(null)}
+                setToast={setToast}
+                photoActions={photoActions}
+                uiActions={uiActions}
+              />
+            )}
+            {modal?.kind === "removeCollect" && (
+              <RemoveCollectionModal
+                selected={selected}
+                dir={dir}
+                collections={collections}
+                onClose={() => setModal(null)}
+                setToast={setToast}
+                photoActions={photoActions}
+                uiActions={uiActions}
+              />
+            )}
 
-        {/* Filters panel */}
-        {showFilters && (
-          <div className="absolute right-6 top-20 z-50 bg-white border border-gray-200 shadow-lg rounded-lg p-4 w-96">
-            <div className="flex items-center justify-between mb-2">
-              <div className="font-semibold">Filters</div>
-              <button
-                type="button"
-                className="text-sm text-gray-500"
-                onClick={() => setShowFilters(false)}
-              >
-                Close
-              </button>
-            </div>
-            <div className="space-y-3 text-sm">
-              <div className="flex items-center justify-between">
-                <label htmlFor="flt-fav">Favorites only</label>
-                <input
-                  id="flt-fav"
-                  type="checkbox"
-                  checked={favOnly}
-                  onChange={(e) => photoActions.setFavOnly(e.target.checked)}
+            {/* Lightbox */}
+            {detailIdx !== null &&
+              results &&
+              results[detailIdx] &&
+              (VideoService.isVideoFile(results[detailIdx].path) ? (
+                <VideoLightbox
+                  videoPath={results[detailIdx].path}
+                  videoUrl={`/api/media/${encodeURIComponent(
+                    results[detailIdx].path
+                  )}`}
+                  onPrevious={() => navDetail(-1)}
+                  onNext={() => navDetail(1)}
+                  onClose={() => setDetailIdx(null)}
                 />
-              </div>
-              <div>
-                <label className="block mb-1" htmlFor="flt-tags">
-                  Tags (comma)
-                </label>
-                <input
-                  id="flt-tags"
-                  className="w-full border rounded px-2 py-1"
-                  value={tagFilter}
-                  onChange={(e) => photoActions.setTagFilter(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block mb-1" htmlFor="flt-camera">
-                  Camera
-                </label>
-                <input
-                  id="flt-camera"
-                  className="w-full border rounded px-2 py-1"
-                  value={camera}
-                  onChange={(e) => settingsActions.setCamera(e.target.value)}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block mb-1" htmlFor="flt-iso-min">
-                    ISO min
-                  </label>
-                  <input
-                    id="flt-iso-min"
-                    className="w-full border rounded px-2 py-1"
-                    value={isoMin}
-                    onChange={(e) => settingsActions.setIsoMin(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block mb-1" htmlFor="flt-iso-max">
-                    ISO max
-                  </label>
-                  <input
-                    id="flt-iso-max"
-                    className="w-full border rounded px-2 py-1"
-                    value={isoMax}
-                    onChange={(e) => settingsActions.setIsoMax(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block mb-1" htmlFor="flt-date-from">
-                    Date from
-                  </label>
-                  <input
-                    id="flt-date-from"
-                    type="date"
-                    className="w-full border rounded px-2 py-1"
-                    value={dateFrom}
-                    onChange={(e) => setDateFrom(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block mb-1" htmlFor="flt-date-to">
-                    Date to
-                  </label>
-                  <input
-                    id="flt-date-to"
-                    type="date"
-                    className="w-full border rounded px-2 py-1"
-                    value={dateTo}
-                    onChange={(e) => setDateTo(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block mb-1" htmlFor="flt-fmin">
-                    f/ min
-                  </label>
-                  <input
-                    id="flt-fmin"
-                    className="w-full border rounded px-2 py-1"
-                    value={fMin}
-                    onChange={(e) => settingsActions.setFMin(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block mb-1" htmlFor="flt-fmax">
-                    f/ max
-                  </label>
-                  <input
-                    id="flt-fmax"
-                    className="w-full border rounded px-2 py-1"
-                    value={fMax}
-                    onChange={(e) => settingsActions.setFMax(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block mb-1" htmlFor="flt-place">
-                  Place
-                </label>
-                <input
-                  id="flt-place"
-                  className="w-full border rounded px-2 py-1"
-                  value={place}
-                  onChange={(e) => settingsActions.setPlace(e.target.value)}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <label htmlFor="flt-caps">Use captions</label>
-                <input
-                  id="flt-caps"
-                  type="checkbox"
-                  checked={useCaps}
-                  onChange={(e) => settingsActions.setUseCaps(e.target.checked)}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <label htmlFor="flt-ocr">Use OCR</label>
-                <input
-                  id="flt-ocr"
-                  type="checkbox"
-                  checked={useOcr}
-                  onChange={(e) => settingsActions.setUseOcr(e.target.checked)}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <label htmlFor="flt-hastext">Has text</label>
-                <input
-                  id="flt-hastext"
-                  type="checkbox"
-                  checked={hasText}
-                  onChange={(e) => settingsActions.setHasText(e.target.checked)}
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  className="px-3 py-1 rounded border"
-                  onClick={() => setShowFilters(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="px-3 py-1 rounded bg-blue-600 text-white"
-                  onClick={() => {
-                    setShowFilters(false);
-                    doSearch(searchText);
+              ) : (
+                <Lightbox
+                  dir={dir}
+                  engine={engine}
+                  path={results[detailIdx].path}
+                  onPrev={() => navDetail(-1)}
+                  onNext={() => navDetail(1)}
+                  onClose={() => setDetailIdx(null)}
+                  onReveal={async () => {
+                    try {
+                      const { apiOpen } = await import("./api");
+                      const p =
+                        results && detailIdx !== null
+                          ? results[detailIdx]?.path
+                          : undefined;
+                      if (p) await apiOpen(dir, p);
+                    } catch {}
                   }}
-                >
-                  Apply
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Modals */}
-        {modal?.kind === "export" && (
-          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center" onKeyDown={(e)=>{ if(e.key==='Escape') setModal(null) }}>
-            <FocusTrap onEscape={()=> setModal(null)}>
-            <div className="bg-white rounded-lg p-4 w-full max-w-md" role="dialog" aria-modal="true">
-              <div className="font-semibold mb-2">Export Selected</div>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const form = e.target as HTMLFormElement;
-                  const dest = (form.elements.namedItem('dest') as HTMLInputElement).value.trim();
-                  if (!dest) return;
-                  // Read preset + toggles (UI-level; backend currently supports strip_exif and overwrite)
-                  const _preset = (form.elements.namedItem('preset') as RadioNodeList)?.value || 'web';
-                  const stripAll = (form.elements.namedItem('strip_all') as HTMLInputElement)?.checked || false;
-                  const overwrite = (form.elements.namedItem('overwrite') as HTMLInputElement)?.checked || false;
-                  // Execute export (resize/quality handled in a later backend iteration)
-                  (async () => {
+                  onFavorite={async () => {
                     try {
-                      const paths = Array.from(selected);
-                      const r = await apiExport(dir!, paths, dest, 'copy', stripAll, overwrite)
-                      uiActions.setNote(`Exported ${r.copied}, skipped ${r.skipped}, errors ${r.errors} → ${r.dest}`)
-                    } catch (e) {
-                      uiActions.setNote(e instanceof Error ? e.message : 'Export failed')
-                    }
-                  })();
-                  setModal(null);
-                }}
-              >
-                <div className="grid gap-3">
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1">Destination</label>
-                    <input name="dest" className="w-full border rounded px-2 py-1" placeholder="/absolute/path" />
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium mb-1">Preset</div>
-                    <div className="flex gap-3 text-sm">
-                      <label className="flex items-center gap-1"><input type="radio" name="preset" value="web" defaultChecked /> Web</label>
-                      <label className="flex items-center gap-1"><input type="radio" name="preset" value="email" /> Email</label>
-                      <label className="flex items-center gap-1"><input type="radio" name="preset" value="print" /> Print</label>
-                      <label className="flex items-center gap-1"><input type="radio" name="preset" value="custom" /> Custom</label>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium mb-1">Privacy</div>
-                    <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="strip_all" /> Strip all EXIF/IPTC</label>
-                    <label className="flex items-center gap-2 text-sm opacity-60" title="Planned: requires backend support"><input type="checkbox" disabled /> Strip GPS only</label>
-                    <label className="flex items-center gap-2 text-sm opacity-60" title="Planned: requires backend support"><input type="checkbox" disabled /> Keep copyright only</label>
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium mb-1">Options</div>
-                    <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="overwrite" /> Overwrite existing files</label>
-                  </div>
-                </div>
-                <div className="mt-4 flex justify-end gap-2">
-                  <button type="button" className="px-3 py-1 rounded border" onClick={() => setModal(null)}>Cancel</button>
-                  <button type="submit" className="px-3 py-1 rounded bg-blue-600 text-white">Export</button>
-                </div>
-              </form>
-            </div>
-            </FocusTrap>
-          </div>
-        )}
-        {modal?.kind === ("share" as any) && (
-          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center" onKeyDown={(e)=>{ if(e.key==='Escape') setModal(null) }}>
-            <FocusTrap onEscape={()=> setModal(null)}>
-            <div className="bg-white rounded-lg p-4 w-full max-w-md" role="dialog" aria-modal="true">
-              <div className="font-semibold mb-2">Share (v1)</div>
-              <div className="text-sm text-gray-600 mb-3">Feature gated. This is a preview stub for Sharing v1 (expiring links + presets).</div>
-              <div className="flex justify-end gap-2">
-                <button type="button" className="px-3 py-1 rounded border" onClick={() => setModal(null)}>Close</button>
-              </div>
-            </div>
-            </FocusTrap>
-          </div>
-        )}
-        {modal?.kind === "tag" && (
-          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center" onKeyDown={(e)=>{ if(e.key==='Escape') setModal(null) }}>
-            <FocusTrap onEscape={()=> setModal(null)}>
-            <div className="bg-white rounded-lg p-4 w-full max-w-md" role="dialog" aria-modal="true">
-              <div className="font-semibold mb-2">Tag Selected</div>
-              <div className="text-sm text-gray-600 mb-2">
-                Enter comma-separated tags
-              </div>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const form = e.target as HTMLFormElement;
-                  const tags = (
-                    form.elements.namedItem("tags") as HTMLInputElement
-                  ).value.trim();
-                  if (tags) {
-                    tagSelected(tags);
-                    setModal(null);
-                  }
-                }}
-              >
-                <input
-                  name="tags"
-                  className="w-full border rounded px-2 py-1"
-                  placeholder="family, beach, 2024"
-                />
-                <div className="mt-3 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    className="px-3 py-1 rounded border"
-                    onClick={() => setModal(null)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-3 py-1 rounded bg-blue-600 text-white"
-                  >
-                    Save
-                  </button>
-                </div>
-              </form>
-            </div>
-            </FocusTrap>
-          </div>
-        )}
-        {modal?.kind === "folder" && (
-          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center" onKeyDown={(e)=>{ if(e.key==='Escape') setModal(null) }}>
-            <FocusTrap onEscape={()=> setModal(null)}>
-            <div className="bg-white rounded-lg p-4 w-full max-w-md" role="dialog" aria-modal="true">
-              <div className="font-semibold mb-2">Set Photo Folder</div>
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  const form = e.target as HTMLFormElement;
-                  const path = (
-                    form.elements.namedItem("path") as HTMLInputElement
-                  ).value.trim();
-                  if (path) {
-                    settingsActions.setDir(path);
-                    setModal(null);
-                    // Add path to workspace and index it
+                      const p =
+                        results && detailIdx !== null
+                          ? results[detailIdx]?.path
+                          : undefined;
+                      if (p) {
+                        await apiSetFavorite(dir, p, !fav.includes(p));
+                        await loadFav();
+                      }
+                    } catch {}
+                  }}
+                  onMoreLikeThis={async () => {
                     try {
-                      await apiWorkspaceAdd(path);
-                      await doIndex();
-                    } catch (error) {
-                      console.error('Failed to add path or index:', error);
-                      uiActions.setNote(error instanceof Error ? error.message : "Failed to add path");
-                    }
-                  }
-                }}
-              >
-                <label htmlFor="sel-folder" className="block text-sm mb-1">Folder path</label>
-                <input id="sel-folder" name="path" className="w-full border rounded px-2 py-1" placeholder="/absolute/folder" defaultValue={dir} />
-                <div className="mt-3 flex items-center justify-between">
-                  <label htmlFor="use-os-trash" className="text-sm">Use OS Trash (no Undo)</label>
-                  <input id="use-os-trash" type="checkbox" checked={useOsTrash} onChange={(e)=> settingsActions.setUseOsTrash(e.target.checked)} />
-                </div>
-
-                <div className="mt-4 border-t pt-3">
-                  <div className="font-medium mb-2">Preferences</div>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-center justify-between">
-                      <label htmlFor="pref-fast">Use Fast Index</label>
-                      <input id="pref-fast" type="checkbox" checked={useFast} onChange={(e)=> settingsActions.setUseFast(e.target.checked)} />
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <label htmlFor="pref-fastkind">Fast Kind</label>
-                      <select id="pref-fastkind" className="border rounded px-2 py-1" value={fastKind} onChange={(e)=> settingsActions.setFastKind(e.target.value as any)}>
-                        <option value="">Auto</option>
-                        <option value="annoy">Annoy</option>
-                        <option value="faiss">FAISS</option>
-                        <option value="hnsw">HNSW</option>
-                      </select>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <label htmlFor="pref-caps">Use Captions</label>
-                      <input id="pref-caps" type="checkbox" checked={useCaps} onChange={(e)=> settingsActions.setUseCaps(e.target.checked)} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <label htmlFor="pref-ocr">Use OCR</label>
-                      <input id="pref-ocr" type="checkbox" checked={useOcr} onChange={(e)=> settingsActions.setUseOcr(e.target.checked)} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <label htmlFor="pref-hastext">Default: Has Text</label>
-                      <input id="pref-hastext" type="checkbox" checked={hasText} onChange={(e)=> settingsActions.setHasText(e.target.checked)} />
-                    </div>
-                    <div>
-                      <label htmlFor="pref-vlm" className="block mb-1">VLM Model</label>
-                      <input id="pref-vlm" className="w-full border rounded px-2 py-1" defaultValue="" onChange={(e)=> { /* TODO: implement VLM model setting */ }} />
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-3 flex justify-between gap-2">
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      className="px-3 py-1 rounded border"
-                      onClick={doIndex}
-                    >
-                      Index
-                    </button>
-                    <button
-                      type="button"
-                      className="px-3 py-1 rounded border"
-                      onClick={() => prepareFast("annoy")}
-                    >
-                      Fast
-                    </button>
-                    <button
-                      type="button"
-                      className="px-3 py-1 rounded border"
-                      onClick={buildOCR}
-                    >
-                      OCR
-                    </button>
-                    <button
-                      type="button"
-                      className="px-3 py-1 rounded border"
-                      onClick={buildMetadata}
-                    >
-                      Metadata
-                    </button>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      className="px-3 py-1 rounded border"
-                      onClick={() => setModal(null)}
-                    >
-                      Close
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-3 py-1 rounded bg-blue-600 text-white"
-                    >
-                      Save
-                    </button>
-                  </div>
-                </div>
-              </form>
-            </div>
-            </FocusTrap>
-          </div>
-        )}
-        {modal?.kind === "likeplus" && (
-          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center" onKeyDown={(e)=>{ if(e.key==='Escape') setModal(null) }}>
-            <FocusTrap onEscape={()=> setModal(null)}>
-            <div className="bg-white rounded-lg p-4 w-full max-w-md" role="dialog" aria-modal="true">
-              <div className="font-semibold mb-2">Similar + Text</div>
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  const form = e.target as HTMLFormElement;
-                  const text = (
-                    form.elements.namedItem("text") as HTMLInputElement
-                  ).value.trim();
-                  const weight = parseFloat(
-                    (form.elements.namedItem("weight") as HTMLInputElement)
-                      .value
-                  );
-                  if (selected.size === 1) {
-                    try {
-                      const p = Array.from(selected)[0];
-                      const { apiSearchLikePlus } = await import("./api");
-                      uiActions.setBusy("Searching…");
-                      const r = await apiSearchLikePlus(
-                        dir,
-                        p,
-                        engine,
-                        topK,
-                        text || undefined,
-                        Number.isNaN(weight) ? 0.5 : weight
-                      );
+                      const { apiSearchLike } = await import("./api");
+                      const p =
+                        results && detailIdx !== null
+                          ? results[detailIdx]?.path
+                          : undefined;
+                      if (!p) return;
+                      uiActions.setBusy("Searching similar…");
+                      const r = await apiSearchLike(dir, p, engine, topK);
                       photoActions.setResults(r.results || []);
                       setSelectedView("results");
                     } catch (e) {
@@ -2149,424 +2776,263 @@ export default function App() {
                     } finally {
                       uiActions.setBusy("");
                     }
-                  }
+                  }}
+                />
+              ))}
+
+            {/* Floating Jobs button + drawer */}
+            <button
+              type="button"
+              onClick={() => setModal({ kind: "jobs" as any })}
+              className="fixed bottom-4 right-4 bg-blue-600 text-white rounded-full shadow px-4 py-2"
+              title="Open Jobs"
+              aria-label="Open the jobs panel"
+            >
+              Jobs
+            </button>
+
+            {modal?.kind === ("jobs" as any) && (
+              <JobsDrawer open={true} onClose={() => setModal(null)} />
+            )}
+            {modal?.kind === ("advanced" as any) && (
+              <AdvancedSearchModal
+                open={true}
+                onClose={() => setModal(null)}
+                onApply={(q) => {
+                  setSearchText(q);
+                  doSearch(q);
                   setModal(null);
                 }}
-              >
-                <label className="block text-sm mb-1" htmlFor="likeplus-text">
-                  Text (optional)
-                </label>
-                <input
-                  id="likeplus-text"
-                  name="text"
-                  className="w-full border rounded px-2 py-1"
-                  placeholder="e.g. beach at sunset"
-                />
-                <label className="block text-sm mt-3 mb-1" htmlFor="mix-weight">
-                  Weight (image vs text)
-                </label>
-                <input
-                  id="mix-weight"
-                  name="weight"
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  defaultValue="0.5"
-                  className="w-full"
-                />
-                <div className="mt-3 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    className="px-3 py-1 rounded border"
-                    onClick={() => setModal(null)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-3 py-1 rounded bg-blue-600 text-white"
-                  >
-                    Search
-                  </button>
-                </div>
-              </form>
-            </div>
-            </FocusTrap>
-          </div>
-        )}
-        {modal?.kind === "save" && (
-          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center" onKeyDown={(e)=>{ if(e.key==='Escape') setModal(null) }}>
-            <FocusTrap onEscape={()=> setModal(null)}>
-            <div className="bg-white rounded-lg p-4 w-full max-w-md" role="dialog" aria-modal="true">
-              <div className="font-semibold mb-2">Save Search</div>
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  const form = e.target as HTMLFormElement;
-                  const name = (
-                    form.elements.namedItem("name") as HTMLInputElement
-                  ).value.trim();
-                  if (!name) return;
+                onSave={async (n, q) => {
                   try {
-                    const { apiAddSaved, apiGetSaved } = await import("./api");
-                    await apiAddSaved(
-                      dir,
-                      name,
-                      searchText || query || "",
-                      topK
-                    );
-                    const r = await apiGetSaved(dir);
-                    photoActions.setSaved(r.saved || []);
-                    setSelectedView("saved");
+                    const { apiAddPreset } = await import("./api");
+                    await apiAddPreset(dir, n, q);
+                    setToast({ message: `Saved preset ${n}` });
+                    await loadPresets();
                   } catch (e) {
                     uiActions.setNote(
                       e instanceof Error ? e.message : "Save failed"
                     );
                   }
-                  setModal(null);
                 }}
-              >
-                <label className="block text-sm mb-1" htmlFor="save-name">
-                  Name
-                </label>
-                <input
-                  id="save-name"
-                  name="name"
-                  className="w-full border rounded px-2 py-1"
-                  placeholder="e.g. Dogs on beach"
-                />
-                <div className="mt-3 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    className="px-3 py-1 rounded border"
-                    onClick={() => setModal(null)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-3 py-1 rounded bg-blue-600 text-white"
-                  >
-                    Save
-                  </button>
-                </div>
-              </form>
-            </div>
-            </FocusTrap>
-          </div>
-        )}
-        {modal?.kind === "collect" && (
-          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center" onKeyDown={(e)=>{ if(e.key==='Escape') setModal(null) }}>
-            <FocusTrap onEscape={()=> setModal(null)}>
-            <div className="bg-white rounded-lg p-4 w-full max-w-md" role="dialog" aria-modal="true">
-              <div className="font-semibold mb-2">Add to Collection</div>
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  const form = e.target as HTMLFormElement;
-                  const name = (
-                    form.elements.namedItem("name") as HTMLInputElement
-                  ).value.trim();
-                  if (!name) return;
-                  try {
-                    const { apiSetCollection, apiGetCollections } =
-                      await import("./api");
-                    await apiSetCollection(dir, name, Array.from(selected));
-                    const r = await apiGetCollections(dir);
-                    photoActions.setCollections(r.collections || {});
-                    setToast({ message: `Added ${selected.size} to ${name}` });
-                  } catch (e) {
-                    uiActions.setNote(
-                      e instanceof Error
-                        ? e.message
-                        : "Collection update failed"
-                    );
-                  }
-                  setModal(null);
-                }}
-              >
-                <label className="block text-sm mb-1" htmlFor="col-name">
-                  Collection
-                </label>
-                <input
-                  id="col-name"
-                  name="name"
-                  list="collections-list"
-                  className="w-full border rounded px-2 py-1"
-                  placeholder="Type or choose…"
-                />
-                <datalist id="collections-list">
-                  {Object.keys(collections || {}).map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </datalist>
-                <div className="mt-3 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    className="px-3 py-1 rounded border"
-                    onClick={() => setModal(null)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-3 py-1 rounded bg-blue-600 text-white"
-                  >
-                    Add
-                  </button>
-                </div>
-              </form>
-            </div>
-            </FocusTrap>
-          </div>
-        )}
-        {modal?.kind === "removeCollect" && (
-          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center" onKeyDown={(e)=>{ if(e.key==='Escape') setModal(null) }}>
-            <FocusTrap onEscape={()=> setModal(null)}>
-            <div className="bg-white rounded-lg p-4 w-full max-w-md" role="dialog" aria-modal="true">
-              <div className="font-semibold mb-2">Remove from Collection</div>
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  const form = e.target as HTMLFormElement;
-                  const name = (
-                    form.elements.namedItem("name") as HTMLInputElement
-                  ).value.trim();
-                  if (!name) return;
-                  try {
-                    const { apiGetCollections, apiSetCollection } =
-                      await import("./api");
-                    const r = await apiGetCollections(dir);
-                    const existing = r.collections?.[name] || [];
-                    const next = existing.filter(
-                      (p: string) => !selected.has(p)
-                    );
-                    await apiSetCollection(dir, name, next);
-                    const r2 = await apiGetCollections(dir);
-                    photoActions.setCollections(r2.collections || {});
-                    setToast({ message: `Removed ${existing.length - next.length} from ${name}` });
-                  } catch (e) {
-                    uiActions.setNote(
-                      e instanceof Error
-                        ? e.message
-                        : "Collection update failed"
-                    );
-                  }
-                  setModal(null);
-                }}
-              >
-                <label className="block text-sm mb-1" htmlFor="col-name-remove">
-                  Collection
-                </label>
-                <input
-                  id="col-name-remove"
-                  name="name"
-                  list="collections-list"
-                  className="w-full border rounded px-2 py-1"
-                  placeholder="Choose collection"
-                />
-                <datalist id="collections-list">
-                  {Object.keys(collections || {}).map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </datalist>
-                <div className="mt-3 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    className="px-3 py-1 rounded border"
-                    onClick={() => setModal(null)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-3 py-1 rounded bg-blue-600 text-white"
-                  >
-                    Remove
-                  </button>
-                </div>
-              </form>
-            </div>
-            </FocusTrap>
-          </div>
-        )}
+                allTags={allTags || []}
+                cameras={meta?.cameras || []}
+                people={(clusters || [])
+                  .filter((c) => c.name)
+                  .map((c) => String(c.name))}
+              />
+            )}
 
-        {/* Lightbox */}
-        {detailIdx !== null && results && results[detailIdx] && (
-          <Lightbox
-            dir={dir}
-            engine={engine}
-            path={results[detailIdx].path}
-            onPrev={() => navDetail(-1)}
-            onNext={() => navDetail(1)}
-            onClose={() => setDetailIdx(null)}
-            onReveal={async () => {
-              try {
-                const { apiOpen } = await import("./api");
-                const p =
-                  results && detailIdx !== null
-                    ? results[detailIdx]?.path
-                    : undefined;
-                if (p) await apiOpen(dir, p);
-              } catch {}
-            }}
-            onFavorite={async () => {
-              try {
-                const p =
-                  results && detailIdx !== null
-                    ? results[detailIdx]?.path
-                    : undefined;
-                if (p) {
-                  await apiSetFavorite(dir, p, !fav.includes(p));
-                  await loadFav();
-                }
-              } catch {}
-            }}
-            onMoreLikeThis={async () => {
-              try {
-                const { apiSearchLike } = await import("./api");
-                const p =
-                  results && detailIdx !== null
-                    ? results[detailIdx]?.path
-                    : undefined;
-                if (!p) return;
-                uiActions.setBusy("Searching similar…");
-                const r = await apiSearchLike(dir, p, engine, topK);
-                photoActions.setResults(r.results || []);
-                setSelectedView("results");
-              } catch (e) {
-                uiActions.setNote(
-                  e instanceof Error ? e.message : "Search failed"
-                );
-              } finally {
-                uiActions.setBusy("");
-              }
-            }}
-          />
-        )}
-
-        {/* Shortcuts overlay */}
-        {showShortcuts && (
-          <div className="fixed inset-0 z-[1060] flex items-center justify-center">
-            <button
-              type="button"
-              aria-label="Close shortcuts overlay"
-              className="absolute inset-0 w-full h-full bg-black/50"
-              onClick={() => setShowShortcuts(false)}
+            {/* Help Modal */}
+            <HelpModal
+              isOpen={showHelpModal}
+              onClose={() => setShowHelpModal(false)}
+              initialSection="getting-started"
             />
-            <div
-              className="relative z-[1061] bg-white dark:bg-gray-900 rounded-lg shadow p-5 w-full max-w-lg text-sm"
-              role="dialog"
-              aria-modal="true"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <div className="font-semibold">Keyboard Shortcuts</div>
-                <button
-                  type="button"
-                  className="px-2 py-1 border rounded"
-                  onClick={() => setShowShortcuts(false)}
-                >
-                  Close
-                </button>
-              </div>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-2">
-                <div>
-                  <span className="font-mono">/</span> Focus search
-                </div>
-                <div>
-                  <span className="font-mono">?</span> Shortcuts help
-                </div>
-                <div>
-                  <span className="font-mono">←/→</span> Move focus
-                </div>
-                <div>
-                  <span className="font-mono">↑/↓</span> Row up/down
-                </div>
-                <div>
-                  <span className="font-mono">Home/End</span> Start/end
-                </div>
-                <div>
-                  <span className="font-mono">PgUp/PgDn</span> Jump rows
-                </div>
-                <div>
-                  <span className="font-mono">Space</span> Select focused
-                </div>
-                <div>
-                  <span className="font-mono">A</span> Select all
-                </div>
-                <div>
-                  <span className="font-mono">C</span> Clear selection
-                </div>
-                <div>
-                  <span className="font-mono">Enter</span> Open lightbox
-                </div>
-                <div>
-                  <span className="font-mono">F</span> Favorite
-                </div>
-                <div>
-                  <span className="font-mono">Esc</span> Close panel/lightbox
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
-        {/* Global progress overlay */}
-        {!!busy && (
-          <div className="fixed inset-0 z-[1050] bg-black/40 flex items-center justify-center" role="status" aria-live="polite">
-            <div className="bg-white dark:bg-gray-900 rounded-lg shadow p-4 w-full max-w-sm text-sm">
-              <div className="flex items-center gap-3">
-                <div className="h-6 w-6 border-2 border-gray-300 dark:border-gray-700 border-t-blue-600 rounded-full animate-spin"></div>
-                <div className="min-w-0">
-                  <div className="font-medium text-gray-900 dark:text-gray-100">
-                    {busy}
-                  </div>
+            {/* Theme Settings Modal */}
+            <ThemeSettingsModal
+              isOpen={showThemeModal}
+              onClose={() => setShowThemeModal(false)}
+            />
+
+            {/* Global progress overlay */}
+            {!!busy && (
+              <div
+                className="fixed inset-0 z-[1050] bg-black/40 flex items-center justify-center"
+                role="status"
+                aria-live="polite"
+              >
+                <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-6 w-full max-w-sm">
+                  <LoadingSpinner
+                    size="lg"
+                    message={busy}
+                    className="text-center"
+                  />
                   {note && (
-                    <div className="text-gray-600 dark:text-gray-300 truncate">
+                    <p className="mt-3 text-sm text-gray-600 dark:text-gray-300 text-center">
                       {note}
-                    </div>
+                    </p>
                   )}
                 </div>
               </div>
-            </div>
-          </div>
-        )}
-        {toast && (
-          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[1070]" role="status" aria-live="polite">
-            <div className="flex items-center gap-3 bg-gray-900 text-white px-4 py-2 rounded shadow">
-              <span className="text-sm">{toast.message}</span>
-              {toast.actionLabel && toast.onAction && (
-                <button
-                  type="button"
-                  className="text-sm underline"
-                  onClick={toast.onAction}
-                >
-                  {toast.actionLabel}
-                </button>
-              )}
-              <button
-                type="button"
-                aria-label="Close"
-                className="ml-1"
-                onClick={() => {
-                  setToast(null);
-                  if (toastTimerRef.current) {
-                    window.clearTimeout(toastTimerRef.current);
-                    toastTimerRef.current = null;
-                  }
-                }}
+            )}
+            {toast && (
+              <div
+                className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[1070]"
+                role="status"
+                aria-live="polite"
               >
-                ×
-              </button>
-            </div>
+                <div className="flex items-center gap-3 bg-gray-900 text-white px-4 py-2 rounded shadow">
+                  <span className="text-sm">{toast.message}</span>
+                  {toast.actionLabel && toast.onAction && (
+                    <button
+                      type="button"
+                      className="text-sm underline"
+                      onClick={toast.onAction}
+                    >
+                      {toast.actionLabel}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    aria-label="Close notification"
+                    className="ml-1"
+                    onClick={() => {
+                      setToast(null);
+                      if (toastTimerRef.current) {
+                        window.clearTimeout(toastTimerRef.current);
+                        toastTimerRef.current = null;
+                      }
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Status Bar */}
+            <StatusBar
+              photoCount={library?.length || 0}
+              indexedCount={library?.length || 0}
+              searchProvider={engine}
+              isIndexing={isIndexing}
+              isConnected={true}
+              currentDirectory={dir}
+              activeJobs={jobs.filter((j) => j.status === "running").length}
+            />
+
+            {/* Jobs Center */}
+            <JobsCenter
+              jobs={jobs}
+              onPause={(jobId) => {
+                setJobs((prev) =>
+                  prev.map((j) =>
+                    j.id === jobId ? { ...j, status: "paused" as const } : j
+                  )
+                );
+              }}
+              onResume={(jobId) => {
+                setJobs((prev) =>
+                  prev.map((j) =>
+                    j.id === jobId ? { ...j, status: "running" as const } : j
+                  )
+                );
+              }}
+              onCancel={(jobId) => {
+                setJobs((prev) =>
+                  prev.map((j) =>
+                    j.id === jobId ? { ...j, status: "cancelled" as const } : j
+                  )
+                );
+              }}
+              onRetry={(jobId) => {
+                setJobs((prev) =>
+                  prev.map((j) =>
+                    j.id === jobId ? { ...j, status: "queued" as const } : j
+                  )
+                );
+              }}
+              onClear={(jobId) => {
+                setJobs((prev) => prev.filter((j) => j.id !== jobId));
+              }}
+              onClearAll={() => {
+                setJobs((prev) =>
+                  prev.filter(
+                    (j) => j.status === "running" || j.status === "queued"
+                  )
+                );
+              }}
+            />
+
+            {/* Bottom Navigation */}
+            <BottomNavigation
+              activeTab={bottomNavTab}
+              onTabChange={(tab) => {
+                setBottomNavTab(tab);
+                // Map bottom nav tabs to main views
+                switch (tab) {
+                  case "home":
+                    setSelectedView("library");
+                    break;
+                  case "search":
+                    setSelectedView("results");
+                    break;
+                  case "favorites":
+                    setSelectedView("results");
+                    photoActions.setFavOnly(true);
+                    break;
+                  case "settings":
+                    setSelectedView("tasks");
+                    break;
+                }
+              }}
+              onShowFilters={() => setShowFilters(true)}
+              onShowUpload={() => setModal({ kind: "folder" })}
+              onShowLibrary={() => setModal({ kind: "folder" })}
+              showSecondaryActions={true}
+            />
           </div>
+
+          {/* Progressive Onboarding Components */}
+          <ContextualHelp
+            isVisible={showContextualHelp}
+            onDismiss={() => setShowContextualHelp(false)}
+            context={
+              selectedView as
+                | "search"
+                | "library"
+                | "results"
+                | "settings"
+                | "collections"
+            }
+            userActions={userActions}
+          />
+
+          <OnboardingChecklist
+            isVisible={showOnboardingChecklist}
+            onComplete={() => {
+              setShowOnboardingChecklist(false);
+              // Mark onboarding as complete
+              try {
+                localStorage.setItem("onboardingComplete", "true");
+              } catch {}
+            }}
+            completedSteps={onboardingSteps}
+            onStepComplete={(step) => {
+              setOnboardingSteps((prev) => {
+                if (!prev.includes(step)) {
+                  const newSteps = [...prev, step];
+                  try {
+                    localStorage.setItem(
+                      "onboardingSteps",
+                      JSON.stringify(newSteps)
+                    );
+                  } catch {}
+                  return newSteps;
+                }
+                return prev;
+              });
+            }}
+          />
+
+          {/* Guided Indexing Flow */}
+          {isIndexing && (
+            <GuidedIndexingFlow
+              isVisible={true}
+              onComplete={() => setIsIndexing(false)}
+              onCancel={() => setIsIndexing(false)}
+              directory={dir}
+              engine={engine}
+            />
+          )}
+
+          {/* Performance Monitor for development */}
+          <PerformanceMonitor />
+        </div>
         )}
-      </div>
-    </div>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }

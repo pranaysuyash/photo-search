@@ -62,7 +62,7 @@ class IndexStore:
         if self.state.embeddings is not None:
             np.save(self.embeddings_file, self.state.embeddings)
 
-    def upsert(self, embedder, photos: List[Photo], batch_size: int = 32) -> Tuple[int, int]:
+    def upsert(self, embedder, photos: List[Photo], batch_size: int = 32, progress: Optional[callable] = None) -> Tuple[int, int]:
         self.load()
         existing_map = {p: i for i, p in enumerate(self.state.paths)}
 
@@ -82,34 +82,65 @@ class IndexStore:
         # Update modified
         updated_count = 0
         if modified_idx and self.state.embeddings is not None and len(self.state.embeddings) == len(self.state.paths):
-            paths_to_update = [Path(self.state.paths[i]) for i in modified_idx]
-            new_embs = embedder.embed_images(paths_to_update, batch_size=batch_size)
-            for j, idx in enumerate(modified_idx):
-                v = new_embs[j]
-                if np.linalg.norm(v) > 0:
-                    self.state.embeddings[idx] = v
-                    sp = self.state.paths[idx]
-                    self.state.mtimes[idx] = path_new_mtime.get(sp, Path(sp).stat().st_mtime)
-            updated_count = len(modified_idx)
+            # Process in chunks to enable progress updates
+            total_updates = len(modified_idx)
+            done_updates = 0
+            for start in range(0, total_updates, max(1, int(batch_size))):
+                chunk_idx = modified_idx[start:start + max(1, int(batch_size))]
+                paths_to_update = [Path(self.state.paths[i]) for i in chunk_idx]
+                new_embs = embedder.embed_images(paths_to_update, batch_size=batch_size)
+                for j, idx in enumerate(chunk_idx):
+                    v = new_embs[j]
+                    if np.linalg.norm(v) > 0:
+                        self.state.embeddings[idx] = v
+                        sp = self.state.paths[idx]
+                        self.state.mtimes[idx] = path_new_mtime.get(sp, Path(sp).stat().st_mtime)
+                done_updates += len(chunk_idx)
+                if callable(progress):
+                    try:
+                        progress({
+                            'phase': 'update',
+                            'done': int(done_updates),
+                            'total': int(total_updates),
+                        })
+                    except Exception:
+                        pass
+            updated_count = total_updates
 
         # Insert new
         new_count = 0
         if new_items:
-            new_embs = embedder.embed_images([p.path for p in new_items], batch_size=batch_size)
-            # Keep only non-zero vectors
-            mask = [i for i in range(len(new_embs)) if np.linalg.norm(new_embs[i]) > 0]
-            kept_embs = new_embs[mask] if len(mask) > 0 else np.zeros((0, new_embs.shape[1] if new_embs.ndim == 2 else 0), dtype=np.float32)
-            kept_items = [new_items[i] for i in mask]
-            if kept_embs.size > 0:
-                if self.state.embeddings is None or len(self.state.paths) == 0:
-                    self.state.embeddings = kept_embs
-                    self.state.paths = [str(p.path) for p in kept_items]
-                    self.state.mtimes = [p.mtime for p in kept_items]
-                else:
-                    self.state.embeddings = np.vstack([self.state.embeddings, kept_embs])
-                    self.state.paths.extend([str(p.path) for p in kept_items])
-                    self.state.mtimes.extend([p.mtime for p in kept_items])
-                new_count = len(kept_items)
+            total_new = len(new_items)
+            done_new = 0
+            # Process in chunks to enable progress updates
+            for start in range(0, total_new, max(1, int(batch_size))):
+                chunk = new_items[start:start + max(1, int(batch_size))]
+                new_embs = embedder.embed_images([p.path for p in chunk], batch_size=batch_size)
+                # Keep only non-zero vectors
+                mask = [i for i in range(len(new_embs)) if np.linalg.norm(new_embs[i]) > 0]
+                kept_embs = new_embs[mask] if len(mask) > 0 else np.zeros((0, new_embs.shape[1] if new_embs.ndim == 2 else 0), dtype=np.float32)
+                kept_items = [chunk[i] for i in mask]
+                if kept_embs.size > 0:
+                    if self.state.embeddings is None or len(self.state.paths) == 0:
+                        self.state.embeddings = kept_embs
+                        self.state.paths = [str(p.path) for p in kept_items]
+                        self.state.mtimes = [p.mtime for p in kept_items]
+                    else:
+                        self.state.embeddings = np.vstack([self.state.embeddings, kept_embs])
+                        self.state.paths.extend([str(p.path) for p in kept_items])
+                        self.state.mtimes.extend([p.mtime for p in kept_items])
+                    new_count += len(kept_items)
+                done_new += len(chunk)
+                # Emit progress after each chunk
+                if callable(progress):
+                    try:
+                        progress({
+                            'phase': 'insert',
+                            'done': int(done_new),
+                            'total': int(total_new),
+                        })
+                    except Exception:
+                        pass
 
         # Prune removed files
         photo_set = {str(p.path) for p in photos}
@@ -488,4 +519,3 @@ class IndexStore:
             return [SearchResult(path=Path(self.state.paths[i]), score=float(sims[i])) for i in labs]
         # Fallback without exact rerank
         return [SearchResult(path=Path(self.state.paths[i]), score=1.0) for i in labs]
-
