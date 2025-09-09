@@ -459,6 +459,28 @@ export default function App() {
       return [];
     }
   });
+  // Event-based onboarding completion helper with prerequisites
+  const completeOnboardingStep = useCallback(
+    (step: "select_directory" | "index_photos" | "first_search" | "explore_features") => {
+      const prereq: Record<string, string[]> = {
+        select_directory: [],
+        index_photos: ["select_directory"],
+        first_search: ["index_photos"],
+        explore_features: ["first_search"],
+      };
+      setOnboardingSteps((prev) => {
+        if (prev.includes(step)) return prev;
+        const req = prereq[step] || [];
+        if (!req.every((s) => prev.includes(s))) return prev; // don't skip ahead
+        const next = [...prev, step];
+        try {
+          localStorage.setItem("onboardingSteps", JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    },
+    []
+  );
   const [showContextualHelp, setShowContextualHelp] = useState(false);
   const [showOnboardingChecklist, setShowOnboardingChecklist] = useState(false);
   const ratingMap = useMemo(() => {
@@ -703,8 +725,10 @@ export default function App() {
         }
         return prev;
       });
+      // Complete onboarding step when a real directory is set
+      completeOnboardingStep("select_directory");
     }
-  }, [dir]);
+  }, [dir, completeOnboardingStep]);
 
   useEffect(() => {
     if (library && library.length > 0) {
@@ -720,6 +744,13 @@ export default function App() {
       });
     }
   }, [library]);
+
+  // Complete "Explore Features" once user navigates to Collections (after prior steps)
+  useEffect(() => {
+    if (selectedView === "collections") {
+      completeOnboardingStep("explore_features");
+    }
+  }, [selectedView, completeOnboardingStep]);
 
   // Show contextual help based on context and user actions
   useEffect(() => {
@@ -929,6 +960,9 @@ export default function App() {
         )
       );
 
+      // Mark onboarding: indexing completed successfully
+      completeOnboardingStep("index_photos");
+
       await loadLibrary(120, 0);
     } catch (e) {
       uiActions.setNote(e instanceof Error ? e.message : "Index failed");
@@ -959,6 +993,7 @@ export default function App() {
     openaiKey,
     loadLibrary,
     uiActions,
+    completeOnboardingStep,
   ]);
 
   const doSearchImmediate = useCallback(
@@ -1056,6 +1091,8 @@ export default function App() {
         uiActions.setNote(`Found ${r.results?.length || 0} results.`);
         await Promise.all([loadFav(), loadSaved(), loadTags(), loadDiag()]);
         setSelectedView("results");
+        // Mark onboarding: first search completed
+        completeOnboardingStep("first_search");
       } catch (e) {
         uiActions.setNote(e instanceof Error ? e.message : "Search failed");
       } finally {
@@ -1098,6 +1135,7 @@ export default function App() {
       loadSaved,
       loadTags,
       loadDiag,
+      completeOnboardingStep,
     ]
   );
 
@@ -3000,21 +3038,7 @@ export default function App() {
               } catch {}
             }}
             completedSteps={onboardingSteps}
-            onStepComplete={(step) => {
-              setOnboardingSteps((prev) => {
-                if (!prev.includes(step)) {
-                  const newSteps = [...prev, step];
-                  try {
-                    localStorage.setItem(
-                      "onboardingSteps",
-                      JSON.stringify(newSteps)
-                    );
-                  } catch {}
-                  return newSteps;
-                }
-                return prev;
-              });
-            }}
+            onStepComplete={() => { /* no-op: completion is event-based */ }}
             onStepAction={(step) => {
               // Navigate to the appropriate task/page and keep current completion behavior
               switch (step) {
@@ -3050,17 +3074,6 @@ export default function App() {
                   break;
                 }
               }
-              // Preserve existing behavior of marking the step complete
-              setOnboardingSteps((prev) => {
-                if (!prev.includes(step)) {
-                  const newSteps = [...prev, step];
-                  try {
-                    localStorage.setItem("onboardingSteps", JSON.stringify(newSteps));
-                  } catch {}
-                  return newSteps;
-                }
-                return prev;
-              });
             }}
           />
 
