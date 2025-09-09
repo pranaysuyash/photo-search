@@ -37,7 +37,7 @@ Legend: [x] done • [>] in progress • [ ] planned • (opt) optional
 - [x] Text/semantic search (content/OCR/captions toggles)
 - [x] People filtering (named clusters, multi‑select)
 - [x] Date range (From/To)
-- [ ] Search history (recent)
+- [x] Search history (recent)
 - [ ] Boolean operators (AND/OR/NOT)
 - [ ] Color‑based search (dominant colors)
 - [ ] Fuzzy search (typo tolerance)
@@ -192,6 +192,7 @@ Legend: [x] done • [>] in progress • [ ] planned • (opt) optional
 - [ ] Shortcut overlay (cheat sheet)
 - [ ] Focus trapping in modals; improved tab order
 - [ ] High‑contrast mode; larger text presets
+- [ ] Link Intent User Flows doc (INTENT_USER_FLOWS.md) from Tasks view and/or Sidebar
 
 ## Settings & Config (Local)
 - [x] Folder selection; engine config

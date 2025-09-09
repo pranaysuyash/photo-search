@@ -1,0 +1,1 @@
+- to memorize  use existing .venv

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useSimpleStore } from '../../stores/SimpleStore'
+import { API_BASE } from '../../api'
 
 type ScanItem = { path: string; exists: boolean; files: number; bytes: number }
 
@@ -52,7 +53,7 @@ export default function FirstRunSetup({
     const load = async () => {
       setLoading(true)
       try {
-        const r = await fetch(`/scan_count?include_videos=${includeVideos ? '1':'0'}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(paths) })
+        const r = await fetch(`${API_BASE}/scan_count?include_videos=${includeVideos ? '1':'0'}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(paths) })
         if (!r.ok) throw new Error(await r.text())
         const data = await r.json() as { items: ScanItem[] }
         if (!cancelled) setItems(data.items || [])
@@ -107,7 +108,7 @@ export default function FirstRunSetup({
                 const until = Date.now() + 7000
                 while (Date.now() < until) {
                   try {
-                    const r = await fetch(`/analytics?dir=${encodeURIComponent(first)}&limit=5`)
+                    const r = await fetch(`${API_BASE}/analytics?dir=${encodeURIComponent(first)}&limit=5`)
                     if (r.ok) {
                       const js = await r.json() as any
                       const ev = (js.events||[]).find((e:any)=> e.type==='index')

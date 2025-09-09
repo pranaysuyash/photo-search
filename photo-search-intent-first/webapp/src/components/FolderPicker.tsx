@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { FolderOpen, RefreshCw, AlertCircle } from 'lucide-react';
+import { API_BASE } from '../api';
 
 interface FolderInfo {
   path: string;
@@ -26,7 +27,7 @@ export default function FolderPicker({ onFolderSelect, currentPath }: FolderPick
     setError('');
     
     try {
-      const response = await fetch('/scan_count', {
+      const response = await fetch(`${API_BASE}/scan_count`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify([path]),

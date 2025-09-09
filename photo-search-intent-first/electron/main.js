@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, Menu, ipcMain } = require('electron')
+const { app, BrowserWindow, dialog, Menu, ipcMain, protocol } = require('electron')
 const isDev = process.env.NODE_ENV === 'development'
 const path = require('path')
 const { spawn } = require('child_process')
@@ -40,7 +40,8 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
+      preload: path.join(__dirname, 'preload.js'),
+      webSecurity: false // Allow file:// protocol access for local images
     },
     show: false // Don't show until page is loaded
   })
@@ -135,6 +136,29 @@ async function checkForUpdates(userTriggered = false) {
 }
 
 app.whenReady().then(async () => {
+  // Register custom file protocol handler
+  protocol.registerFileProtocol('app', (request, callback) => {
+    try {
+      console.log('[Protocol Handler] Received request:', request.url)
+      const url = request.url.replace('app://', '')
+      const filePath = path.normalize(decodeURIComponent(url))
+      console.log('[Protocol Handler] Resolved file path:', filePath)
+      
+      // Check if file exists
+      const fs = require('fs')
+      if (fs.existsSync(filePath)) {
+        console.log('[Protocol Handler] File exists, serving:', filePath)
+        callback({ path: filePath })
+      } else {
+        console.log('[Protocol Handler] File NOT found:', filePath)
+        callback({ error: -6 }) // net::ERR_FILE_NOT_FOUND
+      }
+    } catch (error) {
+      console.error('[Protocol Handler] Error processing request:', error)
+      callback({ error: -2 }) // net::ERR_FAILED
+    }
+  })
+  
   const isApiRunning = await checkAPIRunning(8000)
   if (!isApiRunning) {
     console.log('Starting API server...')
@@ -167,5 +191,19 @@ app.on('before-quit', () => {
     apiProc.kill()
   }
 })
+
+// Register custom protocol for file access - MUST be called before app.whenReady()
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'app',
+    privileges: {
+      standard: true,
+      secure: true,
+      allowServiceWorkers: true,
+      supportFetchAPI: true,
+      corsEnabled: true
+    }
+  }
+])
 
 autoUpdater.checkForUpdatesAndNotify()

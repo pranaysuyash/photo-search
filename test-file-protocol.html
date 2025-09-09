@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>File Protocol Test</title>
+</head>
+<body>
+    <h1>File Protocol Test for Offline Images</h1>
+    <div id="results"></div>
+    
+    <script>
+        function log(message) {
+            document.getElementById('results').innerHTML += '<p>' + message + '</p>';
+            console.log(message);
+        }
+        
+        // Test file:// protocol
+        const testUrl = 'file:///Users/pranay/Desktop/Screenshot 2025-09-09 at 6.32.09 PM.png';
+        log('Testing URL: ' + testUrl);
+        
+        const img = new Image();
+        img.onload = function() {
+            log('✅ Image loaded successfully!');
+            log('Width: ' + img.width + ', Height: ' + img.height);
+            document.body.appendChild(img);
+        };
+        img.onerror = function(e) {
+            log('❌ Image failed to load');
+            log('Error event: ' + JSON.stringify(e.type));
+            log('Image src: ' + img.src);
+            
+            // Try to get more error details
+            const testImg = document.createElement('img');
+            testImg.onerror = function(evt) {
+                log('Detailed error: ' + evt.message || 'Unknown error');
+            };
+            testImg.src = testUrl;
+        };
+        img.src = testUrl;
+        
+        // Also test with a simple local file that should exist
+        const simpleTestUrl = 'file:///Users/pranay/Desktop';
+        log('Testing simple directory URL: ' + simpleTestUrl);
+        
+        const simpleImg = new Image();
+        simpleImg.onload = function() {
+            log('✅ Simple directory loaded (this should not work for directories)');
+        };
+        simpleImg.onerror = function() {
+            log('✅ Simple directory failed as expected (directories cannot be loaded as images)');
+        };
+        simpleImg.src = simpleTestUrl;
+    </script>
+</body>
+</html>

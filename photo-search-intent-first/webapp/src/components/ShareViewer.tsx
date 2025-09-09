@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { thumbUrl } from '../api'
+import { thumbUrl, API_BASE } from '../api'
 
 type ShareDetail = {
   ok: boolean
@@ -29,7 +29,7 @@ export default function ShareViewer() {
     try {
       const qs = new URLSearchParams({ token })
       if (password.trim()) qs.set('password', password.trim())
-      const r = await fetch(`/share/detail?${qs.toString()}`)
+      const r = await fetch(`${API_BASE}/share/detail?${qs.toString()}`)
       const js: ShareDetail = await r.json()
       setDetail(js)
       if (!js.ok) {

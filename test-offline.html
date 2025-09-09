@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Offline Image Test</title>
+</head>
+<body>
+    <h1>Electron Detection Test</h1>
+    <div id="results"></div>
+    
+    <script>
+        function log(message) {
+            document.getElementById('results').innerHTML += '<p>' + message + '</p>';
+            console.log(message);
+        }
+        
+        // Test Electron detection
+        const isElectron = () => {
+            return typeof window !== "undefined" &&
+                ((window).electronAPI !== undefined ||
+                (window).process?.type === "renderer" ||
+                navigator.userAgent.toLowerCase().includes("electron"));
+        };
+        
+        log('window.electronAPI: ' + (window.electronAPI !== undefined));
+        log('window.process?.type: ' + (window.process?.type));
+        log('User Agent: ' + navigator.userAgent);
+        log('isElectron(): ' + isElectron());
+        
+        // Test URL generation
+        function thumbUrl(dir, provider, path, size = 256) {
+            if (isElectron()) {
+                const absolutePath = path.startsWith("/") ? path : `${dir}/${path}`;
+                return `app://${encodeURIComponent(absolutePath)}`;
+            }
+            
+            const API_BASE = 'http://127.0.0.1:8000';
+            const qs = new URLSearchParams({ dir, provider, path, size: String(size) });
+            return `${API_BASE}/thumb?${qs.toString()}`;
+        }
+        
+        const testDir = '/Users/pranay/Desktop';
+        const testPath = 'Screenshot 2025-09-09 at 6.32.09 PM.png';
+        const testUrl = thumbUrl(testDir, 'local', testPath);
+        
+        log('Generated URL: ' + testUrl);
+        
+        // Test image loading
+        const img = new Image();
+        img.onload = function() {
+            log('✅ Image loaded successfully!');
+            log('Width: ' + img.width + ', Height: ' + img.height);
+        };
+        img.onerror = function(e) {
+            log('❌ Image failed to load: ' + e);
+        };
+        img.src = testUrl;
+        
+        document.body.appendChild(img);
+    </script>
+</body>
+</html>

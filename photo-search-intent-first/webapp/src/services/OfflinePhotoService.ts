@@ -3,6 +3,9 @@
  * Manages photo caching, offline viewing, and sync operations
  */
 
+import React from 'react'
+import { API_BASE } from '../api'
+
 export interface PhotoCacheEntry {
   path: string
   thumbnailUrl: string
@@ -87,8 +90,8 @@ export class OfflinePhotoService {
       }
 
       // Get photo URLs
-      const thumbnailUrl = `/api/thumb/${encodeURIComponent(path)}?size=400`
-      const fullUrl = `/api/media/${encodeURIComponent(path)}`
+      const thumbnailUrl = `${API_BASE}/api/thumb/${encodeURIComponent(path)}?size=400`
+      const fullUrl = `${API_BASE}/api/media/${encodeURIComponent(path)}`
       
       // Cache thumbnail
       const thumbnailCache = await caches.open(this.cacheName)
@@ -140,8 +143,8 @@ export class OfflinePhotoService {
     try {
       const cache = await caches.open(this.cacheName)
       const url = size === 'thumbnail' 
-        ? `/api/thumb/${encodeURIComponent(path)}?size=400`
-        : `/api/media/${encodeURIComponent(path)}`
+        ? `${API_BASE}/api/thumb/${encodeURIComponent(path)}?size=400`
+        : `${API_BASE}/api/media/${encodeURIComponent(path)}`
       
       const response = await cache.match(url)
       if (response) {

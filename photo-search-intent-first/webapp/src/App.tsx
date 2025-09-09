@@ -48,6 +48,7 @@ import {
   apiGetMetadata,
   thumbUrl,
   type SearchResult,
+  API_BASE,
 } from "./api";
 import { apiDelete, apiUndoDelete } from "./api";
 
@@ -926,8 +927,8 @@ export default function App() {
 
   // Actions
   const doIndex = useCallback(async () => {
-    uiActions.setBusy("Indexing…");
-    uiActions.setNote("");
+    // Don't block UI - just show a small notification
+    uiActions.setNote("Indexing started in background. You can continue using the app.");
     setIsIndexing(true);
 
     // Create a job for indexing
@@ -944,6 +945,12 @@ export default function App() {
     };
     setJobs((prev) => [...prev, indexJob]);
 
+    // Start periodic library refresh to show images as they're indexed
+    let refreshInterval: NodeJS.Timeout | undefined;
+    refreshInterval = setInterval(async () => {
+      await loadLibrary(120, 0);
+    }, 3000); // Refresh every 3 seconds
+
     try {
       const r = await apiIndex(
         dir,
@@ -952,8 +959,11 @@ export default function App() {
         needsHf ? hfToken : undefined,
         needsOAI ? openaiKey : undefined
       );
+      
+      if (refreshInterval) clearInterval(refreshInterval); // Stop refreshing
+      
       uiActions.setNote(
-        `Indexed. New ${r.new}, Updated ${r.updated}, Total ${r.total}`
+        `Indexing complete! New: ${r.new}, Updated: ${r.updated}, Total: ${r.total}`
       );
 
       // Update job to completed
@@ -973,8 +983,9 @@ export default function App() {
       // Mark onboarding: indexing completed successfully
       completeOnboardingStep("index_photos");
 
-      await loadLibrary(120, 0);
+      await loadLibrary(120, 0); // Final refresh
     } catch (e) {
+      if (refreshInterval) clearInterval(refreshInterval); // Stop refreshing on error
       uiActions.setNote(e instanceof Error ? e.message : "Index failed");
 
       // Update job to failed
@@ -991,7 +1002,6 @@ export default function App() {
         )
       );
     } finally {
-      uiActions.setBusy("");
       setIsIndexing(false);
     }
   }, [
@@ -1831,7 +1841,7 @@ export default function App() {
                 const existing: string[] = [];
                 for (const p of paths) {
                   try {
-                    const st = await fetch("/scan_count", {
+                    const st = await fetch(`${API_BASE}/scan_count`, {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify([p]),
@@ -3088,16 +3098,7 @@ export default function App() {
             }}
           />
 
-          {/* Guided Indexing Flow */}
-          {isIndexing && (
-            <GuidedIndexingFlow
-              isVisible={true}
-              onComplete={() => setIsIndexing(false)}
-              onCancel={() => setIsIndexing(false)}
-              directory={dir}
-              engine={engine}
-            />
-          )}
+          {/* Removed blocking GuidedIndexingFlow - indexing now runs in background */}
 
           {/* Performance Monitor for development */}
           <PerformanceMonitor />

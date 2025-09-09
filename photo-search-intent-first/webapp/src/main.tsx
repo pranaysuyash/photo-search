@@ -7,6 +7,7 @@ import { ModularApp } from "./ModularApp";
 import { RootProviders } from "./RootProviders";
 import "./styles.css";
 import "./styles-modern.css";
+import "./styles/responsive-fixes.css";
 
 // Register service worker for PWA functionality
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
