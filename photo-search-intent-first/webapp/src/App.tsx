@@ -745,9 +745,19 @@ export default function App() {
     }
   }, [library]);
 
-  // Complete "Explore Features" once user navigates to Collections (after prior steps)
+  // Complete "Explore Features" once user navigates to Collections or other feature areas (after prior steps)
   useEffect(() => {
-    if (selectedView === "collections") {
+    const exploringViews: Array<View> = [
+      "collections",
+      "saved",
+      "smart",
+      "memories",
+      "trips",
+      "videos",
+      "people",
+      "map",
+    ];
+    if (exploringViews.includes(selectedView as View)) {
       completeOnboardingStep("explore_features");
     }
   }, [selectedView, completeOnboardingStep]);
@@ -3038,6 +3048,7 @@ export default function App() {
               } catch {}
             }}
             completedSteps={onboardingSteps}
+            inProgressStepId={isIndexing ? "index_photos" : undefined}
             onStepComplete={() => { /* no-op: completion is event-based */ }}
             onStepAction={(step) => {
               // Navigate to the appropriate task/page and keep current completion behavior

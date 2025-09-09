@@ -230,6 +230,8 @@ interface OnboardingChecklistProps {
   onStepComplete: (step: string) => void;
   // Optional: trigger a navigation or task for a given step
   onStepAction?: (step: string) => void;
+  // Optional: show a step as currently running
+  inProgressStepId?: string;
 }
 
 export function OnboardingChecklist({
@@ -238,6 +240,7 @@ export function OnboardingChecklist({
   completedSteps,
   onStepComplete,
   onStepAction,
+  inProgressStepId,
 }: OnboardingChecklistProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -382,17 +385,23 @@ export function OnboardingChecklist({
                         </p>
 
                         {!isCompleted && isNext && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              onStepAction
-                                ? onStepAction(step.id)
-                                : onStepComplete(step.id)
-                            }
-                            className="mt-2 px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
-                          >
-                            {step.action}
-                          </button>
+                          inProgressStepId === step.id ? (
+                            <span className="mt-2 inline-flex items-center px-3 py-1 bg-gray-500 text-white text-xs rounded">
+                              In progress…
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onStepAction
+                                  ? onStepAction(step.id)
+                                  : onStepComplete(step.id)
+                              }
+                              className="mt-2 px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
+                            >
+                              {step.action}
+                            </button>
+                          )
                         )}
                       </div>
                     </div>
