@@ -168,6 +168,20 @@ node_modules/
 **/.DS_Store
 *.map
 
+# Frontend/dev logs and PIDs
+**/vite.pid
+**/vite.log
+**/vite.dev.run.log
+**/react-dev.log
+**/*.pid
+
+# Test reports and coverage
+coverage/
+**/coverage/
+playwright-report/
+test-results/
+.playwright/
+
 # Electron build/cache
 **/out/
 **/release/
