@@ -1,4 +1,5 @@
 import React from "react";
+import { motion } from "framer-motion";
 import { useUIContext } from "../contexts/UIContext";
 import {
   Search as IconSearch,
@@ -165,7 +166,7 @@ export function TopBar({
   const { state: uiState } = useUIContext();
 
   return (
-    <div className="top-bar top-bar-mobile">
+    <div className="top-bar top-bar-mobile bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-700/50">
       {/* Busy progress bar */}
       {busy && (
         <div className="progress-bar">
@@ -174,14 +175,16 @@ export function TopBar({
       )}
       <div className="top-bar-content">
         <div className="top-bar-left">
-          <button
+          <motion.button
             type="button"
-            className="mobile-menu-button"
+            className="mobile-menu-button p-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             onClick={() => setIsMobileMenuOpen(true)}
             aria-label="Open menu"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
-            <Menu className="w-5 h-5" />
-          </button>
+            <Menu className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+          </motion.button>
           <SearchBar
             searchText={searchText}
             setSearchText={setSearchText}
@@ -277,15 +280,17 @@ export function TopBar({
             </button>
           </div>
 
-          <button
+          <motion.button
             type="button"
-            className="btn btn-secondary"
+            className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
             onClick={() => setShowFilters((v) => !v)}
             aria-label="Show filters"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
-            <Filter className="w-4 h-4" />
-            <span className="text-sm">Filters</span>
-          </button>
+            <Filter className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+            <span className="text-sm text-gray-700 dark:text-gray-300">Filters</span>
+          </motion.button>
           {/* Optional clear filters chip, if query looks filtery (basic heuristic via presence of tokens) */}
           {/(camera:|tag:|person:|has_text:|iso:|fnumber:|width:|height:|place:)/i.test(
             searchText || ""
@@ -311,16 +316,18 @@ export function TopBar({
               Clear filters
             </button>
           )}
-          <button
+          <motion.button
             type="button"
-            className="btn btn-secondary"
+            className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
             onClick={() => setModal({ kind: "save" })}
             title="Save this search for later"
             aria-label="Save current search"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
-            <BookmarkPlus className="w-4 h-4" />
-            <span className="text-sm">Remember</span>
-          </button>
+            <BookmarkPlus className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+            <span className="text-sm text-gray-700 dark:text-gray-300">Remember</span>
+          </motion.button>
         </div>
 
         <div className="top-bar-right">
@@ -465,24 +472,28 @@ export function TopBar({
             </button>
           </div>
 
-          <button
+          <motion.button
             type="button"
-            className="mobile-menu-button"
+            className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             title="Settings & Indexing"
             onClick={() => setModal({ kind: "folder" })}
             aria-label="Open settings and indexing options"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
-            <Settings className="w-4 h-4" />
-          </button>
-          <button
+            <Settings className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+          </motion.button>
+          <motion.button
             type="button"
-            className="mobile-menu-button"
+            className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             title="Open theme settings"
             aria-label="Open theme settings"
             onClick={() => onOpenThemeModal?.()}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
-            <Palette className="w-4 h-4" />
-          </button>
+            <Palette className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+          </motion.button>
         </div>
       </div>
 
