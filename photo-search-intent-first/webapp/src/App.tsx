@@ -121,6 +121,7 @@ import type {
 // Reuse existing feature components
 import JustifiedResults from "./components/JustifiedResults";
 import { Lightbox } from "./components/Lightbox";
+import { EnhancedLightbox } from "./components/EnhancedLightbox";
 import { VideoLightbox } from "./components/VideoLightbox";
 import { VideoService } from "./services/VideoService";
 import LibraryBrowser from "./components/LibraryBrowser";
@@ -2800,10 +2801,12 @@ export default function App() {
                     onClose={() => setDetailIdx(null)}
                   />
                 ) : (
-                  <Lightbox
+                  <EnhancedLightbox
                     dir={dir}
                     engine={engine}
                     path={results[detailIdx].path}
+                    currentIndex={detailIdx}
+                    totalCount={results.length}
                     onPrev={() => navDetail(-1)}
                     onNext={() => navDetail(1)}
                     onClose={() => setDetailIdx(null)}

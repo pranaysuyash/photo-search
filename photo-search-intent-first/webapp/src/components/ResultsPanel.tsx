@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ResultsGrid } from './ResultsGrid'
-import { Lightbox } from './Lightbox'
+import { EnhancedLightbox } from './EnhancedLightbox'
 import { NoResultsEmpty } from './ui/EmptyState'
 import { useDir, useEngine, useCaptionsEnabled, useHasText, useOcrEnabled, usePlace, useShowExplain, useSettingsActions } from '../stores/settingsStore'
 import { apiLogEvent } from '../api'
@@ -142,10 +142,12 @@ export default function ResultsPanel() {
       )}
 
       {detailIdx !== null && results[detailIdx] && (
-        <Lightbox
+        <EnhancedLightbox
           dir={dir}
           engine={engine}
           path={results[detailIdx].path}
+          currentIndex={detailIdx}
+          totalCount={results.length}
           onPrev={()=>navDetail(-1)}
           onNext={()=>navDetail(1)}
           onClose={()=>setDetailIdx(null)}

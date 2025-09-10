@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import ProUI from './components/ProUI';
 import ModernApp from './components/ModernApp';
 import App from './App';
+import { ToastProvider } from './components/ui/Toast';
 import './styles-modern.css';
 import './styles-pro.css';
 
@@ -38,24 +39,32 @@ const AppWrapper: React.FC = () => {
 
   if (UI_MODE === 'pro') {
     return (
-      <ProUI 
-        darkMode={darkMode}
-        onDarkModeToggle={handleDarkModeToggle}
-      />
+      <ToastProvider>
+        <ProUI 
+          darkMode={darkMode}
+          onDarkModeToggle={handleDarkModeToggle}
+        />
+      </ToastProvider>
     );
   }
 
   if (UI_MODE === 'modern') {
     return (
-      <ModernApp 
-        darkMode={darkMode}
-        onDarkModeToggle={handleDarkModeToggle}
-      />
+      <ToastProvider>
+        <ModernApp 
+          darkMode={darkMode}
+          onDarkModeToggle={handleDarkModeToggle}
+        />
+      </ToastProvider>
     );
   }
 
   // Fall back to original App component
-  return <App />;
+  return (
+    <ToastProvider>
+      <App />
+    </ToastProvider>
+  );
 };
 
 export default AppWrapper;

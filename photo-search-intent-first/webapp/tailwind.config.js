@@ -112,6 +112,33 @@ export default {
         'popover': '1060',
         'tooltip': '1070',
       },
+      // Custom animations for UX improvements
+      animation: {
+        'fade-in-out': 'fadeInOut 2s ease-in-out',
+        'slide-in-right': 'slideInRight 0.3s ease-out',
+        'slide-in-left': 'slideInLeft 0.3s ease-out',
+        'scale-up': 'scaleUp 0.2s ease-out',
+      },
+      keyframes: {
+        fadeInOut: {
+          '0%': { opacity: '0', transform: 'translateY(-10px)' },
+          '20%': { opacity: '1', transform: 'translateY(0)' },
+          '80%': { opacity: '1', transform: 'translateY(0)' },
+          '100%': { opacity: '0', transform: 'translateY(-10px)' },
+        },
+        slideInRight: {
+          '0%': { opacity: '0', transform: 'translateX(20px)' },
+          '100%': { opacity: '1', transform: 'translateX(0)' },
+        },
+        slideInLeft: {
+          '0%': { opacity: '0', transform: 'translateX(-20px)' },
+          '100%': { opacity: '1', transform: 'translateX(0)' },
+        },
+        scaleUp: {
+          '0%': { opacity: '0', transform: 'scale(0.95)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
+        },
+      },
     },
   },
   plugins: [],
