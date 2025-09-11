@@ -33,13 +33,20 @@ function authHeaders() {
 }
 
 async function post<T>(path: string, body: any): Promise<T> {
-	const r = await fetch(`${API_BASE}${path}`, {
-		method: "POST",
-		headers: { "Content-Type": "application/json", ...authHeaders() },
-		body: JSON.stringify(body),
-	});
-	if (!r.ok) throw new Error(await r.text());
-	return r.json();
+    const r = await fetch(`${API_BASE}${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify(body),
+    });
+    if (!r.ok) {
+        if (r.status === 401) {
+            throw new Error(
+                "401 Unauthorized: Configure API_TOKEN for the server and VITE_API_TOKEN (or localStorage `api_token`) for the webapp.",
+            );
+        }
+        throw new Error(await r.text());
+    }
+    return r.json();
 }
 
 export async function apiIndex(

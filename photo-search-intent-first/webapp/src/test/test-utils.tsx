@@ -12,6 +12,17 @@ import { PhotoVaultAPIProvider } from "../services/PhotoVaultAPIProvider";
 import { SimpleStoreProvider } from "../stores/SimpleStore";
 import "@testing-library/jest-dom/vitest";
 
+// Helpful: surface a console hint if the API enforces auth but frontend lacks token
+if (typeof window !== "undefined") {
+  const token = (import.meta as any).env?.VITE_API_TOKEN || localStorage.getItem("api_token");
+  if (!token) {
+    // eslint-disable-next-line no-console
+    console.info(
+      "Tip: If your API sets API_TOKEN, add VITE_API_TOKEN in webapp .env or localStorage.setItem('api_token', '<value>').",
+    );
+  }
+}
+
 // Mock the accessibility settings hook
 vi.mock("../components/AccessibilityPanel", () => ({
 	useAccessibilitySettings: () => ({
