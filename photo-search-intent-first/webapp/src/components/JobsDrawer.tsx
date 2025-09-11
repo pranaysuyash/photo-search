@@ -63,7 +63,7 @@ export default function JobsDrawer({
 				<div className="space-y-2">
 					{events.map((e, i) => (
 						<div
-							key={`${e.id || e.path || e.name || e.key || ""}-${i}`}
+							key={`event-${e.type}-${e.time}-${i}`}
 							className="p-2 border rounded text-sm flex items-center justify-between"
 						>
 							<div>

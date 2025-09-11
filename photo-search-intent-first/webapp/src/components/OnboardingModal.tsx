@@ -120,7 +120,7 @@ export function OnboardingModal({
 					<div className="flex gap-2">
 						{steps.map((_, idx) => (
 							<div
-								key={`${_.id || _.path || _.name || _.key || ""}-${idx}`}
+								key={`step-${idx}`}
 								className={`h-2 rounded-full transition-all ${
 									idx === currentStep
 										? "w-8 bg-blue-500"

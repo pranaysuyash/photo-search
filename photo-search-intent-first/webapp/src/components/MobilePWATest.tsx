@@ -126,7 +126,7 @@ export function MobilePWATest() {
 						const Icon = feature.icon;
 						return (
 							<div
-								key={`${feature.id || feature.path || feature.name || feature.key || ""}-${index}`}
+								key={`feature-${feature.name}-${index}`}
 								className="border rounded-lg p-4"
 							>
 								<div className="flex items-center mb-2">

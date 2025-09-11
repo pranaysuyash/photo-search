@@ -2206,23 +2206,29 @@ export default function App() {
 											onSettingsClick={() => setShowAccessibilityPanel(true)}
 											onSelectLibrary={() => setModal({ kind: "folder" })}
 										/>
-									) : (
-										<Sidebar
-											selectedView={selectedView}
-											onViewChange={(view: string) =>
-												setSelectedView(view as View)
-											}
-											library={library}
-											favorites={fav}
-											collections={Object.keys(collections || {})}
-											clusters={clusters}
-											savedSearches={savedSearches}
-											smart={Object.keys(smart || {})}
-											trips={trips}
-											isOpen={isMobileMenuOpen}
-											onClose={() => setIsMobileMenuOpen(false)}
-										/>
-									)}
+                ) : (
+                    <ModernSidebar
+                        selectedView={selectedView}
+                        onViewChange={(view: string) =>
+                            setSelectedView(view as View)
+                        }
+                        stats={{
+                            totalPhotos: library?.length || 0,
+                            collections: Object.keys(collections || {}).length,
+                            people: (clusters || []).length,
+                            favorites: fav.length,
+                        }}
+                        aiStatus={{
+                            indexReady: true,
+                            fastIndexType: "FAISS",
+                            freeSpace: 0,
+                        }}
+                        darkMode={false}
+                        onDarkModeToggle={() => {}}
+                        onSettingsClick={() => setShowAccessibilityPanel(true)}
+                        onSelectLibrary={() => setModal({ kind: "folder" })}
+                    />
+                )}
 
 									<div className="flex-1 flex flex-col overflow-hidden">
 										{/* Modern Header Wrapper */}

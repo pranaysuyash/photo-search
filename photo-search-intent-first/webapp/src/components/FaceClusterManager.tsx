@@ -313,7 +313,7 @@ export function FaceClusterManager({
 								<div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto">
 									{clusterPhotos.map((photoPath, index) => (
 										<div
-											key={`${photoPath.id || photoPath.path || photoPath.name || photoPath.key || ""}-${index}`}
+											key={`photo-${photoPath}-${index}`}
 											onClick={() => togglePhotoSelection(photoPath)}
 											className={`relative aspect-square cursor-pointer rounded overflow-hidden ${
 												selectedPhotos.has(photoPath)

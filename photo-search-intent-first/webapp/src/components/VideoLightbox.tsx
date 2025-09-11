@@ -300,7 +300,7 @@ export function VideoLightbox({
 										<div className="keyframes">
 											{keyframes.map((frame, i) => (
 												<img
-													key={`${frame.id || frame.path || frame.name || frame.key || ""}-${i}`}
+													key={`frame-${i}`}
 													src={frame}
 													className="keyframe"
 													style={{

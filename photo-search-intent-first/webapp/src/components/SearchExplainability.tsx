@@ -104,7 +104,7 @@ export function SearchExplainability({
 			<div className="flex flex-wrap gap-1 mt-1">
 				{topReasons.map((reason, idx) => (
 					<div
-						key={`${reason.id || reason.path || reason.name || reason.key || ""}-${idx}`}
+						key={`reason-${idx}`}
 						className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border ${getConfidenceColor(reason.confidence)}`}
 						title={reason.detail}
 					>
@@ -134,7 +134,7 @@ export function SearchExplainability({
 			<div className="space-y-1">
 				{topReasons.map((reason, idx) => (
 					<div
-						key={`${reason.id || reason.path || reason.name || reason.key || ""}-${idx}`}
+						key={`reason-${idx}`}
 						className="flex items-start gap-2 text-sm"
 					>
 						<div
@@ -184,14 +184,14 @@ function HighlightedText({
 			{parts.map((part, idx) =>
 				part.toLowerCase() === highlight.toLowerCase() ? (
 					<mark
-						key={`${part.id || part.path || part.name || part.key || ""}-${idx}`}
+						key={`part-${idx}`}
 						className="bg-yellow-200 dark:bg-yellow-800 px-0.5 rounded"
 					>
 						{part}
 					</mark>
 				) : (
 					<span
-						key={`${part.id || part.path || part.name || part.key || ""}-${idx}`}
+						key={`part-${idx}`}
 					>
 						{part}
 					</span>

@@ -134,7 +134,7 @@ export function VideoManager({ currentDir, provider }: VideoManagerProps) {
 						<div className="space-y-2 max-h-96 overflow-y-auto">
 							{videos.map((video, index) => (
 								<div
-									key={`${video.id || video.path || video.name || video.key || ""}-${index}`}
+									key={`video-${video.path}-${index}`}
 									onClick={() => selectVideo(video)}
 									className={`p-3 border rounded cursor-pointer transition-colors ${
 										selectedVideo?.path === video.path

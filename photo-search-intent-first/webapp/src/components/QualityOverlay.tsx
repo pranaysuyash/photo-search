@@ -126,7 +126,7 @@ export function QualityOverlay({
 					<div className="flex flex-wrap gap-1">
 						{metrics.issues.map((issue, idx) => (
 							<span
-								key={`${issue.id || issue.path || issue.name || issue.key || ""}-${idx}`}
+								key={`issue-${issue}-${idx}`}
 								className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded"
 							>
 								{issue}

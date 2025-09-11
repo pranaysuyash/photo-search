@@ -211,7 +211,7 @@ export function CommandPalette({
 
 		return keys.map((key, idx) => (
 			<React.Fragment
-				key={`${key.id || key.path || key.name || key.key || ""}-${idx}`}
+				key={`key-${idx}`}
 			>
 				{idx > 0 && <span className="mx-0.5">+</span>}
 				<kbd className="px-1.5 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 rounded">

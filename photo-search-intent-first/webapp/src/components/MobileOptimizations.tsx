@@ -350,7 +350,7 @@ export function MobileActionSheet({
 					{actions.map((action, index) => (
 						<button
 							type="button"
-							key={`${action.id || action.path || action.name || action.key || ""}-${index}`}
+							key={`action-${action.label}-${index}`}
 							onClick={() => {
 								action.onClick();
 								onClose();

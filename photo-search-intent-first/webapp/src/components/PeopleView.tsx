@@ -97,7 +97,7 @@ export default function PeopleView({
 				<div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
 					{clusterPhotos.map((photo, index) => (
 						<img
-							key={`${photo.id || photo.path || photo.name || photo.key || ""}-${index}`}
+							key={`photo-${photo}-${index}`}
 							src={thumbUrl(dir, engine, photo, 196)}
 							alt={`Photo ${index + 1}`}
 							className="w-full h-24 object-cover rounded cursor-pointer hover:ring-2 hover:ring-blue-500"

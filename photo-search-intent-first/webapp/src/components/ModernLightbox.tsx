@@ -515,7 +515,7 @@ const ModernLightbox: React.FC<ModernLightboxProps> = ({
 										<div className="flex flex-wrap gap-2">
 											{currentPhoto.aiAnalysis.tags.map((tag, index) => (
 												<span
-													key={`${tag.id || tag.path || tag.name || tag.key || ""}-${index}`}
+													key={`tag-${index}`}
 													className="px-2 py-1 bg-white/10 text-white/80 text-xs rounded-lg"
 												>
 													{tag}
@@ -617,7 +617,7 @@ const ModernLightbox: React.FC<ModernLightboxProps> = ({
 										<div className="flex flex-wrap gap-2">
 											{currentPhoto.tags.map((tag, index) => (
 												<span
-													key={`${tag.id || tag.path || tag.name || tag.key || ""}-${index}`}
+													key={`tag-${index}`}
 													className="px-3 py-1 bg-white/10 text-white/80 text-sm rounded-lg hover:bg-white/20 transition-colors cursor-pointer"
 												>
 													#{tag}
@@ -637,7 +637,7 @@ const ModernLightbox: React.FC<ModernLightboxProps> = ({
 										<div className="space-y-2">
 											{currentPhoto.comments.map((comment, index) => (
 												<div
-													key={`${comment.id || comment.path || comment.name || comment.key || ""}-${index}`}
+													key={`comment-${index}`}
 													className="p-3 bg-white/5 rounded-lg"
 												>
 													<div className="flex items-center justify-between mb-1">

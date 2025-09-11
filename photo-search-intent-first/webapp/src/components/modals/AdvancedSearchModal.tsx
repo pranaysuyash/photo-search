@@ -270,7 +270,7 @@ export default function AdvancedSearchModal({
 					{warnings.length > 0 && (
 						<ul className="mt-2 text-xs text-red-600 list-disc pl-5">
 							{warnings.map((w, i) => (
-								<li key={`${w.id || w.path || w.name || w.key || ""}-${i}`}>
+								<li key={`warning-${i}`}>
 									{w}
 								</li>
 							))}

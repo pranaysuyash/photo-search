@@ -252,7 +252,7 @@ export function DuplicateDetectionPanel({
 						<div className="space-y-1">
 							{result.recommendations.map((rec, idx) => (
 								<p
-									key={`${rec.id || rec.path || rec.name || rec.key || ""}-${idx}`}
+									key={`rec-${idx}`}
 									className="text-sm text-blue-800"
 								>
 									• {rec}

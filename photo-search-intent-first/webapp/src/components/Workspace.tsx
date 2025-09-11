@@ -19,7 +19,7 @@ export default function Workspace({ workspace, setWorkspace }: WorkspaceProps) {
 					<div className="grid grid-cols-1 md:grid-cols-2 gap-2">
 						{workspace.map((p, i) => (
 							<div
-								key={`${p.id || p.path || p.name || p.key || ""}-${i}`}
+								key={`folder-${i}`}
 								className="border rounded p-2 flex items-center justify-between"
 							>
 								<div className="font-mono text-xs truncate" title={p}>

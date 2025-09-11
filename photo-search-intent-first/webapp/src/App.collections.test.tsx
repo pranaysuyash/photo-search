@@ -168,9 +168,7 @@ describe("App Collections wiring (mocked stores)", () => {
 		const { usePhotoActions } = await import("./stores/useStores");
 		render(<App />);
 		// Navigate to Collections view first
-		const collectionsNav = screen.getByRole("button", {
-			name: "Collections 0",
-		});
+    const collectionsNav = screen.getByRole("button", { name: /Collections/ });
 		fireEvent.click(collectionsNav);
 		// Click the Collections Refresh button
 		const refreshBtn = await screen.findByRole("button", { name: "Refresh" });

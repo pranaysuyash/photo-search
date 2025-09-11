@@ -124,7 +124,7 @@ export const SearchHistoryPanel: React.FC<SearchHistoryPanelProps> = ({
 					<div className="search-history-list">
 						{history.map((entry, index) => (
 							<div
-								key={`${entry.id || entry.path || entry.name || entry.key || ""}-${index}`}
+								key={`entry-${entry.query}-${index}`}
 								className="search-history-item"
 							>
 								<button

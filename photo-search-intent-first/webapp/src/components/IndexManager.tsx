@@ -145,7 +145,7 @@ export default function IndexManager({
 								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
 									{diag.engines.map((e, i) => (
 										<div
-											key={`${e.id || e.path || e.name || e.key || ""}-${i}`}
+											key={`engine-${e.key}-${i}`}
 											className="border rounded p-2 flex items-center justify-between"
 										>
 											<div>

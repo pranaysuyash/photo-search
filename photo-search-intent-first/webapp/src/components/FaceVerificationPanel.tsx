@@ -98,7 +98,7 @@ export function FaceVerificationPanel({
 					{detectedFaces.map((_face, idx) => (
 						<button
 							type="button"
-							key={`${_face.id || _face.path || _face.name || _face.key || ""}-${idx}`}
+							key={`face-${idx}`}
 							onClick={() => setSelectedFace(idx)}
 							className={`relative w-16 h-16 rounded overflow-hidden border-2 transition-colors ${
 								selectedFace === idx ? "border-blue-500" : "border-gray-300"

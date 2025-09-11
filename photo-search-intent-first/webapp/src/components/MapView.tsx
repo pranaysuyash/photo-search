@@ -22,7 +22,7 @@ export default function MapView({ points, onLoadMap }: MapViewProps) {
 				<div className="mt-2 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 text-xs">
 					{points.map((p, i) => (
 						<div
-							key={`${p.id || p.path || p.name || p.key || ""}-${i}`}
+							key={`point-${p.lat}-${p.lon}-${i}`}
 							className="border rounded p-2"
 						>
 							{p.lat.toFixed(5)}, {p.lon.toFixed(5)}

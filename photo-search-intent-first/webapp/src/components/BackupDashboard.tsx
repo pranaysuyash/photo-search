@@ -276,7 +276,7 @@ export function BackupDashboard({ isOpen, onClose }: BackupDashboardProps) {
 											<ul className="space-y-1">
 												{health.recommendations.map((rec, idx) => (
 													<li
-														key={`${rec.id || rec.path || rec.name || rec.key || ""}-${idx}`}
+														key={`rec-${idx}`}
 														className="text-sm text-gray-600 dark:text-gray-400"
 													>
 														• {rec}

@@ -335,7 +335,7 @@ const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
 							<div className="space-y-1">
 								{displaySuggestions.map((suggestion, index) => (
 									<motion.button
-										key={`${suggestion.id || suggestion.path || suggestion.name || suggestion.key || ""}-${index}`}
+										key={`suggestion-${suggestion.text}-${index}`}
 										initial={{ opacity: 0, x: -20 }}
 										animate={{ opacity: 1, x: 0 }}
 										transition={{ delay: index * 0.05 }}
