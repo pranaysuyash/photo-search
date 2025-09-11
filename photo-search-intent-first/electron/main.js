@@ -5,9 +5,12 @@ const { spawn } = require('child_process')
 const { autoUpdater } = require('electron-updater')
 const { loadLicense, licenseAllowsMajor } = require('./license')
 const http = require('http')
+const crypto = require('crypto')
 
 let apiProc = null
+let viteProc = null
 let mainWindow = null
+let apiToken = null
 
 function checkAPIRunning(port = 5001) {
   return new Promise((resolve) => {
@@ -25,8 +28,12 @@ function checkAPIRunning(port = 5001) {
 function startAPI() {
   const cwd = path.resolve(__dirname, '..')
   const pythonPath = path.join(cwd, '.venv', 'bin', 'python')
-  const args = ['-m', 'uvicorn', 'api.server:app', '--host', '127.0.0.1', '--port', '5001']
-  apiProc = spawn(pythonPath, args, { cwd, stdio: 'inherit' })
+  // Standardize dev API port to 8000 for consistency with docs and UI
+  const args = ['-m', 'uvicorn', 'api.server:app', '--host', '127.0.0.1', '--port', '8000']
+  // Generate an ephemeral API token for this run
+  apiToken = crypto.randomBytes(24).toString('hex')
+  const env = { ...process.env, API_TOKEN: apiToken }
+  apiProc = spawn(pythonPath, args, { cwd, stdio: 'inherit', env })
   
   apiProc.on('exit', (code, signal) => {
     console.log(`API process exited with code ${code} and signal ${signal}`)
@@ -45,10 +52,58 @@ function createWindow() {
     },
     show: false // Don't show until page is loaded
   })
-  
-  // Load the original UI - it has more features integrated!
-  mainWindow.loadURL('http://127.0.0.1:5173/')
-  
+}
+
+function httpPing(url) {
+  return new Promise((resolve) => {
+    try {
+      const req = http.get(url, (res) => {
+        resolve(res.statusCode && res.statusCode >= 200 && res.statusCode < 500)
+      })
+      req.on('error', () => resolve(false))
+      req.setTimeout(1000, () => { req.destroy(); resolve(false) })
+    } catch {
+      resolve(false)
+    }
+  })
+}
+
+async function ensureViteDevServer() {
+  const devUrl = 'http://127.0.0.1:5173/'
+  // If already running, use it
+  if (await httpPing(devUrl)) return { type: 'dev', url: devUrl }
+  // Try to start Vite dev server
+  try {
+    const cwd = path.resolve(__dirname, '../webapp')
+    console.log('Starting Vite dev server...')
+    viteProc = spawn(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'dev'], { cwd, stdio: 'inherit', env: { ...process.env, BROWSER: 'none' } })
+  } catch (e) {
+    console.warn('Failed to spawn Vite dev server:', e?.message)
+  }
+  // Wait up to ~15s for Vite to become available
+  for (let i = 0; i < 30; i++) {
+    if (await httpPing(devUrl)) return { type: 'dev', url: devUrl }
+    await new Promise((r) => setTimeout(r, 500))
+  }
+  // Fall back to built files, if present
+  const builtIndex = path.resolve(__dirname, '../api/web/index.html')
+  return { type: 'file', file: builtIndex }
+}
+
+function loadUI(target) {
+  if (!mainWindow) return
+  if (target.type === 'dev') {
+    mainWindow.loadURL(target.url)
+  } else {
+    const fs = require('fs')
+    if (fs.existsSync(target.file)) {
+      console.log('Loading built UI from', target.file)
+      mainWindow.loadFile(target.file)
+    } else {
+      dialog.showErrorBox('UI Not Available', 'Vite dev server is not running and no built UI was found. Run "npm --prefix ../webapp run dev" or "npm --prefix ../webapp run build" and try again.')
+    }
+  }
+
   mainWindow.webContents.on('did-finish-load', () => {
     console.log('Page finished loading')
     mainWindow.show()
@@ -124,6 +179,11 @@ ipcMain.handle('select-folder', async () => {
   return null
 })
 
+// IPC handler to expose API token to the renderer (preload bridges it safely)
+ipcMain.handle('get-api-token', async () => {
+  return apiToken || ''
+})
+
 async function checkForUpdates(userTriggered = false) {
   try {
     const { updateInfo } = await autoUpdater.checkForUpdatesAndNotify()
@@ -171,6 +231,8 @@ app.whenReady().then(async () => {
   
   setupMenu()
   createWindow()
+  const uiTarget = await ensureViteDevServer()
+  loadUI(uiTarget)
   
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -182,6 +244,9 @@ app.on('window-all-closed', () => {
     if (apiProc) {
       apiProc.kill()
     }
+    if (viteProc) {
+      try { viteProc.kill() } catch {}
+    }
     app.quit()
   }
 })
@@ -189,6 +254,9 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   if (apiProc) {
     apiProc.kill()
+  }
+  if (viteProc) {
+    try { viteProc.kill() } catch {}
   }
 })
 

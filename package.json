@@ -8,7 +8,13 @@
     "test:web": "npm run -s test:web:classic && npm run -s test:web:if",
     "coverage:web:classic": "npm --prefix archive/photo-search-classic/webapp run test:coverage",
     "coverage:web:if": "npm --prefix photo-search-intent-first/webapp run test:coverage",
-    "coverage:web": "npm run -s coverage:web:classic && npm run -s coverage:web:if"
+    "coverage:web": "npm run -s coverage:web:classic && npm run -s coverage:web:if",
+    "visual:classic": "npm --prefix archive/photo-search-classic/webapp run test:visual",
+    "visual:if": "npm --prefix photo-search-intent-first/webapp run test:visual",
+    "visual": "npm run -s visual:classic && npm run -s visual:if",
+    "visual:ci:classic": "npm --prefix archive/photo-search-classic/webapp run test:visual:ci",
+    "visual:ci:if": "npm --prefix photo-search-intent-first/webapp run test:visual:ci",
+    "visual:ci": "npm run -s visual:ci:classic && npm run -s visual:ci:if"
   },
   "devDependencies": {
     "react-scan": "^0.4.3",

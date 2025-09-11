@@ -1,252 +1,269 @@
 // Offline Service for managing offline functionality and sync
 export interface OfflineAction {
-  id: string;
-  type: 'search' | 'collection' | 'tag' | 'delete';
-  payload: any;
-  timestamp: number;
-  retries: number;
+	id: string;
+	type: "search" | "collection" | "tag" | "delete";
+	payload: any;
+	timestamp: number;
+	retries: number;
 }
 
 class OfflineService {
-  private readonly QUEUE_KEY = 'offline_action_queue';
-  private readonly MAX_RETRIES = 3;
-  private isOnline: boolean;
-  private syncInProgress: boolean = false;
-  private listeners: Set<(online: boolean) => void> = new Set();
+	private readonly QUEUE_KEY = "offline_action_queue";
+	private readonly MAX_RETRIES = 3;
+	private isOnline: boolean;
+	private syncInProgress: boolean = false;
+	private listeners: Set<(online: boolean) => void> = new Set();
 
-  constructor() {
-    this.isOnline = navigator.onLine;
-    this.setupEventListeners();
-    this.checkConnection();
-  }
+	constructor() {
+		this.isOnline = navigator.onLine;
+		this.setupEventListeners();
+		this.checkConnection();
+	}
 
-  private setupEventListeners() {
-    window.addEventListener('online', () => this.handleOnline());
-    window.addEventListener('offline', () => this.handleOffline());
-    
-    // Periodic connection check
-    setInterval(() => this.checkConnection(), 30000);
-  }
+	private setupEventListeners() {
+		window.addEventListener("online", () => this.handleOnline());
+		window.addEventListener("offline", () => this.handleOffline());
 
-  private async checkConnection() {
-    try {
-      const response = await fetch('/api/ping', { 
-        method: 'HEAD',
-        cache: 'no-cache'
-      });
-      this.setOnlineStatus(response.ok);
-    } catch {
-      this.setOnlineStatus(false);
-    }
-  }
+		// Periodic connection check
+		setInterval(() => this.checkConnection(), 30000);
+	}
 
-  private setOnlineStatus(online: boolean) {
-    if (this.isOnline !== online) {
-      this.isOnline = online;
-      this.notifyListeners(online);
-      
-      if (online) {
-        this.syncQueue();
-      }
-    }
-  }
+	private async checkConnection() {
+		try {
+			const response = await fetch("/api/ping", {
+				method: "HEAD",
+				cache: "no-cache",
+			});
+			this.setOnlineStatus(response.ok);
+		} catch {
+			this.setOnlineStatus(false);
+		}
+	}
 
-  private handleOnline() {
-    console.log('[Offline Service] Connection restored');
-    this.setOnlineStatus(true);
-  }
+	private setOnlineStatus(online: boolean) {
+		if (this.isOnline !== online) {
+			this.isOnline = online;
+			this.notifyListeners(online);
 
-  private handleOffline() {
-    console.log('[Offline Service] Connection lost');
-    this.setOnlineStatus(false);
-  }
+			if (online) {
+				this.syncQueue();
+			}
+		}
+	}
 
-  private notifyListeners(online: boolean) {
-    this.listeners.forEach(listener => listener(online));
-  }
+	private handleOnline() {
+		console.log("[Offline Service] Connection restored");
+		this.setOnlineStatus(true);
+	}
 
-  // Public API
-  public onStatusChange(callback: (online: boolean) => void) {
-    this.listeners.add(callback);
-    return () => this.listeners.delete(callback);
-  }
+	private handleOffline() {
+		console.log("[Offline Service] Connection lost");
+		this.setOnlineStatus(false);
+	}
 
-  public getStatus(): boolean {
-    return this.isOnline;
-  }
+	private notifyListeners(online: boolean) {
+		this.listeners.forEach((listener) => listener(online));
+	}
 
-  public async queueAction(action: Omit<OfflineAction, 'id' | 'timestamp' | 'retries'>) {
-    const queuedAction: OfflineAction = {
-      ...action,
-      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      timestamp: Date.now(),
-      retries: 0
-    };
+	// Public API
+	public onStatusChange(callback: (online: boolean) => void) {
+		this.listeners.add(callback);
+		return () => {
+			this.listeners.delete(callback);
+		};
+	}
 
-    const queue = this.getQueue();
-    queue.push(queuedAction);
-    this.saveQueue(queue);
+	public getStatus(): boolean {
+		return this.isOnline;
+	}
 
-    // Try to sync immediately if online
-    if (this.isOnline) {
-      this.syncQueue();
-    }
+	public async queueAction(
+		action: Omit<OfflineAction, "id" | "timestamp" | "retries">,
+	) {
+		const queuedAction: OfflineAction = {
+			...action,
+			id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+			timestamp: Date.now(),
+			retries: 0,
+		};
 
-    return queuedAction.id;
-  }
+		const queue = this.getQueue();
+		queue.push(queuedAction);
+		this.saveQueue(queue);
 
-  private getQueue(): OfflineAction[] {
-    try {
-      const stored = localStorage.getItem(this.QUEUE_KEY);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  }
+		// Try to sync immediately if online
+		if (this.isOnline) {
+			this.syncQueue();
+		}
 
-  private saveQueue(queue: OfflineAction[]) {
-    try {
-      localStorage.setItem(this.QUEUE_KEY, JSON.stringify(queue));
-    } catch (error) {
-      console.error('[Offline Service] Failed to save queue:', error);
-    }
-  }
+		return queuedAction.id;
+	}
 
-  public async syncQueue() {
-    if (!this.isOnline || this.syncInProgress) {
-      return;
-    }
+	private getQueue(): OfflineAction[] {
+		try {
+			const stored = localStorage.getItem(this.QUEUE_KEY);
+			return stored ? JSON.parse(stored) : [];
+		} catch {
+			return [];
+		}
+	}
 
-    this.syncInProgress = true;
-    const queue = this.getQueue();
-    const remaining: OfflineAction[] = [];
+	private saveQueue(queue: OfflineAction[]) {
+		try {
+			localStorage.setItem(this.QUEUE_KEY, JSON.stringify(queue));
+		} catch (error) {
+			console.error("[Offline Service] Failed to save queue:", error);
+		}
+	}
 
-    for (const action of queue) {
-      try {
-        await this.processAction(action);
-        console.log(`[Offline Service] Synced action: ${action.id}`);
-      } catch (error) {
-        console.error(`[Offline Service] Failed to sync action: ${action.id}`, error);
-        action.retries++;
-        
-        if (action.retries < this.MAX_RETRIES) {
-          remaining.push(action);
-        } else {
-          console.error(`[Offline Service] Max retries reached for action: ${action.id}`);
-        }
-      }
-    }
+	public async syncQueue() {
+		if (!this.isOnline || this.syncInProgress) {
+			return;
+		}
 
-    this.saveQueue(remaining);
-    this.syncInProgress = false;
+		this.syncInProgress = true;
+		const queue = this.getQueue();
+		const remaining: OfflineAction[] = [];
 
-    if (remaining.length > 0) {
-      // Retry failed actions after delay
-      setTimeout(() => this.syncQueue(), 60000);
-    }
-  }
+		for (const action of queue) {
+			try {
+				await this.processAction(action);
+				console.log(`[Offline Service] Synced action: ${action.id}`);
+			} catch (error) {
+				console.error(
+					`[Offline Service] Failed to sync action: ${action.id}`,
+					error,
+				);
+				action.retries++;
 
-  private async processAction(action: OfflineAction): Promise<void> {
-    const { apiSearch, apiSetCollection, apiBatchTag, apiBatchDelete } = await import('../api');
+				if (action.retries < this.MAX_RETRIES) {
+					remaining.push(action);
+				} else {
+					console.error(
+						`[Offline Service] Max retries reached for action: ${action.id}`,
+					);
+				}
+			}
+		}
 
-    switch (action.type) {
-      case 'search':
-        await apiSearch(
-          action.payload.dir,
-          action.payload.query,
-          action.payload.topK
-        );
-        break;
+		this.saveQueue(remaining);
+		this.syncInProgress = false;
 
-      case 'collection':
-        await apiSetCollection(
-          action.payload.dir,
-          action.payload.name,
-          action.payload.paths
-        );
-        break;
+		if (remaining.length > 0) {
+			// Retry failed actions after delay
+			setTimeout(() => this.syncQueue(), 60000);
+		}
+	}
 
-      case 'tag':
-        await apiBatchTag(
-          action.payload.dir,
-          action.payload.paths,
-          action.payload.tags,
-          action.payload.operation
-        );
-        break;
+	private async processAction(action: OfflineAction): Promise<void> {
+		const { apiSearch, apiSetCollection, apiBatchTag, apiBatchDelete } =
+			await import("../api");
 
-      case 'delete':
-        await apiBatchDelete(
-          action.payload.dir,
-          action.payload.paths,
-          action.payload.useOsTrash
-        );
-        break;
+		switch (action.type) {
+			case "search":
+				await apiSearch(
+					action.payload.dir,
+					action.payload.query,
+					action.payload.topK,
+				);
+				break;
 
-      default:
-        throw new Error(`Unknown action type: ${action.type}`);
-    }
-  }
+			case "collection":
+				await apiSetCollection(
+					action.payload.dir,
+					action.payload.name,
+					action.payload.paths,
+				);
+				break;
 
-  // Cache management
-  public async precacheImages(urls: string[]) {
-    if (!('caches' in window)) {
-      return;
-    }
+			case "tag":
+				await apiBatchTag(
+					action.payload.dir,
+					action.payload.paths,
+					action.payload.tags,
+					action.payload.operation,
+				);
+				break;
 
-    try {
-      const cache = await caches.open('photovault-images');
-      await cache.addAll(urls);
-    } catch (error) {
-      console.error('[Offline Service] Failed to precache images:', error);
-    }
-  }
+			case "delete":
+				await apiBatchDelete(
+					action.payload.dir,
+					action.payload.paths,
+					action.payload.useOsTrash,
+				);
+				break;
 
-  public async getCachedImage(url: string): Promise<Response | null> {
-    if (!('caches' in window)) {
-      return null;
-    }
+			default:
+				throw new Error(`Unknown action type: ${action.type}`);
+		}
+	}
 
-    try {
-      const cache = await caches.open('photovault-images');
-      return await cache.match(url);
-    } catch {
-      return null;
-    }
-  }
+	// Cache management
+	public async precacheImages(urls: string[]) {
+		if (!("caches" in window)) {
+			return;
+		}
 
-  // Background sync registration
-  public async registerBackgroundSync(tag: string) {
-    if (!('serviceWorker' in navigator) || !('sync' in ServiceWorkerRegistration.prototype)) {
-      return;
-    }
+		try {
+			const cache = await caches.open("photovault-images");
+			await cache.addAll(urls);
+		} catch (error) {
+			console.error("[Offline Service] Failed to precache images:", error);
+		}
+	}
 
-    try {
-      const registration = await navigator.serviceWorker.ready;
-      await (registration as any).sync.register(tag);
-      console.log(`[Offline Service] Background sync registered: ${tag}`);
-    } catch (error) {
-      console.error('[Offline Service] Failed to register background sync:', error);
-    }
-  }
+	public async getCachedImage(url: string): Promise<Response | null> {
+		if (!("caches" in window)) {
+			return null;
+		}
 
-  // Clear all offline data
-  public async clearOfflineData() {
-    // Clear queue
-    localStorage.removeItem(this.QUEUE_KEY);
+		try {
+			const cache = await caches.open("photovault-images");
+			const response = await cache.match(url);
+			return response || null;
+		} catch {
+			return null;
+		}
+	}
 
-    // Clear caches
-    if ('caches' in window) {
-      const cacheNames = await caches.keys();
-      await Promise.all(
-        cacheNames
-          .filter(name => name.startsWith('photovault-'))
-          .map(name => caches.delete(name))
-      );
-    }
+	// Background sync registration
+	public async registerBackgroundSync(tag: string) {
+		if (
+			!("serviceWorker" in navigator) ||
+			!("sync" in ServiceWorkerRegistration.prototype)
+		) {
+			return;
+		}
 
-    console.log('[Offline Service] Offline data cleared');
-  }
+		try {
+			const registration = await navigator.serviceWorker.ready;
+			await (registration as any).sync.register(tag);
+			console.log(`[Offline Service] Background sync registered: ${tag}`);
+		} catch (error) {
+			console.error(
+				"[Offline Service] Failed to register background sync:",
+				error,
+			);
+		}
+	}
+
+	// Clear all offline data
+	public async clearOfflineData() {
+		// Clear queue
+		localStorage.removeItem(this.QUEUE_KEY);
+
+		// Clear caches
+		if ("caches" in window) {
+			const cacheNames = await caches.keys();
+			await Promise.all(
+				cacheNames
+					.filter((name) => name.startsWith("photovault-"))
+					.map((name) => caches.delete(name)),
+			);
+		}
+
+		console.log("[Offline Service] Offline data cleared");
+	}
 }
 
 export const offlineService = new OfflineService();

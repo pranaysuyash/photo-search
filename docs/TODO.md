@@ -5,18 +5,22 @@ This is the canonical backlog. It consolidates everything shared so far into a l
 Legend: [x] done • [>] in progress • [ ] planned • (opt) optional
 
 ## Top Priorities (Now)
-- [>] Long‑ops progress UI (index/OCR/metadata/fast) with indeterminate bar + notes
+- [x] Index progress UI (determinate + ETA + tooltip)
+- [>] Long‑ops progress UI parity for OCR/Metadata/Fast (determinate where available + notes)
 - [ ] Index chip: show indexed count + coverage inline under count
+- [x] Index chip: show indexed count + coverage inline under count
 - [ ] Index chip hover: multi‑line card (processed N/D • indexed X • target T • coverage P% • drift D • ETA • last index time)
 - [ ] Humanized ETA in tooltip (e.g., 2m 30s) + show rate (items/s)
 - [ ] OCR pill hover: show OCR text count and CTA to build/update OCR when not ready
 - [ ] One‑click “Extract text (OCR)” from OCR hover (calls /ocr/build and updates status)
+- [x] OCR pill hover: show OCR text count and CTA to build/update OCR when not ready
+- [x] One‑click “Extract text (OCR)” from OCR hover (calls /ocr/build and updates status)
 - [ ] Quick video filters: preset dropdown (e.g., Videos > 30s, slow‑mo, timelapse)
-- [ ] Safe delete to OS trash + Undo (session)
-- [ ] Move to collection (add/remove)
+- [x] Safe delete to OS trash + Undo (session)
+- [x] Move to collection (add/remove)
 - [x] Ratings (⭐1–5) + rating filters
 - [x] Keyboard shortcut help overlay (cheat sheet)
-- [ ] Timeline view (date clusters + quick scrubbing)
+- [x] Timeline view (date clusters + quick scrubbing)
  - [>] API/Client contract alignment (JSON body for POST endpoints)
 
 ## Recently Delivered
@@ -58,7 +62,7 @@ Legend: [x] done • [>] in progress • [ ] planned • (opt) optional
 - [ ] Grid micro-animations
 - [ ] Mosaic/Woven variants (opt)
 - [ ] Timeline view with auto clustering by date
-  - [>] Basic timeline view added (group by day, lazy EXIF load)
+  - [x] Basic timeline view added (group by day, lazy EXIF load)
 
 ## Lightbox
 - [x] Zoom/pan + double‑click zoom
@@ -91,9 +95,10 @@ Legend: [x] done • [>] in progress • [ ] planned • (opt) optional
 - [ ] Year/Month timelines; “one year ago” surfacing
 
 ## Editing & Enhancement (Non‑destructive)
-- [ ] Crop/rotate/flip + basic adjustments (exposure/contrast/temperature)
+- [x] Rotate/flip/crop (non‑destructive, derived outputs)
+- [ ] Basic adjustments (exposure/contrast/temperature)
 - [ ] Sidecars for edits, reset to original
-- [ ] Upscale 2×/4× (Real‑ESRGAN) with preview
+- [x] Upscale 2×/4× (engine pluggable; PIL available)
 - [ ] Denoise/deblur presets
 - [ ] Background removal (Rembg) + PNG export
 
@@ -103,7 +108,7 @@ Legend: [x] done • [>] in progress • [ ] planned • (opt) optional
 
 ## Maps & Place
 - [x] Map view with points
-- [ ] Tile provider + clustering; hover preview
+- [ ] Tile provider + clustering; hover preview (local‑first)
 - [ ] Reverse geocoding (offline) → place chips
 
 ## Performance & Tech
@@ -115,7 +120,7 @@ Legend: [x] done • [>] in progress • [ ] planned • (opt) optional
 ## Navigation & Routing
 - [x] HashRouter deep links (#/library, #/search, #/people, #/collections, #/settings)
 - [x] URL state for search query (`q`) with back/forward integration
-- [ ] Encode filters in URL (tags, favOnly, dates, people, place)
+- [>] Encode filters in URL (tags, favOnly, dates, people, place)
 - [ ] Route-aware view components (post-App.tsx refactor)
 - [ ] Deep link to people/collections detail (ids in URL; open view)
 
@@ -241,3 +246,34 @@ Legend: [x] done • [>] in progress • [ ] planned • (opt) optional
 ## Notes
 - Private by default; on‑device first. Cloud items are optional and off by default.
 - Maintain graceful fallbacks and clear user control for heavy features.
+
+---
+
+## New Tasks (Intent‑First, No Regression)
+
+- [ ] OCR/Metadata/Fast Progress Parity
+  - Acceptance: Determinate progress/ETA in JobsCenter for OCR/Metadata/Fast; analytics notes stream while running.
+- [ ] Index Chip Polish (Coverage + Drift)
+  - Acceptance: Chip shows “Indexed N (P%)”; hover card lists processed/target/indexed/coverage/drift/ETA/last index time.
+- [ ] OCR UX Improvements
+  - Acceptance: OCR pill hover lists built text count; “Extract text (OCR)” CTA updates count without reload.
+- [ ] Video Quick Filters
+  - Acceptance: Presets (>30s, slow‑mo, timelapse) narrow results instantly on 5k library.
+- [ ] Map Clustering + Hover Preview
+  - Acceptance: 5k+ GPS points cluster smoothly; hover shows 128px thumb; offline works.
+- [ ] Share Viewer Paging + Download (non‑view‑only)
+  - Acceptance: Large shares page correctly; optional download when permitted; share_open logged.
+- [ ] URL State Completeness
+  - Acceptance: Tags/favorites/dates/people/place fully round‑trip via URL across views.
+- [ ] Preferences Export/Import (JSON)
+  - Acceptance: Export non‑sensitive settings/theme; import preview + merge; tokens never exported.
+- [ ] Progressive Image Loading Tiers
+  - Acceptance: Lazy thumb→medium→full with abortable fetch; no layout jank; lower CPU/network vs baseline.
+- [ ] People/Pet Filters
+  - Acceptance: Pet grouping and group/individual filters correctly change result sets; persisted across sessions.
+- [ ] Non‑destructive Adjustments Backend
+  - Acceptance: Apply exposure/contrast/saturation server‑side to derived files; “Revert” restores original.
+- [ ] Offline Error Logging
+  - Acceptance: Errors posted to /analytics/log; queued via Service Worker when offline; no user regressions.
+- [ ] Electron Packaging (Local)
+  - Acceptance: macOS/Windows builds run offline with local API; protocol+token handoff to UI works; CI artifacts produced.

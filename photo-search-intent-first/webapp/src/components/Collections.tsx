@@ -1,380 +1,467 @@
-import React, { useState, useRef, useCallback } from 'react'
-import { thumbUrl, apiSetCollection, apiCreateShare, apiExport } from '../api'
-import { Share2, Download, Edit3, Trash2, Plus, FolderPlus, GripVertical } from 'lucide-react'
+import {
+	Download,
+	FolderPlus,
+	GripVertical,
+	Plus,
+	Share2,
+	Trash2,
+} from "lucide-react";
+import type React from "react";
+import { useCallback, useRef, useState } from "react";
+import { apiCreateShare, apiExport, apiSetCollection, thumbUrl } from "../api";
 
 interface CollectionsProps {
-  dir: string
-  engine: string
-  collections: Record<string, string[]>
-  onLoadCollections: () => void
-  onOpen: (name: string) => void
-  onDelete?: (name: string) => void
-  onShare?: (name: string, paths: string[]) => void
-  onExport?: (name: string, paths: string[]) => void
-  selectedPhotos?: string[] // Photos to add to collection
-  onCollectionUpdate?: (collections: Record<string, string[]>) => void
+	dir: string;
+	engine: string;
+	collections: Record<string, string[]>;
+	onLoadCollections: () => void;
+	onOpen: (name: string) => void;
+	onDelete?: (name: string) => void;
+	onShare?: (name: string, paths: string[]) => void;
+	onExport?: (name: string, paths: string[]) => void;
+	selectedPhotos?: string[]; // Photos to add to collection
+	onCollectionUpdate?: (collections: Record<string, string[]>) => void;
 }
 
 type DragItem = {
-  type: 'collection' | 'photo';
-  data: string | string[];
-  name?: string;
-}
+	type: "collection" | "photo";
+	data: string | string[];
+	name?: string;
+};
 
 export default function Collections({
-  dir, engine, collections, onLoadCollections, onOpen, onDelete, onShare, onExport,
-  selectedPhotos = [], onCollectionUpdate
+	dir,
+	engine,
+	collections,
+	onLoadCollections,
+	onOpen,
+	onDelete,
+	onShare,
+	onExport,
+	selectedPhotos = [],
+	onCollectionUpdate,
 }: CollectionsProps) {
-  const [draggedItem, setDraggedItem] = useState<DragItem | null>(null)
-  const [dragOverCollection, setDragOverCollection] = useState<string | null>(null)
-  const [showCreateForm, setShowCreateForm] = useState(false)
-  const [newCollectionName, setNewCollectionName] = useState('')
-  const [isCreating, setIsCreating] = useState(false)
-  const [expandedActions, setExpandedActions] = useState<string | null>(null)
-  
-  const dragCounter = useRef(0)
+	const [draggedItem, setDraggedItem] = useState<DragItem | null>(null);
+	const [dragOverCollection, setDragOverCollection] = useState<string | null>(
+		null,
+	);
+	const [showCreateForm, setShowCreateForm] = useState(false);
+	const [newCollectionName, setNewCollectionName] = useState("");
+	const [isCreating, setIsCreating] = useState(false);
+	const [expandedActions, _setExpandedActions] = useState<string | null>(null);
 
-  // Handle creating new collection
-  const handleCreateCollection = useCallback(async () => {
-    if (!newCollectionName.trim() || isCreating) return
-    
-    setIsCreating(true)
-    try {
-      await apiSetCollection(dir, newCollectionName.trim(), selectedPhotos)
-      setNewCollectionName('')
-      setShowCreateForm(false)
-      onLoadCollections()
-      if (onCollectionUpdate) {
-        const updated = { ...collections, [newCollectionName.trim()]: selectedPhotos }
-        onCollectionUpdate(updated)
-      }
-    } catch (error) {
-      console.error('Failed to create collection:', error)
-      alert(error instanceof Error ? error.message : 'Failed to create collection')
-    } finally {
-      setIsCreating(false)
-    }
-  }, [newCollectionName, selectedPhotos, dir, onLoadCollections, collections, onCollectionUpdate])
+	const dragCounter = useRef(0);
 
-  // Handle drag start for collections (reordering)
-  const handleCollectionDragStart = useCallback((e: React.DragEvent, collectionName: string) => {
-    const item: DragItem = { type: 'collection', data: collectionName, name: collectionName }
-    setDraggedItem(item)
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/plain', JSON.stringify(item))
-  }, [])
+	// Handle creating new collection
+	const handleCreateCollection = useCallback(async () => {
+		if (!newCollectionName.trim() || isCreating) return;
 
-  // Handle drag over collection (to add photos)
-  const handleDragOver = useCallback((e: React.DragEvent, collectionName: string) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'copy'
-    setDragOverCollection(collectionName)
-  }, [])
+		setIsCreating(true);
+		try {
+			await apiSetCollection(dir, newCollectionName.trim(), selectedPhotos);
+			setNewCollectionName("");
+			setShowCreateForm(false);
+			onLoadCollections();
+			if (onCollectionUpdate) {
+				const updated = {
+					...collections,
+					[newCollectionName.trim()]: selectedPhotos,
+				};
+				onCollectionUpdate(updated);
+			}
+		} catch (error) {
+			console.error("Failed to create collection:", error);
+			alert(
+				error instanceof Error ? error.message : "Failed to create collection",
+			);
+		} finally {
+			setIsCreating(false);
+		}
+	}, [
+		newCollectionName,
+		selectedPhotos,
+		dir,
+		onLoadCollections,
+		collections,
+		onCollectionUpdate,
+		isCreating,
+	]);
 
-  const handleDragEnter = useCallback((e: React.DragEvent, collectionName: string) => {
-    e.preventDefault()
-    dragCounter.current++
-    setDragOverCollection(collectionName)
-  }, [])
+	// Handle drag start for collections (reordering)
+	const handleCollectionDragStart = useCallback(
+		(e: React.DragEvent, collectionName: string) => {
+			const item: DragItem = {
+				type: "collection",
+				data: collectionName,
+				name: collectionName,
+			};
+			setDraggedItem(item);
+			e.dataTransfer.effectAllowed = "move";
+			e.dataTransfer.setData("text/plain", JSON.stringify(item));
+		},
+		[],
+	);
 
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    dragCounter.current--
-    if (dragCounter.current === 0) {
-      setDragOverCollection(null)
-    }
-  }, [])
+	// Handle drag over collection (to add photos)
+	const handleDragOver = useCallback(
+		(e: React.DragEvent, collectionName: string) => {
+			e.preventDefault();
+			e.dataTransfer.dropEffect = "copy";
+			setDragOverCollection(collectionName);
+		},
+		[],
+	);
 
-  // Handle drop on collection
-  const handleDrop = useCallback(async (e: React.DragEvent, targetCollection: string) => {
-    e.preventDefault()
-    dragCounter.current = 0
-    setDragOverCollection(null)
-    
-    try {
-      const dataTransfer = e.dataTransfer.getData('text/plain')
-      let dragData: DragItem
-      
-      if (dataTransfer) {
-        dragData = JSON.parse(dataTransfer)
-      } else {
-        // Fallback to state
-        if (!draggedItem) return
-        dragData = draggedItem
-      }
+	const handleDragEnter = useCallback(
+		(e: React.DragEvent, collectionName: string) => {
+			e.preventDefault();
+			dragCounter.current++;
+			setDragOverCollection(collectionName);
+		},
+		[],
+	);
 
-      if (dragData.type === 'photo') {
-        // Adding photos to collection
-        const photoPaths = Array.isArray(dragData.data) ? dragData.data : [dragData.data as string]
-        const existingPaths = collections[targetCollection] || []
-        const newPaths = Array.from(new Set([...existingPaths, ...photoPaths]))
-        
-        await apiSetCollection(dir, targetCollection, newPaths)
-        onLoadCollections()
-        
-        if (onCollectionUpdate) {
-          const updated = { ...collections, [targetCollection]: newPaths }
-          onCollectionUpdate(updated)
-        }
-      }
-    } catch (error) {
-      console.error('Failed to update collection:', error)
-      alert('Failed to update collection')
-    } finally {
-      setDraggedItem(null)
-    }
-  }, [collections, dir, onLoadCollections, onCollectionUpdate, draggedItem])
+	const handleDragLeave = useCallback((_e: React.DragEvent) => {
+		dragCounter.current--;
+		if (dragCounter.current === 0) {
+			setDragOverCollection(null);
+		}
+	}, []);
 
-  // Handle sharing collection
-  const handleShare = useCallback(async (collectionName: string) => {
-    if (onShare) {
-      onShare(collectionName, collections[collectionName] || [])
-    } else {
-      // Default sharing implementation
-      try {
-        const paths = collections[collectionName] || []
-        if (paths.length === 0) {
-          alert('Collection is empty')
-          return
-        }
-        
-        const result = await apiCreateShare(dir, engine, paths, { 
-          expiryHours: 24,
-          viewOnly: true 
-        })
-        
-        await navigator.clipboard.writeText(window.location.origin + result.url)
-        alert('Share link copied to clipboard!')
-      } catch (error) {
-        console.error('Failed to share collection:', error)
-        alert(error instanceof Error ? error.message : 'Failed to share collection')
-      }
-    }
-  }, [onShare, collections, dir, engine])
+	// Handle drop on collection
+	const handleDrop = useCallback(
+		async (e: React.DragEvent, targetCollection: string) => {
+			e.preventDefault();
+			dragCounter.current = 0;
+			setDragOverCollection(null);
 
-  // Handle exporting collection
-  const handleExport = useCallback(async (collectionName: string) => {
-    if (onExport) {
-      onExport(collectionName, collections[collectionName] || [])
-    } else {
-      // Default export implementation
-      const folderName = prompt(`Export collection "${collectionName}" to folder:`, collectionName)
-      if (!folderName) return
-      
-      try {
-        const paths = collections[collectionName] || []
-        if (paths.length === 0) {
-          alert('Collection is empty')
-          return
-        }
-        
-        await apiExport(dir, paths, folderName, 'copy', false, false)
-        alert(`Exported ${paths.length} photos to ${folderName}`)
-      } catch (error) {
-        console.error('Failed to export collection:', error)
-        alert(error instanceof Error ? error.message : 'Failed to export collection')
-      }
-    }
-  }, [onExport, collections, dir])
-  return (
-    <div className="bg-white border rounded p-3">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <h2 className="font-semibold">Collections</h2>
-          {selectedPhotos.length > 0 && (
-            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
-              {selectedPhotos.length} selected
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {selectedPhotos.length > 0 && (
-            <button
-              onClick={() => setShowCreateForm(true)}
-              className="bg-green-600 text-white rounded px-3 py-1 text-sm hover:bg-green-700 flex items-center gap-1"
-            >
-              <Plus className="w-3 h-3" />
-              New
-            </button>
-          )}
-          <button 
-            onClick={onLoadCollections} 
-            className="bg-gray-200 rounded px-3 py-1 text-sm hover:bg-gray-300"
-          >
-            Refresh
-          </button>
-        </div>
-      </div>
+			try {
+				const dataTransfer = e.dataTransfer.getData("text/plain");
+				let dragData: DragItem;
 
-      {/* Create new collection form */}
-      {showCreateForm && (
-        <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded">
-          <div className="flex items-center gap-2">
-            <FolderPlus className="w-4 h-4 text-blue-600" />
-            <input
-              type="text"
-              placeholder="Collection name"
-              value={newCollectionName}
-              onChange={(e) => setNewCollectionName(e.target.value)}
-              className="flex-1 border rounded px-2 py-1 text-sm"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleCreateCollection()
-                if (e.key === 'Escape') setShowCreateForm(false)
-              }}
-              autoFocus
-            />
-            <button
-              onClick={handleCreateCollection}
-              disabled={!newCollectionName.trim() || isCreating}
-              className="bg-blue-600 text-white px-3 py-1 text-sm rounded hover:bg-blue-700 disabled:opacity-50"
-            >
-              {isCreating ? 'Creating...' : 'Create'}
-            </button>
-            <button
-              onClick={() => setShowCreateForm(false)}
-              className="text-gray-500 hover:text-gray-700 px-2 py-1 text-sm"
-            >
-              Cancel
-            </button>
-          </div>
-          {selectedPhotos.length > 0 && (
-            <div className="text-xs text-blue-600 mt-1">
-              Will add {selectedPhotos.length} selected photo{selectedPhotos.length !== 1 ? 's' : ''}
-            </div>
-          )}
-        </div>
-      )}
+				if (dataTransfer) {
+					dragData = JSON.parse(dataTransfer);
+				} else {
+					// Fallback to state
+					if (!draggedItem) return;
+					dragData = draggedItem;
+				}
 
-      {/* Collections list */}
-      {Object.keys(collections || {}).length === 0 ? (
-        <div className="text-center py-8">
-          <FolderPlus className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-          <div className="text-sm text-gray-600 mb-2">No collections yet</div>
-          {selectedPhotos.length > 0 ? (
-            <button
-              onClick={() => setShowCreateForm(true)}
-              className="text-sm text-blue-600 hover:text-blue-800"
-            >
-              Create your first collection with {selectedPhotos.length} selected photo{selectedPhotos.length !== 1 ? 's' : ''}
-            </button>
-          ) : (
-            <div className="text-xs text-gray-500">Select photos and create collections to organize them</div>
-          )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
-          {Object.keys(collections).map(name => {
-            const isDropTarget = dragOverCollection === name
-            const collectionPaths = collections[name] || []
-            
-            return (
-              <div
-                key={name}
-                draggable
-                onDragStart={(e) => handleCollectionDragStart(e, name)}
-                onDragOver={(e) => handleDragOver(e, name)}
-                onDragEnter={(e) => handleDragEnter(e, name)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, name)}
-                className={`border rounded-lg p-3 transition-all cursor-move ${
-                  isDropTarget 
-                    ? 'border-blue-500 bg-blue-50 shadow-md' 
-                    : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
-                } ${expandedActions === name ? 'ring-2 ring-blue-200' : ''}`}
-              >
-                {/* Collection header with drag handle */}
-                <div className="flex items-start gap-2 mb-2">
-                  <GripVertical className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate" title={name}>{name}</div>
-                    <div className="text-xs text-gray-600">
-                      {collectionPaths.length} item{collectionPaths.length !== 1 ? 's' : ''}
-                      {isDropTarget && (
-                        <span className="ml-2 text-blue-600 font-medium">Drop here to add</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
+				if (dragData.type === "photo") {
+					// Adding photos to collection
+					const photoPaths = Array.isArray(dragData.data)
+						? dragData.data
+						: [dragData.data as string];
+					const existingPaths = collections[targetCollection] || [];
+					const newPaths = Array.from(
+						new Set([...existingPaths, ...photoPaths]),
+					);
 
-                {/* Thumbnail preview */}
-                <div className="flex gap-1 mb-3 overflow-hidden">
-                  {collectionPaths.slice(0, 4).map((p, i) => (
-                    <img
-                      key={p}
-                      src={thumbUrl(dir, engine, p, 96)}
-                      alt={p.split('/').pop() || p}
-                      className={`object-cover rounded ${
-                        collectionPaths.length === 1 ? 'w-full h-20' :
-                        collectionPaths.length === 2 ? 'w-1/2 h-16' :
-                        'w-1/4 h-12'
-                      }`}
-                    />
-                  ))}
-                  {collectionPaths.length > 4 && (
-                    <div className="w-1/4 h-12 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-500">
-                      +{collectionPaths.length - 4}
-                    </div>
-                  )}
-                  {collectionPaths.length === 0 && (
-                    <div className="w-full h-16 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-500">
-                      Empty collection
-                    </div>
-                  )}
-                </div>
+					await apiSetCollection(dir, targetCollection, newPaths);
+					onLoadCollections();
 
-                {/* Action buttons */}
-                <div className="flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={() => onOpen(name)}
-                    className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 text-xs"
-                  >
-                    Open
-                  </button>
-                  
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => handleShare(name)}
-                      className="p-1 rounded hover:bg-gray-100 text-gray-600 hover:text-blue-600"
-                      title="Share collection"
-                      disabled={collectionPaths.length === 0}
-                    >
-                      <Share2 className="w-3 h-3" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleExport(name)}
-                      className="p-1 rounded hover:bg-gray-100 text-gray-600 hover:text-green-600"
-                      title="Export collection"
-                      disabled={collectionPaths.length === 0}
-                    >
-                      <Download className="w-3 h-3" />
-                    </button>
-                    {onDelete && (
-                      <button
-                        type="button"
-                        onClick={() => onDelete(name)}
-                        className="p-1 rounded hover:bg-gray-100 text-gray-600 hover:text-red-600"
-                        title="Delete collection"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
+					if (onCollectionUpdate) {
+						const updated = { ...collections, [targetCollection]: newPaths };
+						onCollectionUpdate(updated);
+					}
+				}
+			} catch (error) {
+				console.error("Failed to update collection:", error);
+				alert("Failed to update collection");
+			} finally {
+				setDraggedItem(null);
+			}
+		},
+		[collections, dir, onLoadCollections, onCollectionUpdate, draggedItem],
+	);
 
-      {/* Drop zone hint */}
-      {selectedPhotos.length > 0 && Object.keys(collections || {}).length > 0 && (
-        <div className="mt-3 text-xs text-center text-gray-500 border-t pt-2">
-          💡 Drag photos onto collections to add them, or create a new collection above
-        </div>
-      )}
-    </div>
-  )
+	// Handle sharing collection
+	const handleShare = useCallback(
+		async (collectionName: string) => {
+			if (onShare) {
+				onShare(collectionName, collections[collectionName] || []);
+			} else {
+				// Default sharing implementation
+				try {
+					const paths = collections[collectionName] || [];
+					if (paths.length === 0) {
+						alert("Collection is empty");
+						return;
+					}
+
+					const result = await apiCreateShare(dir, engine, paths, {
+						expiryHours: 24,
+						viewOnly: true,
+					});
+
+					await navigator.clipboard.writeText(
+						window.location.origin + result.url,
+					);
+					alert("Share link copied to clipboard!");
+				} catch (error) {
+					console.error("Failed to share collection:", error);
+					alert(
+						error instanceof Error
+							? error.message
+							: "Failed to share collection",
+					);
+				}
+			}
+		},
+		[onShare, collections, dir, engine],
+	);
+
+	// Handle exporting collection
+	const handleExport = useCallback(
+		async (collectionName: string) => {
+			if (onExport) {
+				onExport(collectionName, collections[collectionName] || []);
+			} else {
+				// Default export implementation
+				const folderName = prompt(
+					`Export collection "${collectionName}" to folder:`,
+					collectionName,
+				);
+				if (!folderName) return;
+
+				try {
+					const paths = collections[collectionName] || [];
+					if (paths.length === 0) {
+						alert("Collection is empty");
+						return;
+					}
+
+					await apiExport(dir, paths, folderName, "copy", false, false);
+					alert(`Exported ${paths.length} photos to ${folderName}`);
+				} catch (error) {
+					console.error("Failed to export collection:", error);
+					alert(
+						error instanceof Error
+							? error.message
+							: "Failed to export collection",
+					);
+				}
+			}
+		},
+		[onExport, collections, dir],
+	);
+	return (
+		<div className="bg-white border rounded p-3">
+			{/* Header */}
+			<div className="flex items-center justify-between mb-3">
+				<div className="flex items-center gap-2">
+					<h2 className="font-semibold">Collections</h2>
+					{selectedPhotos.length > 0 && (
+						<span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+							{selectedPhotos.length} selected
+						</span>
+					)}
+				</div>
+				<div className="flex items-center gap-2">
+					{selectedPhotos.length > 0 && (
+						<button
+							type="button"
+							onClick={() => setShowCreateForm(true)}
+							className="bg-green-600 text-white rounded px-3 py-1 text-sm hover:bg-green-700 flex items-center gap-1"
+						>
+							<Plus className="w-3 h-3" />
+							New
+						</button>
+					)}
+					<button
+						type="button"
+						onClick={onLoadCollections}
+						className="bg-gray-200 rounded px-3 py-1 text-sm hover:bg-gray-300"
+					>
+						Refresh
+					</button>
+				</div>
+			</div>
+
+			{/* Create new collection form */}
+			{showCreateForm && (
+				<div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded">
+					<div className="flex items-center gap-2">
+						<FolderPlus className="w-4 h-4 text-blue-600" />
+						<input
+							type="text"
+							placeholder="Collection name"
+							value={newCollectionName}
+							onChange={(e) => setNewCollectionName(e.target.value)}
+							className="flex-1 border rounded px-2 py-1 text-sm"
+							onKeyDown={(e) => {
+								if (e.key === "Enter") handleCreateCollection();
+								if (e.key === "Escape") setShowCreateForm(false);
+							}}
+						/>
+						<button
+							type="button"
+							onClick={handleCreateCollection}
+							disabled={!newCollectionName.trim() || isCreating}
+							className="bg-blue-600 text-white px-3 py-1 text-sm rounded hover:bg-blue-700 disabled:opacity-50"
+						>
+							{isCreating ? "Creating..." : "Create"}
+						</button>
+						<button
+							type="button"
+							onClick={() => setShowCreateForm(false)}
+							className="text-gray-500 hover:text-gray-700 px-2 py-1 text-sm"
+						>
+							Cancel
+						</button>
+					</div>
+					{selectedPhotos.length > 0 && (
+						<div className="text-xs text-blue-600 mt-1">
+							Will add {selectedPhotos.length} selected photo
+							{selectedPhotos.length !== 1 ? "s" : ""}
+						</div>
+					)}
+				</div>
+			)}
+
+			{/* Collections list */}
+			{Object.keys(collections || {}).length === 0 ? (
+				<div className="text-center py-8">
+					<FolderPlus className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+					<div className="text-sm text-gray-600 mb-2">No collections yet</div>
+					{selectedPhotos.length > 0 ? (
+						<button
+							type="button"
+							onClick={() => setShowCreateForm(true)}
+							className="text-sm text-blue-600 hover:text-blue-800"
+						>
+							Create your first collection with {selectedPhotos.length} selected
+							photo{selectedPhotos.length !== 1 ? "s" : ""}
+						</button>
+					) : (
+						<div className="text-xs text-gray-500">
+							Select photos and create collections to organize them
+						</div>
+					)}
+				</div>
+			) : (
+				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+					{Object.keys(collections).map((name) => {
+						const isDropTarget = dragOverCollection === name;
+						const collectionPaths = collections[name] || [];
+
+						return (
+							<div
+								key={name}
+								draggable
+								onDragStart={(e) => handleCollectionDragStart(e, name)}
+								onDragOver={(e) => handleDragOver(e, name)}
+								onDragEnter={(e) => handleDragEnter(e, name)}
+								onDragLeave={handleDragLeave}
+								onDrop={(e) => handleDrop(e, name)}
+								className={`border rounded-lg p-3 transition-all cursor-move ${
+									isDropTarget
+										? "border-blue-500 bg-blue-50 shadow-md"
+										: "border-gray-200 hover:border-gray-300 hover:shadow-sm"
+								} ${expandedActions === name ? "ring-2 ring-blue-200" : ""}`}
+							>
+								{/* Collection header with drag handle */}
+								<div className="flex items-start gap-2 mb-2">
+									<GripVertical className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+									<div className="flex-1 min-w-0">
+										<div className="font-medium truncate" title={name}>
+											{name}
+										</div>
+										<div className="text-xs text-gray-600">
+											{collectionPaths.length} item
+											{collectionPaths.length !== 1 ? "s" : ""}
+											{isDropTarget && (
+												<span className="ml-2 text-blue-600 font-medium">
+													Drop here to add
+												</span>
+											)}
+										</div>
+									</div>
+								</div>
+
+								{/* Thumbnail preview */}
+								<div className="flex gap-1 mb-3 overflow-hidden">
+									{collectionPaths.slice(0, 4).map((p, _i) => (
+										<img
+											key={p}
+											src={thumbUrl(dir, engine, p, 96)}
+											alt={p.split("/").pop() || p}
+											className={`object-cover rounded ${
+												collectionPaths.length === 1
+													? "w-full h-20"
+													: collectionPaths.length === 2
+														? "w-1/2 h-16"
+														: "w-1/4 h-12"
+											}`}
+										/>
+									))}
+									{collectionPaths.length > 4 && (
+										<div className="w-1/4 h-12 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-500">
+											+{collectionPaths.length - 4}
+										</div>
+									)}
+									{collectionPaths.length === 0 && (
+										<div className="w-full h-16 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-500">
+											Empty collection
+										</div>
+									)}
+								</div>
+
+								{/* Action buttons */}
+								<div className="flex items-center justify-between">
+									<button
+										type="button"
+										onClick={() => onOpen(name)}
+										className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 text-xs"
+									>
+										Open
+									</button>
+
+									<div className="flex items-center gap-1">
+										<button
+											type="button"
+											onClick={() => handleShare(name)}
+											className="p-1 rounded hover:bg-gray-100 text-gray-600 hover:text-blue-600"
+											title="Share collection"
+											disabled={collectionPaths.length === 0}
+										>
+											<Share2 className="w-3 h-3" />
+										</button>
+										<button
+											type="button"
+											onClick={() => handleExport(name)}
+											className="p-1 rounded hover:bg-gray-100 text-gray-600 hover:text-green-600"
+											title="Export collection"
+											disabled={collectionPaths.length === 0}
+										>
+											<Download className="w-3 h-3" />
+										</button>
+										{onDelete && (
+											<button
+												type="button"
+												onClick={() => onDelete(name)}
+												className="p-1 rounded hover:bg-gray-100 text-gray-600 hover:text-red-600"
+												title="Delete collection"
+											>
+												<Trash2 className="w-3 h-3" />
+											</button>
+										)}
+									</div>
+								</div>
+							</div>
+						);
+					})}
+				</div>
+			)}
+
+			{/* Drop zone hint */}
+			{selectedPhotos.length > 0 &&
+				Object.keys(collections || {}).length > 0 && (
+					<div className="mt-3 text-xs text-center text-gray-500 border-t pt-2">
+						💡 Drag photos onto collections to add them, or create a new
+						collection above
+					</div>
+				)}
+		</div>
+	);
 }

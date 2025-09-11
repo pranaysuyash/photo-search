@@ -1,425 +1,491 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { getAPI } from '../services/PhotoVaultAPI';
-import { 
-  RotateCw, Flip, Crop, Maximize, Download, 
-  Save, X, Check, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
-  Sun, Contrast, Palette
-} from 'lucide-react';
+import {
+	ArrowDown,
+	ArrowLeft,
+	ArrowRight,
+	ArrowUp,
+	Check,
+	Contrast,
+	Crop,
+	Download,
+	Maximize,
+	Palette,
+	RotateCw,
+	Save,
+	Sun,
+	X,
+} from "lucide-react";
+import { useRef, useState } from "react";
+import { getAPI } from "../services/PhotoVaultAPI";
 
 interface ImageEditorProps {
-  imagePath: string;
-  onClose?: () => void;
-  onSave?: (path: string) => void;
+	imagePath: string;
+	onClose?: () => void;
+	onSave?: (path: string) => void;
 }
 
 export function ImageEditor({ imagePath, onClose, onSave }: ImageEditorProps) {
-  const [editedPath, setEditedPath] = useState(imagePath);
-  const [originalPath, setOriginalPath] = useState(imagePath);
-  const [rotation, setRotation] = useState(0);
-  const [flipH, setFlipH] = useState(false);
-  const [flipV, setFlipV] = useState(false);
-  const [cropMode, setCropMode] = useState(false);
-  const [cropArea, setCropArea] = useState({ x: 0, y: 0, w: 100, h: 100 });
-  const [upscaleScale, setUpscaleScale] = useState<2 | 4>(2);
-  const [upscaleEngine, setUpscaleEngine] = useState<'pil' | 'realesrgan'>('pil');
-  const [processing, setProcessing] = useState(false);
-  const [history, setHistory] = useState<string[]>([imagePath]);
-  const [historyIndex, setHistoryIndex] = useState(0);
-  const [showBeforeAfter, setShowBeforeAfter] = useState(false);
-  const [adjustments, setAdjustments] = useState({
-    brightness: 100,
-    contrast: 100,
-    saturation: 100
-  });
-  
-  const api = getAPI();
-  const imageRef = useRef<HTMLImageElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+	const [editedPath, setEditedPath] = useState(imagePath);
+	const [originalPath, _setOriginalPath] = useState(imagePath);
+	const [rotation, setRotation] = useState(0);
+	const [flipH, setFlipH] = useState(false);
+	const [flipV, setFlipV] = useState(false);
+	const [cropMode, setCropMode] = useState(false);
+	const [cropArea, _setCropArea] = useState({ x: 0, y: 0, w: 100, h: 100 });
+	const [upscaleScale, setUpscaleScale] = useState<2 | 4>(2);
+	const [upscaleEngine, setUpscaleEngine] = useState<"pil" | "realesrgan">(
+		"pil",
+	);
+	const [processing, setProcessing] = useState(false);
+	const [history, setHistory] = useState<string[]>([imagePath]);
+	const [historyIndex, setHistoryIndex] = useState(0);
+	const [showBeforeAfter, setShowBeforeAfter] = useState(false);
+	const [adjustments, setAdjustments] = useState({
+		brightness: 100,
+		contrast: 100,
+		saturation: 100,
+	});
 
-  // Apply image adjustments using canvas
-  const applyAdjustments = (img: HTMLImageElement) => {
-    if (!canvasRef.current) return;
-    
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    
-    canvas.width = img.naturalWidth;
-    canvas.height = img.naturalHeight;
-    
-    ctx.filter = `
+	const api = getAPI();
+	const imageRef = useRef<HTMLImageElement>(null);
+	const canvasRef = useRef<HTMLCanvasElement>(null);
+
+	// Apply image adjustments using canvas
+	const _applyAdjustments = (img: HTMLImageElement) => {
+		if (!canvasRef.current) return;
+
+		const canvas = canvasRef.current;
+		const ctx = canvas.getContext("2d");
+		if (!ctx) return;
+
+		canvas.width = img.naturalWidth;
+		canvas.height = img.naturalHeight;
+
+		ctx.filter = `
       brightness(${adjustments.brightness}%) 
       contrast(${adjustments.contrast}%) 
       saturate(${adjustments.saturation}%)
     `;
-    ctx.drawImage(img, 0, 0);
-  };
+		ctx.drawImage(img, 0, 0);
+	};
 
-  const applyRotation = async (degrees: number) => {
-    setProcessing(true);
-    try {
-      const ops = { rotate: degrees };
-      const result = await api.editImage(editedPath, ops);
-      addToHistory(result.out_path);
-      setEditedPath(result.out_path);
-      setRotation(0);
-    } catch (error) {
-      console.error('Failed to rotate image:', error);
-    } finally {
-      setProcessing(false);
-    }
-  };
+	const applyRotation = async (degrees: number) => {
+		setProcessing(true);
+		try {
+			const ops = { rotate: degrees };
+			const result = await api.editImage(editedPath, ops);
+			addToHistory(result.out_path);
+			setEditedPath(result.out_path);
+			setRotation(0);
+		} catch (error) {
+			console.error("Failed to rotate image:", error);
+		} finally {
+			setProcessing(false);
+		}
+	};
 
-  const applyFlip = async (direction: 'h' | 'v') => {
-    setProcessing(true);
-    try {
-      const ops = { flip: direction };
-      const result = await api.editImage(editedPath, ops);
-      addToHistory(result.out_path);
-      setEditedPath(result.out_path);
-      if (direction === 'h') setFlipH(false);
-      else setFlipV(false);
-    } catch (error) {
-      console.error('Failed to flip image:', error);
-    } finally {
-      setProcessing(false);
-    }
-  };
+	const applyFlip = async (direction: "h" | "v") => {
+		setProcessing(true);
+		try {
+			const ops = { flip: direction };
+			const result = await api.editImage(editedPath, ops);
+			addToHistory(result.out_path);
+			setEditedPath(result.out_path);
+			if (direction === "h") setFlipH(false);
+			else setFlipV(false);
+		} catch (error) {
+			console.error("Failed to flip image:", error);
+		} finally {
+			setProcessing(false);
+		}
+	};
 
-  const applyCrop = async () => {
-    if (!imageRef.current) return;
-    
-    setProcessing(true);
-    try {
-      const img = imageRef.current;
-      const realCrop = {
-        x: Math.round((cropArea.x / 100) * img.naturalWidth),
-        y: Math.round((cropArea.y / 100) * img.naturalHeight),
-        w: Math.round((cropArea.w / 100) * img.naturalWidth),
-        h: Math.round((cropArea.h / 100) * img.naturalHeight)
-      };
-      
-      const ops = { crop: realCrop };
-      const result = await api.editImage(editedPath, ops);
-      addToHistory(result.out_path);
-      setEditedPath(result.out_path);
-      setCropMode(false);
-    } catch (error) {
-      console.error('Failed to crop image:', error);
-    } finally {
-      setProcessing(false);
-    }
-  };
+	const applyCrop = async () => {
+		if (!imageRef.current) return;
 
-  const applyUpscale = async () => {
-    setProcessing(true);
-    try {
-      const result = await api.upscaleImage(editedPath, upscaleScale, upscaleEngine);
-      addToHistory(result.out_path);
-      setEditedPath(result.out_path);
-    } catch (error) {
-      console.error('Failed to upscale image:', error);
-    } finally {
-      setProcessing(false);
-    }
-  };
+		setProcessing(true);
+		try {
+			const img = imageRef.current;
+			const realCrop = {
+				x: Math.round((cropArea.x / 100) * img.naturalWidth),
+				y: Math.round((cropArea.y / 100) * img.naturalHeight),
+				w: Math.round((cropArea.w / 100) * img.naturalWidth),
+				h: Math.round((cropArea.h / 100) * img.naturalHeight),
+			};
 
-  const applyAdjustmentsToImage = async () => {
-    if (adjustments.brightness === 100 && adjustments.contrast === 100 && adjustments.saturation === 100) {
-      return;
-    }
-    
-    setProcessing(true);
-    try {
-      // For now, we'll just show a message since the backend doesn't support adjustments yet
-      alert('Adjustments would be applied here. In a full implementation, this would process the image with the selected adjustments.');
-    } catch (error) {
-      console.error('Failed to apply adjustments:', error);
-    } finally {
-      setProcessing(false);
-    }
-  };
+			const ops = { crop: realCrop };
+			const result = await api.editImage(editedPath, ops);
+			addToHistory(result.out_path);
+			setEditedPath(result.out_path);
+			setCropMode(false);
+		} catch (error) {
+			console.error("Failed to crop image:", error);
+		} finally {
+			setProcessing(false);
+		}
+	};
 
-  const addToHistory = (path: string) => {
-    const newHistory = history.slice(0, historyIndex + 1);
-    newHistory.push(path);
-    setHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
-  };
+	const applyUpscale = async () => {
+		setProcessing(true);
+		try {
+			const result = await api.upscaleImage(
+				editedPath,
+				upscaleScale,
+				upscaleEngine,
+			);
+			addToHistory(result.out_path);
+			setEditedPath(result.out_path);
+		} catch (error) {
+			console.error("Failed to upscale image:", error);
+		} finally {
+			setProcessing(false);
+		}
+	};
 
-  const undo = () => {
-    if (historyIndex > 0) {
-      setHistoryIndex(historyIndex - 1);
-      setEditedPath(history[historyIndex - 1]);
-    }
-  };
+	const applyAdjustmentsToImage = async () => {
+		if (
+			adjustments.brightness === 100 &&
+			adjustments.contrast === 100 &&
+			adjustments.saturation === 100
+		) {
+			return;
+		}
 
-  const redo = () => {
-    if (historyIndex < history.length - 1) {
-      setHistoryIndex(historyIndex + 1);
-      setEditedPath(history[historyIndex + 1]);
-    }
-  };
+		setProcessing(true);
+		try {
+			// For now, we'll just show a message since the backend doesn't support adjustments yet
+			alert(
+				"Adjustments would be applied here. In a full implementation, this would process the image with the selected adjustments.",
+			);
+		} catch (error) {
+			console.error("Failed to apply adjustments:", error);
+		} finally {
+			setProcessing(false);
+		}
+	};
 
-  const revertToOriginal = () => {
-    setEditedPath(originalPath);
-    setHistory([originalPath]);
-    setHistoryIndex(0);
-    setAdjustments({
-      brightness: 100,
-      contrast: 100,
-      saturation: 100
-    });
-  };
+	const addToHistory = (path: string) => {
+		const newHistory = history.slice(0, historyIndex + 1);
+		newHistory.push(path);
+		setHistory(newHistory);
+		setHistoryIndex(newHistory.length - 1);
+	};
 
-  const handleSave = () => {
-    if (onSave) onSave(editedPath);
-    if (onClose) onClose();
-  };
+	const undo = () => {
+		if (historyIndex > 0) {
+			setHistoryIndex(historyIndex - 1);
+			setEditedPath(history[historyIndex - 1]);
+		}
+	};
 
-  const exportImage = async () => {
-    try {
-      const dest = prompt('Enter export destination folder:');
-      if (!dest) return;
-      
-      const result = await api.exportImages([editedPath], dest, 'copy', false, false);
-      alert(`Exported to: ${result.dest}`);
-    } catch (error) {
-      console.error('Failed to export image:', error);
-    }
-  };
+	const redo = () => {
+		if (historyIndex < history.length - 1) {
+			setHistoryIndex(historyIndex + 1);
+			setEditedPath(history[historyIndex + 1]);
+		}
+	};
 
-  return (
-    <div className="image-editor">
-      <div className="editor-toolbar">
-        <div className="toolbar-group">
-          <button 
-            onClick={() => applyRotation(90)}
-            disabled={processing}
-            className="toolbar-btn"
-            title="Rotate 90°"
-          >
-            <RotateCw className="w-4 h-4" />
-          </button>
-          <button 
-            onClick={() => applyFlip('h')}
-            disabled={processing}
-            className="toolbar-btn"
-            title="Flip Horizontal"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <ArrowRight className="w-4 h-4" />
-          </button>
-          <button 
-            onClick={() => applyFlip('v')}
-            disabled={processing}
-            className="toolbar-btn"
-            title="Flip Vertical"
-          >
-            <ArrowUp className="w-4 h-4" />
-            <ArrowDown className="w-4 h-4" />
-          </button>
-          <button 
-            onClick={() => setCropMode(!cropMode)}
-            disabled={processing}
-            className={`toolbar-btn ${cropMode ? 'active' : ''}`}
-            title="Crop"
-          >
-            <Crop className="w-4 h-4" />
-          </button>
-        </div>
+	const revertToOriginal = () => {
+		setEditedPath(originalPath);
+		setHistory([originalPath]);
+		setHistoryIndex(0);
+		setAdjustments({
+			brightness: 100,
+			contrast: 100,
+			saturation: 100,
+		});
+	};
 
-        <div className="toolbar-group">
-          <button 
-            onClick={() => setShowBeforeAfter(!showBeforeAfter)}
-            className="toolbar-btn"
-            title="Before/After Toggle"
-          >
-            <span>Before/After</span>
-          </button>
-        </div>
+	const handleSave = () => {
+		if (onSave) onSave(editedPath);
+		if (onClose) onClose();
+	};
 
-        <div className="toolbar-group">
-          <select 
-            value={upscaleScale}
-            onChange={(e) => setUpscaleScale(Number(e.target.value) as 2 | 4)}
-            className="toolbar-select"
-          >
-            <option value={2}>2x</option>
-            <option value={4}>4x</option>
-          </select>
-          <select 
-            value={upscaleEngine}
-            onChange={(e) => setUpscaleEngine(e.target.value as 'pil' | 'realesrgan')}
-            className="toolbar-select"
-          >
-            <option value="pil">PIL</option>
-            <option value="realesrgan">RealESRGAN</option>
-          </select>
-          <button 
-            onClick={applyUpscale}
-            disabled={processing}
-            className="toolbar-btn"
-            title="Upscale"
-          >
-            <Maximize className="w-4 h-4" />
-          </button>
-        </div>
+	const exportImage = async () => {
+		try {
+			const dest = prompt("Enter export destination folder:");
+			if (!dest) return;
 
-        <div className="toolbar-group">
-          <button 
-            onClick={undo}
-            disabled={historyIndex === 0 || processing}
-            className="toolbar-btn"
-          >
-            Undo
-          </button>
-          <button 
-            onClick={redo}
-            disabled={historyIndex === history.length - 1 || processing}
-            className="toolbar-btn"
-          >
-            Redo
-          </button>
-        </div>
+			const result = await api.exportImages(
+				[editedPath],
+				dest,
+				"copy",
+				false,
+				false,
+			);
+			alert(`Exported to: ${result.dest}`);
+		} catch (error) {
+			console.error("Failed to export image:", error);
+		}
+	};
 
-        <div className="toolbar-group ml-auto">
-          <button onClick={revertToOriginal} className="toolbar-btn" title="Revert to Original">
-            Revert
-          </button>
-          <button onClick={exportImage} className="toolbar-btn">
-            <Download className="w-4 h-4" />
-            Export
-          </button>
-          <button onClick={handleSave} className="btn btn-primary">
-            <Save className="w-4 h-4" />
-            Save
-          </button>
-          {onClose && (
-            <button onClick={onClose} className="toolbar-btn">
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-      </div>
+	return (
+		<div className="image-editor">
+			<div className="editor-toolbar">
+				<div className="toolbar-group">
+					<button
+						type="button"
+						onClick={() => applyRotation(90)}
+						disabled={processing}
+						className="toolbar-btn"
+						title="Rotate 90°"
+					>
+						<RotateCw className="w-4 h-4" />
+					</button>
+					<button
+						type="button"
+						onClick={() => applyFlip("h")}
+						disabled={processing}
+						className="toolbar-btn"
+						title="Flip Horizontal"
+					>
+						<ArrowLeft className="w-4 h-4" />
+						<ArrowRight className="w-4 h-4" />
+					</button>
+					<button
+						type="button"
+						onClick={() => applyFlip("v")}
+						disabled={processing}
+						className="toolbar-btn"
+						title="Flip Vertical"
+					>
+						<ArrowUp className="w-4 h-4" />
+						<ArrowDown className="w-4 h-4" />
+					</button>
+					<button
+						type="button"
+						onClick={() => setCropMode(!cropMode)}
+						disabled={processing}
+						className={`toolbar-btn ${cropMode ? "active" : ""}`}
+						title="Crop"
+					>
+						<Crop className="w-4 h-4" />
+					</button>
+				</div>
 
-      {/* Adjustment Controls */}
-      <div className="adjustment-panel">
-        <div className="adjustment-control">
-          <Sun className="w-4 h-4" />
-          <label>Brightness</label>
-          <input
-            type="range"
-            min="0"
-            max="200"
-            value={adjustments.brightness}
-            onChange={(e) => setAdjustments({...adjustments, brightness: parseInt(e.target.value)})}
-            className="adjustment-slider"
-          />
-          <span>{adjustments.brightness}%</span>
-        </div>
-        <div className="adjustment-control">
-          <Contrast className="w-4 h-4" />
-          <label>Contrast</label>
-          <input
-            type="range"
-            min="0"
-            max="200"
-            value={adjustments.contrast}
-            onChange={(e) => setAdjustments({...adjustments, contrast: parseInt(e.target.value)})}
-            className="adjustment-slider"
-          />
-          <span>{adjustments.contrast}%</span>
-        </div>
-        <div className="adjustment-control">
-          <Palette className="w-4 h-4" />
-          <label>Saturation</label>
-          <input
-            type="range"
-            min="0"
-            max="200"
-            value={adjustments.saturation}
-            onChange={(e) => setAdjustments({...adjustments, saturation: parseInt(e.target.value)})}
-            className="adjustment-slider"
-          />
-          <span>{adjustments.saturation}%</span>
-        </div>
-        <button 
-          onClick={applyAdjustmentsToImage}
-          disabled={processing}
-          className="btn btn-secondary"
-        >
-          Apply Adjustments
-        </button>
-      </div>
+				<div className="toolbar-group">
+					<button
+						type="button"
+						onClick={() => setShowBeforeAfter(!showBeforeAfter)}
+						className="toolbar-btn"
+						title="Before/After Toggle"
+					>
+						<span>Before/After</span>
+					</button>
+				</div>
 
-      <div className="editor-canvas">
-        {processing && (
-          <div className="processing-overlay">
-            <div className="spinner" />
-            <p>Processing...</p>
-          </div>
-        )}
-        
-        <div className="image-container">
-          {showBeforeAfter ? (
-            <div className="before-after-container">
-              <div className="before-after-panel">
-                <h3>Before</h3>
-                <img 
-                  src={api.getThumbnailUrl(originalPath)}
-                  alt="Original"
-                />
-              </div>
-              <div className="before-after-panel">
-                <h3>After</h3>
-                <img 
-                  src={api.getThumbnailUrl(editedPath)}
-                  alt="Edited"
-                />
-              </div>
-            </div>
-          ) : (
-            <>
-              <img 
-                ref={imageRef}
-                src={api.getThumbnailUrl(editedPath)}
-                alt="Editing"
-                style={{
-                  transform: `rotate(${rotation}deg) ${flipH ? 'scaleX(-1)' : ''} ${flipV ? 'scaleY(-1)' : ''}`,
-                  filter: `brightness(${adjustments.brightness}%) contrast(${adjustments.contrast}%) saturate(${adjustments.saturation}%)`
-                }}
-              />
-              <canvas ref={canvasRef} style={{ display: 'none' }} />
-            </>
-          )}
-          
-          {cropMode && (
-            <div 
-              className="crop-overlay"
-              style={{
-                left: `${cropArea.x}%`,
-                top: `${cropArea.y}%`,
-                width: `${cropArea.w}%`,
-                height: `${cropArea.h}%`
-              }}
-            >
-              <div className="crop-controls">
-                <button onClick={applyCrop} className="btn btn-primary btn-sm">
-                  <Check className="w-3 h-3" />
-                  Apply
-                </button>
-                <button onClick={() => setCropMode(false)} className="btn btn-secondary btn-sm">
-                  <X className="w-3 h-3" />
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+				<div className="toolbar-group">
+					<select
+						value={upscaleScale}
+						onChange={(e) => setUpscaleScale(Number(e.target.value) as 2 | 4)}
+						className="toolbar-select"
+					>
+						<option value={2}>2x</option>
+						<option value={4}>4x</option>
+					</select>
+					<select
+						value={upscaleEngine}
+						onChange={(e) =>
+							setUpscaleEngine(e.target.value as "pil" | "realesrgan")
+						}
+						className="toolbar-select"
+					>
+						<option value="pil">PIL</option>
+						<option value="realesrgan">RealESRGAN</option>
+					</select>
+					<button
+						type="button"
+						onClick={applyUpscale}
+						disabled={processing}
+						className="toolbar-btn"
+						title="Upscale"
+					>
+						<Maximize className="w-4 h-4" />
+					</button>
+				</div>
 
-      <style jsx>{`
+				<div className="toolbar-group">
+					<button
+						type="button"
+						onClick={undo}
+						disabled={historyIndex === 0 || processing}
+						className="toolbar-btn"
+					>
+						Undo
+					</button>
+					<button
+						type="button"
+						onClick={redo}
+						disabled={historyIndex === history.length - 1 || processing}
+						className="toolbar-btn"
+					>
+						Redo
+					</button>
+				</div>
+
+				<div className="toolbar-group ml-auto">
+					<button
+						type="button"
+						onClick={revertToOriginal}
+						className="toolbar-btn"
+						title="Revert to Original"
+					>
+						Revert
+					</button>
+					<button type="button" onClick={exportImage} className="toolbar-btn">
+						<Download className="w-4 h-4" />
+						Export
+					</button>
+					<button
+						type="button"
+						onClick={handleSave}
+						className="btn btn-primary"
+					>
+						<Save className="w-4 h-4" />
+						Save
+					</button>
+					{onClose && (
+						<button type="button" onClick={onClose} className="toolbar-btn">
+							<X className="w-4 h-4" />
+						</button>
+					)}
+				</div>
+			</div>
+
+			{/* Adjustment Controls */}
+			<div className="adjustment-panel">
+				<div className="adjustment-control">
+					<Sun className="w-4 h-4" />
+					<label>Brightness</label>
+					<input
+						type="range"
+						min="0"
+						max="200"
+						value={adjustments.brightness}
+						onChange={(e) =>
+							setAdjustments({
+								...adjustments,
+								brightness: parseInt(e.target.value),
+							})
+						}
+						className="adjustment-slider"
+					/>
+					<span>{adjustments.brightness}%</span>
+				</div>
+				<div className="adjustment-control">
+					<Contrast className="w-4 h-4" />
+					<label>Contrast</label>
+					<input
+						type="range"
+						min="0"
+						max="200"
+						value={adjustments.contrast}
+						onChange={(e) =>
+							setAdjustments({
+								...adjustments,
+								contrast: parseInt(e.target.value),
+							})
+						}
+						className="adjustment-slider"
+					/>
+					<span>{adjustments.contrast}%</span>
+				</div>
+				<div className="adjustment-control">
+					<Palette className="w-4 h-4" />
+					<label>Saturation</label>
+					<input
+						type="range"
+						min="0"
+						max="200"
+						value={adjustments.saturation}
+						onChange={(e) =>
+							setAdjustments({
+								...adjustments,
+								saturation: parseInt(e.target.value),
+							})
+						}
+						className="adjustment-slider"
+					/>
+					<span>{adjustments.saturation}%</span>
+				</div>
+				<button
+					type="button"
+					onClick={applyAdjustmentsToImage}
+					disabled={processing}
+					className="btn btn-secondary"
+				>
+					Apply Adjustments
+				</button>
+			</div>
+
+			<div className="editor-canvas">
+				{processing && (
+					<div className="processing-overlay">
+						<div className="spinner" />
+						<p>Processing...</p>
+					</div>
+				)}
+
+				<div className="image-container">
+					{showBeforeAfter ? (
+						<div className="before-after-container">
+							<div className="before-after-panel">
+								<h3>Before</h3>
+								<img src={api.getThumbnailUrl(originalPath)} alt="Original" />
+							</div>
+							<div className="before-after-panel">
+								<h3>After</h3>
+								<img src={api.getThumbnailUrl(editedPath)} alt="Edited" />
+							</div>
+						</div>
+					) : (
+						<>
+							<img
+								ref={imageRef}
+								src={api.getThumbnailUrl(editedPath)}
+								alt="Editing"
+								style={{
+									transform: `rotate(${rotation}deg) ${flipH ? "scaleX(-1)" : ""} ${flipV ? "scaleY(-1)" : ""}`,
+									filter: `brightness(${adjustments.brightness}%) contrast(${adjustments.contrast}%) saturate(${adjustments.saturation}%)`,
+								}}
+							/>
+							<canvas ref={canvasRef} style={{ display: "none" }} />
+						</>
+					)}
+
+					{cropMode && (
+						<div
+							className="crop-overlay"
+							style={{
+								left: `${cropArea.x}%`,
+								top: `${cropArea.y}%`,
+								width: `${cropArea.w}%`,
+								height: `${cropArea.h}%`,
+							}}
+						>
+							<div className="crop-controls">
+								<button
+									type="button"
+									onClick={applyCrop}
+									className="btn btn-primary btn-sm"
+								>
+									<Check className="w-3 h-3" />
+									Apply
+								</button>
+								<button
+									type="button"
+									onClick={() => setCropMode(false)}
+									className="btn btn-secondary btn-sm"
+								>
+									<X className="w-3 h-3" />
+									Cancel
+								</button>
+							</div>
+						</div>
+					)}
+				</div>
+			</div>
+
+			<style>{`
         .image-editor {
           display: flex;
           flex-direction: column;
@@ -620,6 +686,6 @@ export function ImageEditor({ imagePath, onClose, onSave }: ImageEditorProps) {
           }
         }
       `}</style>
-    </div>
-  );
+		</div>
+	);
 }

@@ -2,319 +2,365 @@
 // Handles error tracking, performance monitoring, and analytics
 
 interface ErrorReport {
-  message: string;
-  stack?: string;
-  context?: Record<string, any>;
-  severity: 'low' | 'medium' | 'high' | 'critical';
-  timestamp: number;
-  userAgent: string;
-  url: string;
+	message: string;
+	stack?: string;
+	context?: Record<string, any>;
+	severity: "low" | "medium" | "high" | "critical";
+	timestamp: number;
+	userAgent: string;
+	url: string;
 }
 
 interface PerformanceMetric {
-  name: string;
-  value: number;
-  unit: 'ms' | 'bytes' | 'count';
-  tags?: Record<string, string>;
-  timestamp: number;
+	name: string;
+	value: number;
+	unit: "ms" | "bytes" | "count";
+	tags?: Record<string, string>;
+	timestamp: number;
 }
 
 interface UserEvent {
-  action: string;
-  category: string;
-  label?: string;
-  value?: number;
-  metadata?: Record<string, any>;
-  timestamp: number;
+	action: string;
+	category: string;
+	label?: string;
+	value?: number;
+	metadata?: Record<string, any>;
+	timestamp: number;
 }
 
 class MonitoringService {
-  private errorQueue: ErrorReport[] = [];
-  private metricsQueue: PerformanceMetric[] = [];
-  private eventsQueue: UserEvent[] = [];
-  private flushInterval: number = 30000; // 30 seconds
-  private maxQueueSize: number = 100;
-  private sessionId: string;
-  private userId?: string;
+	private errorQueue: ErrorReport[] = [];
+	private metricsQueue: PerformanceMetric[] = [];
+	private eventsQueue: UserEvent[] = [];
+	private flushInterval: number = 30000; // 30 seconds
+	private maxQueueSize: number = 100;
+	private sessionId: string;
+	private userId?: string;
 
-  constructor() {
-    this.sessionId = this.generateSessionId();
-    this.setupErrorHandling();
-    this.setupPerformanceObserver();
-    this.startFlushInterval();
-  }
+	constructor() {
+		this.sessionId = this.generateSessionId();
+		this.setupErrorHandling();
+		this.setupPerformanceObserver();
+		this.startFlushInterval();
+	}
 
-  private generateSessionId(): string {
-    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  }
+	private generateSessionId(): string {
+		return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+	}
 
-  private setupErrorHandling() {
-    // Global error handler
-    window.addEventListener('error', (event) => {
-      this.logError({
-        message: event.message,
-        stack: event.error?.stack,
-        context: {
-          filename: event.filename,
-          lineno: event.lineno,
-          colno: event.colno,
-        },
-        severity: 'high',
-      });
-    });
+	private setupErrorHandling() {
+		// Global error handler
+		window.addEventListener("error", (event) => {
+			this.logError({
+				message: event.message,
+				stack: event.error?.stack,
+				context: {
+					filename: event.filename,
+					lineno: event.lineno,
+					colno: event.colno,
+				},
+				severity: "high",
+			});
+		});
 
-    // Unhandled promise rejections
-    window.addEventListener('unhandledrejection', (event) => {
-      this.logError({
-        message: `Unhandled Promise Rejection: ${event.reason}`,
-        stack: event.reason?.stack,
-        severity: 'high',
-      });
-    });
-  }
+		// Unhandled promise rejections
+		window.addEventListener("unhandledrejection", (event) => {
+			this.logError({
+				message: `Unhandled Promise Rejection: ${event.reason}`,
+				stack: event.reason?.stack,
+				severity: "high",
+			});
+		});
+	}
 
-  private setupPerformanceObserver() {
-    if (!('PerformanceObserver' in window)) return;
+	private setupPerformanceObserver() {
+		if (!("PerformanceObserver" in window)) return;
 
-    // Observe navigation timing
-    const observer = new PerformanceObserver((list) => {
-      for (const entry of list.getEntries()) {
-        if (entry.entryType === 'navigation') {
-          const nav = entry as PerformanceNavigationTiming;
-          this.trackMetric('page_load', nav.loadEventEnd - nav.fetchStart);
-          this.trackMetric('dom_content_loaded', nav.domContentLoadedEventEnd - nav.fetchStart);
-          this.trackMetric('first_byte', nav.responseStart - nav.fetchStart);
-        } else if (entry.entryType === 'largest-contentful-paint') {
-          this.trackMetric('lcp', entry.startTime);
-        } else if (entry.entryType === 'first-input') {
-          const fid = entry as PerformanceEventTiming;
-          this.trackMetric('fid', fid.processingStart - fid.startTime);
-        } else if (entry.entryType === 'layout-shift') {
-          const cls = entry as any;
-          if (!cls.hadRecentInput) {
-            this.trackMetric('cls', cls.value, 'count');
-          }
-        }
-      }
-    });
+		// Observe navigation timing
+		const observer = new PerformanceObserver((list) => {
+			for (const entry of list.getEntries()) {
+				if (entry.entryType === "navigation") {
+					const nav = entry as PerformanceNavigationTiming;
+					this.trackMetric("page_load", nav.loadEventEnd - nav.fetchStart);
+					this.trackMetric(
+						"dom_content_loaded",
+						nav.domContentLoadedEventEnd - nav.fetchStart,
+					);
+					this.trackMetric("first_byte", nav.responseStart - nav.fetchStart);
+				} else if (entry.entryType === "largest-contentful-paint") {
+					this.trackMetric("lcp", entry.startTime);
+				} else if (entry.entryType === "first-input") {
+					const fid = entry as PerformanceEventTiming;
+					this.trackMetric("fid", fid.processingStart - fid.startTime);
+				} else if (entry.entryType === "layout-shift") {
+					const cls = entry as any;
+					if (!cls.hadRecentInput) {
+						this.trackMetric("cls", cls.value, "count");
+					}
+				}
+			}
+		});
 
-    // Observe various performance metrics
-    try {
-      observer.observe({ entryTypes: ['navigation', 'largest-contentful-paint', 'first-input', 'layout-shift'] });
-    } catch (e) {
-      // Some entry types might not be supported
-      console.warn('Performance observer setup failed:', e);
-    }
-  }
+		// Observe various performance metrics
+		try {
+			observer.observe({
+				entryTypes: [
+					"navigation",
+					"largest-contentful-paint",
+					"first-input",
+					"layout-shift",
+				],
+			});
+		} catch (e) {
+			// Some entry types might not be supported
+			console.warn("Performance observer setup failed:", e);
+		}
+	}
 
-  private startFlushInterval() {
-    setInterval(() => {
-      this.flush();
-    }, this.flushInterval);
+	private startFlushInterval() {
+		setInterval(() => {
+			this.flush();
+		}, this.flushInterval);
 
-    // Flush on page unload
-    window.addEventListener('beforeunload', () => {
-      this.flush(true);
-    });
-  }
+		// Flush on page unload
+		window.addEventListener("beforeunload", () => {
+			this.flush(true);
+		});
+	}
 
-  // Public API
+	// Public API
 
-  public setUser(userId: string) {
-    this.userId = userId;
-  }
+	public setUser(userId: string) {
+		this.userId = userId;
+	}
 
-  public logError(error: Partial<ErrorReport>) {
-    const report: ErrorReport = {
-      message: error.message || 'Unknown error',
-      stack: error.stack,
-      context: error.context,
-      severity: error.severity || 'medium',
-      timestamp: Date.now(),
-      userAgent: navigator.userAgent,
-      url: window.location.href,
-    };
+	public logError(error: Partial<ErrorReport>) {
+		const report: ErrorReport = {
+			message: error.message || "Unknown error",
+			stack: error.stack,
+			context: error.context,
+			severity: error.severity || "medium",
+			timestamp: Date.now(),
+			userAgent: navigator.userAgent,
+			url: window.location.href,
+		};
 
-    this.errorQueue.push(report);
+		this.errorQueue.push(report);
 
-    // Immediate flush for critical errors
-    if (report.severity === 'critical') {
-      this.flush();
-    } else if (this.errorQueue.length >= this.maxQueueSize) {
-      this.flush();
-    }
+		// Immediate flush for critical errors
+		if (report.severity === "critical") {
+			this.flush();
+		} else if (this.errorQueue.length >= this.maxQueueSize) {
+			this.flush();
+		}
 
-    // Log to console in development
-    if (import.meta.env.DEV) {
-      console.error('[Monitoring]', report);
-    }
-  }
+		// Log to console in development
+		if (import.meta.env.DEV) {
+			console.error("[Monitoring]", report);
+		}
+	}
 
-  public trackMetric(name: string, value: number, unit: 'ms' | 'bytes' | 'count' = 'ms', tags?: Record<string, string>) {
-    const metric: PerformanceMetric = {
-      name,
-      value,
-      unit,
-      tags,
-      timestamp: Date.now(),
-    };
+	public trackMetric(
+		name: string,
+		value: number,
+		unit: "ms" | "bytes" | "count" = "ms",
+		tags?: Record<string, string>,
+	) {
+		const metric: PerformanceMetric = {
+			name,
+			value,
+			unit,
+			tags,
+			timestamp: Date.now(),
+		};
 
-    this.metricsQueue.push(metric);
+		this.metricsQueue.push(metric);
 
-    if (this.metricsQueue.length >= this.maxQueueSize) {
-      this.flush();
-    }
+		if (this.metricsQueue.length >= this.maxQueueSize) {
+			this.flush();
+		}
 
-    // Log to console in development
-    if (import.meta.env.DEV) {
-      console.log('[Metric]', metric);
-    }
-  }
+		// Log to console in development
+		if (import.meta.env.DEV) {
+			console.log("[Metric]", metric);
+		}
+	}
 
-  public trackEvent(action: string, category: string, label?: string, value?: number, metadata?: Record<string, any>) {
-    const event: UserEvent = {
-      action,
-      category,
-      label,
-      value,
-      metadata,
-      timestamp: Date.now(),
-    };
+	public trackEvent(
+		action: string,
+		category: string,
+		label?: string,
+		value?: number,
+		metadata?: Record<string, any>,
+	) {
+		const event: UserEvent = {
+			action,
+			category,
+			label,
+			value,
+			metadata,
+			timestamp: Date.now(),
+		};
 
-    this.eventsQueue.push(event);
+		this.eventsQueue.push(event);
 
-    if (this.eventsQueue.length >= this.maxQueueSize) {
-      this.flush();
-    }
+		if (this.eventsQueue.length >= this.maxQueueSize) {
+			this.flush();
+		}
 
-    // Send to Google Analytics if configured
-    if (typeof gtag !== 'undefined' && import.meta.env.VITE_GA_MEASUREMENT_ID) {
-      gtag('event', action, {
-        event_category: category,
-        event_label: label,
-        value: value,
-        ...metadata,
-      });
-    }
-  }
+		// Send to Google Analytics if configured
+		if (
+			typeof (window as any).gtag !== "undefined" &&
+			import.meta.env.VITE_GA_MEASUREMENT_ID
+		) {
+			(window as any).gtag("event", action, {
+				event_category: category,
+				event_label: label,
+				value: value,
+				...metadata,
+			});
+		}
+	}
 
-  public trackPageView(path: string, title?: string) {
-    this.trackEvent('page_view', 'navigation', path, undefined, { title });
+	public trackPageView(path: string, title?: string) {
+		this.trackEvent("page_view", "navigation", path, undefined, { title });
 
-    // Send to Google Analytics
-    if (typeof gtag !== 'undefined' && import.meta.env.VITE_GA_MEASUREMENT_ID) {
-      gtag('config', import.meta.env.VITE_GA_MEASUREMENT_ID, {
-        page_path: path,
-        page_title: title,
-      });
-    }
-  }
+		// Send to Google Analytics
+		if (
+			typeof (window as any).gtag !== "undefined" &&
+			import.meta.env.VITE_GA_MEASUREMENT_ID
+		) {
+			(window as any).gtag("config", import.meta.env.VITE_GA_MEASUREMENT_ID, {
+				page_path: path,
+				page_title: title,
+			});
+		}
+	}
 
-  public startTimer(name: string): () => void {
-    const startTime = performance.now();
-    
-    return () => {
-      const duration = performance.now() - startTime;
-      this.trackMetric(name, duration);
-    };
-  }
+	public startTimer(name: string): () => void {
+		const startTime = performance.now();
 
-  public measureApiCall(endpoint: string, method: string): () => void {
-    return this.startTimer(`api_${method.toLowerCase()}_${endpoint.replace(/\//g, '_')}`);
-  }
+		return () => {
+			const duration = performance.now() - startTime;
+			this.trackMetric(name, duration);
+		};
+	}
 
-  private async flush(immediate = false) {
-    if (!import.meta.env.VITE_ENABLE_ERROR_REPORTING && 
-        !import.meta.env.VITE_ENABLE_PERFORMANCE_MONITORING && 
-        !import.meta.env.VITE_ENABLE_ANALYTICS) {
-      return;
-    }
+	public measureApiCall(endpoint: string, method: string): () => void {
+		return this.startTimer(
+			`api_${method.toLowerCase()}_${endpoint.replace(/\//g, "_")}`,
+		);
+	}
 
-    const payload = {
-      sessionId: this.sessionId,
-      userId: this.userId,
-      errors: [...this.errorQueue],
-      metrics: [...this.metricsQueue],
-      events: [...this.eventsQueue],
-    };
+	private async flush(immediate = false) {
+		if (
+			!import.meta.env.VITE_ENABLE_ERROR_REPORTING &&
+			!import.meta.env.VITE_ENABLE_PERFORMANCE_MONITORING &&
+			!import.meta.env.VITE_ENABLE_ANALYTICS
+		) {
+			return;
+		}
 
-    // Clear queues
-    this.errorQueue = [];
-    this.metricsQueue = [];
-    this.eventsQueue = [];
+		const payload = {
+			sessionId: this.sessionId,
+			userId: this.userId,
+			errors: [...this.errorQueue],
+			metrics: [...this.metricsQueue],
+			events: [...this.eventsQueue],
+		};
 
-    // Don't send empty payloads
-    if (payload.errors.length === 0 && 
-        payload.metrics.length === 0 && 
-        payload.events.length === 0) {
-      return;
-    }
+		// Clear queues
+		this.errorQueue = [];
+		this.metricsQueue = [];
+		this.eventsQueue = [];
 
-    try {
-      // Send to monitoring endpoint
-      const endpoint = import.meta.env.VITE_MONITORING_ENDPOINT || '/api/monitoring';
-      
-      if (immediate) {
-        // Use sendBeacon for page unload
-        const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-        navigator.sendBeacon(endpoint, blob);
-      } else {
-        // Regular fetch
-        await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload),
-        });
-      }
-    } catch (error) {
-      // Monitoring should never break the app
-      console.warn('Failed to send monitoring data:', error);
-    }
-  }
+		// Don't send empty payloads
+		if (
+			payload.errors.length === 0 &&
+			payload.metrics.length === 0 &&
+			payload.events.length === 0
+		) {
+			return;
+		}
 
-  // Web Vitals tracking
-  public trackWebVitals() {
-    // Track Core Web Vitals
-    if ('web-vital' in window) {
-      const { onCLS, onFID, onLCP, onFCP, onTTFB } = window['web-vital'];
-      
-      onCLS((metric) => this.trackMetric('cls', metric.value, 'count'));
-      onFID((metric) => this.trackMetric('fid', metric.value));
-      onLCP((metric) => this.trackMetric('lcp', metric.value));
-      onFCP((metric) => this.trackMetric('fcp', metric.value));
-      onTTFB((metric) => this.trackMetric('ttfb', metric.value));
-    }
-  }
+		try {
+			// Send to monitoring endpoint
+			const endpoint =
+				import.meta.env.VITE_MONITORING_ENDPOINT || "/api/monitoring";
 
-  // Custom business metrics
-  public trackSearch(query: string, resultCount: number, duration: number) {
-    this.trackEvent('search', 'interaction', query, resultCount, {
-      duration,
-      hasResults: resultCount > 0,
-    });
-    this.trackMetric('search_duration', duration);
-    this.trackMetric('search_results', resultCount, 'count');
-  }
+			if (immediate) {
+				// Use sendBeacon for page unload
+				const blob = new Blob([JSON.stringify(payload)], {
+					type: "application/json",
+				});
+				navigator.sendBeacon(endpoint, blob);
+			} else {
+				// Regular fetch
+				await fetch(endpoint, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify(payload),
+				});
+			}
+		} catch (error) {
+			// Monitoring should never break the app
+			console.warn("Failed to send monitoring data:", error);
+		}
+	}
 
-  public trackPhotoView(photoId: string, source: string) {
-    this.trackEvent('photo_view', 'interaction', source, undefined, {
-      photoId,
-    });
-  }
+	// Web Vitals tracking
+	public trackWebVitals() {
+		// Track Core Web Vitals
+		if ("web-vital" in window) {
+			const webVital = window["web-vital"] as any;
+			const { onCLS, onFID, onLCP, onFCP, onTTFB } = webVital;
 
-  public trackCollection(action: 'create' | 'delete' | 'add_to' | 'remove_from', collectionName: string, itemCount?: number) {
-    this.trackEvent(`collection_${action}`, 'collection', collectionName, itemCount);
-  }
+			onCLS((metric: any) => this.trackMetric("cls", metric.value, "count"));
+			onFID((metric: any) => this.trackMetric("fid", metric.value));
+			onLCP((metric: any) => this.trackMetric("lcp", metric.value));
+			onFCP((metric: any) => this.trackMetric("fcp", metric.value));
+			onTTFB((metric: any) => this.trackMetric("ttfb", metric.value));
+		}
+	}
 
-  public trackExport(format: string, count: number, size: number) {
-    this.trackEvent('export', 'interaction', format, count, {
-      totalSize: size,
-      averageSize: size / count,
-    });
-    this.trackMetric('export_size', size, 'bytes');
-  }
+	// Custom business metrics
+	public trackSearch(query: string, resultCount: number, duration: number) {
+		this.trackEvent("search", "interaction", query, resultCount, {
+			duration,
+			hasResults: resultCount > 0,
+		});
+		this.trackMetric("search_duration", duration);
+		this.trackMetric("search_results", resultCount, "count");
+	}
+
+	public trackPhotoView(photoId: string, source: string) {
+		this.trackEvent("photo_view", "interaction", source, undefined, {
+			photoId,
+		});
+	}
+
+	public trackCollection(
+		action: "create" | "delete" | "add_to" | "remove_from",
+		collectionName: string,
+		itemCount?: number,
+	) {
+		this.trackEvent(
+			`collection_${action}`,
+			"collection",
+			collectionName,
+			itemCount,
+		);
+	}
+
+	public trackExport(format: string, count: number, size: number) {
+		this.trackEvent("export", "interaction", format, count, {
+			totalSize: size,
+			averageSize: size / count,
+		});
+		this.trackMetric("export_size", size, "bytes");
+	}
 }
 
 // Singleton instance
@@ -322,10 +368,10 @@ export const monitoringService = new MonitoringService();
 
 // React Error Boundary integration
 export function logErrorToService(error: Error, errorInfo: any) {
-  monitoringService.logError({
-    message: error.message,
-    stack: error.stack,
-    context: errorInfo,
-    severity: 'high',
-  });
+	monitoringService.logError({
+		message: error.message,
+		stack: error.stack,
+		context: errorInfo,
+		severity: "high",
+	});
 }

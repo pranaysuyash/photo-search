@@ -3,274 +3,285 @@
  */
 
 interface ImageLoadingOptions {
-  threshold?: number;
-  rootMargin?: string;
-  quality?: 'low' | 'medium' | 'high';
-  enableProgressiveLoading?: boolean;
+	threshold?: number;
+	rootMargin?: string;
+	quality?: "low" | "medium" | "high";
+	enableProgressiveLoading?: boolean;
 }
 
 interface CacheEntry {
-  blob: Blob;
-  url: string;
-  timestamp: number;
-  size: number;
+	blob: Blob;
+	url: string;
+	timestamp: number;
+	size: number;
 }
 
 class ImageLoadingService {
-  private intersectionObserver: IntersectionObserver | null = null;
-  private imageCache = new Map<string, CacheEntry>();
-  private loadingQueue = new Set<string>();
-  private maxCacheSize = 100 * 1024 * 1024; // 100MB
-  private currentCacheSize = 0;
-  private options: Required<ImageLoadingOptions>;
+	private intersectionObserver: IntersectionObserver | null = null;
+	private imageCache = new Map<string, CacheEntry>();
+	private loadingQueue = new Set<string>();
+	private maxCacheSize = 100 * 1024 * 1024; // 100MB
+	private currentCacheSize = 0;
+	private options: Required<ImageLoadingOptions>;
 
-  constructor(options: ImageLoadingOptions = {}) {
-    this.options = {
-      threshold: options.threshold ?? 0.1,
-      rootMargin: options.rootMargin ?? '50px',
-      quality: options.quality ?? 'medium',
-      enableProgressiveLoading: options.enableProgressiveLoading ?? true,
-    };
+	constructor(options: ImageLoadingOptions = {}) {
+		this.options = {
+			threshold: options.threshold ?? 0.1,
+			rootMargin: options.rootMargin ?? "50px",
+			quality: options.quality ?? "medium",
+			enableProgressiveLoading: options.enableProgressiveLoading ?? true,
+		};
 
-    this.initIntersectionObserver();
-  }
+		this.initIntersectionObserver();
+	}
 
-  private initIntersectionObserver() {
-    if (typeof window === 'undefined' || !window.IntersectionObserver) {
-      return;
-    }
+	private initIntersectionObserver() {
+		if (typeof window === "undefined" || !window.IntersectionObserver) {
+			return;
+		}
 
-    this.intersectionObserver = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            const img = entry.target as HTMLImageElement;
-            const src = img.dataset.src;
-            if (src && !img.src) {
-              this.loadImage(src, img);
-              this.intersectionObserver?.unobserve(img);
-            }
-          }
-        });
-      },
-      {
-        threshold: this.options.threshold,
-        rootMargin: this.options.rootMargin,
-      }
-    );
-  }
+		this.intersectionObserver = new IntersectionObserver(
+			(entries) => {
+				entries.forEach((entry) => {
+					if (entry.isIntersecting) {
+						const img = entry.target as HTMLImageElement;
+						const src = img.dataset.src;
+						if (src && !img.src) {
+							this.loadImage(src, img);
+							this.intersectionObserver?.unobserve(img);
+						}
+					}
+				});
+			},
+			{
+				threshold: this.options.threshold,
+				rootMargin: this.options.rootMargin,
+			},
+		);
+	}
 
-  /**
-   * Observe an image element for lazy loading
-   */
-  observeImage(img: HTMLImageElement, src: string) {
-    if (!this.intersectionObserver) {
-      // Fallback for browsers without intersection observer
-      this.loadImage(src, img);
-      return;
-    }
+	/**
+	 * Observe an image element for lazy loading
+	 */
+	observeImage(img: HTMLImageElement, src: string) {
+		if (!this.intersectionObserver) {
+			// Fallback for browsers without intersection observer
+			this.loadImage(src, img);
+			return;
+		}
 
-    img.dataset.src = src;
-    
-    // Add loading placeholder
-    if (this.options.enableProgressiveLoading) {
-      img.style.backgroundColor = '#f3f4f6';
-      img.style.backgroundImage = 'linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.3) 50%, transparent 60%)';
-      img.style.backgroundSize = '200% 100%';
-      img.style.animation = 'shimmer 2s infinite linear';
-    }
+		img.dataset.src = src;
 
-    this.intersectionObserver.observe(img);
-  }
+		// Add loading placeholder
+		if (this.options.enableProgressiveLoading) {
+			img.style.backgroundColor = "#f3f4f6";
+			img.style.backgroundImage =
+				"linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.3) 50%, transparent 60%)";
+			img.style.backgroundSize = "200% 100%";
+			img.style.animation = "shimmer 2s infinite linear";
+		}
 
-  /**
-   * Load image with caching
-   */
-  private async loadImage(src: string, img: HTMLImageElement) {
-    if (this.loadingQueue.has(src)) {
-      return;
-    }
+		this.intersectionObserver.observe(img);
+	}
 
-    // Check cache first
-    const cached = this.imageCache.get(src);
-    if (cached) {
-      this.applyImageToElement(cached.url, img);
-      // Move to end of cache (LRU)
-      this.imageCache.delete(src);
-      this.imageCache.set(src, cached);
-      return;
-    }
+	/**
+	 * Load image with caching
+	 */
+	private async loadImage(src: string, img: HTMLImageElement) {
+		if (this.loadingQueue.has(src)) {
+			return;
+		}
 
-    this.loadingQueue.add(src);
+		// Check cache first
+		const cached = this.imageCache.get(src);
+		if (cached) {
+			this.applyImageToElement(cached.url, img);
+			// Move to end of cache (LRU)
+			this.imageCache.delete(src);
+			this.imageCache.set(src, cached);
+			return;
+		}
 
-    try {
-      const response = await fetch(src, {
-        credentials: 'same-origin',
-        cache: 'force-cache',
-      });
+		this.loadingQueue.add(src);
 
-      if (!response.ok) {
-        throw new Error(`Failed to load image: ${response.status}`);
-      }
+		try {
+			const response = await fetch(src, {
+				credentials: "same-origin",
+				cache: "force-cache",
+			});
 
-      const blob = await response.blob();
-      const objectUrl = URL.createObjectURL(blob);
+			if (!response.ok) {
+				throw new Error(`Failed to load image: ${response.status}`);
+			}
 
-      // Add to cache
-      const entry: CacheEntry = {
-        blob,
-        url: objectUrl,
-        timestamp: Date.now(),
-        size: blob.size,
-      };
+			const blob = await response.blob();
+			const objectUrl = URL.createObjectURL(blob);
 
-      this.addToCache(src, entry);
-      this.applyImageToElement(objectUrl, img);
-    } catch (error) {
-      console.warn('Failed to load image:', src, error);
-      img.style.backgroundColor = '#fee2e2';
-      img.alt = 'Failed to load';
-    } finally {
-      this.loadingQueue.delete(src);
-    }
-  }
+			// Add to cache
+			const entry: CacheEntry = {
+				blob,
+				url: objectUrl,
+				timestamp: Date.now(),
+				size: blob.size,
+			};
 
-  private applyImageToElement(url: string, img: HTMLImageElement) {
-    img.onload = () => {
-      // Remove loading animation
-      img.style.backgroundColor = '';
-      img.style.backgroundImage = '';
-      img.style.animation = '';
-    };
+			this.addToCache(src, entry);
+			this.applyImageToElement(objectUrl, img);
+		} catch (error) {
+			console.warn("Failed to load image:", src, error);
+			img.style.backgroundColor = "#fee2e2";
+			img.alt = "Failed to load";
+		} finally {
+			this.loadingQueue.delete(src);
+		}
+	}
 
-    img.src = url;
-  }
+	private applyImageToElement(url: string, img: HTMLImageElement) {
+		img.onload = () => {
+			// Remove loading animation
+			img.style.backgroundColor = "";
+			img.style.backgroundImage = "";
+			img.style.animation = "";
+		};
 
-  private addToCache(key: string, entry: CacheEntry) {
-    // Implement LRU cache with size limit
-    this.currentCacheSize += entry.size;
+		img.src = url;
+	}
 
-    // Remove oldest entries if over limit
-    while (this.currentCacheSize > this.maxCacheSize && this.imageCache.size > 0) {
-      const [oldestKey, oldestEntry] = this.imageCache.entries().next().value;
-      this.imageCache.delete(oldestKey);
-      this.currentCacheSize -= oldestEntry.size;
-      URL.revokeObjectURL(oldestEntry.url);
-    }
+	private addToCache(key: string, entry: CacheEntry) {
+		// Implement LRU cache with size limit
+		this.currentCacheSize += entry.size;
 
-    this.imageCache.set(key, entry);
-  }
+		// Remove oldest entries if over limit
+		while (
+			this.currentCacheSize > this.maxCacheSize &&
+			this.imageCache.size > 0
+		) {
+			const firstEntry = this.imageCache.entries().next().value;
+			if (firstEntry) {
+				const [oldestKey, oldestEntry] = firstEntry;
+				this.imageCache.delete(oldestKey);
+				this.currentCacheSize -= oldestEntry.size;
+				URL.revokeObjectURL(oldestEntry.url);
+			}
+		}
 
-  /**
-   * Preload images for better UX
-   */
-  preloadImages(urls: string[], priority: 'high' | 'low' = 'low') {
-    if (priority === 'low') {
-      // Use requestIdleCallback for low priority preloading
-      if (window.requestIdleCallback) {
-        window.requestIdleCallback(() => {
-          this.preloadImageBatch(urls);
-        });
-      } else {
-        setTimeout(() => this.preloadImageBatch(urls), 100);
-      }
-    } else {
-      this.preloadImageBatch(urls);
-    }
-  }
+		this.imageCache.set(key, entry);
+	}
 
-  private async preloadImageBatch(urls: string[]) {
-    const promises = urls
-      .filter((url) => !this.imageCache.has(url) && !this.loadingQueue.has(url))
-      .slice(0, 10) // Limit concurrent preloads
-      .map((url) => this.preloadSingleImage(url));
+	/**
+	 * Preload images for better UX
+	 */
+	preloadImages(urls: string[], priority: "high" | "low" = "low") {
+		if (priority === "low") {
+			// Use requestIdleCallback for low priority preloading
+			if (window.requestIdleCallback) {
+				window.requestIdleCallback(() => {
+					this.preloadImageBatch(urls);
+				});
+			} else {
+				setTimeout(() => this.preloadImageBatch(urls), 100);
+			}
+		} else {
+			this.preloadImageBatch(urls);
+		}
+	}
 
-    await Promise.allSettled(promises);
-  }
+	private async preloadImageBatch(urls: string[]) {
+		const promises = urls
+			.filter((url) => !this.imageCache.has(url) && !this.loadingQueue.has(url))
+			.slice(0, 10) // Limit concurrent preloads
+			.map((url) => this.preloadSingleImage(url));
 
-  private async preloadSingleImage(src: string): Promise<void> {
-    if (this.imageCache.has(src) || this.loadingQueue.has(src)) {
-      return;
-    }
+		await Promise.allSettled(promises);
+	}
 
-    this.loadingQueue.add(src);
+	private async preloadSingleImage(src: string): Promise<void> {
+		if (this.imageCache.has(src) || this.loadingQueue.has(src)) {
+			return;
+		}
 
-    try {
-      const response = await fetch(src, {
-        credentials: 'same-origin',
-        cache: 'force-cache',
-      });
+		this.loadingQueue.add(src);
 
-      if (response.ok) {
-        const blob = await response.blob();
-        const objectUrl = URL.createObjectURL(blob);
-        
-        const entry: CacheEntry = {
-          blob,
-          url: objectUrl,
-          timestamp: Date.now(),
-          size: blob.size,
-        };
+		try {
+			const response = await fetch(src, {
+				credentials: "same-origin",
+				cache: "force-cache",
+			});
 
-        this.addToCache(src, entry);
-      }
-    } catch {
-      // Ignore preload failures
-    } finally {
-      this.loadingQueue.delete(src);
-    }
-  }
+			if (response.ok) {
+				const blob = await response.blob();
+				const objectUrl = URL.createObjectURL(blob);
 
-  /**
-   * Clear cache and release memory
-   */
-  clearCache() {
-    for (const entry of this.imageCache.values()) {
-      URL.revokeObjectURL(entry.url);
-    }
-    this.imageCache.clear();
-    this.currentCacheSize = 0;
-  }
+				const entry: CacheEntry = {
+					blob,
+					url: objectUrl,
+					timestamp: Date.now(),
+					size: blob.size,
+				};
 
-  /**
-   * Get cache statistics
-   */
-  getCacheStats() {
-    return {
-      size: this.imageCache.size,
-      totalSize: this.currentCacheSize,
-      maxSize: this.maxCacheSize,
-      hitRate: this.imageCache.size > 0 ? 
-        Array.from(this.imageCache.values()).filter(e => Date.now() - e.timestamp < 300000).length / this.imageCache.size : 0
-    };
-  }
+				this.addToCache(src, entry);
+			}
+		} catch {
+			// Ignore preload failures
+		} finally {
+			this.loadingQueue.delete(src);
+		}
+	}
 
-  /**
-   * Cleanup when service is destroyed
-   */
-  destroy() {
-    if (this.intersectionObserver) {
-      this.intersectionObserver.disconnect();
-      this.intersectionObserver = null;
-    }
-    this.clearCache();
-    this.loadingQueue.clear();
-  }
+	/**
+	 * Clear cache and release memory
+	 */
+	clearCache() {
+		for (const entry of this.imageCache.values()) {
+			URL.revokeObjectURL(entry.url);
+		}
+		this.imageCache.clear();
+		this.currentCacheSize = 0;
+	}
+
+	/**
+	 * Get cache statistics
+	 */
+	getCacheStats() {
+		return {
+			size: this.imageCache.size,
+			totalSize: this.currentCacheSize,
+			maxSize: this.maxCacheSize,
+			hitRate:
+				this.imageCache.size > 0
+					? Array.from(this.imageCache.values()).filter(
+							(e) => Date.now() - e.timestamp < 300000,
+						).length / this.imageCache.size
+					: 0,
+		};
+	}
+
+	/**
+	 * Cleanup when service is destroyed
+	 */
+	destroy() {
+		if (this.intersectionObserver) {
+			this.intersectionObserver.disconnect();
+			this.intersectionObserver = null;
+		}
+		this.clearCache();
+		this.loadingQueue.clear();
+	}
 }
 
 // Create singleton instance
 export const imageLoadingService = new ImageLoadingService();
 
 // Add CSS for shimmer effect
-if (typeof document !== 'undefined') {
-  const style = document.createElement('style');
-  style.textContent = `
+if (typeof document !== "undefined") {
+	const style = document.createElement("style");
+	style.textContent = `
     @keyframes shimmer {
       0% { background-position: -200% 0; }
       100% { background-position: 200% 0; }
     }
   `;
-  document.head.appendChild(style);
+	document.head.appendChild(style);
 }
 
 export default ImageLoadingService;

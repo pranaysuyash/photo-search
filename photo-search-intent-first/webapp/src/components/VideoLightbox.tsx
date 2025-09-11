@@ -1,389 +1,440 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { VideoService, VideoFile } from '../services/VideoService';
-import { 
-  Play, Pause, Volume2, VolumeX, Maximize, 
-  SkipBack, SkipForward, Download, Info
-} from 'lucide-react';
+import {
+	Download,
+	Info,
+	Maximize,
+	Pause,
+	Play,
+	SkipBack,
+	SkipForward,
+	Volume2,
+	VolumeX,
+} from "lucide-react";
+import type React from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { type VideoFile, VideoService } from "../services/VideoService";
 
 interface VideoLightboxProps {
-  videoPath: string;
-  videoUrl: string;
-  onClose: () => void;
-  onNext?: () => void;
-  onPrevious?: () => void;
+	videoPath: string;
+	videoUrl: string;
+	onClose: () => void;
+	onNext?: () => void;
+	onPrevious?: () => void;
 }
 
-export function VideoLightbox({ 
-  videoPath, 
-  videoUrl, 
-  onClose, 
-  onNext, 
-  onPrevious 
+export function VideoLightbox({
+	videoPath,
+	videoUrl,
+	onClose,
+	onNext,
+	onPrevious,
 }: VideoLightboxProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const progressRef = useRef<HTMLDivElement>(null);
-  const [videoInfo, setVideoInfo] = useState<VideoFile | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1);
-  const [showControls, setShowControls] = useState(true);
-  const [loading, setLoading] = useState(true);
-  const [buffered, setBuffered] = useState(0);
-  const [showInfo, setShowInfo] = useState(false);
-  const [keyframes, setKeyframes] = useState<string[]>([]);
-  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
-  const [isSwiping, setIsSwiping] = useState(false);
-  
-  const controlsTimeout = useRef<NodeJS.Timeout>();
+	const videoRef = useRef<HTMLVideoElement>(null);
+	const progressRef = useRef<HTMLDivElement>(null);
+	const [videoInfo, setVideoInfo] = useState<VideoFile | null>(null);
+	const [isPlaying, setIsPlaying] = useState(false);
+	const [isMuted, setIsMuted] = useState(false);
+	const [currentTime, setCurrentTime] = useState(0);
+	const [duration, setDuration] = useState(0);
+	const [volume, setVolume] = useState(1);
+	const [showControls, setShowControls] = useState(true);
+	const [loading, setLoading] = useState(true);
+	const [buffered, setBuffered] = useState(0);
+	const [showInfo, setShowInfo] = useState(false);
+	const [keyframes, setKeyframes] = useState<string[]>([]);
+	const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(
+		null,
+	);
+	const [isSwiping, setIsSwiping] = useState(false);
 
-  useEffect(() => {
-    loadVideoInfo();
-    return () => {
-      if (controlsTimeout.current) {
-        clearTimeout(controlsTimeout.current);
-      }
-    };
-  }, [videoPath, videoUrl]);
+	const controlsTimeout = useRef<NodeJS.Timeout>();
 
-  const loadVideoInfo = async () => {
-    setLoading(true);
-    try {
-      const info = await VideoService.getVideoInfo(videoPath, videoUrl);
-      setVideoInfo(info);
-      
-      // Load keyframes for timeline preview
-      VideoService.extractKeyframes(videoUrl, 10, 120, 68)
-        .then(frames => setKeyframes(frames))
-        .catch(console.error);
-    } catch (error) {
-      console.error('Failed to load video info:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+	const loadVideoInfo = useCallback(async () => {
+		setLoading(true);
+		try {
+			const info = await VideoService.getVideoInfo(videoPath, videoUrl);
+			setVideoInfo(info);
 
-  const togglePlayPause = () => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play();
-      }
-      setIsPlaying(!isPlaying);
-    }
-  };
+			// Load keyframes for timeline preview
+			VideoService.extractKeyframes(videoUrl, 10, 120, 68)
+				.then((frames) => setKeyframes(frames))
+				.catch(console.error);
+		} catch (error) {
+			console.error("Failed to load video info:", error);
+		} finally {
+			setLoading(false);
+		}
+	}, [videoPath, videoUrl]);
 
-  const toggleMute = () => {
-    if (videoRef.current) {
-      videoRef.current.muted = !isMuted;
-      setIsMuted(!isMuted);
-    }
-  };
+	useEffect(() => {
+		loadVideoInfo();
+		return () => {
+			if (controlsTimeout.current) {
+				clearTimeout(controlsTimeout.current);
+			}
+		};
+	}, [loadVideoInfo]);
 
-  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newVolume = parseFloat(e.target.value);
-    setVolume(newVolume);
-    if (videoRef.current) {
-      videoRef.current.volume = newVolume;
-      setIsMuted(newVolume === 0);
-    }
-  };
+	const togglePlayPause = () => {
+		if (videoRef.current) {
+			if (isPlaying) {
+				videoRef.current.pause();
+			} else {
+				videoRef.current.play();
+			}
+			setIsPlaying(!isPlaying);
+		}
+	};
 
-  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (videoRef.current && progressRef.current) {
-      const rect = progressRef.current.getBoundingClientRect();
-      const percent = (e.clientX - rect.left) / rect.width;
-      const newTime = percent * duration;
-      videoRef.current.currentTime = newTime;
-      setCurrentTime(newTime);
-    }
-  };
+	const toggleMute = () => {
+		if (videoRef.current) {
+			videoRef.current.muted = !isMuted;
+			setIsMuted(!isMuted);
+		}
+	};
 
-  const handleTimeUpdate = () => {
-    if (videoRef.current) {
-      setCurrentTime(videoRef.current.currentTime);
-      
-      // Update buffered amount
-      if (videoRef.current.buffered.length > 0) {
-        const bufferedEnd = videoRef.current.buffered.end(
-          videoRef.current.buffered.length - 1
-        );
-        setBuffered((bufferedEnd / duration) * 100);
-      }
-    }
-  };
+	const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const newVolume = parseFloat(e.target.value);
+		setVolume(newVolume);
+		if (videoRef.current) {
+			videoRef.current.volume = newVolume;
+			setIsMuted(newVolume === 0);
+		}
+	};
 
-  const handleLoadedMetadata = () => {
-    if (videoRef.current) {
-      setDuration(videoRef.current.duration);
-    }
-  };
+	const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+		if (videoRef.current && progressRef.current) {
+			const rect = progressRef.current.getBoundingClientRect();
+			const percent = (e.clientX - rect.left) / rect.width;
+			const newTime = percent * duration;
+			videoRef.current.currentTime = newTime;
+			setCurrentTime(newTime);
+		}
+	};
 
-  const skip = (seconds: number) => {
-    if (videoRef.current) {
-      videoRef.current.currentTime += seconds;
-    }
-  };
+	const handleTimeUpdate = () => {
+		if (videoRef.current) {
+			setCurrentTime(videoRef.current.currentTime);
 
-  const toggleFullscreen = () => {
-    if (videoRef.current) {
-      if (document.fullscreenElement) {
-        document.exitFullscreen();
-      } else {
-        videoRef.current.requestFullscreen();
-      }
-    }
-  };
+			// Update buffered amount
+			if (videoRef.current.buffered.length > 0) {
+				const bufferedEnd = videoRef.current.buffered.end(
+					videoRef.current.buffered.length - 1,
+				);
+				setBuffered((bufferedEnd / duration) * 100);
+			}
+		}
+	};
 
-  const handleMouseMove = () => {
-    setShowControls(true);
-    if (controlsTimeout.current) {
-      clearTimeout(controlsTimeout.current);
-    }
-    controlsTimeout.current = setTimeout(() => {
-      if (isPlaying) {
-        setShowControls(false);
-      }
-    }, 3000);
-  };
+	const handleLoadedMetadata = () => {
+		if (videoRef.current) {
+			setDuration(videoRef.current.duration);
+		}
+	};
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    switch (e.key) {
-      case ' ':
-        e.preventDefault();
-        togglePlayPause();
-        break;
-      case 'ArrowLeft':
-        skip(-10);
-        break;
-      case 'ArrowRight':
-        skip(10);
-        break;
-      case 'ArrowUp':
-        setVolume(Math.min(1, volume + 0.1));
-        break;
-      case 'ArrowDown':
-        setVolume(Math.max(0, volume - 0.1));
-        break;
-      case 'm':
-        toggleMute();
-        break;
-      case 'f':
-        toggleFullscreen();
-        break;
-      case 'Escape':
-        onClose();
-        break;
-    }
-  };
+	const skip = (seconds: number) => {
+		if (videoRef.current) {
+			videoRef.current.currentTime += seconds;
+		}
+	};
 
-  // Touch/swipe gesture handlers for mobile navigation
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 1) {
-      const touch = e.touches[0];
-      setTouchStart({ x: touch.clientX, y: touch.clientY });
-      setIsSwiping(false);
-    }
-  };
+	const toggleFullscreen = () => {
+		if (videoRef.current) {
+			if (document.fullscreenElement) {
+				document.exitFullscreen();
+			} else {
+				videoRef.current.requestFullscreen();
+			}
+		}
+	};
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!touchStart || e.touches.length !== 1) return;
-    
-    const touch = e.touches[0];
-    const deltaX = touch.clientX - touchStart.x;
-    const deltaY = touch.clientY - touchStart.y;
-    const absDeltaX = Math.abs(deltaX);
-    const absDeltaY = Math.abs(deltaY);
-    
-    // Determine if horizontal swipe (ignore vertical swipes)
-    if (absDeltaX > absDeltaY && absDeltaX > 30) {
-      setIsSwiping(true);
-    }
-  };
+	const handleMouseMove = () => {
+		setShowControls(true);
+		if (controlsTimeout.current) {
+			clearTimeout(controlsTimeout.current);
+		}
+		controlsTimeout.current = setTimeout(() => {
+			if (isPlaying) {
+				setShowControls(false);
+			}
+		}, 3000);
+	};
 
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!touchStart || !isSwiping) {
-      setTouchStart(null);
-      setIsSwiping(false);
-      return;
-    }
-    
-    const touch = e.changedTouches[0];
-    const deltaX = touch.clientX - touchStart.x;
-    const minSwipeDistance = 50; // Minimum distance for a valid swipe
-    
-    if (Math.abs(deltaX) > minSwipeDistance) {
-      if (deltaX > 0) {
-        // Swipe right - go to previous video
-        if (onPrevious) onPrevious();
-      } else {
-        // Swipe left - go to next video
-        if (onNext) onNext();
-      }
-    }
-    
-    setTouchStart(null);
-    setIsSwiping(false);
-  };
+	const handleKeyDown = (e: React.KeyboardEvent) => {
+		switch (e.key) {
+			case " ":
+				e.preventDefault();
+				togglePlayPause();
+				break;
+			case "ArrowLeft":
+				skip(-10);
+				break;
+			case "ArrowRight":
+				skip(10);
+				break;
+			case "ArrowUp":
+				setVolume(Math.min(1, volume + 0.1));
+				break;
+			case "ArrowDown":
+				setVolume(Math.max(0, volume - 0.1));
+				break;
+			case "m":
+				toggleMute();
+				break;
+			case "f":
+				toggleFullscreen();
+				break;
+			case "Escape":
+				onClose();
+				break;
+		}
+	};
 
-  const formatTime = (seconds: number): string => {
-    return VideoService.formatDuration(seconds);
-  };
+	// Touch/swipe gesture handlers for mobile navigation
+	const handleTouchStart = (e: React.TouchEvent) => {
+		if (e.touches.length === 1) {
+			const touch = e.touches[0];
+			setTouchStart({ x: touch.clientX, y: touch.clientY });
+			setIsSwiping(false);
+		}
+	};
 
-  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+	const handleTouchMove = (e: React.TouchEvent) => {
+		if (!touchStart || e.touches.length !== 1) return;
 
-  return (
-    <div 
-      className="video-lightbox"
-      onMouseMove={handleMouseMove}
-      onKeyDown={handleKeyDown}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      tabIndex={0}
-    >
-      <div className="video-container">
-        {loading ? (
-          <div className="loading-spinner">
-            <div className="spinner" />
-            <p>Loading video...</p>
-          </div>
-        ) : (
-          <>
-            <video
-              ref={videoRef}
-              src={videoUrl}
-              onTimeUpdate={handleTimeUpdate}
-              onLoadedMetadata={handleLoadedMetadata}
-              onEnded={() => setIsPlaying(false)}
-              onClick={togglePlayPause}
-              className="video-player"
-            />
-            
-            {/* Video Controls */}
-            <div className={`video-controls ${showControls ? 'visible' : 'hidden'}`}>
-              {/* Timeline with keyframe previews */}
-              <div className="timeline-container">
-                <div 
-                  ref={progressRef}
-                  className="progress-bar"
-                  onClick={handleSeek}
-                >
-                  <div className="buffered-bar" style={{ width: `${buffered}%` }} />
-                  <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
-                  <div className="progress-handle" style={{ left: `${progressPercent}%` }} />
-                  
-                  {/* Keyframe previews on hover */}
-                  {keyframes.length > 0 && (
-                    <div className="keyframes">
-                      {keyframes.map((frame, i) => (
-                        <img 
-                          key={i}
-                          src={frame}
-                          className="keyframe"
-                          style={{ left: `${(i + 1) * (100 / (keyframes.length + 1))}%` }}
-                          alt=""
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="time-display">
-                  <span>{formatTime(currentTime)}</span>
-                  <span className="separator">/</span>
-                  <span>{formatTime(duration)}</span>
-                </div>
-              </div>
-              
-              {/* Control buttons */}
-              <div className="control-buttons">
-                <div className="controls-left">
-                  <button onClick={togglePlayPause} className="control-btn">
-                    {isPlaying ? <Pause /> : <Play />}
-                  </button>
-                  <button onClick={() => skip(-10)} className="control-btn">
-                    <SkipBack />
-                  </button>
-                  <button onClick={() => skip(10)} className="control-btn">
-                    <SkipForward />
-                  </button>
-                  
-                  <div className="volume-control">
-                    <button onClick={toggleMute} className="control-btn">
-                      {isMuted || volume === 0 ? <VolumeX /> : <Volume2 />}
-                    </button>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={volume}
-                      onChange={handleVolumeChange}
-                      className="volume-slider"
-                    />
-                  </div>
-                </div>
-                
-                <div className="controls-right">
-                  <button 
-                    onClick={() => setShowInfo(!showInfo)} 
-                    className="control-btn"
-                  >
-                    <Info />
-                  </button>
-                  <button onClick={toggleFullscreen} className="control-btn">
-                    <Maximize />
-                  </button>
-                  <a 
-                    href={videoUrl} 
-                    download={videoPath.split('/').pop()}
-                    className="control-btn"
-                  >
-                    <Download />
-                  </a>
-                </div>
-              </div>
-            </div>
-            
-            {/* Video info overlay */}
-            {showInfo && videoInfo && (
-              <div className="video-info-overlay">
-                <h3>{videoPath.split('/').pop()}</h3>
-                <div className="info-grid">
-                  <div>Format: {videoInfo.format}</div>
-                  <div>Resolution: {videoInfo.metadata.width}×{videoInfo.metadata.height}</div>
-                  <div>Duration: {formatTime(videoInfo.metadata.duration)}</div>
-                  <div>Codec: {videoInfo.metadata.codec}</div>
-                  <div>Quality: {VideoService.getResolutionLabel(
-                    videoInfo.metadata.width, 
-                    videoInfo.metadata.height
-                  )}</div>
-                  <div>Audio: {videoInfo.metadata.hasAudio ? 'Yes' : 'No'}</div>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-      
-      {/* Navigation buttons */}
-      {onPrevious && (
-        <button onClick={onPrevious} className="nav-btn nav-prev">
-          <SkipBack />
-        </button>
-      )}
-      {onNext && (
-        <button onClick={onNext} className="nav-btn nav-next">
-          <SkipForward />
-        </button>
-      )}
-      
-      {/* Close button */}
-      <button onClick={onClose} className="close-btn">×</button>
+		const touch = e.touches[0];
+		const deltaX = touch.clientX - touchStart.x;
+		const deltaY = touch.clientY - touchStart.y;
+		const absDeltaX = Math.abs(deltaX);
+		const absDeltaY = Math.abs(deltaY);
 
-      <style jsx>{`
+		// Determine if horizontal swipe (ignore vertical swipes)
+		if (absDeltaX > absDeltaY && absDeltaX > 30) {
+			setIsSwiping(true);
+		}
+	};
+
+	const handleTouchEnd = (e: React.TouchEvent) => {
+		if (!touchStart || !isSwiping) {
+			setTouchStart(null);
+			setIsSwiping(false);
+			return;
+		}
+
+		const touch = e.changedTouches[0];
+		const deltaX = touch.clientX - touchStart.x;
+		const minSwipeDistance = 50; // Minimum distance for a valid swipe
+
+		if (Math.abs(deltaX) > minSwipeDistance) {
+			if (deltaX > 0) {
+				// Swipe right - go to previous video
+				if (onPrevious) onPrevious();
+			} else {
+				// Swipe left - go to next video
+				if (onNext) onNext();
+			}
+		}
+
+		setTouchStart(null);
+		setIsSwiping(false);
+	};
+
+	const formatTime = (seconds: number): string => {
+		return VideoService.formatDuration(seconds);
+	};
+
+	const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+	return (
+		<div
+			className="video-lightbox"
+			onMouseMove={handleMouseMove}
+			onKeyDown={handleKeyDown}
+			onTouchStart={handleTouchStart}
+			onTouchMove={handleTouchMove}
+			onTouchEnd={handleTouchEnd}
+		>
+			<div className="video-container">
+				{loading ? (
+					<div className="loading-spinner">
+						<div className="spinner" />
+						<p>Loading video...</p>
+					</div>
+				) : (
+					<>
+						<video
+							ref={videoRef}
+							src={videoUrl}
+							onTimeUpdate={handleTimeUpdate}
+							onLoadedMetadata={handleLoadedMetadata}
+							onEnded={() => setIsPlaying(false)}
+							onClick={togglePlayPause}
+							className="video-player"
+						/>
+
+						{/* Video Controls */}
+						<div
+							className={`video-controls ${showControls ? "visible" : "hidden"}`}
+						>
+							{/* Timeline with keyframe previews */}
+							<div className="timeline-container">
+								<div
+									ref={progressRef}
+									className="progress-bar"
+									onClick={handleSeek}
+								>
+									<div
+										className="buffered-bar"
+										style={{ width: `${buffered}%` }}
+									/>
+									<div
+										className="progress-fill"
+										style={{ width: `${progressPercent}%` }}
+									/>
+									<div
+										className="progress-handle"
+										style={{ left: `${progressPercent}%` }}
+									/>
+
+									{/* Keyframe previews on hover */}
+									{keyframes.length > 0 && (
+										<div className="keyframes">
+											{keyframes.map((frame, i) => (
+												<img
+													key={`${frame.id || frame.path || frame.name || frame.key || ""}-${i}`}
+													src={frame}
+													className="keyframe"
+													style={{
+														left: `${(i + 1) * (100 / (keyframes.length + 1))}%`,
+													}}
+													alt=""
+												/>
+											))}
+										</div>
+									)}
+								</div>
+								<div className="time-display">
+									<span>{formatTime(currentTime)}</span>
+									<span className="separator">/</span>
+									<span>{formatTime(duration)}</span>
+								</div>
+							</div>
+
+							{/* Control buttons */}
+							<div className="control-buttons">
+								<div className="controls-left">
+									<button
+										type="button"
+										onClick={togglePlayPause}
+										className="control-btn"
+									>
+										{isPlaying ? <Pause /> : <Play />}
+									</button>
+									<button
+										type="button"
+										onClick={() => skip(-10)}
+										className="control-btn"
+									>
+										<SkipBack />
+									</button>
+									<button
+										type="button"
+										onClick={() => skip(10)}
+										className="control-btn"
+									>
+										<SkipForward />
+									</button>
+
+									<div className="volume-control">
+										<button
+											type="button"
+											onClick={toggleMute}
+											className="control-btn"
+										>
+											{isMuted || volume === 0 ? <VolumeX /> : <Volume2 />}
+										</button>
+										<input
+											type="range"
+											min="0"
+											max="1"
+											step="0.05"
+											value={volume}
+											onChange={handleVolumeChange}
+											className="volume-slider"
+										/>
+									</div>
+								</div>
+
+								<div className="controls-right">
+									<button
+										type="button"
+										onClick={() => setShowInfo(!showInfo)}
+										className="control-btn"
+									>
+										<Info />
+									</button>
+									<button
+										type="button"
+										onClick={toggleFullscreen}
+										className="control-btn"
+									>
+										<Maximize />
+									</button>
+									<a
+										href={videoUrl}
+										download={videoPath.split("/").pop()}
+										className="control-btn"
+									>
+										<Download />
+									</a>
+								</div>
+							</div>
+						</div>
+
+						{/* Video info overlay */}
+						{showInfo && videoInfo && (
+							<div className="video-info-overlay">
+								<h3>{videoPath.split("/").pop()}</h3>
+								<div className="info-grid">
+									<div>Format: {videoInfo.format}</div>
+									<div>
+										Resolution: {videoInfo.metadata.width}×
+										{videoInfo.metadata.height}
+									</div>
+									<div>Duration: {formatTime(videoInfo.metadata.duration)}</div>
+									<div>Codec: {videoInfo.metadata.codec}</div>
+									<div>
+										Quality:{" "}
+										{VideoService.getResolutionLabel(
+											videoInfo.metadata.width,
+											videoInfo.metadata.height,
+										)}
+									</div>
+									<div>Audio: {videoInfo.metadata.hasAudio ? "Yes" : "No"}</div>
+								</div>
+							</div>
+						)}
+					</>
+				)}
+			</div>
+
+			{/* Navigation buttons */}
+			{onPrevious && (
+				<button type="button" onClick={onPrevious} className="nav-btn nav-prev">
+					<SkipBack />
+				</button>
+			)}
+			{onNext && (
+				<button type="button" onClick={onNext} className="nav-btn nav-next">
+					<SkipForward />
+				</button>
+			)}
+
+			{/* Close button */}
+			<button type="button" onClick={onClose} className="close-btn">
+				×
+			</button>
+
+			<style>{`
         .video-lightbox {
           position: fixed;
           inset: 0;
@@ -633,6 +684,6 @@ export function VideoLightbox({
           to { transform: rotate(360deg); }
         }
       `}</style>
-    </div>
-  );
+		</div>
+	);
 }

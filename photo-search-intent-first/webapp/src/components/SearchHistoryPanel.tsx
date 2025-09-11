@@ -1,141 +1,160 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Clock, X, Trash2 } from 'lucide-react';
-import { searchHistoryService, type SearchHistoryEntry } from '../services/SearchHistoryService';
+import { Clock, Search, Trash2, X } from "lucide-react";
+import type React from "react";
+import { useCallback, useEffect, useState } from "react";
+import {
+	type SearchHistoryEntry,
+	searchHistoryService,
+} from "../services/SearchHistoryService";
 
 interface SearchHistoryPanelProps {
-  onSearch: (query: string) => void;
-  onClose: () => void;
+	onSearch: (query: string) => void;
+	onClose: () => void;
 }
 
-export const SearchHistoryPanel: React.FC<SearchHistoryPanelProps> = ({ 
-  onSearch,
-  onClose
+export const SearchHistoryPanel: React.FC<SearchHistoryPanelProps> = ({
+	onSearch,
+	onClose,
 }) => {
-  const [history, setHistory] = useState<SearchHistoryEntry[]>([]);
-  const [showClearConfirm, setShowClearConfirm] = useState(false);
+	const [history, setHistory] = useState<SearchHistoryEntry[]>([]);
+	const [showClearConfirm, setShowClearConfirm] = useState(false);
 
-  useEffect(() => {
-    loadHistory();
-  }, []);
+	const loadHistory = useCallback(() => {
+		const historyEntries = searchHistoryService.getHistory();
+		setHistory(historyEntries);
+	}, []);
 
-  const loadHistory = () => {
-    const historyEntries = searchHistoryService.getHistory();
-    setHistory(historyEntries);
-  };
+	useEffect(() => {
+		loadHistory();
+	}, [loadHistory]);
 
-  const handleSearch = (query: string) => {
-    onSearch(query);
-    onClose();
-  };
+	const handleSearch = (query: string) => {
+		onSearch(query);
+		onClose();
+	};
 
-  const clearHistory = () => {
-    searchHistoryService.clearHistory();
-    setHistory([]);
-    setShowClearConfirm(false);
-  };
+	const clearHistory = () => {
+		searchHistoryService.clearHistory();
+		setHistory([]);
+		setShowClearConfirm(false);
+	};
 
-  const formatRelativeTime = (timestamp: number): string => {
-    const now = Date.now();
-    const diff = now - timestamp;
-    const minutes = Math.floor(diff / (1000 * 60));
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+	const formatRelativeTime = (timestamp: number): string => {
+		const now = Date.now();
+		const diff = now - timestamp;
+		const minutes = Math.floor(diff / (1000 * 60));
+		const hours = Math.floor(diff / (1000 * 60 * 60));
+		const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
-    if (minutes < 1) return 'Just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    if (days < 7) return `${days}d ago`;
-    return new Date(timestamp).toLocaleDateString();
-  };
+		if (minutes < 1) return "Just now";
+		if (minutes < 60) return `${minutes}m ago`;
+		if (hours < 24) return `${hours}h ago`;
+		if (days < 7) return `${days}d ago`;
+		return new Date(timestamp).toLocaleDateString();
+	};
 
-  const formatDate = (timestamp: number): string => {
-    return new Date(timestamp).toLocaleDateString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
-  };
+	const formatDate = (timestamp: number): string => {
+		return new Date(timestamp).toLocaleDateString(undefined, {
+			month: "short",
+			day: "numeric",
+			year: "numeric",
+		});
+	};
 
-  return (
-    <div className="search-history-panel">
-      <div className="search-history-header">
-        <div className="search-history-title">
-          <Clock className="w-5 h-5" />
-          <span>Search History</span>
-        </div>
-        <div className="search-history-actions">
-          <button
-            onClick={() => setShowClearConfirm(true)}
-            className="clear-history-btn"
-            title="Clear search history"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-          <button
-            onClick={onClose}
-            className="close-btn"
-            title="Close"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
+	return (
+		<div className="search-history-panel">
+			<div className="search-history-header">
+				<div className="search-history-title">
+					<Clock className="w-5 h-5" />
+					<span>Search History</span>
+				</div>
+				<div className="search-history-actions">
+					<button
+						type="button"
+						onClick={() => setShowClearConfirm(true)}
+						className="clear-history-btn"
+						title="Clear search history"
+					>
+						<Trash2 className="w-4 h-4" />
+					</button>
+					<button
+						type="button"
+						onClick={onClose}
+						className="close-btn"
+						title="Close"
+					>
+						<X className="w-4 h-4" />
+					</button>
+				</div>
+			</div>
 
-      {showClearConfirm && (
-        <div className="clear-confirm-overlay">
-          <div className="clear-confirm-dialog">
-            <p>Are you sure you want to clear your search history?</p>
-            <div className="clear-confirm-actions">
-              <button
-                onClick={() => setShowClearConfirm(false)}
-                className="cancel-btn"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={clearHistory}
-                className="confirm-btn"
-              >
-                Clear History
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+			{showClearConfirm && (
+				<div className="clear-confirm-overlay">
+					<div className="clear-confirm-dialog">
+						<p>Are you sure you want to clear your search history?</p>
+						<div className="clear-confirm-actions">
+							<button
+								type="button"
+								onClick={() => setShowClearConfirm(false)}
+								className="cancel-btn"
+							>
+								Cancel
+							</button>
+							<button
+								type="button"
+								onClick={clearHistory}
+								className="confirm-btn"
+							>
+								Clear History
+							</button>
+						</div>
+					</div>
+				</div>
+			)}
 
-      <div className="search-history-content">
-        {history.length === 0 ? (
-          <div className="empty-state">
-            <Clock className="w-12 h-12 text-gray-300" />
-            <p>No search history yet</p>
-            <p className="text-sm text-gray-500">Your recent searches will appear here</p>
-          </div>
-        ) : (
-          <div className="search-history-list">
-            {history.map((entry, index) => (
-              <div key={index} className="search-history-item">
-                <button
-                  onClick={() => handleSearch(entry.query)}
-                  className="search-history-button"
-                >
-                  <Search className="w-4 h-4 text-gray-400" />
-                  <div className="search-query-container">
-                    <span className="search-query">{entry.query}</span>
-                    <div className="search-meta">
-                      <span className="result-count">{entry.resultCount} results</span>
-                      <span className="search-time" title={formatDate(entry.timestamp)}>
-                        {formatRelativeTime(entry.timestamp)}
-                      </span>
-                    </div>
-                  </div>
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+			<div className="search-history-content">
+				{history.length === 0 ? (
+					<div className="empty-state">
+						<Clock className="w-12 h-12 text-gray-300" />
+						<p>No search history yet</p>
+						<p className="text-sm text-gray-500">
+							Your recent searches will appear here
+						</p>
+					</div>
+				) : (
+					<div className="search-history-list">
+						{history.map((entry, index) => (
+							<div
+								key={`${entry.id || entry.path || entry.name || entry.key || ""}-${index}`}
+								className="search-history-item"
+							>
+								<button
+									type="button"
+									onClick={() => handleSearch(entry.query)}
+									className="search-history-button"
+								>
+									<Search className="w-4 h-4 text-gray-400" />
+									<div className="search-query-container">
+										<span className="search-query">{entry.query}</span>
+										<div className="search-meta">
+											<span className="result-count">
+												{entry.resultCount} results
+											</span>
+											<span
+												className="search-time"
+												title={formatDate(entry.timestamp)}
+											>
+												{formatRelativeTime(entry.timestamp)}
+											</span>
+										</div>
+									</div>
+								</button>
+							</div>
+						))}
+					</div>
+				)}
+			</div>
 
-      <style jsx>{`
+			<style>{`
         .search-history-panel {
           position: fixed;
           top: 0;
@@ -334,6 +353,6 @@ export const SearchHistoryPanel: React.FC<SearchHistoryPanelProps> = ({
           }
         }
       `}</style>
-    </div>
-  );
+		</div>
+	);
 };

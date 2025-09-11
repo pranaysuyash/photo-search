@@ -250,6 +250,44 @@ ps-intent-ui  # Launch the UI (uses PS_INTENT_PORT env var if set)
 - `HF_API_TOKEN` - Hugging Face API token for cloud models
 - `OPENAI_API_KEY` - OpenAI API key for captioning and embedding
 
+## Utility Scripts
+
+### Curl-based Media Fetching
+A set of utility scripts for fetching media assets (images, icons, audio) using curl:
+
+1. **fetch_media.sh** - For downloading images and icons:
+   - Basic downloads from any URL
+   - Downloads with custom headers (for APIs requiring authentication)
+   - Download and resize functionality (with ImageMagick)
+   - Helpful error checking and file type verification
+
+2. **fetch_audio.sh** - For downloading audio files:
+   - Basic audio downloads
+   - Downloads with custom headers
+   - Bulk downloads from a list file
+   - Supports various audio formats (mp3, wav, ogg, etc.)
+
+### Usage Examples
+
+```bash
+# Download a single image
+./fetch_media.sh https://example.com/icon.png website_icon.png
+
+# Download with authentication headers
+./fetch_media.sh -H "Authorization: Bearer token" https://api.example.com/chart.png chart.png
+
+# Download and resize an image
+./fetch_media.sh -r 128x128 https://example.com/avatar.jpg small_avatar.jpg
+
+# Download a single audio file
+./fetch_audio.sh https://example.com/sound.mp3 effect.mp3
+
+# Download multiple audio files from a list
+./fetch_audio.sh -l audio_list_example.txt
+```
+
+These scripts can be used with any API that returns media files, making it easy to fetch assets for the application.
+
 ## Project Status
 
 The intent-first approach is the primary focus of ongoing development. It provides:

@@ -1,0 +1,14 @@
+# Example list of audio files to download
+# Format: URL|filename
+
+# Sound effects
+https://example.com/sounds/click.mp3|click.mp3
+https://example.com/sounds/notification.wav|notification.wav
+
+# Music tracks
+https://example.com/music/background.mp3|background_music.mp3
+https://example.com/music/intro.ogg|intro_music.ogg
+
+# Voice clips
+https://example.com/voices/greeting.mp3|greeting.mp3
+https://example.com/voices/farewell.wav|farewell.wav

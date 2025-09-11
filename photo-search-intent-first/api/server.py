@@ -6,7 +6,7 @@ from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
 from adapters.provider_factory import get_provider
@@ -45,12 +45,23 @@ import json
 import time
 
 from PIL import Image, ExifTags
+from infra.watcher import WatchManager
+from domain.models import SUPPORTED_EXTS
 
 
 app = FastAPI(title="Photo Search – Intent-First API")
+
+# CORS / Origin policy – prefer explicit local origins when possible
+_allowed_origins = [
+    "http://127.0.0.1:5173",
+    "http://localhost:5173",
+    "http://127.0.0.1:8000",
+    "http://localhost:8000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -94,6 +105,13 @@ if _static is not None:
 @app.get("/api/ping")
 def api_ping() -> Dict[str, Any]:
     return {"ok": True}
+
+# Watchers (optional)
+_WATCH = WatchManager()
+
+@app.get("/watch/status")
+def api_watch_status() -> Dict[str, Any]:
+    return {"available": _WATCH.available()}
 
 
 # Sharing APIs
@@ -282,6 +300,64 @@ def _load_env_file() -> None:
 
 _load_env_file()
 
+# Optional ephemeral auth token – when set, enforce on write endpoints
+_API_TOKEN = os.environ.get("API_TOKEN", "").strip() or None
+
+@app.middleware("http")
+async def _auth_middleware(request, call_next):
+    try:
+        # Skip if no token configured
+        if not _API_TOKEN:
+            return await call_next(request)
+        path = str(request.url.path or "")
+        # Allow static assets and share viewer endpoints without auth
+        if path.startswith("/app") or path.startswith("/assets") or path.startswith("/share/") or path == "/api/ping" or path == "/scan_count":
+            return await call_next(request)
+        # Enforce Authorization for mutating methods
+        if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            auth = request.headers.get("authorization") or request.headers.get("Authorization")
+            if not auth or auth != f"Bearer {_API_TOKEN}":
+                return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+        return await call_next(request)
+    except Exception:
+        # Fail open (but log) if middleware raises unexpectedly
+        try:
+            return await call_next(request)
+        except Exception:
+            return JSONResponse(status_code=500, content={"detail": "Server error"})
+
+# Exclude patterns per directory (privacy filters)
+@app.get("/settings/excludes")
+def api_get_excludes(dir: str) -> Dict[str, Any]:
+    folder = Path(dir)
+    cfg = folder / ".photo_index" / "excludes.json"
+    try:
+        if cfg.exists():
+            data = json.loads(cfg.read_text(encoding='utf-8'))
+            pats = data.get('patterns') or []
+            return {"patterns": [str(p) for p in pats]}
+    except Exception:
+        pass
+    return {"patterns": []}
+
+
+class ExcludeReq(BaseModel):
+    dir: str
+    patterns: list[str] = []
+
+
+@app.post("/settings/excludes")
+def api_set_excludes(req: ExcludeReq) -> Dict[str, Any]:
+    folder = Path(req.dir)
+    try:
+        p = folder / ".photo_index"
+        p.mkdir(parents=True, exist_ok=True)
+        cfg = p / "excludes.json"
+        cfg.write_text(json.dumps({"patterns": req.patterns}, indent=2), encoding='utf-8')
+        return {"ok": True}
+    except Exception as e:
+        raise HTTPException(500, f"Failed to save excludes: {e}")
+
 @app.get("/todo")
 def api_todo() -> Dict[str, Any]:
     """Return the repository TODO.md contents for in-app Tasks view."""
@@ -324,6 +400,109 @@ def api_index(req: IndexRequest) -> Dict[str, Any]:
     except Exception:
         pass
     return {"new": new_c, "updated": upd_c, "total": total}
+
+
+class WatchReq(BaseModel):
+    dir: str
+    provider: str = "local"
+    debounce_ms: int = 1500
+    batch_size: int = 12
+
+
+@app.post("/watch/start")
+def api_watch_start(req: WatchReq) -> Dict[str, Any]:
+    if not _WATCH.available():
+        raise HTTPException(400, "watchdog not available")
+    folder = Path(req.dir)
+    if not folder.exists():
+        raise HTTPException(400, "Folder not found")
+    emb = _emb(req.provider, None, None)
+    store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
+
+    def on_batch(paths: set[str]) -> None:
+        try:
+            wanted = [p for p in paths if str(p).lower().endswith(tuple(SUPPORTED_EXTS))]
+            if not wanted:
+                return
+            store.upsert_paths(emb, wanted, batch_size=max(1, int(req.batch_size)))
+        except Exception:
+            pass
+
+    ok = _WATCH.start(folder, on_batch, exts=set(SUPPORTED_EXTS), debounce_ms=max(500, int(req.debounce_ms)))
+    if not ok:
+        raise HTTPException(500, "Failed to start watcher")
+    return {"ok": True}
+
+
+@app.post("/watch/stop")
+def api_watch_stop(dir: str) -> Dict[str, Any]:
+    folder = Path(dir)
+    _WATCH.stop(folder)
+    return {"ok": True}
+
+
+# Model management (minimal)
+@app.get("/models/capabilities")
+def api_models_capabilities() -> Dict[str, Any]:
+    caps: Dict[str, Any] = {"transformers": False, "torch": False, "cuda": False, "mps": False}
+    try:
+        import torch  # type: ignore
+        caps["torch"] = True
+        caps["cuda"] = bool(getattr(torch, "cuda", None) and torch.cuda.is_available())
+        mps = getattr(getattr(torch, "backends", None), "mps", None)
+        caps["mps"] = bool(mps and mps.is_available())
+    except Exception:
+        pass
+    try:
+        import transformers  # type: ignore
+        caps["transformers"] = True
+    except Exception:
+        pass
+    return {"ok": True, "capabilities": caps}
+
+
+class ModelDownloadReq(BaseModel):
+    model: str = "openai/clip-vit-base-patch32"
+
+
+@app.post("/models/download")
+def api_models_download(req: ModelDownloadReq) -> Dict[str, Any]:
+    try:
+        from transformers import AutoProcessor, CLIPModel  # type: ignore
+        _ = AutoProcessor.from_pretrained(req.model)
+        _ = CLIPModel.from_pretrained(req.model)
+        return {"ok": True, "model": req.model}
+    except Exception as e:
+        raise HTTPException(500, f"Model download failed: {e}")
+
+
+@app.post("/data/nuke")
+def api_data_nuke(dir: Optional[str] = None, all: bool = False) -> Dict[str, Any]:  # type: ignore[assignment]
+    try:
+        if all:
+            base = os.environ.get("PS_APPDATA_DIR", "").strip()
+            if base:
+                bp = Path(base).expanduser().resolve()
+                if bp.exists() and bp.is_dir() and str(bp) not in ("/", str(Path.home())):
+                    shutil.rmtree(bp)
+                    return {"ok": True, "cleared": str(bp)}
+                else:
+                    raise HTTPException(400, "Unsafe app data path")
+            else:
+                raise HTTPException(400, "PS_APPDATA_DIR not set")
+        if not dir:
+            raise HTTPException(400, "dir required unless all=1")
+        folder = Path(dir)
+        emb = _emb("local", None, None)
+        store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
+        idx = store.index_dir
+        if idx.exists() and idx.is_dir():
+            shutil.rmtree(idx)
+        return {"ok": True, "cleared": str(idx)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Failed to clear data: {e}")
 
 
 @app.get("/index/status")
@@ -1423,6 +1602,12 @@ def api_build_fast(dir: str, kind: str = "faiss", trees: int = 50, provider: str
         raise HTTPException(400, "Folder not found")
     emb = _emb(provider, hf_token, openai_key)
     store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
+    # Write fast status (best-effort, no incremental progress available)
+    status_path = store.index_dir / 'fast_status.json'
+    try:
+        status_path.write_text(json.dumps({ 'state': 'running', 'kind': kind, 'start': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()) }), encoding='utf-8')
+    except Exception:
+        pass
     ok = False
     if kind.lower() == 'faiss':
         ok = store.build_faiss()
@@ -1431,6 +1616,10 @@ def api_build_fast(dir: str, kind: str = "faiss", trees: int = 50, provider: str
     else:
         ok = store.build_annoy(trees=trees)
     _write_event(store.index_dir, { 'type': 'fast_build', 'time': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'ok': ok, 'kind': kind })
+    try:
+        status_path.write_text(json.dumps({ 'state': 'complete', 'kind': kind, 'end': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'ok': bool(ok) }), encoding='utf-8')
+    except Exception:
+        pass
     return {"ok": ok, "kind": kind}
 
 
@@ -1450,6 +1639,17 @@ def api_build_thumbs(dir: str, size: int = 512, provider: str = "local", hf_toke
     out = {"made": made}
     _write_event(store.index_dir, { 'type': 'thumbs_build', 'time': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'made': made, 'size': size })
     return out
+
+@app.get("/fast/status")
+def api_fast_status(dir: str) -> Dict[str, Any]:
+    store = IndexStore(Path(dir))
+    try:
+        p = store.index_dir / 'fast_status.json'
+        if p.exists():
+            return json.loads(p.read_text(encoding='utf-8'))
+        return { 'state': 'idle' }
+    except Exception:
+        return { 'state': 'unknown' }
 
 
 @app.get("/map")
@@ -1625,6 +1825,28 @@ def api_ocr_status(dir: str) -> Dict[str, Any]:
     """Return whether OCR texts have been built for this index."""
     store = IndexStore(Path(dir))
     try:
+        # If an OCR status file exists, surface its data (parity with index status)
+        status_file = store.index_dir / 'ocr_status.json'
+        if status_file.exists():
+            try:
+                data = json.loads(status_file.read_text(encoding='utf-8'))
+                # Enrich with current count when possible
+                count = 0
+                if store.ocr_texts_file.exists():
+                    try:
+                        d = json.loads(store.ocr_texts_file.read_text())
+                        arr = d.get('texts', []) or []
+                        count = len([t for t in arr if isinstance(t, str) and t.strip()])
+                    except Exception:
+                        count = 0
+                data['count'] = int(count)
+                # Provide a ready flag when completed
+                if str(data.get('state')) == 'complete':
+                    data['ready'] = True
+                return data
+            except Exception:
+                # Fall through to simple ready/count
+                pass
         ready = store.ocr_texts_file.exists()
         count = 0
         if ready:
@@ -1865,6 +2087,19 @@ def _build_exif_index(index_dir: Path, paths: List[str]) -> Dict[str, Any]:
         "gps_lat": [], "gps_lon": [], "place": [],
         "sharpness": [], "brightness": [], "contrast": []
     }
+    # Initialize metadata status for UI polling
+    status_path = index_dir / 'metadata_status.json'
+    try:
+        status_path.write_text(json.dumps({
+            'state': 'running',
+            'start': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+            'total': int(len(paths or [])),
+            'done': 0,
+            'updated': 0,
+        }), encoding='utf-8')
+    except Exception:
+        pass
+    done = 0
     for sp in paths:
         p = Path(sp)
         cam = None; iso = None; fn = None; exp = None; foc = None; w=None; h=None
@@ -2010,7 +2245,31 @@ def _build_exif_index(index_dir: Path, paths: List[str]) -> Dict[str, Any]:
         out["sharpness"].append(sharp)
         out["brightness"].append(bright)
         out["contrast"].append(contrast)
+        # Update status after each file
+        try:
+            cur = {}
+            try:
+                cur = json.loads(status_path.read_text(encoding='utf-8')) if status_path.exists() else {}
+            except Exception:
+                cur = {}
+            done += 1
+            cur['done'] = int(done)
+            cur['updated'] = int(done)
+            status_path.write_text(json.dumps(cur), encoding='utf-8')
+        except Exception:
+            pass
     (index_dir / 'exif_index.json').write_text(json.dumps(out))
+    # Mark completion
+    try:
+        status_path.write_text(json.dumps({
+            'state': 'complete',
+            'end': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+            'total': int(len(paths or [])),
+            'done': int(done),
+            'updated': int(done),
+        }), encoding='utf-8')
+    except Exception:
+        pass
     return out
 
 @app.post("/metadata/build")

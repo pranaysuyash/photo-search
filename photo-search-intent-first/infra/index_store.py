@@ -6,6 +6,7 @@ from typing import List, Tuple, Optional
 import numpy as np
 
 from domain.models import MODEL_NAME, Photo, SearchResult
+import os
 
 
 @dataclass
@@ -28,7 +29,14 @@ class IndexStore:
     def __init__(self, root: Path, index_key: Optional[str] = None) -> None:
         self.root = Path(root).expanduser().resolve()
         key = _sanitize_key(index_key or MODEL_NAME)
-        self.index_dir = self.root / ".photo_index" / key
+        # Optional app data dir override for central storage
+        base = os.environ.get("PS_APPDATA_DIR", "").strip()
+        if base:
+            # Flatten per-root under appdata using sanitized path component
+            safe_root = _sanitize_key(str(self.root))
+            self.index_dir = Path(base).expanduser().resolve() / safe_root / key
+        else:
+            self.index_dir = self.root / ".photo_index" / key
         self.index_dir.mkdir(parents=True, exist_ok=True)
         self.paths_file = self.index_dir / "paths.json"
         self.embeddings_file = self.index_dir / "embeddings.npy"
@@ -155,6 +163,64 @@ class IndexStore:
         self.save()
         return new_count, updated_count
 
+    def upsert_paths(self, embedder, paths: List[Path], batch_size: int = 32) -> Tuple[int, int]:
+        """Update or insert only the specified paths; does not prune deletions.
+        Returns (new_count, updated_count).
+        """
+        from domain.models import Photo as _Photo
+        self.load()
+        existing_map = {p: i for i, p in enumerate(self.state.paths)}
+        want = [Path(p) for p in paths]
+        to_update_idx: list[int] = []
+        to_insert: list[_Photo] = []
+        for wp in want:
+            sp = str(wp)
+            if sp in existing_map:
+                to_update_idx.append(existing_map[sp])
+            else:
+                try:
+                    mt = wp.stat().st_mtime
+                except Exception:
+                    continue
+                to_insert.append(_Photo(path=wp, mtime=mt))
+        updated = 0
+        if to_update_idx and self.state.embeddings is not None and len(self.state.embeddings) == len(self.state.paths):
+            for start in range(0, len(to_update_idx), max(1, int(batch_size))):
+                chunk_idx = to_update_idx[start:start + max(1, int(batch_size))]
+                batch_paths = [Path(self.state.paths[i]) for i in chunk_idx]
+                new_embs = embedder.embed_images(batch_paths, batch_size=batch_size)
+                for j, idx in enumerate(chunk_idx):
+                    v = new_embs[j]
+                    if np.linalg.norm(v) > 0:
+                        self.state.embeddings[idx] = v
+                        sp = self.state.paths[idx]
+                        try:
+                            self.state.mtimes[idx] = Path(sp).stat().st_mtime
+                        except Exception:
+                            pass
+                updated += len(chunk_idx)
+        newc = 0
+        if to_insert:
+            embs = embedder.embed_images([p.path for p in to_insert], batch_size=batch_size)
+            keep: list[int] = []
+            for j in range(embs.shape[0]):
+                if np.linalg.norm(embs[j]) > 0:
+                    keep.append(j)
+            if keep:
+                kept = [to_insert[j] for j in keep]
+                kept_embs = embs[keep]
+                if self.state.embeddings is None or len(self.state.embeddings) == 0:
+                    self.state.embeddings = kept_embs
+                    self.state.paths = [str(p.path) for p in kept]
+                    self.state.mtimes = [p.mtime for p in kept]
+                else:
+                    self.state.embeddings = np.vstack([self.state.embeddings, kept_embs])
+                    self.state.paths.extend([str(p.path) for p in kept])
+                    self.state.mtimes.extend([p.mtime for p in kept])
+                newc = len(kept)
+        self.save()
+        return newc, updated
+
     def search(self, embedder, query: str, top_k: int = 12, subset: Optional[List[int]] = None) -> List[SearchResult]:
         if not self.state.paths or self.state.embeddings is None or len(self.state.embeddings) == 0:
             return []
@@ -202,6 +268,21 @@ class IndexStore:
         self.load()
         if not self.state.paths:
             return 0
+        # Prepare progress status file for UI polling (OCR)
+        status_path = self.index_dir / 'ocr_status.json'
+        try:
+            total = len(self.state.paths or [])
+            status = {
+                'state': 'running',
+                'start': __import__('time').strftime('%Y-%m-%dT%H:%M:%SZ', __import__('time').gmtime()),
+                'total': int(total),
+                'done': 0,
+                'updated': 0,
+            }
+            status_path.parent.mkdir(parents=True, exist_ok=True)
+            status_path.write_text(json.dumps(status), encoding='utf-8')
+        except Exception:
+            pass
         texts = {}
         if self.ocr_texts_file.exists():
             try:
@@ -213,10 +294,23 @@ class IndexStore:
         reader = easyocr.Reader(languages or ["en"], gpu=False)
         updated = 0
         ocr_texts: list[str] = []
+        done = 0
         for p, mtime in zip(self.state.paths, self.state.mtimes):
             t_prev = texts.get(p)
             if t_prev:
                 ocr_texts.append(t_prev)
+                done += 1
+                try:
+                    cur = {}
+                    try:
+                        cur = json.loads(status_path.read_text(encoding='utf-8')) if status_path.exists() else {}
+                    except Exception:
+                        cur = {}
+                    cur['done'] = int(done)
+                    cur['updated'] = int(updated)
+                    status_path.write_text(json.dumps(cur), encoding='utf-8')
+                except Exception:
+                    pass
                 continue
             try:
                 res = reader.readtext(p, detail=0)
@@ -226,6 +320,19 @@ class IndexStore:
             texts[p] = txt
             ocr_texts.append(txt)
             updated += 1
+            done += 1
+            # Update OCR status after each item
+            try:
+                cur = {}
+                try:
+                    cur = json.loads(status_path.read_text(encoding='utf-8')) if status_path.exists() else {}
+                except Exception:
+                    cur = {}
+                cur['done'] = int(done)
+                cur['updated'] = int(updated)
+                status_path.write_text(json.dumps(cur), encoding='utf-8')
+            except Exception:
+                pass
         # Save texts
         with open(self.ocr_texts_file, "w") as f:
             json.dump({"paths": self.state.paths, "texts": ocr_texts}, f)
@@ -238,6 +345,18 @@ class IndexStore:
                 vecs.append(np.zeros((self.state.embeddings.shape[1],), dtype=np.float32))
         O = np.stack(vecs).astype(np.float32)
         np.save(self.ocr_embeds_file, O)
+        # Mark completion
+        try:
+            status = {
+                'state': 'complete',
+                'end': __import__('time').strftime('%Y-%m-%dT%H:%M:%SZ', __import__('time').gmtime()),
+                'total': int(len(self.state.paths or [])),
+                'done': int(len(self.state.paths or [])),
+                'updated': int(updated),
+            }
+            status_path.write_text(json.dumps(status), encoding='utf-8')
+        except Exception:
+            pass
         return updated
 
     def search_with_ocr(self, embedder, query: str, top_k: int = 12, subset: Optional[List[int]] = None, weight_img: float = 0.5, weight_ocr: float = 0.5) -> List[SearchResult]:

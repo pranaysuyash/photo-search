@@ -1,204 +1,233 @@
-import React, { useState, useEffect } from 'react';
-import { getAPI } from '../services/PhotoVaultAPI';
-import { Plus, Trash2, Edit, FolderPlus, Grid, List, ChevronRight } from 'lucide-react';
+import {
+	ChevronRight,
+	FolderPlus,
+	Grid,
+	List,
+	Plus,
+	Trash2,
+} from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { getAPI } from "../services/PhotoVaultAPI";
 
 interface Collection {
-  name: string;
-  paths: string[];
-  count: number;
-  preview?: string;
+	name: string;
+	paths: string[];
+	count: number;
+	preview?: string;
 }
 
 export function CollectionsManager() {
-  const [collections, setCollections] = useState<Collection[]>([]);
-  const [selectedCollection, setSelectedCollection] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [isCreating, setIsCreating] = useState(false);
-  const [newCollectionName, setNewCollectionName] = useState('');
-  const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-  
-  const api = getAPI();
+	const [collections, setCollections] = useState<Collection[]>([]);
+	const [selectedCollection, setSelectedCollection] = useState<string | null>(
+		null,
+	);
+	const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+	const [isCreating, setIsCreating] = useState(false);
+	const [newCollectionName, setNewCollectionName] = useState("");
+	const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
+	const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    loadCollections();
-  }, []);
+	const api = getAPI();
 
-  const loadCollections = async () => {
-    setLoading(true);
-    try {
-      const data = await api.getCollections();
-      const collectionsList = Object.entries(data.collections).map(([name, paths]) => ({
-        name,
-        paths,
-        count: paths.length,
-        preview: paths[0]
-      }));
-      setCollections(collectionsList);
-    } catch (error) {
-      console.error('Failed to load collections:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+	const loadCollections = useCallback(async () => {
+		setLoading(true);
+		try {
+			const data = await api.getCollections();
+			const collectionsList = Object.entries(data.collections).map(
+				([name, paths]) => ({
+					name,
+					paths,
+					count: paths.length,
+					preview: paths[0],
+				}),
+			);
+			setCollections(collectionsList);
+		} catch (error) {
+			console.error("Failed to load collections:", error);
+		} finally {
+			setLoading(false);
+		}
+	}, [api]);
 
-  const createCollection = async () => {
-    if (!newCollectionName.trim()) return;
-    
-    try {
-      await api.setCollection(newCollectionName, selectedPaths);
-      await loadCollections();
-      setIsCreating(false);
-      setNewCollectionName('');
-      setSelectedPaths([]);
-    } catch (error) {
-      console.error('Failed to create collection:', error);
-    }
-  };
+	useEffect(() => {
+		loadCollections();
+	}, [loadCollections]);
 
-  const deleteCollection = async (name: string) => {
-    if (!confirm(`Delete collection "${name}"?`)) return;
-    
-    try {
-      await api.deleteCollection(name);
-      await loadCollections();
-      if (selectedCollection === name) {
-        setSelectedCollection(null);
-      }
-    } catch (error) {
-      console.error('Failed to delete collection:', error);
-    }
-  };
+	const createCollection = async () => {
+		if (!newCollectionName.trim()) return;
 
-  const CollectionCard = ({ collection }: { collection: Collection }) => (
-    <div 
-      className="collection-card"
-      onClick={() => setSelectedCollection(collection.name)}
-    >
-      <div className="collection-preview">
-        {collection.preview && (
-          <img 
-            src={api.getThumbnailUrl(collection.preview)} 
-            alt={collection.name}
-          />
-        )}
-        <div className="collection-overlay">
-          <Grid className="w-5 h-5" />
-        </div>
-      </div>
-      <div className="collection-info">
-        <h3>{collection.name}</h3>
-        <span className="text-sm text-gray-500">{collection.count} items</span>
-      </div>
-      <div className="collection-actions">
-        <button 
-          onClick={(e) => {
-            e.stopPropagation();
-            deleteCollection(collection.name);
-          }}
-          className="btn-icon"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
-      </div>
-    </div>
-  );
+		try {
+			await api.setCollection(newCollectionName, selectedPaths);
+			await loadCollections();
+			setIsCreating(false);
+			setNewCollectionName("");
+			setSelectedPaths([]);
+		} catch (error) {
+			console.error("Failed to create collection:", error);
+		}
+	};
 
-  const CollectionListItem = ({ collection }: { collection: Collection }) => (
-    <div 
-      className="collection-list-item"
-      onClick={() => setSelectedCollection(collection.name)}
-    >
-      <ChevronRight className="w-4 h-4 text-gray-400" />
-      <FolderPlus className="w-5 h-5 text-blue-500" />
-      <div className="flex-1">
-        <h3 className="font-medium">{collection.name}</h3>
-        <span className="text-sm text-gray-500">{collection.count} items</span>
-      </div>
-      <button 
-        onClick={(e) => {
-          e.stopPropagation();
-          deleteCollection(collection.name);
-        }}
-        className="btn-icon"
-      >
-        <Trash2 className="w-4 h-4" />
-      </button>
-    </div>
-  );
+	const deleteCollection = async (name: string) => {
+		if (!confirm(`Delete collection "${name}"?`)) return;
 
-  return (
-    <div className="collections-manager">
-      <div className="manager-header">
-        <h2 className="text-2xl font-bold">Collections</h2>
-        <div className="flex items-center gap-3">
-          <div className="view-toggle">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={viewMode === 'grid' ? 'active' : ''}
-            >
-              <Grid className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={viewMode === 'list' ? 'active' : ''}
-            >
-              <List className="w-4 h-4" />
-            </button>
-          </div>
-          <button 
-            onClick={() => setIsCreating(true)}
-            className="btn btn-primary"
-          >
-            <Plus className="w-4 h-4" />
-            New Collection
-          </button>
-        </div>
-      </div>
+		try {
+			await api.deleteCollection(name);
+			await loadCollections();
+			if (selectedCollection === name) {
+				setSelectedCollection(null);
+			}
+		} catch (error) {
+			console.error("Failed to delete collection:", error);
+		}
+	};
 
-      {isCreating && (
-        <div className="create-collection-panel">
-          <input
-            type="text"
-            placeholder="Collection name..."
-            value={newCollectionName}
-            onChange={(e) => setNewCollectionName(e.target.value)}
-            className="input"
-            autoFocus
-          />
-          <div className="flex gap-2">
-            <button onClick={createCollection} className="btn btn-primary">
-              Create
-            </button>
-            <button 
-              onClick={() => {
-                setIsCreating(false);
-                setNewCollectionName('');
-              }}
-              className="btn btn-secondary"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
+	const CollectionCard = ({ collection }: { collection: Collection }) => (
+		<div
+			className="collection-card"
+			onClick={() => setSelectedCollection(collection.name)}
+		>
+			<div className="collection-preview">
+				{collection.preview && (
+					<img
+						src={api.getThumbnailUrl(collection.preview)}
+						alt={collection.name}
+					/>
+				)}
+				<div className="collection-overlay">
+					<Grid className="w-5 h-5" />
+				</div>
+			</div>
+			<div className="collection-info">
+				<h3>{collection.name}</h3>
+				<span className="text-sm text-gray-500">{collection.count} items</span>
+			</div>
+			<div className="collection-actions">
+				<button
+					type="button"
+					onClick={(e) => {
+						e.stopPropagation();
+						deleteCollection(collection.name);
+					}}
+					className="btn-icon"
+				>
+					<Trash2 className="w-4 h-4" />
+				</button>
+			</div>
+		</div>
+	);
 
-      {loading ? (
-        <div className="loading-state">
-          <div className="spinner" />
-          <p>Loading collections...</p>
-        </div>
-      ) : (
-        <div className={viewMode === 'grid' ? 'collections-grid' : 'collections-list'}>
-          {collections.map(collection => 
-            viewMode === 'grid' ? 
-              <CollectionCard key={collection.name} collection={collection} /> :
-              <CollectionListItem key={collection.name} collection={collection} />
-          )}
-        </div>
-      )}
+	const CollectionListItem = ({ collection }: { collection: Collection }) => (
+		<div
+			className="collection-list-item"
+			onClick={() => setSelectedCollection(collection.name)}
+		>
+			<ChevronRight className="w-4 h-4 text-gray-400" />
+			<FolderPlus className="w-5 h-5 text-blue-500" />
+			<div className="flex-1">
+				<h3 className="font-medium">{collection.name}</h3>
+				<span className="text-sm text-gray-500">{collection.count} items</span>
+			</div>
+			<button
+				type="button"
+				onClick={(e) => {
+					e.stopPropagation();
+					deleteCollection(collection.name);
+				}}
+				className="btn-icon"
+			>
+				<Trash2 className="w-4 h-4" />
+			</button>
+		</div>
+	);
 
-      <style jsx>{`
+	return (
+		<div className="collections-manager">
+			<div className="manager-header">
+				<h2 className="text-2xl font-bold">Collections</h2>
+				<div className="flex items-center gap-3">
+					<div className="view-toggle">
+						<button
+							type="button"
+							onClick={() => setViewMode("grid")}
+							className={viewMode === "grid" ? "active" : ""}
+						>
+							<Grid className="w-4 h-4" />
+						</button>
+						<button
+							type="button"
+							onClick={() => setViewMode("list")}
+							className={viewMode === "list" ? "active" : ""}
+						>
+							<List className="w-4 h-4" />
+						</button>
+					</div>
+					<button
+						type="button"
+						onClick={() => setIsCreating(true)}
+						className="btn btn-primary"
+					>
+						<Plus className="w-4 h-4" />
+						New Collection
+					</button>
+				</div>
+			</div>
+
+			{isCreating && (
+				<div className="create-collection-panel">
+					<input
+						type="text"
+						placeholder="Collection name..."
+						value={newCollectionName}
+						onChange={(e) => setNewCollectionName(e.target.value)}
+						className="input"
+					/>
+					<div className="flex gap-2">
+						<button
+							type="button"
+							onClick={createCollection}
+							className="btn btn-primary"
+						>
+							Create
+						</button>
+						<button
+							type="button"
+							onClick={() => {
+								setIsCreating(false);
+								setNewCollectionName("");
+							}}
+							className="btn btn-secondary"
+						>
+							Cancel
+						</button>
+					</div>
+				</div>
+			)}
+
+			{loading ? (
+				<div className="loading-state">
+					<div className="spinner" />
+					<p>Loading collections...</p>
+				</div>
+			) : (
+				<div
+					className={
+						viewMode === "grid" ? "collections-grid" : "collections-list"
+					}
+				>
+					{collections.map((collection) =>
+						viewMode === "grid" ? (
+							<CollectionCard key={collection.name} collection={collection} />
+						) : (
+							<CollectionListItem
+								key={collection.name}
+								collection={collection}
+							/>
+						),
+					)}
+				</div>
+			)}
+
+			<style>{`
         .collections-manager {
           padding: 2rem;
           height: 100%;
@@ -360,6 +389,6 @@ export function CollectionsManager() {
           to { transform: rotate(360deg); }
         }
       `}</style>
-    </div>
-  );
+		</div>
+	);
 }

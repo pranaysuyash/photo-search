@@ -1,197 +1,208 @@
-import React, { useState, useEffect } from 'react';
-import { getAPI } from '../services/PhotoVaultAPI';
-import { Users, UserPlus, Edit2, RefreshCw, Check, X } from 'lucide-react';
+import { Check, Edit2, RefreshCw, UserPlus, Users, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { getAPI } from "../services/PhotoVaultAPI";
 
 interface FaceCluster {
-  id: string;
-  name?: string;
-  size: number;
-  examples: [string, number][];
+	id: string;
+	name?: string;
+	size: number;
+	examples: [string, number][];
 }
 
 export function FaceDetection() {
-  const [clusters, setClusters] = useState<FaceCluster[]>([]);
-  const [selectedCluster, setSelectedCluster] = useState<string | null>(null);
-  const [editingCluster, setEditingCluster] = useState<string | null>(null);
-  const [newName, setNewName] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [building, setBuilding] = useState(false);
-  const [stats, setStats] = useState({ totalFaces: 0, namedPeople: 0 });
-  
-  const api = getAPI();
+	const [clusters, setClusters] = useState<FaceCluster[]>([]);
+	const [selectedCluster, setSelectedCluster] = useState<string | null>(null);
+	const [editingCluster, setEditingCluster] = useState<string | null>(null);
+	const [newName, setNewName] = useState("");
+	const [loading, setLoading] = useState(false);
+	const [building, setBuilding] = useState(false);
+	const [stats, setStats] = useState({ totalFaces: 0, namedPeople: 0 });
 
-  useEffect(() => {
-    loadClusters();
-  }, []);
+	const api = getAPI();
 
-  const loadClusters = async () => {
-    setLoading(true);
-    try {
-      const data = await api.getFaceClusters();
-      setClusters(data.clusters);
-      
-      const totalFaces = data.clusters.reduce((sum, c) => sum + c.size, 0);
-      const namedPeople = data.clusters.filter(c => c.name).length;
-      setStats({ totalFaces, namedPeople });
-    } catch (error) {
-      console.error('Failed to load face clusters:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+	const loadClusters = useCallback(async () => {
+		setLoading(true);
+		try {
+			const data = await api.getFaceClusters();
+			setClusters(data.clusters);
 
-  const buildFaceIndex = async () => {
-    setBuilding(true);
-    try {
-      const result = await api.buildFaces();
-      console.log(`Built faces: ${result.faces} faces in ${result.clusters} clusters`);
-      await loadClusters();
-    } catch (error) {
-      console.error('Failed to build face index:', error);
-    } finally {
-      setBuilding(false);
-    }
-  };
+			const totalFaces = data.clusters.reduce((sum, c) => sum + c.size, 0);
+			const namedPeople = data.clusters.filter((c) => c.name).length;
+			setStats({ totalFaces, namedPeople });
+		} catch (error) {
+			console.error("Failed to load face clusters:", error);
+		} finally {
+			setLoading(false);
+		}
+	}, [api]);
 
-  const nameCluster = async (clusterId: string) => {
-    if (!newName.trim()) return;
-    
-    try {
-      await api.nameFaceCluster(clusterId, newName);
-      await loadClusters();
-      setEditingCluster(null);
-      setNewName('');
-    } catch (error) {
-      console.error('Failed to name cluster:', error);
-    }
-  };
+	useEffect(() => {
+		loadClusters();
+	}, [loadClusters]);
 
-  const FaceClusterCard = ({ cluster }: { cluster: FaceCluster }) => (
-    <div 
-      className={`face-cluster-card ${selectedCluster === cluster.id ? 'selected' : ''}`}
-      onClick={() => setSelectedCluster(cluster.id)}
-    >
-      <div className="cluster-header">
-        {editingCluster === cluster.id ? (
-          <div className="name-editor">
-            <input
-              type="text"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="Enter name..."
-              className="name-input"
-              autoFocus
-              onClick={(e) => e.stopPropagation()}
-            />
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                nameCluster(cluster.id);
-              }}
-              className="btn-icon"
-            >
-              <Check className="w-4 h-4" />
-            </button>
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                setEditingCluster(null);
-                setNewName('');
-              }}
-              className="btn-icon"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        ) : (
-          <>
-            <h3 className="cluster-name">
-              {cluster.name || `Person ${cluster.id.slice(0, 8)}`}
-            </h3>
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                setEditingCluster(cluster.id);
-                setNewName(cluster.name || '');
-              }}
-              className="btn-icon"
-            >
-              <Edit2 className="w-4 h-4" />
-            </button>
-          </>
-        )}
-      </div>
-      
-      <div className="cluster-stats">
-        <span className="text-sm text-gray-500">{cluster.size} photos</span>
-      </div>
-      
-      <div className="face-examples">
-        {cluster.examples.slice(0, 4).map(([path, embIdx], i) => (
-          <div key={i} className="face-thumbnail">
-            <img 
-              src={api.getFaceThumbnailUrl(path, embIdx, 96)} 
-              alt={`Face ${i + 1}`}
-            />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+	const buildFaceIndex = async () => {
+		setBuilding(true);
+		try {
+			const result = await api.buildFaces();
+			console.log(
+				`Built faces: ${result.faces} faces in ${result.clusters} clusters`,
+			);
+			await loadClusters();
+		} catch (error) {
+			console.error("Failed to build face index:", error);
+		} finally {
+			setBuilding(false);
+		}
+	};
 
-  return (
-    <div className="face-detection">
-      <div className="detection-header">
-        <div>
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            <Users className="w-6 h-6" />
-            People
-          </h2>
-          <p className="text-gray-500 mt-1">
-            {stats.totalFaces} faces detected • {stats.namedPeople} people identified
-          </p>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={buildFaceIndex}
-            disabled={building}
-            className="btn btn-secondary"
-          >
-            <RefreshCw className={`w-4 h-4 ${building ? 'animate-spin' : ''}`} />
-            {building ? 'Building...' : 'Rebuild Index'}
-          </button>
-        </div>
-      </div>
+	const nameCluster = async (clusterId: string) => {
+		if (!newName.trim()) return;
 
-      {loading ? (
-        <div className="loading-state">
-          <div className="spinner" />
-          <p>Loading faces...</p>
-        </div>
-      ) : clusters.length === 0 ? (
-        <div className="empty-state">
-          <Users className="w-16 h-16 text-gray-300" />
-          <h3 className="text-xl font-semibold mt-4">No faces detected yet</h3>
-          <p className="text-gray-500 mt-2">Build the face index to detect and group people in your photos</p>
-          <button 
-            onClick={buildFaceIndex}
-            disabled={building}
-            className="btn btn-primary mt-4"
-          >
-            <UserPlus className="w-4 h-4" />
-            Build Face Index
-          </button>
-        </div>
-      ) : (
-        <div className="clusters-grid">
-          {clusters.map(cluster => (
-            <FaceClusterCard key={cluster.id} cluster={cluster} />
-          ))}
-        </div>
-      )}
+		try {
+			await api.nameFaceCluster(clusterId, newName);
+			await loadClusters();
+			setEditingCluster(null);
+			setNewName("");
+		} catch (error) {
+			console.error("Failed to name cluster:", error);
+		}
+	};
 
-      <style jsx>{`
+	const FaceClusterCard = ({ cluster }: { cluster: FaceCluster }) => (
+		<div
+			className={`face-cluster-card ${selectedCluster === cluster.id ? "selected" : ""}`}
+			onClick={() => setSelectedCluster(cluster.id)}
+		>
+			<div className="cluster-header">
+				{editingCluster === cluster.id ? (
+					<div className="name-editor">
+						<input
+							type="text"
+							value={newName}
+							onChange={(e) => setNewName(e.target.value)}
+							placeholder="Enter name..."
+							className="name-input"
+							onClick={(e) => e.stopPropagation()}
+						/>
+						<button
+							type="button"
+							onClick={(e) => {
+								e.stopPropagation();
+								nameCluster(cluster.id);
+							}}
+							className="btn-icon"
+						>
+							<Check className="w-4 h-4" />
+						</button>
+						<button
+							type="button"
+							onClick={(e) => {
+								e.stopPropagation();
+								setEditingCluster(null);
+								setNewName("");
+							}}
+							className="btn-icon"
+						>
+							<X className="w-4 h-4" />
+						</button>
+					</div>
+				) : (
+					<>
+						<h3 className="cluster-name">
+							{cluster.name || `Person ${cluster.id.slice(0, 8)}`}
+						</h3>
+						<button
+							type="button"
+							onClick={(e) => {
+								e.stopPropagation();
+								setEditingCluster(cluster.id);
+								setNewName(cluster.name || "");
+							}}
+							className="btn-icon"
+						>
+							<Edit2 className="w-4 h-4" />
+						</button>
+					</>
+				)}
+			</div>
+
+			<div className="cluster-stats">
+				<span className="text-sm text-gray-500">{cluster.size} photos</span>
+			</div>
+
+			<div className="face-examples">
+				{cluster.examples.slice(0, 4).map(([path, embIdx], i) => (
+					<div key={`item-${i}`} className="face-thumbnail">
+						<img
+							src={api.getFaceThumbnailUrl(path, embIdx, 96)}
+							alt={`Face ${i + 1}`}
+						/>
+					</div>
+				))}
+			</div>
+		</div>
+	);
+
+	return (
+		<div className="face-detection">
+			<div className="detection-header">
+				<div>
+					<h2 className="text-2xl font-bold flex items-center gap-2">
+						<Users className="w-6 h-6" />
+						People
+					</h2>
+					<p className="text-gray-500 mt-1">
+						{stats.totalFaces} faces detected • {stats.namedPeople} people
+						identified
+					</p>
+				</div>
+
+				<div className="flex items-center gap-3">
+					<button
+						type="button"
+						onClick={buildFaceIndex}
+						disabled={building}
+						className="btn btn-secondary"
+					>
+						<RefreshCw
+							className={`w-4 h-4 ${building ? "animate-spin" : ""}`}
+						/>
+						{building ? "Building..." : "Rebuild Index"}
+					</button>
+				</div>
+			</div>
+
+			{loading ? (
+				<div className="loading-state">
+					<div className="spinner" />
+					<p>Loading faces...</p>
+				</div>
+			) : clusters.length === 0 ? (
+				<div className="empty-state">
+					<Users className="w-16 h-16 text-gray-300" />
+					<h3 className="text-xl font-semibold mt-4">No faces detected yet</h3>
+					<p className="text-gray-500 mt-2">
+						Build the face index to detect and group people in your photos
+					</p>
+					<button
+						type="button"
+						onClick={buildFaceIndex}
+						disabled={building}
+						className="btn btn-primary mt-4"
+					>
+						<UserPlus className="w-4 h-4" />
+						Build Face Index
+					</button>
+				</div>
+			) : (
+				<div className="clusters-grid">
+					{clusters.map((cluster) => (
+						<FaceClusterCard key={cluster.id} cluster={cluster} />
+					))}
+				</div>
+			)}
+
+			<style>{`
         .face-detection {
           padding: 2rem;
           height: 100%;
@@ -329,6 +340,6 @@ export function FaceDetection() {
           to { transform: rotate(360deg); }
         }
       `}</style>
-    </div>
-  );
+		</div>
+	);
 }

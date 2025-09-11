@@ -3,503 +3,587 @@
  * Integrates ALL 47 backend endpoints with proper typing and error handling
  */
 
-import * as api from '../api';
+import * as api from "../api";
+
+// Narrowed option types to mirror api.ts without duplicating full shapes here
+export type SearchOptions = {
+	hfToken?: string;
+	openaiKey?: string;
+	favoritesOnly?: boolean;
+	tags?: string[];
+	dateFrom?: number;
+	dateTo?: number;
+	useFast?: boolean;
+	fastKind?: string;
+	useCaptions?: boolean;
+	camera?: string;
+	isoMin?: number;
+	isoMax?: number;
+	fMin?: number;
+	fMax?: number;
+	flash?: "fired" | "noflash";
+	wb?: "auto" | "manual";
+	metering?: string;
+	altMin?: number;
+	altMax?: number;
+	headingMin?: number;
+	headingMax?: number;
+	place?: string;
+	useOcr?: boolean;
+	hasText?: boolean;
+	person?: string;
+	persons?: string[];
+	sharpOnly?: boolean;
+	excludeUnder?: boolean;
+	excludeOver?: boolean;
+};
 
 export interface PhotoVaultConfig {
-  dir: string;
-  provider: string;
-  hfToken?: string;
-  openaiKey?: string;
+	dir: string;
+	provider: string;
+	hfToken?: string;
+	openaiKey?: string;
 }
 
 export class PhotoVaultAPI {
-  private config: PhotoVaultConfig;
-  
-  constructor(config: PhotoVaultConfig) {
-    this.config = config;
-  }
+	private config: PhotoVaultConfig;
 
-  // ============================================================
-  // SEARCH & AI ENDPOINTS (7/7)
-  // ============================================================
-  
-  /**
-   * Text/semantic search across images
-   */
-  async search(query: string, topK = 24) {
-    return api.apiSearch(this.config.dir, query, this.config.provider, topK);
-  }
+	constructor(config: PhotoVaultConfig) {
+		this.config = config;
+	}
 
-  /**
-   * Search across entire workspace
-   */
-  async searchWorkspace(query: string, topK = 24) {
-    return api.apiSearchWorkspace(
-      this.config.dir,
-      query, 
-      this.config.provider, 
-      topK
-    );
-  }
+	// ============================================================
+	// SEARCH & AI ENDPOINTS (7/7)
+	// ============================================================
 
-  /**
-   * Find visually similar images
-   */
-  async searchSimilar(imagePath: string, topK = 24) {
-    return api.apiSearchLike(
-      this.config.dir,
-      imagePath,
-      this.config.provider,
-      topK
-    );
-  }
+	/**
+	 * Text/semantic search across images
+	 */
+	async search(query: string, topK = 24, opts?: SearchOptions) {
+		return api.apiSearch(this.config.dir, query, this.config.provider, topK, {
+			hfToken: this.config.hfToken,
+			openaiKey: this.config.openaiKey,
+			...opts,
+		});
+	}
 
-  /**
-   * Advanced similarity search with text weighting
-   */
-  async searchSimilarPlus(imagePath: string, text?: string, weight = 0.5, topK = 24) {
-    return api.apiSearchLikePlus(
-      this.config.dir,
-      imagePath,
-      this.config.provider,
-      topK,
-      text,
-      weight
-    );
-  }
+	/**
+	 * Search across entire workspace
+	 */
+	async searchWorkspace(
+		query: string,
+		topK = 24,
+		opts?: Pick<
+			SearchOptions,
+			| "favoritesOnly"
+			| "tags"
+			| "dateFrom"
+			| "dateTo"
+			| "place"
+			| "hasText"
+			| "person"
+			| "persons"
+		>,
+	) {
+		return api.apiSearchWorkspace(
+			this.config.dir,
+			query,
+			this.config.provider,
+			topK,
+			opts,
+		);
+	}
 
-  /**
-   * Build/rebuild search index
-   */
-  async buildIndex(batchSize = 32) {
-    return api.apiIndex(
-      this.config.dir,
-      this.config.provider,
-      batchSize,
-      this.config.hfToken,
-      this.config.openaiKey
-    );
-  }
+	/**
+	 * Find visually similar images
+	 */
+	async searchSimilar(imagePath: string, topK = 24) {
+		return api.apiSearchLike(
+			this.config.dir,
+			imagePath,
+			this.config.provider,
+			topK,
+		);
+	}
 
-  /**
-   * Build fast index (FAISS/Annoy/HNSW)
-   */
-  async buildFastIndex(kind: 'annoy' | 'faiss' | 'hnsw') {
-    return api.apiBuildFast(
-      this.config.dir,
-      kind,
-      this.config.provider,
-      this.config.hfToken,
-      this.config.openaiKey
-    );
-  }
+	/**
+	 * Advanced similarity search with text weighting
+	 */
+	async searchSimilarPlus(
+		imagePath: string,
+		text?: string,
+		weight = 0.5,
+		topK = 24,
+	) {
+		return api.apiSearchLikePlus(
+			this.config.dir,
+			imagePath,
+			this.config.provider,
+			topK,
+			text,
+			weight,
+		);
+	}
 
-  /**
-   * Generate AI captions for images
-   */
-  async buildCaptions(vlmModel: string) {
-    return api.apiBuildCaptions(
-      this.config.dir,
-      vlmModel,
-      this.config.provider,
-      this.config.hfToken,
-      this.config.openaiKey
-    );
-  }
+	/**
+	 * Build/rebuild search index
+	 */
+	async buildIndex(batchSize = 32) {
+		return api.apiIndex(
+			this.config.dir,
+			this.config.provider,
+			batchSize,
+			this.config.hfToken,
+			this.config.openaiKey,
+		);
+	}
 
-  // ============================================================
-  // COLLECTIONS & ORGANIZATION (9/9)
-  // ============================================================
+	/**
+	 * Build fast index (FAISS/Annoy/HNSW)
+	 */
+	async buildFastIndex(kind: "annoy" | "faiss" | "hnsw") {
+		return api.apiBuildFast(
+			this.config.dir,
+			kind,
+			this.config.provider,
+			this.config.hfToken,
+			this.config.openaiKey,
+		);
+	}
 
-  /**
-   * Get all collections
-   */
-  async getCollections() {
-    return api.apiGetCollections(this.config.dir);
-  }
+	/**
+	 * Generate AI captions for images
+	 */
+	async buildCaptions(vlmModel: string) {
+		return api.apiBuildCaptions(
+			this.config.dir,
+			vlmModel,
+			this.config.provider,
+			this.config.hfToken,
+			this.config.openaiKey,
+		);
+	}
 
-  /**
-   * Create or update a collection
-   */
-  async setCollection(name: string, paths: string[]) {
-    return api.apiSetCollection(this.config.dir, name, paths);
-  }
+	// ============================================================
+	// COLLECTIONS & ORGANIZATION (9/9)
+	// ============================================================
 
-  /**
-   * Delete a collection
-   */
-  async deleteCollection(name: string) {
-    return api.apiDeleteCollection(this.config.dir, name);
-  }
+	/**
+	 * Get all collections
+	 */
+	async getCollections() {
+		return api.apiGetCollections(this.config.dir);
+	}
 
-  /**
-   * Get smart collections
-   */
-  async getSmartCollections() {
-    return api.apiGetSmart(this.config.dir);
-  }
+	/**
+	 * Create or update a collection
+	 */
+	async setCollection(name: string, paths: string[]) {
+		return api.apiSetCollection(this.config.dir, name, paths);
+	}
 
-  /**
-   * Create smart collection with rules
-   */
-  async setSmartCollection(name: string, rules: any) {
-    return api.apiSetSmart(this.config.dir, name, rules);
-  }
+	/**
+	 * Delete a collection
+	 */
+	async deleteCollection(name: string) {
+		return api.apiDeleteCollection(this.config.dir, name);
+	}
 
-  /**
-   * Delete smart collection
-   */
-  async deleteSmartCollection(name: string) {
-    return api.apiDeleteSmart(this.config.dir, name);
-  }
+	/**
+	 * Get smart collections
+	 */
+	async getSmartCollections() {
+		return api.apiGetSmart(this.config.dir);
+	}
 
-  /**
-   * Resolve smart collection to get matching images
-   */
-  async resolveSmartCollection(name: string, topK = 24) {
-    return api.apiResolveSmart(
-      this.config.dir,
-      name,
-      this.config.provider,
-      topK
-    );
-  }
+	/**
+	 * Create smart collection with rules
+	 */
+	async setSmartCollection(name: string, rules: any) {
+		return api.apiSetSmart(this.config.dir, name, rules);
+	}
 
-  /**
-   * Build trips from photo metadata
-   */
-  async buildTrips() {
-    return api.apiTripsBuild(this.config.dir, this.config.provider);
-  }
+	/**
+	 * Delete smart collection
+	 */
+	async deleteSmartCollection(name: string) {
+		return api.apiDeleteSmart(this.config.dir, name);
+	}
 
-  /**
-   * Get list of detected trips
-   */
-  async getTrips() {
-    return api.apiTripsList(this.config.dir);
-  }
+	/**
+	 * Resolve smart collection to get matching images
+	 */
+	async resolveSmartCollection(name: string, topK = 24) {
+		return api.apiResolveSmart(
+			this.config.dir,
+			name,
+			this.config.provider,
+			topK,
+		);
+	}
 
-  // ============================================================
-  // FACE DETECTION & PEOPLE (3/3)
-  // ============================================================
+	/**
+	 * Build trips from photo metadata
+	 */
+	async buildTrips() {
+		return api.apiTripsBuild(this.config.dir, this.config.provider);
+	}
 
-  /**
-   * Build face detection index
-   */
-  async buildFaces() {
-    return api.apiBuildFaces(this.config.dir, this.config.provider);
-  }
+	/**
+	 * Get list of detected trips
+	 */
+	async getTrips() {
+		return api.apiTripsList(this.config.dir);
+	}
 
-  /**
-   * Get face clusters
-   */
-  async getFaceClusters() {
-    return api.apiFacesClusters(this.config.dir);
-  }
+	// ============================================================
+	// FACE DETECTION & PEOPLE (3/3)
+	// ============================================================
 
-  /**
-   * Name a face cluster
-   */
-  async nameFaceCluster(clusterId: string, name: string) {
-    return api.apiFacesName(this.config.dir, clusterId, name);
-  }
+	/**
+	 * Build face detection index
+	 */
+	async buildFaces() {
+		return api.apiBuildFaces(this.config.dir, this.config.provider);
+	}
 
-  // ============================================================
-  // TEXT & OCR (2/2)
-  // ============================================================
+	/**
+	 * Get face clusters
+	 */
+	async getFaceClusters() {
+		return api.apiFacesClusters(this.config.dir);
+	}
 
-  /**
-   * Build OCR text extraction
-   */
-  async buildOCR(languages?: string[]) {
-    return api.apiBuildOCR(
-      this.config.dir,
-      this.config.provider,
-      languages,
-      this.config.hfToken,
-      this.config.openaiKey
-    );
-  }
+	/**
+	 * Name a face cluster
+	 */
+	async nameFaceCluster(clusterId: string, name: string) {
+		return api.apiFacesName(this.config.dir, clusterId, name);
+	}
 
-  /**
-   * Get OCR text snippets for images
-   */
-  async getOCRSnippets(paths: string[], limit = 160) {
-    return api.apiOcrSnippets(this.config.dir, paths, limit);
-  }
+	// ============================================================
+	// TEXT & OCR (2/2)
+	// ============================================================
 
-  // ============================================================
-  // METADATA & TAGS (6/6)
-  // ============================================================
+	/**
+	 * Build OCR text extraction
+	 */
+	async buildOCR(languages?: string[]) {
+		return api.apiBuildOCR(
+			this.config.dir,
+			this.config.provider,
+			languages,
+			this.config.hfToken,
+			this.config.openaiKey,
+		);
+	}
 
-  /**
-   * Get all metadata
-   */
-  async getMetadata() {
-    return api.apiGetMetadata(this.config.dir);
-  }
+	/**
+	 * Get OCR text snippets for images
+	 */
+	async getOCRSnippets(paths: string[], limit = 160) {
+		return api.apiOcrSnippets(this.config.dir, paths, limit);
+	}
 
-  /**
-   * Get detailed metadata for specific image
-   */
-  async getMetadataDetail(path: string) {
-    return api.apiMetadataDetail(this.config.dir, path);
-  }
+	// ============================================================
+	// METADATA & TAGS (6/6)
+	// ============================================================
 
-  /**
-   * Build metadata extraction
-   */
-  async buildMetadata() {
-    return api.apiBuildMetadata(
-      this.config.dir,
-      this.config.provider,
-      this.config.hfToken,
-      this.config.openaiKey
-    );
-  }
+	/**
+	 * Get all metadata
+	 */
+	async getMetadata() {
+		return api.apiGetMetadata(this.config.dir);
+	}
 
-  /**
-   * Get all tags
-   */
-  async getTags() {
-    return api.apiGetTags(this.config.dir);
-  }
+	/**
+	 * Get detailed metadata for specific image
+	 */
+	async getMetadataDetail(path: string) {
+		return api.apiMetadataDetail(this.config.dir, path);
+	}
 
-  /**
-   * Set tags for an image
-   */
-  async setTags(path: string, tags: string[]) {
-    return api.apiSetTags(this.config.dir, path, tags);
-  }
+	/**
+	 * Build metadata extraction
+	 */
+	async buildMetadata() {
+		return api.apiBuildMetadata(
+			this.config.dir,
+			this.config.provider,
+			this.config.hfToken,
+			this.config.openaiKey,
+		);
+	}
 
-  /**
-   * Get location/map data
-   */
-  async getMapData() {
-    return api.apiMap(this.config.dir);
-  }
+	/**
+	 * Get all tags
+	 */
+	async getTags() {
+		return api.apiGetTags(this.config.dir);
+	}
 
-  // ============================================================
-  // FAVORITES & SAVED (5/5)
-  // ============================================================
+	/**
+	 * Set tags for an image
+	 */
+	async setTags(path: string, tags: string[]) {
+		return api.apiSetTags(this.config.dir, path, tags);
+	}
 
-  /**
-   * Get favorite images
-   */
-  async getFavorites() {
-    return api.apiGetFavorites(this.config.dir);
-  }
+	/**
+	 * Get location/map data
+	 */
+	async getMapData() {
+		return api.apiMap(this.config.dir);
+	}
 
-  /**
-   * Toggle favorite status
-   */
-  async setFavorite(path: string, favorite: boolean) {
-    return api.apiSetFavorite(this.config.dir, path, favorite);
-  }
+	// ============================================================
+	// FAVORITES & SAVED (5/5)
+	// ============================================================
 
-  /**
-   * Get saved searches
-   */
-  async getSavedSearches() {
-    return api.apiGetSaved(this.config.dir);
-  }
+	/**
+	 * Get favorite images
+	 */
+	async getFavorites() {
+		return api.apiGetFavorites(this.config.dir);
+	}
 
-  /**
-   * Save a search
-   */
-  async addSavedSearch(name: string, query: string, topK: number) {
-    return api.apiAddSaved(this.config.dir, name, query, topK);
-  }
+	/**
+	 * Toggle favorite status
+	 */
+	async setFavorite(path: string, favorite: boolean) {
+		return api.apiSetFavorite(this.config.dir, path, favorite);
+	}
 
-  /**
-   * Delete saved search
-   */
-  async deleteSavedSearch(name: string) {
-    return api.apiDeleteSaved(this.config.dir, name);
-  }
+	/**
+	 * Get saved searches
+	 */
+	async getSavedSearches() {
+		return api.apiGetSaved(this.config.dir);
+	}
 
-  // ============================================================
-  // IMAGE OPERATIONS (4/4)
-  // ============================================================
+	/**
+	 * Save a search
+	 */
+	async addSavedSearch(name: string, query: string, topK: number) {
+		return api.apiAddSaved(this.config.dir, name, query, topK);
+	}
 
-  /**
-   * Edit operations (rotate, flip, crop)
-   */
-  async editImage(path: string, ops: {
-    rotate?: number;
-    flip?: 'h' | 'v';
-    crop?: { x: number; y: number; w: number; h: number };
-  }) {
-    return api.apiEditOps(this.config.dir, path, ops);
-  }
+	/**
+	 * Delete saved search
+	 */
+	async deleteSavedSearch(name: string) {
+		return api.apiDeleteSaved(this.config.dir, name);
+	}
 
-  /**
-   * AI upscale image
-   */
-  async upscaleImage(path: string, scale: 2 | 4 = 2, engine: 'pil' | 'realesrgan' = 'pil') {
-    return api.apiUpscale(this.config.dir, path, scale, engine);
-  }
+	// ============================================================
+	// IMAGE OPERATIONS (4/4)
+	// ============================================================
 
-  /**
-   * Export images with options
-   */
-  async exportImages(
-    paths: string[],
-    dest: string,
-    mode: 'copy' | 'symlink' = 'copy',
-    stripExif = false,
-    overwrite = false
-  ) {
-    return api.apiExport(this.config.dir, paths, dest, mode, stripExif, overwrite);
-  }
+	/**
+	 * Edit operations (rotate, flip, crop)
+	 */
+	async editImage(
+		path: string,
+		ops: {
+			rotate?: number;
+			flip?: "h" | "v";
+			crop?: { x: number; y: number; w: number; h: number };
+		},
+	) {
+		return api.apiEditOps(this.config.dir, path, ops);
+	}
 
-  /**
-   * Open image in external application
-   */
-  async openExternal(path: string) {
-    return api.apiOpen(this.config.dir, path);
-  }
+	/**
+	 * AI upscale image
+	 */
+	async upscaleImage(
+		path: string,
+		scale: 2 | 4 = 2,
+		engine: "pil" | "realesrgan" = "pil",
+	) {
+		return api.apiUpscale(this.config.dir, path, scale, engine);
+	}
 
-  // ============================================================
-  // FILE MANAGEMENT (5/5)
-  // ============================================================
+	/**
+	 * Export images with options
+	 */
+	async exportImages(
+		paths: string[],
+		dest: string,
+		mode: "copy" | "symlink" = "copy",
+		stripExif = false,
+		overwrite = false,
+	) {
+		return api.apiExport(
+			this.config.dir,
+			paths,
+			dest,
+			mode,
+			stripExif,
+			overwrite,
+		);
+	}
 
-  /**
-   * Get library images
-   */
-  async getLibrary(limit = 120, offset = 0) {
-    return api.apiLibrary(
-      this.config.dir,
-      this.config.provider,
-      limit,
-      offset,
-      {
-        hfToken: this.config.hfToken,
-        openaiKey: this.config.openaiKey
-      }
-    );
-  }
+	/**
+	 * Open image in external application
+	 */
+	async openExternal(path: string) {
+		return api.apiOpen(this.config.dir, path);
+	}
 
-  /**
-   * List workspace folders
-   */
-  async getWorkspace() {
-    return api.apiWorkspaceList();
-  }
+	// ============================================================
+	// FILE MANAGEMENT (5/5)
+	// ============================================================
 
-  /**
-   * Add folder to workspace
-   */
-  async addToWorkspace(path: string) {
-    return api.apiWorkspaceAdd(path);
-  }
+	/**
+	 * Get library images
+	 */
+	async getLibrary(limit = 120, offset = 0) {
+		return api.apiLibrary(
+			this.config.dir,
+			this.config.provider,
+			limit,
+			offset,
+			{
+				hfToken: this.config.hfToken,
+				openaiKey: this.config.openaiKey,
+			},
+		);
+	}
 
-  /**
-   * Remove folder from workspace
-   */
-  async removeFromWorkspace(path: string) {
-    return api.apiWorkspaceRemove(path);
-  }
+	/**
+	 * List workspace folders
+	 */
+	async getWorkspace() {
+		return api.apiWorkspaceList();
+	}
 
-  /**
-   * Delete images (with optional OS trash)
-   */
-  async deleteImages(paths: string[], useOsTrash = true) {
-    return api.apiDelete(this.config.dir, paths, useOsTrash);
-  }
+	/**
+	 * Add folder to workspace
+	 */
+	async addToWorkspace(path: string) {
+		return api.apiWorkspaceAdd(path);
+	}
 
-  /**
-   * Undo last delete operation
-   */
-  async undoDelete() {
-    return api.apiUndoDelete(this.config.dir);
-  }
+	/**
+	 * Remove folder from workspace
+	 */
+	async removeFromWorkspace(path: string) {
+		return api.apiWorkspaceRemove(path);
+	}
 
-  // ============================================================
-  // SIMILARITY & ANALYSIS (2/2)
-  // ============================================================
+	/**
+	 * Delete images (with optional OS trash)
+	 */
+	async deleteImages(paths: string[], useOsTrash = true) {
+		return api.apiDelete(this.config.dir, paths, useOsTrash);
+	}
 
-  /**
-   * Find duplicate/similar images
-   */
-  async findLookalikes(maxDistance = 5) {
-    return api.apiLookalikes(this.config.dir, maxDistance);
-  }
+	/**
+	 * Undo last delete operation
+	 */
+	async undoDelete() {
+		return api.apiUndoDelete(this.config.dir);
+	}
 
-  /**
-   * Resolve lookalikes (mark as duplicates)
-   */
-  async resolveLookalikes(paths: string[]) {
-    return api.apiResolveLookalike(this.config.dir, paths);
-  }
+	// ============================================================
+	// SIMILARITY & ANALYSIS (2/2)
+	// ============================================================
 
-  // ============================================================
-  // SYSTEM & FEEDBACK (3/3)
-  // ============================================================
+	/**
+	 * Find duplicate/similar images
+	 */
+	async findLookalikes(maxDistance = 5) {
+		return api.apiLookalikes(this.config.dir, maxDistance);
+	}
 
-  /**
-   * Run system diagnostics
-   */
-  async runDiagnostics() {
-    return api.apiDiagnostics(
-      this.config.dir,
-      this.config.provider,
-      this.config.openaiKey,
-      this.config.hfToken
-    );
-  }
+	/**
+	 * Resolve lookalikes (mark as duplicates)
+	 */
+	async resolveLookalikes(paths: string[]) {
+		return api.apiResolveLookalike(this.config.dir, paths);
+	}
 
-  /**
-   * Submit user feedback
-   */
-  async submitFeedback(searchId: string, query: string, positives: string[], note: string) {
-    return api.apiFeedback(this.config.dir, searchId, query, positives, note);
-  }
+	// ============================================================
+	// SYSTEM & FEEDBACK (3/3)
+	// ============================================================
 
-  /**
-   * Get todo/task list
-   */
-  async getTodos() {
-    return api.apiTodo();
-  }
+	/**
+	 * Run system diagnostics
+	 */
+	async runDiagnostics() {
+		return api.apiDiagnostics(
+			this.config.dir,
+			this.config.provider,
+			this.config.openaiKey,
+			this.config.hfToken,
+		);
+	}
 
-  // ============================================================
-  // UTILITIES
-  // ============================================================
+	/**
+	 * Submit user feedback
+	 */
+	async submitFeedback(
+		searchId: string,
+		query: string,
+		positives: string[],
+		note: string,
+	) {
+		return api.apiFeedback(this.config.dir, searchId, query, positives, note);
+	}
 
-  /**
-   * Get thumbnail URL for image
-   */
-  getThumbnailUrl(path: string): string {
-    return api.thumbUrl(this.config.dir, this.config.provider, path);
-  }
+	/**
+	 * Get todo/task list
+	 */
+	async getTodos() {
+		return api.apiTodo();
+	}
 
-  /**
-   * Get face thumbnail URL
-   */
-  getFaceThumbnailUrl(path: string, emb: number, size = 196): string {
-    return api.thumbFaceUrl(this.config.dir, this.config.provider, path, emb, size);
-  }
+	// ============================================================
+	// UTILITIES
+	// ============================================================
 
-  /**
-   * Auto-tag images
-   */
-  async autoTag() {
-    return api.apiAutotag(this.config.dir, this.config.provider);
-  }
+	/**
+	 * Get thumbnail URL for image
+	 */
+	getThumbnailUrl(path: string): string {
+		return api.thumbUrl(this.config.dir, this.config.provider, path);
+	}
+
+	/**
+	 * Get face thumbnail URL
+	 */
+	getFaceThumbnailUrl(path: string, emb: number, size = 196): string {
+		return api.thumbFaceUrl(
+			this.config.dir,
+			this.config.provider,
+			path,
+			emb,
+			size,
+		);
+	}
+
+	/**
+	 * Auto-tag images
+	 */
+	async autoTag() {
+		return api.apiAutotag(this.config.dir, this.config.provider);
+	}
 }
 
 // Singleton instance
 let apiInstance: PhotoVaultAPI | null = null;
 
 export function initializeAPI(config: PhotoVaultConfig): PhotoVaultAPI {
-  apiInstance = new PhotoVaultAPI(config);
-  return apiInstance;
+	apiInstance = new PhotoVaultAPI(config);
+	return apiInstance;
 }
 
 export function getAPI(): PhotoVaultAPI {
-  if (!apiInstance) {
-    throw new Error('PhotoVault API not initialized. Call initializeAPI first.');
-  }
-  return apiInstance;
+	if (!apiInstance) {
+		throw new Error(
+			"PhotoVault API not initialized. Call initializeAPI first.",
+		);
+	}
+	return apiInstance;
 }
