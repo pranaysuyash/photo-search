@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import React, {
 	useCallback,
 	useEffect,
@@ -104,7 +104,7 @@ import { Welcome } from "./components/Welcome";
 import { useDebouncedCallback } from "./hooks/useDebounce";
 import { ShareManager } from "./modules/ShareManager";
 import { VideoService } from "./services/VideoService";
-import { useHighContrast } from "./stores/settingsStore";
+import { useHighContrast, useThemeStore } from "./stores/settingsStore";
 import {
 	useAllTags,
 	// Individual UI hooks
@@ -328,8 +328,8 @@ export default function App() {
 	const _libHasMore = useLibHasMore();
 	const tagsMap = useTagsMap();
 
-	// Individual hooks for UI
-	const busy = useBusy();
+    // Individual hooks for UI
+    const busy = useBusy();
 	const note = useNote();
 	// const viewMode = useViewMode()
 	const showWelcome = useShowWelcome();
@@ -350,7 +350,11 @@ export default function App() {
 	const uiActions = useUIActions();
 	const workspaceActions = useWorkspaceActions();
 
-	// Local UI state
+    // Theme controls
+    const themeMode = useThemeStore((s) => s.themeMode);
+    const setThemeMode = useThemeStore((s) => s.setThemeMode);
+
+    // Local UI state
 	const [selectedView, setSelectedView] = useState<View>("library");
 	const location = useLocation();
 	const navigate = useNavigate();
@@ -2201,8 +2205,10 @@ export default function App() {
 												fastIndexType: "FAISS",
 												freeSpace: 0,
 											}}
-											darkMode={false}
-											onDarkModeToggle={() => {}}
+                            darkMode={themeMode === "dark"}
+                            onDarkModeToggle={() =>
+                                setThemeMode(themeMode === "dark" ? "light" : "dark")
+                            }
 											onSettingsClick={() => setShowAccessibilityPanel(true)}
 											onSelectLibrary={() => setModal({ kind: "folder" })}
 										/>
@@ -2223,8 +2229,10 @@ export default function App() {
                             fastIndexType: "FAISS",
                             freeSpace: 0,
                         }}
-                        darkMode={false}
-                        onDarkModeToggle={() => {}}
+                        darkMode={themeMode === "dark"}
+                        onDarkModeToggle={() =>
+                            setThemeMode(themeMode === "dark" ? "light" : "dark")
+                        }
                         onSettingsClick={() => setShowAccessibilityPanel(true)}
                         onSelectLibrary={() => setModal({ kind: "folder" })}
                     />
@@ -2357,11 +2365,12 @@ export default function App() {
 												</div>
 											)}
 										</div>
-										<div
-											className="flex-1 overflow-auto"
-											ref={scrollContainerRef}
-										>
-											{selectedView === "results" && (
+                            <div
+                                className="flex-1 overflow-auto"
+                                ref={scrollContainerRef}
+                            >
+                                
+                                {selectedView === "results" && (
 												<SectionErrorBoundary sectionName="Search Results">
 													<div className="p-4">
 														{/* Results context toolbar */}
@@ -2509,8 +2518,9 @@ export default function App() {
 																showInfoOverlay={showInfoOverlay}
 																bucket={timelineBucket}
 															/>
-														)}
-													</div>
+                                )}
+                                
+                            </div>
 												</SectionErrorBoundary>
 											)}
 											{selectedView === "library" && (

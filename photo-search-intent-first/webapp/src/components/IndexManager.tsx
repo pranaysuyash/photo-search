@@ -40,10 +40,10 @@ export default function IndexManager({
 	onAutoTag,
 	onLoadDiag,
 }: IndexManagerProps) {
-	return (
-		<div className="space-y-6">
-			{/* Index Building Controls */}
-			<div className="bg-white border rounded p-3">
+    return (
+        <div className="space-y-6">
+            {/* Index Building Controls */}
+            <div className="glass-panel p-3">
 				<div className="flex items-center justify-between mb-3">
 					<h2 className="font-semibold">Index Management</h2>
 					<button
@@ -117,8 +117,8 @@ export default function IndexManager({
 				)}
 			</div>
 
-			{/* Diagnostics */}
-			<div className="bg-white border rounded p-3">
+            {/* Diagnostics */}
+            <div className="glass-panel p-3">
 				<div className="flex items-center justify-between">
 					<h2 className="font-semibold">Diagnostics</h2>
 					<button
