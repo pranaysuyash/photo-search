@@ -64,3 +64,20 @@ Testing Without Downloading Models
   - Intent-First: `PYTHONPATH=photo-search-intent-first python3 photo-search-intent-first/tests/smoke_dummy.py`
 
 See `DIFFERENCES.md` for a comparison of the two approaches.
+
+Dev: API Token Pairing (401 fix)
+- When `API_TOKEN` is set, the backend requires `Authorization: Bearer <token>` on mutating endpoints (search, index, etc.).
+Dev auth defaults
+- Default is no-auth in development: `.env` includes `DEV_NO_AUTH=1` which bypasses auth even if `API_TOKEN` is set.
+- To test auth locally, set `DEV_NO_AUTH=0` (or unset), then add a matching token pair:
+  - Backend: `API_TOKEN=dev123`
+  - Frontend: `VITE_API_TOKEN=dev123` (or `localStorage.setItem('api_token','dev123')`)
+- Diagnostics:
+  - `GET /auth/status` → `{ auth_required: true|false }`
+  - `POST /auth/check` (with Authorization header) → 200 if accepted
+
+Production auth
+- Set `API_TOKEN=<strong-random>` and do not set `DEV_NO_AUTH`.
+- Ensure the deployed UI sends `Authorization: Bearer <token>` for write calls. See `docs/AUTH.md` for options and security notes.
+
+If you still see HMR reload errors, hard refresh the browser to clear stale modules and ensure API is running on `http://localhost:8000` (per `VITE_API_BASE`).

@@ -19,17 +19,14 @@ export const API_BASE =
 	"http://127.0.0.1:8000";
 
 function authHeaders() {
-	try {
-		// Prefer Vite env at build-time; allow runtime override via localStorage
-		const token =
-			(import.meta as any).env?.VITE_API_TOKEN ||
-			(typeof window !== "undefined"
-				? localStorage.getItem("api_token")
-				: null);
-		if (token)
-			return { Authorization: `Bearer ${token}` } as Record<string, string>;
-	} catch {}
-	return {} as Record<string, string>;
+    try {
+        // Runtime token from localStorage should take precedence in dev
+        const ls = typeof window !== "undefined" ? localStorage.getItem("api_token") : null;
+        const envTok = (import.meta as any).env?.VITE_API_TOKEN;
+        const token = ls || envTok;
+        if (token) return { Authorization: `Bearer ${token}` } as Record<string, string>;
+    } catch {}
+    return {} as Record<string, string>;
 }
 
 async function post<T>(path: string, body: any): Promise<T> {
@@ -885,11 +882,7 @@ export async function apiTripsList(dir: string) {
 	}>;
 }
 
-export async function apiTodo() {
-	const r = await fetch(`${API_BASE}/todo`);
-	if (!r.ok) throw new Error(await r.text());
-	return r.json() as Promise<{ text: string }>;
-}
+// Deprecated: apiTodo() removed
 
 export async function apiAutotag(dir: string, provider: string) {
 	return post<{ tags: Record<string, string[]> }>("/autotag", {

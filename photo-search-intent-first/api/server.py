@@ -106,6 +106,23 @@ if _static is not None:
 def api_ping() -> Dict[str, Any]:
     return {"ok": True}
 
+# Auth status (dev helper)
+@app.get("/auth/status")
+def api_auth_status() -> Dict[str, Any]:
+    """Return whether the API currently requires an auth token.
+
+    Note: Does not reveal the token. Useful for diagnosing 401s in dev.
+    """
+    return {"auth_required": (not _DEV_NO_AUTH) and bool(_API_TOKEN)}
+
+@app.post("/auth/check")
+def api_auth_check() -> Dict[str, Any]:
+    """POST endpoint that succeeds only if Authorization is accepted.
+
+    Useful for quickly verifying client token configuration in development.
+    """
+    return {"ok": True}
+
 # Watchers (optional)
 _WATCH = WatchManager()
 
@@ -302,12 +319,16 @@ _load_env_file()
 
 # Optional ephemeral auth token – when set, enforce on write endpoints
 _API_TOKEN = os.environ.get("API_TOKEN", "").strip() or None
+# Development bypass: when enabled, skip auth even if API_TOKEN is set
+_DEV_NO_AUTH = (os.environ.get("DEV_NO_AUTH", "").strip() == "1") or (
+    os.environ.get("ENV", "").strip().lower() in ("dev", "development")
+)
 
 @app.middleware("http")
 async def _auth_middleware(request, call_next):
     try:
-        # Skip if no token configured
-        if not _API_TOKEN:
+        # Skip in development or if no token configured
+        if _DEV_NO_AUTH or not _API_TOKEN:
             return await call_next(request)
         path = str(request.url.path or "")
         # Allow static assets and share viewer endpoints without auth
@@ -358,18 +379,7 @@ def api_set_excludes(req: ExcludeReq) -> Dict[str, Any]:
     except Exception as e:
         raise HTTPException(500, f"Failed to save excludes: {e}")
 
-@app.get("/todo")
-def api_todo() -> Dict[str, Any]:
-    """Return the repository TODO.md contents for in-app Tasks view."""
-    try:
-        # server.py -> api -> intent-first -> repo root
-        repo_root = Path(__file__).resolve().parents[2]
-        todo_path = repo_root / 'TODO.md'
-        if not todo_path.exists():
-            return {"text": "# TODO\nNo TODO.md found."}
-        return {"text": todo_path.read_text(encoding='utf-8')}
-    except Exception:
-        return {"text": "# TODO\nUnable to load TODO.md."}
+# Removed deprecated developer-only TODO endpoint
 
 
 def _emb(provider: str, hf_token: Optional[str], openai_key: Optional[str], st_model: Optional[str] = None,

@@ -1,5 +1,5 @@
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiWorkspaceAdd } from "../../api";
 import FolderPicker from "../FolderPicker";
 
@@ -9,7 +9,34 @@ interface FocusTrapProps {
 }
 
 const FocusTrap: React.FC<FocusTrapProps> = ({ onEscape, children }) => {
-	return <div>{children}</div>;
+	const modalRef = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.key === 'Escape') {
+				onEscape();
+			}
+		};
+
+		const firstFocusable = modalRef.current?.querySelector(
+			'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+		) as HTMLElement;
+
+		if (firstFocusable) {
+			firstFocusable.focus();
+		}
+
+		document.addEventListener('keydown', handleKeyDown);
+		return () => {
+			document.removeEventListener('keydown', handleKeyDown);
+		};
+	}, [onEscape]);
+
+	return (
+		<div ref={modalRef}>
+			{children}
+		</div>
+	);
 };
 
 interface FolderModalProps {

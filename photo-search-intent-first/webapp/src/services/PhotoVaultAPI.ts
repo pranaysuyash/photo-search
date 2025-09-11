@@ -532,12 +532,7 @@ export class PhotoVaultAPI {
 		return api.apiFeedback(this.config.dir, searchId, query, positives, note);
 	}
 
-	/**
-	 * Get todo/task list
-	 */
-	async getTodos() {
-		return api.apiTodo();
-	}
+    // Developer-only TODOs removed
 
 	// ============================================================
 	// UTILITIES

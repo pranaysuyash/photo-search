@@ -110,12 +110,8 @@ export function Sidebar({
 			icon: IconSearch,
 			count: savedSearches?.length || 0,
 		},
-		{
-			id: "tasks",
-			label: "Tasks",
-			icon: IconTasks,
-		},
-	];
+    // Tasks removed from user app
+];
 
 	const renderNavItem = (item: NavItem) => (
 		<button
@@ -123,6 +119,8 @@ export function Sidebar({
 			type="button"
 			onClick={() => onViewChange(item.id)}
 			className={`nav-item ${selectedView === item.id ? "active" : ""}`}
+			aria-current={selectedView === item.id ? "page" : undefined}
+			aria-label={`${item.label} ${item.count !== undefined ? `(${item.count})` : ""}`}
 		>
 			<div className="nav-item-content">
 				<item.icon className="nav-item-icon" />
@@ -155,7 +153,7 @@ export function Sidebar({
 					</button>
 				</div>
 
-				<nav className="sidebar-nav">
+				<nav className="sidebar-nav" role="navigation" aria-label="Main navigation">
 					<div className="nav-section">
 						<h3 className="nav-section-title">Library</h3>
 						<div className="nav-items">{navItems.map(renderNavItem)}</div>

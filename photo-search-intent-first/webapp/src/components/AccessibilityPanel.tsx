@@ -13,7 +13,7 @@ import {
 	VolumeX,
 	X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface AccessibilityPanelProps {
 	isOpen: boolean;
@@ -55,6 +55,7 @@ export function AccessibilityPanel({
 	const [activeTab, setActiveTab] = useState<
 		"vision" | "motor" | "cognitive" | "general"
 	>("general");
+	const panelRef = useRef<HTMLDivElement>(null);
 
 	// Load settings from localStorage on mount
 	useEffect(() => {
@@ -68,6 +69,19 @@ export function AccessibilityPanel({
 			}
 		}
 	}, []);
+
+	// Auto-focus first focusable element when panel opens
+	useEffect(() => {
+		if (isOpen && panelRef.current) {
+			const firstFocusable = panelRef.current.querySelector(
+				'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+			) as HTMLElement;
+			
+			if (firstFocusable) {
+				firstFocusable.focus();
+			}
+		}
+	}, [isOpen]);
 
 	// Save settings to localStorage and notify parent
 	const updateSetting = <K extends keyof AccessibilitySettings>(
@@ -556,6 +570,7 @@ export function AccessibilityPanel({
 						role="dialog"
 						aria-modal="true"
 						aria-labelledby="accessibility-title"
+						ref={panelRef}
 					>
 						{/* Header */}
 						<div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">

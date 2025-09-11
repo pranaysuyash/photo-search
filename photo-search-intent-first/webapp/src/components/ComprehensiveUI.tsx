@@ -98,7 +98,7 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 
 	// System state
 	const [diagnostics, setDiagnostics] = useState<any>(null);
-	const [_todos, setTodos] = useState<any[]>([]);
+    // Developer-only TODOs removed
 	const [lookalikes, setLookalikes] = useState<any[]>([]);
 
 	// Notification handler
@@ -114,31 +114,29 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 		setLoading(true);
 		try {
 			// Load all data in parallel
-			const [
-				libraryData,
-				collectionsData,
-				smartData,
-				facesData,
-				tripsData,
-				mapData,
-				tagsData,
-				metadataData,
-				favoritesData,
-				savedData,
-				todosData,
-			] = await Promise.all([
-				api.current.getLibrary(),
-				api.current.getCollections(),
-				api.current.getSmartCollections(),
-				api.current.getFaceClusters(),
-				api.current.getTrips(),
-				api.current.getMapData(),
-				api.current.getTags(),
-				api.current.getMetadata(),
-				api.current.getFavorites(),
-				api.current.getSavedSearches(),
-				api.current.getTodos(),
-			]);
+            const [
+                libraryData,
+                collectionsData,
+                smartData,
+                facesData,
+                tripsData,
+                mapData,
+                tagsData,
+                metadataData,
+                favoritesData,
+                savedData,
+            ] = await Promise.all([
+                api.current.getLibrary(),
+                api.current.getCollections(),
+                api.current.getSmartCollections(),
+                api.current.getFaceClusters(),
+                api.current.getTrips(),
+                api.current.getMapData(),
+                api.current.getTags(),
+                api.current.getMetadata(),
+                api.current.getFavorites(),
+                api.current.getSavedSearches(),
+            ]);
 
 			setPhotos(libraryData.paths || []);
 			setCollections(collectionsData.collections || {});
@@ -149,8 +147,7 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 			setTags(tagsData.all || []);
 			setMetadata(metadataData);
 			setFavorites(favoritesData.favorites || []);
-			setSavedSearches(savedData.saved || []);
-			setTodos(todosData.text ? [todosData.text] : []);
+            setSavedSearches(savedData.saved || []);
 
 			showNotification("success", "All data loaded successfully");
 		} catch (err: any) {

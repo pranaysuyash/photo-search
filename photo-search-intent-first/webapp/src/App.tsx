@@ -92,11 +92,12 @@ import { Sidebar } from "./components/Sidebar";
 import SmartCollections from "./components/SmartCollections";
 import { StatsBar } from "./components/StatsBar";
 import { StatusBar } from "./components/StatusBar";
-import TasksView from "./components/TasksView";
+// TasksView removed (developer-only)
 import { ThemeProvider } from "./components/ThemeProvider";
 import { ThemeSettingsModal } from "./components/ThemeSettingsModal";
 import TimelineResults from "./components/TimelineResults";
 import { TopBar } from "./components/TopBar";
+import ToastPortal from "./components/ToastPortal";
 import TripsView from "./components/TripsView";
 import { VideoLightbox } from "./components/VideoLightbox";
 import { VideoManager } from "./components/VideoManager";
@@ -2059,21 +2060,29 @@ export default function App() {
 							onPullToRefresh={handlePullToRefresh}
 						>
 							{/* Dedicated share viewer route (full screen, minimal chrome) */}
-							{(location.pathname || "").startsWith("/share/") ? (
-								<ShareViewer />
-							) : (location.pathname || "").startsWith("/mobile-test") ? (
+							{(location.pathname || "").startsWith("/share/") && <ShareViewer />}
+							{(location.pathname || "").startsWith("/mobile-test") && (
 								<MobilePWATest />
-							) : (
-								<div
-									className={clsx(
-										"flex h-screen bg-white dark:bg-gray-950 dark:text-gray-100",
-										{
-											"high-contrast": accessibilitySettings?.highContrast,
-											"large-text": accessibilitySettings?.largeText,
-										},
-									)}
-								>
-									<OfflineIndicator />
+							)}
+							<div
+								className={clsx(
+									"flex h-screen bg-white dark:bg-gray-950 dark:text-gray-100",
+									{
+										"high-contrast": accessibilitySettings?.highContrast,
+										"large-text": accessibilitySettings?.largeText,
+										hidden:
+											(location.pathname || "").startsWith("/share/") ||
+											(location.pathname || "").startsWith("/mobile-test"),
+									},
+								)}
+							>
+							<a
+								href="#main-content"
+								className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 bg-blue-600 text-white px-4 py-2 rounded-md"
+							>
+								Skip to main content
+							</a>
+							<OfflineIndicator />
 									{showWelcome && (
 										<Welcome
 											onStartDemo={async () => {
@@ -2362,12 +2371,15 @@ export default function App() {
 													>
 														×
 													</button>
-												</div>
-											)}
-										</div>
-                            <div
+									</div>
+										)}
+									</div>
+                            <main
+                                id="main-content"
                                 className="flex-1 overflow-auto"
                                 ref={scrollContainerRef}
+                                role="main"
+                                aria-label="Main content"
                             >
                                 
                                 {selectedView === "results" && (
@@ -2809,11 +2821,7 @@ export default function App() {
 													</div>
 												</div>
 											)}
-											{selectedView === "tasks" && (
-												<div className="p-4">
-													<TasksView />
-												</div>
-											)}
+                            {/* tasks view removed */}
 											{selectedView === "smart" && (
 												<div className="p-4">
 													<SmartCollections
@@ -2857,8 +2865,7 @@ export default function App() {
 													<VideoManager currentDir={dir} provider={engine} />
 												</div>
 											)}
-										</div>
-										<StatsBar
+											<StatsBar
 											items={items}
 											note={note}
 											diag={diag}
@@ -3347,38 +3354,36 @@ export default function App() {
 											</div>
 										)}
 										{toast && (
-											<div
-												className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[1070]"
-												role="status"
-												aria-live="polite"
-											>
-												<div className="flex items-center gap-3 bg-gray-900 text-white px-4 py-2 rounded shadow">
-													<span className="text-sm">{toast.message}</span>
-													{toast.actionLabel && toast.onAction && (
+											<ToastPortal>
+												<div className="pv-toast" role="status" aria-live="polite">
+													<div className="flex items-center gap-3 bg-gray-900 text-white px-4 py-2 rounded shadow">
+														<span className="text-sm">{toast.message}</span>
+														{toast.actionLabel && toast.onAction && (
+															<button
+																type="button"
+																className="text-sm underline"
+																onClick={toast.onAction}
+															>
+																{toast.actionLabel}
+															</button>
+														)}
 														<button
 															type="button"
-															className="text-sm underline"
-															onClick={toast.onAction}
+															aria-label="Close notification"
+															className="ml-1"
+															onClick={() => {
+																setToast(null);
+																if (toastTimerRef.current) {
+																	window.clearTimeout(toastTimerRef.current);
+																	toastTimerRef.current = null;
+																}
+															}}
 														>
-															{toast.actionLabel}
+															×
 														</button>
-													)}
-													<button
-														type="button"
-														aria-label="Close notification"
-														className="ml-1"
-														onClick={() => {
-															setToast(null);
-															if (toastTimerRef.current) {
-																window.clearTimeout(toastTimerRef.current);
-																toastTimerRef.current = null;
-															}
-														}}
-													>
-														×
-													</button>
+													</div>
 												</div>
-											</div>
+											</ToastPortal>
 										)}
 
 										{/* Status Bar */}
@@ -3473,7 +3478,6 @@ export default function App() {
 											onShowLibrary={() => setModal({ kind: "folder" })}
 											showSecondaryActions={true}
 										/>
-									</div>
 
 									{/* Progressive Onboarding Components */}
 									<ContextualHelp
@@ -3550,41 +3554,46 @@ export default function App() {
 
 									{/* Performance Monitor for development */}
 									<PerformanceMonitor />
-								</div>
-							)}
+							</main>
 
-							{/* Modern UX Integration - Accessibility Panel */}
-							{showAccessibilityPanel && (
-								<AccessibilityPanel
-									isOpen={showAccessibilityPanel}
-									onClose={() => setShowAccessibilityPanel(false)}
-									onSettingsChange={handleAccessibilitySettingsChange}
-								/>
-							)}
+							{/* Close main containers returned by the content layout */}
+							</div>
+						</div>
 
-							{/* Modern UX Integration - Onboarding Tour */}
-							{showOnboardingTour && (
-								<OnboardingTour
-									isActive={showOnboardingTour}
-									onComplete={handleOnboardingComplete}
-									onSkip={() => setShowOnboardingTour(false)}
-								/>
-							)}
 
-							{/* Modern UX Integration - Hint System is already provided by HintProvider above */}
-							<AppWithHints
-								searchText={searchText}
-								selected={selected}
-								showAccessibilityPanel={showAccessibilityPanel}
-								setShowAccessibilityPanel={setShowAccessibilityPanel}
-								handleAccessibilitySettingsChange={
-									handleAccessibilitySettingsChange
-								}
-								showOnboardingTour={showOnboardingTour}
-								handleOnboardingComplete={handleOnboardingComplete}
-								setShowOnboardingTour={setShowOnboardingTour}
-							/>
-						</MobileOptimizations>
+									{/* Modern UX Integration - Accessibility Panel */}
+									{showAccessibilityPanel && (
+										<AccessibilityPanel
+											isOpen={showAccessibilityPanel}
+											onClose={() => setShowAccessibilityPanel(false)}
+											onSettingsChange={handleAccessibilitySettingsChange}
+										/>
+									)}
+
+									{/* Modern UX Integration - Onboarding Tour */}
+									{showOnboardingTour && (
+										<OnboardingTour
+											isActive={showOnboardingTour}
+											onComplete={handleOnboardingComplete}
+											onSkip={() => setShowOnboardingTour(false)}
+										/>
+									)}
+
+									{/* Modern UX Integration - Hint System is already provided by HintProvider above */}
+									<AppWithHints
+										searchText={searchText}
+										selected={selected}
+										showAccessibilityPanel={showAccessibilityPanel}
+										setShowAccessibilityPanel={setShowAccessibilityPanel}
+										handleAccessibilitySettingsChange={
+											handleAccessibilitySettingsChange
+										}
+										showOnboardingTour={showOnboardingTour}
+										handleOnboardingComplete={handleOnboardingComplete}
+										setShowOnboardingTour={setShowOnboardingTour}
+									/>
+
+							</MobileOptimizations>
 					</HintManager>
 				</HintProvider>
 			</ThemeProvider>

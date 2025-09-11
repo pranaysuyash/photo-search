@@ -139,6 +139,8 @@ html {
 	font-size: 16px;
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
+    /* Prevent layout shift when scrollbars appear/disappear */
+    scrollbar-gutter: stable both-edges;
 }
 
 body {
@@ -150,6 +152,23 @@ body {
 	color: var(--text-primary);
 	background: var(--bg-primary);
 	transition: background-color var(--animation-base) ease;
+    /* Reserve vertical scrollbar space to prevent width shifts */
+    overflow-y: scroll;
+}
+
+/* Stabilize the main scroll container to avoid width/position jitter when the vertical scrollbar appears/disappears */
+#main-content {
+  scrollbar-gutter: stable both-edges;
+  overscroll-behavior: contain;
+}
+
+/* Global toast container – always bottom-centered and above all UI */
+.pv-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 1rem; /* ~16px */
+  transform: translateX(-50%);
+  z-index: 9999;
 }
 
 /* Scrollbar Styles */
@@ -583,6 +602,8 @@ body {
 	backdrop-filter: var(--glass-blur);
 	border-bottom: 1px solid var(--border-primary);
 	padding: var(--spacing-md);
+    position: relative; /* anchor progress bar without affecting layout */
+    min-height: 64px; /* keep a stable header height */
 }
 
 .top-bar-mobile {
@@ -590,12 +611,14 @@ body {
 }
 
 .progress-bar {
-	height: 4px;
-	width: 100%;
-	background: var(--color-primary-100);
-	margin-bottom: var(--spacing-sm);
-	overflow: hidden;
-	border-radius: var(--radius-sm);
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--color-primary-100);
+  overflow: hidden;
+  border-radius: var(--radius-sm);
 }
 
 .progress-bar-fill {
@@ -863,6 +886,7 @@ body {
 	background: var(--bg-secondary);
 	border-top: 1px solid var(--border-primary);
 	padding: var(--spacing-md);
+    min-height: 44px; /* avoid bumps when content toggles */
 }
 
 .stats-content {
@@ -1116,7 +1140,7 @@ body {
 .nav-section-title {
 	font-size: 0.75rem;
 	font-weight: 600;
-	color: var(--text-secondary);
+	color: var(--text-tertiary);
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
 	margin-bottom: var(--spacing-md);
@@ -1169,7 +1193,7 @@ body {
 
 .nav-item-count {
 	font-size: 0.75rem;
-	color: var(--text-secondary);
+	color: var(--text-tertiary);
 }
 
 .sidebar-footer {

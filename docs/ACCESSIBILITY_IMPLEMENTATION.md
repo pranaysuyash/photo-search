@@ -77,10 +77,21 @@ To enhance the accessibility of the application for screen reader users by addin
     -   `Share` modal: Added `id="expiry-input"` and `id="pw-input"` to the expiry and password inputs respectively, and `htmlFor` to their labels.
     -   `Tag` modal: Added `id="tags-input"` to the tags input and a visually hidden label `htmlFor="tags-input"`.
 
+-   **Landmarks:** Added proper semantic structure with landmarks for screen readers.
+    -   Added skip-to-content link at the top of the application for keyboard users.
+    -   Added `role="main"` and `aria-label="Main content"` to the main content area.
+    -   Added `id="main-content"` for skip link target.
+
 ### Pending Tasks
 
 -   Add ARIA states to complex widgets (e.g., modals, tabs, accordions) for dynamic content changes.
 -   Create screen reader navigation landmarks to improve overall page structure and navigation for assistive technologies.
+
+### Completed Tasks (Additional)
+
+-   Added ARIA states to navigation items with `aria-current="page"` for active items.
+-   Added navigation landmark with `role="navigation"` and `aria-label="Main navigation"` to Sidebar.
+-   Added descriptive ARIA labels to navigation items including count information.
 
 ## Color Contrast & Visual Accessibility
 
@@ -114,7 +125,31 @@ To ensure that all text and background color combinations meet WCAG AA complianc
     -   Implemented a `useEffect` hook to dynamically add or remove the `high-contrast` class to the `<body>` element based on the `highContrast` state.
     -   Added a checkbox in the `folder` modal (settings) to allow users to toggle the high contrast mode (`High Contrast` checkbox with `id="pref-high-contrast"`).
 
+-   **Fixed High Contrast Mode:**
+    -   Added import statement to `main.tsx` to properly load the high contrast CSS file.
+    -   The high contrast mode is now fully functional when enabled through the settings.
+
 ### Pending Tasks
 
 -   Conduct thorough manual testing with various color blindness simulation tools to ensure the high contrast mode and general UI colors are accessible to users with different types of color vision deficiencies.
 
+## Keyboard Navigation & Focus Management
+
+### Objective
+
+To ensure all functionality is accessible via keyboard and focus is properly managed for users who cannot use a mouse.
+
+### Changes Made
+
+-   **Skip-to-Content Link:** Added a skip-to-content link at the top of the application for keyboard users to bypass repetitive navigation.
+-   **Focus Management in Modals:**
+    -   Implemented focus trapping in modal dialogs (`FolderModal.tsx` and `AccessibilityPanel.tsx`).
+    -   Added auto-focus to first focusable elements in modals.
+    -   Implemented proper Escape key handling for modal closing.
+    -   Added keyboard event listeners for focus management.
+-   **Keyboard Navigation:** Ensured all interactive elements are reachable via Tab key.
+
+### Pending Tasks
+
+-   Continue improving keyboard navigation throughout the application.
+-   Add more comprehensive keyboard shortcuts for power users.
