@@ -10,6 +10,7 @@ import { UIProvider } from "../contexts/UIContext";
 import { SearchProvider } from "../contexts/SearchContext";
 import { ModalProvider } from "../contexts/ModalContext";
 import { LibraryProvider } from "../contexts/LibraryContext";
+import { JobsProvider } from "../contexts/JobsContext";
 import { initializeAPI } from "../services/PhotoVaultAPI";
 import { PhotoVaultAPIProvider } from "../services/PhotoVaultAPIProvider";
 import { SimpleStoreProvider } from "../stores/SimpleStore";
@@ -176,8 +177,9 @@ const AllTheProviders: React.FC<{ children: React.ReactNode }> = ({
                 <SimpleStoreProvider>
                   <PhotoVaultAPIProvider>
                     <LibraryProvider>
-                      <SearchProvider>
-                        <ModalProvider>
+                      <JobsProvider>
+                        <SearchProvider>
+                          <ModalProvider>
                           <HintProvider>
                           <HintManager>
                             <MobileOptimizations
@@ -192,8 +194,9 @@ const AllTheProviders: React.FC<{ children: React.ReactNode }> = ({
                         </MobileOptimizations>
                           </HintManager>
                           </HintProvider>
-                        </ModalProvider>
-                      </SearchProvider>
+                          </ModalProvider>
+                        </SearchProvider>
+                      </JobsProvider>
                     </LibraryProvider>
                   </PhotoVaultAPIProvider>
                 </SimpleStoreProvider>

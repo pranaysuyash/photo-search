@@ -58,6 +58,7 @@ import {
 	useHintTriggers,
 } from "./components/HintSystem";
 import { type Job, JobsCenter } from "./components/JobsCenter";
+import { useJobsContext } from "./contexts/JobsContext";
 const JobsDrawer = lazy(() => import("./components/JobsDrawer"));
 // Reuse existing feature components
 import JustifiedResults from "./components/JustifiedResults";
@@ -434,7 +435,8 @@ export default function App() {
 	});
 
 	const [showOnboarding, setShowOnboarding] = useState(false);
-	const [jobs, setJobs] = useState<Job[]>([]);
+const { state: jobsState, actions: jobsActions } = useJobsContext();
+const jobs = jobsState.jobs;
 // Indexing state moved to LibraryProvider
 	const [ocrReady, setOcrReady] = useState<boolean>(false);
 	const [ratingMin, setRatingMin] = useState(0);
@@ -3277,56 +3279,15 @@ export default function App() {
 										/>
 
 										{/* Jobs Center */}
-										<JobsCenter
-											jobs={jobs}
-											onPause={(jobId) => {
-												setJobs((prev) =>
-													prev.map((j) =>
-														j.id === jobId
-															? { ...j, status: "paused" as const }
-															: j,
-													),
-												);
-											}}
-											onResume={(jobId) => {
-												setJobs((prev) =>
-													prev.map((j) =>
-														j.id === jobId
-															? { ...j, status: "running" as const }
-															: j,
-													),
-												);
-											}}
-											onCancel={(jobId) => {
-												setJobs((prev) =>
-													prev.map((j) =>
-														j.id === jobId
-															? { ...j, status: "cancelled" as const }
-															: j,
-													),
-												);
-											}}
-											onRetry={(jobId) => {
-												setJobs((prev) =>
-													prev.map((j) =>
-														j.id === jobId
-															? { ...j, status: "queued" as const }
-															: j,
-													),
-												);
-											}}
-											onClear={(jobId) => {
-												setJobs((prev) => prev.filter((j) => j.id !== jobId));
-											}}
-											onClearAll={() => {
-												setJobs((prev) =>
-													prev.filter(
-														(j) =>
-															j.status === "running" || j.status === "queued",
-													),
-												);
-											}}
-										/>
+            <JobsCenter
+                jobs={jobs}
+                onPause={(jobId) => jobsActions.setStatus(jobId, "paused")}
+                onResume={(jobId) => jobsActions.setStatus(jobId, "running")}
+                onCancel={(jobId) => jobsActions.setStatus(jobId, "cancelled")}
+                onRetry={(jobId) => jobsActions.setStatus(jobId, "queued")}
+                onClear={(jobId) => jobsActions.remove(jobId)}
+                onClearAll={() => jobsActions.clearStopped()}
+            />
 
 										{/* Bottom Navigation */}
 										<BottomNavigation

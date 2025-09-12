@@ -5,6 +5,7 @@ import { SearchProvider } from "./contexts/SearchContext";
 import { SettingsProvider } from "./contexts/SettingsContext";
 import { UIProvider } from "./contexts/UIContext";
 import { ModalProvider } from "./contexts/ModalContext";
+import { JobsProvider } from "./contexts/JobsContext";
 import { PhotoVaultAPIProvider } from "./services/PhotoVaultAPIProvider";
 import { SimpleStoreProvider } from "./stores/SimpleStore";
 
@@ -18,9 +19,11 @@ export function RootProviders({ children }: { children: React.ReactNode }) {
           <UIProvider>
             <PhotoVaultAPIProvider>
               <LibraryProvider>
-                <SearchProvider>
-                  <ModalProvider>{children}</ModalProvider>
-                </SearchProvider>
+                <JobsProvider>
+                  <SearchProvider>
+                    <ModalProvider>{children}</ModalProvider>
+                  </SearchProvider>
+                </JobsProvider>
               </LibraryProvider>
             </PhotoVaultAPIProvider>
           </UIProvider>
