@@ -142,7 +142,7 @@ export function Sidebar({
 				/>
 			)}
 
-			<div className={`sidebar-container ${isOpen ? "open" : ""}`}>
+			<div className={`sidebar-container ${isOpen ? "open" : ""}`} data-tour="sidebar">
 				<div className="sidebar-header">
 					<div>
 						<h1 className="sidebar-title">PhotoVault</h1>

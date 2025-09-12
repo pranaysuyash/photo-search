@@ -6,13 +6,18 @@ import React, {
 	useMemo,
 	useRef,
 	useState,
+	lazy,
+	Suspense,
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
 	API_BASE,
+	apiAuthCheck,
+	apiAuthStatus,
 	apiBuildFast,
 	apiBuildMetadata,
 	apiBuildOCR,
+	apiDemoDir,
 	apiDiagnostics,
 	apiExport,
 	apiFacesClusters,
@@ -23,6 +28,7 @@ import {
 	apiIndex,
 	apiLibrary,
 	apiMap,
+	apiPing,
 	apiSearch,
 	apiSearchWorkspace,
 	apiSetFavorite,
@@ -34,7 +40,7 @@ import {
 import { AccessibilityPanel } from "./components/AccessibilityPanel";
 import { BottomNavigation } from "./components/BottomNavigation";
 import Collections from "./components/Collections";
-import DiagnosticsDrawer from "./components/DiagnosticsDrawer";
+const DiagnosticsDrawer = lazy(() => import("./components/DiagnosticsDrawer"));
 import {
 	QuickActions,
 	SampleSearchSuggestions,
@@ -52,7 +58,7 @@ import {
 	useHintTriggers,
 } from "./components/HintSystem";
 import { type Job, JobsCenter } from "./components/JobsCenter";
-import JobsDrawer from "./components/JobsDrawer";
+const JobsDrawer = lazy(() => import("./components/JobsDrawer"));
 // Reuse existing feature components
 import JustifiedResults from "./components/JustifiedResults";
 import LibraryBrowser from "./components/LibraryBrowser";
@@ -75,8 +81,10 @@ import {
 	SaveModal,
 	TagModal,
 } from "./components/modals";
-import AdvancedSearchModal from "./components/modals/AdvancedSearchModal";
-import { EnhancedSharingModal } from "./components/modals/EnhancedSharingModal";
+const AdvancedSearchModal = lazy(() => import("./components/modals/AdvancedSearchModal"));
+const EnhancedSharingModal = lazy(() =>
+    import("./components/modals/EnhancedSharingModal").then((m) => ({ default: m.EnhancedSharingModal })),
+);
 import FirstRunSetup from "./components/modals/FirstRunSetup";
 import { OfflineIndicator } from "./components/OfflineIndicator";
 import { OnboardingTour, useOnboarding } from "./components/OnboardingTour";
@@ -94,18 +102,23 @@ import { StatsBar } from "./components/StatsBar";
 import { StatusBar } from "./components/StatusBar";
 // TasksView removed (developer-only)
 import { ThemeProvider } from "./components/ThemeProvider";
-import { ThemeSettingsModal } from "./components/ThemeSettingsModal";
+const ThemeSettingsModal = lazy(() =>
+    import("./components/ThemeSettingsModal").then((m) => ({ default: m.ThemeSettingsModal })),
+);
 import TimelineResults from "./components/TimelineResults";
 import { TopBar } from "./components/TopBar";
+const SearchOverlay = lazy(() => import("./components/SearchOverlay"));
 import ToastPortal from "./components/ToastPortal";
 import TripsView from "./components/TripsView";
 import { VideoLightbox } from "./components/VideoLightbox";
 import { VideoManager } from "./components/VideoManager";
 import { Welcome } from "./components/Welcome";
 import { useDebouncedCallback } from "./hooks/useDebounce";
+import { useLibraryContext } from "./contexts/LibraryContext";
 import { ShareManager } from "./modules/ShareManager";
 import { VideoService } from "./services/VideoService";
-import { useHighContrast, useThemeStore } from "./stores/settingsStore";
+import { useHighContrast, useThemeStore, useSearchCommandCenter } from "./stores/settingsStore";
+import { useModalContext } from "./contexts/ModalContext";
 import {
 	useAllTags,
 	// Individual UI hooks
@@ -266,6 +279,9 @@ function _ScrollLoader({
 }
 
 export default function App() {
+	// Skip to content link for keyboard users
+	const skipToContentRef = useRef<HTMLAnchorElement>(null);
+
 	// Safety check to prevent infinite loops on initial render
 	const [isMounted, setIsMounted] = useState(false);
 
@@ -383,7 +399,7 @@ export default function App() {
 			| "removeCollect";
 	}>(null);
 	const [showShortcuts, setShowShortcuts] = useState(false);
-	const [showHelpModal, setShowHelpModal] = useState(false);
+    const { state: modalState, actions: modal } = useModalContext();
 	const [detailIdx, setDetailIdx] = useState<number | null>(null);
 	const [focusIdx, setFocusIdx] = useState<number | null>(null);
 	const [layoutRows, setLayoutRows] = useState<number[][]>([]);
@@ -419,11 +435,7 @@ export default function App() {
 
 	const [showOnboarding, setShowOnboarding] = useState(false);
 	const [jobs, setJobs] = useState<Job[]>([]);
-	const [isIndexing, setIsIndexing] = useState(false);
-	const [indexPct, setIndexPct] = useState<number | undefined>(undefined);
-	const [indexEta, setIndexEta] = useState<number | undefined>(undefined);
-	const [indexPaused, setIndexPaused] = useState<boolean>(false);
-	const [indexTip, setIndexTip] = useState<string | undefined>(undefined);
+// Indexing state moved to LibraryProvider
 	const [ocrReady, setOcrReady] = useState<boolean>(false);
 	const [ratingMin, setRatingMin] = useState(0);
 	const [toast, setToast] = useState<null | {
@@ -431,7 +443,6 @@ export default function App() {
 		actionLabel?: string;
 		onAction?: () => void;
 	}>(null);
-	const [showThemeModal, setShowThemeModal] = useState(false);
 	const [showHelpHint, setShowHelpHint] = useState(() => {
 		try {
 			const seen = localStorage.getItem("ps_hint_help_seen");
@@ -441,6 +452,9 @@ export default function App() {
 		}
 	});
 	const [presets, setPresets] = useState<{ name: string; query: string }[]>([]);
+
+	// Search Command Center
+	const searchCommandCenter = useSearchCommandCenter();
 	const toastTimerRef = useRef<number | null>(null);
 
 	// Onboarding and user action tracking
@@ -490,6 +504,9 @@ export default function App() {
 	);
 	const [showContextualHelp, setShowContextualHelp] = useState(false);
 	const [showOnboardingChecklist, setShowOnboardingChecklist] = useState(false);
+	const [isConnected, setIsConnected] = useState(true);
+	const [authRequired, setAuthRequired] = useState(false);
+	const [authTokenInput, setAuthTokenInput] = useState("");
 	const ratingMap = useMemo(() => {
 		const m: Record<string, number> = {};
 		const tm = tagsMap || {};
@@ -511,6 +528,54 @@ export default function App() {
 	const highContrast = useHighContrast();
 	const showInfoOverlay = useShowInfoOverlay();
 
+	// Onboarding tour action listeners ("Do it for me")
+	useEffect(() => {
+		const openAdvanced = () => setModal({ kind: "advanced" as any });
+		const openFilters = () => setShowFilters(true);
+		const openFolder = () => setModal({ kind: "folder" as any });
+
+		window.addEventListener("tour-action-open-advanced", openAdvanced);
+		window.addEventListener("tour-action-open-filters", openFilters);
+		window.addEventListener("tour-action-select-library", openFolder);
+
+		return () => {
+			window.removeEventListener("tour-action-open-advanced", openAdvanced);
+			window.removeEventListener("tour-action-open-filters", openFilters);
+			window.removeEventListener("tour-action-select-library", openFolder);
+		};
+	}, []);
+
+	// Connectivity ping + auth status
+	useEffect(() => {
+		let t: number | undefined;
+		let stopped = false;
+		const tick = async () => {
+			try {
+				const ok = await apiPing();
+				if (!stopped) setIsConnected(ok);
+			} catch {
+				if (!stopped) setIsConnected(false);
+			}
+			t = window.setTimeout(tick, 2500);
+		};
+		tick();
+		// Probe auth requirement once on mount
+		apiAuthStatus()
+			.then((s) => {
+				try {
+					const ls = localStorage.getItem("api_token");
+					setAuthRequired(Boolean(s?.auth_required) && !ls);
+				} catch {
+					setAuthRequired(Boolean(s?.auth_required));
+				}
+			})
+			.catch(() => {});
+		return () => {
+			stopped = true;
+			if (t) window.clearTimeout(t);
+		};
+	}, []);
+
 	// Global keyboard shortcuts
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
@@ -523,6 +588,12 @@ export default function App() {
 					ae.isContentEditable)
 			)
 				return;
+            // Open Search Overlay (/)
+            if (searchCommandCenter && e.key === "/") {
+                e.preventDefault();
+                modal.open("search");
+                return;
+            }
 			// Toggle info overlay (I)
 			if (e.key.toLowerCase() === "i") {
 				e.preventDefault();
@@ -535,12 +606,12 @@ export default function App() {
 				setModal({ kind: "advanced" as any });
 				return;
 			}
-			// Help (?): toggle Help modal
-			if (e.key === "?") {
-				e.preventDefault();
-				setShowHelpModal((prev) => !prev);
-				return;
-			}
+            // Help (?): toggle Help modal
+            if (e.key === "?") {
+                e.preventDefault();
+                modal.toggle("help");
+                return;
+            }
 			// Timeline jumps only when viewing results timeline
 			if (selectedView === "results" && (resultView as string) === "timeline") {
 				const dispatch = (kind: string) =>
@@ -571,7 +642,7 @@ export default function App() {
 		};
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
-	}, [showInfoOverlay, settingsActions, selectedView, resultView]);
+	}, [showInfoOverlay, settingsActions, selectedView, resultView, searchCommandCenter]);
 
 	useEffect(() => {
 		const body = document.body;
@@ -833,58 +904,7 @@ export default function App() {
 		} catch {}
 	}, [dir]);
 
-	// Poll index status while indexing to update TopBar progress and tooltip
-	useEffect(() => {
-		if (!isIndexing || !dir) return;
-		let cancelled = false;
-		let timer: number | null = null;
-		const poll = async () => {
-			try {
-				const { apiIndexStatus } = await import("./api");
-				const s: any = await apiIndexStatus(
-					dir,
-					engine,
-					needsHf ? hfToken : undefined,
-					needsOAI ? openaiKey : undefined,
-				);
-				if (cancelled) return;
-				const num = (x: any) => (typeof x === "number" ? x : 0);
-				let done = num(s.insert_done) + num(s.updated_done);
-				let total = num(s.insert_total) + num(s.updated_total);
-				if (!(total > 0)) {
-					done = num(s.new) + num(s.updated);
-					total = typeof s.total === "number" ? s.total : 0;
-				}
-				if (!(total > 0) && typeof s.existing === "number") {
-					done = num(s.existing);
-					total = typeof s.target === "number" ? s.target : 0;
-				}
-				const pct =
-					total > 0 ? Math.max(0, Math.min(1, done / total)) : undefined;
-				setIndexPct(pct);
-				setIndexEta(undefined);
-				const parts: string[] = [];
-				if (total > 0) parts.push(`Progress ${done}/${total}`);
-				if (typeof s.state === "string" && s.state)
-					parts.push(`State: ${s.state}`);
-				setIndexTip(parts.join(" • "));
-				if (
-					pct === 1 ||
-					(typeof s.state === "string" && /done|idle|complete/i.test(s.state))
-				) {
-					setIsIndexing(false);
-				}
-			} catch {
-				// ignore transient errors
-			}
-		};
-		poll();
-		timer = window.setInterval(poll, 1500);
-		return () => {
-			cancelled = true;
-			if (timer) window.clearInterval(timer);
-		};
-	}, [isIndexing, dir, engine, needsHf, hfToken, needsOAI, openaiKey]);
+    // Index status polling moved to LibraryProvider
 
 	// Compute index coverage from diagnostics + library
 	const _indexCoverage = useMemo(() => {
@@ -994,133 +1014,27 @@ export default function App() {
 		};
 	}, [dir]);
 
-	// Actions
-	const doIndex = useCallback(async () => {
-		// Don't block UI - just show a small notification
-		uiActions.setNote(
-			"Indexing started in background. You can continue using the app.",
-		);
-		setIsIndexing(true);
-
-		// Create a job for indexing
-		const jobId = `index-${Date.now()}`;
-		const indexJob: Job = {
-			id: jobId,
-			type: "index",
-			title: "Indexing Photos",
-			description: `Analyzing photos in ${dir}`,
-			status: "running",
-			startTime: new Date(),
-			canCancel: true,
-			total: (library || []).length || undefined,
-		};
-		setJobs((prev) => [...prev, indexJob]);
-
-		// Start periodic library refresh to show images as they're indexed
-		let refreshInterval: NodeJS.Timeout | undefined;
-		refreshInterval = setInterval(async () => {
-			await loadLibrary(120, 0);
-		}, 3000); // Refresh every 3 seconds
-
-		try {
-			const r = await apiIndex(
-				dir,
-				engine,
-				32,
-				needsHf ? hfToken : undefined,
-				needsOAI ? openaiKey : undefined,
-			);
-
-			if (refreshInterval) clearInterval(refreshInterval); // Stop refreshing
-
-			uiActions.setNote(
-				`Indexing complete! New: ${r.new}, Updated: ${r.updated}, Total: ${r.total}`,
-			);
-
-			// Update job to completed
-			setJobs((prev) =>
-				prev.map((j) =>
-					j.id === jobId
-						? {
-								...j,
-								status: "completed",
-								endTime: new Date(),
-								progress: r.total,
-							}
-						: j,
-				),
-			);
-
-			// Mark onboarding: indexing completed successfully
-			completeOnboardingStep("index_photos");
-
-			await loadLibrary(120, 0); // Final refresh
-		} catch (e) {
-			if (refreshInterval) clearInterval(refreshInterval); // Stop refreshing on error
-			uiActions.setNote(e instanceof Error ? e.message : "Index failed");
-
-			// Update job to failed
-			setJobs((prev) =>
-				prev.map((j) =>
-					j.id === jobId
-						? {
-								...j,
-								status: "failed",
-								endTime: new Date(),
-								error: e instanceof Error ? e.message : "Index failed",
-							}
-						: j,
-				),
-			);
-		} finally {
-			setIsIndexing(false);
-		}
-	}, [
-		dir,
-		engine,
-		needsHf,
-		hfToken,
-		needsOAI,
-		openaiKey,
-		loadLibrary,
-		uiActions,
-		completeOnboardingStep,
-		library,
-	]);
+    // Actions migrated: indexing managed by LibraryProvider
 
 	const doSearchImmediate = useCallback(
 		async (text?: string) => {
 			const q = (text ?? searchText ?? "").trim();
 			if (!q) return;
 			// If no directory is selected, automatically load the demo library
-			if (!dir) {
-				try {
-					const demoPath =
-						"/Users/pranay/Projects/adhoc_projects/photo-search/e2e_data";
-					settingsActions.setDir(demoPath);
-					uiActions.setNote("Loading demo library… indexing will run once.");
-					try {
-						await apiWorkspaceAdd(demoPath);
-					} catch {}
-					setIsIndexing(true);
-					try {
-						await apiIndex(
-							demoPath,
-							engine,
-							32,
-							needsHf ? hfToken : undefined,
-							needsOAI ? openaiKey : undefined,
-						);
-					} catch (e) {
-						uiActions.setNote(
-							e instanceof Error ? e.message : "Failed to load demo library",
-						);
-					} finally {
-						setIsIndexing(false);
-					}
-					await loadLibrary(120, 0);
-				} catch {}
-			}
+            if (!dir) {
+                try {
+                    const demoPath = await apiDemoDir();
+                    if (!demoPath) {
+                        uiActions.setNote("Demo library not available.");
+                        return;
+                    }
+                    settingsActions.setDir(demoPath);
+                    uiActions.setNote("Loading demo library… indexing will run once.");
+                    try { await apiWorkspaceAdd(demoPath); } catch {}
+                    await lib.index({ dir: demoPath, provider: engine });
+                    await loadLibrary(120, 0);
+                } catch {}
+            }
 			photoActions.setQuery(q);
 			// Push URL state for deep linking including filters
 			try {
@@ -1378,96 +1292,7 @@ export default function App() {
 		};
 	}, [busy, dir, uiActions]);
 
-	// Poll index status for progress/ETA while indexing
-	useEffect(() => {
-		if (!isIndexing || !dir) {
-			setIndexPct(undefined);
-			setIndexEta(undefined);
-			setIndexPaused(false);
-			return;
-		}
-		let t: number | undefined;
-		let startTs: number | undefined;
-		const tick = async () => {
-			try {
-				const { apiIndexStatus } = await import("./api");
-				const s = await apiIndexStatus(
-					dir,
-					engine,
-					needsHf ? hfToken : undefined,
-					needsOAI ? openaiKey : undefined,
-				);
-				// Compute progress based on insert/update subtotals when available
-				const insDone = Number(s.insert_done || 0);
-				const insTot = Number(s.insert_total || 0);
-				const updDone = Number(s.updated_done || 0);
-				const updTot = Number(s.updated_total || 0);
-				const num = insDone + updDone;
-				const den = Math.max(1, insTot + updTot);
-				const pct = Math.min(1, Math.max(0, num / den));
-				if (den > 1) setIndexPct(pct);
-				setIndexPaused(Boolean((s as any).paused) || s.state === "paused");
-				// Tooltip summary (processed • target/indexed/coverage • new/updated • eta)
-				const parts: string[] = [];
-				if (den > 1) parts.push(`processed ${num}/${den}`);
-				if (typeof (s as any).indexed === "number")
-					parts.push(`indexed ${(s as any).indexed}`);
-				if (typeof s.target === "number" && s.target > 0)
-					parts.push(`target ${s.target}`);
-				if (typeof (s as any).coverage === "number")
-					parts.push(`coverage ${Math.round((s as any).coverage * 100)}%`);
-				if (typeof (s as any).drift === "number" && (s as any).drift > 0)
-					parts.push(`drift ${(s as any).drift}`);
-				if (s.state === "complete") {
-					if (typeof s.new === "number") parts.push(`new ${s.new}`);
-					if (typeof s.updated === "number") parts.push(`updated ${s.updated}`);
-					if ((s as any).last_index_time)
-						parts.push(`at ${(s as any).last_index_time}`);
-				}
-				if (
-					typeof indexEta === "number" &&
-					Number.isFinite(indexEta) &&
-					indexEta > 0
-				) {
-					parts.push(`eta ~${Math.max(1, Math.ceil(indexEta / 60))}m`);
-				}
-				if (parts.length > 0) setIndexTip(parts.join(" • "));
-				// ETA: based on elapsed and rate
-				if (!startTs && s.start) {
-					startTs = Date.parse(s.start);
-				}
-				const now = Date.now();
-				const elapsed = startTs
-					? Math.max(1, (now - startTs) / 1000)
-					: undefined;
-				if (elapsed && num > 5) {
-					const rate = num / elapsed; // items per second
-					const remaining = Math.max(0, den - num);
-					const eta = rate > 0 ? remaining / rate : undefined;
-					if (eta && Number.isFinite(eta)) setIndexEta(eta);
-				}
-				if (s.state === "complete") {
-					setIndexPct(undefined);
-					setIndexEta(undefined);
-					setIndexPaused(false);
-				}
-			} catch {}
-			t = window.setTimeout(tick, 1000);
-		};
-		tick();
-		return () => {
-			if (t) window.clearTimeout(t);
-		};
-	}, [
-		isIndexing,
-		dir,
-		engine,
-		needsHf,
-		hfToken,
-		needsOAI,
-		openaiKey,
-		indexEta,
-	]);
+	// Index status polling moved to LibraryProvider
 
 	// Keep URL in sync with resultView/timelineBucket (when in results view)
 	useEffect(() => {
@@ -1905,23 +1730,21 @@ export default function App() {
 						type="no-directory"
 						onAction={() => setModal({ kind: "folder" })}
 						onDemoAction={async () => {
-							// Enable demo mode
-							const demoPath =
-								"/Users/pranay/Projects/adhoc_projects/photo-search/e2e_data";
-							settingsActions.setDir(demoPath);
-
-							// Index the demo photos
 							try {
-								await doIndex();
+								const demoPath = await apiDemoDir();
+								if (!demoPath) {
+									uiActions.setNote("Demo library not available on this install.");
+									return;
+								}
+                            settingsActions.setDir(demoPath);
+                            await lib.index();
 								uiActions.setNote(
-									"Demo library loaded! Try searching for 'beach sunset' or 'family photos'",
+									"Demo library loaded! Try 'beach sunset' or 'family photos'",
 								);
 							} catch (error) {
 								console.error("Failed to setup demo:", error);
 								uiActions.setNote(
-									error instanceof Error
-										? error.message
-										: "Failed to setup demo",
+									error instanceof Error ? error.message : "Failed to setup demo",
 								);
 							}
 						}}
@@ -2087,15 +1910,18 @@ export default function App() {
 										<Welcome
 											onStartDemo={async () => {
 												// Set demo photos directory and close welcome
-												const demoPath =
-													"/Users/pranay/Projects/adhoc_projects/photo-search/e2e_data";
-												settingsActions.setDir(demoPath);
+                                    let demoPath = await apiDemoDir();
+                                    if (!demoPath) {
+                                        uiActions.setNote("Demo data is not available on this system.");
+                                        return;
+                                    }
+                                    settingsActions.setDir(demoPath);
 												uiActions.setShowWelcome(false);
 
 												// Add demo path to workspace and index it
 												try {
-													await apiWorkspaceAdd(demoPath);
-													await doIndex();
+                                        await apiWorkspaceAdd(demoPath);
+                                        await lib.index();
 												} catch (error) {
 													console.error(
 														"Failed to add demo path or index:",
@@ -2178,11 +2004,16 @@ export default function App() {
 										}}
 										onDemo={async () => {
 											try {
-												const demoPath =
-													"/Users/pranay/Projects/adhoc_projects/photo-search/e2e_data";
-												settingsActions.setDir(demoPath);
-												await apiWorkspaceAdd(demoPath);
-												await doIndex();
+                                    let demoPath = await apiDemoDir();
+                                    if (!demoPath) {
+                                        uiActions.setNote("Demo data is not available on this system.");
+                                        setShowOnboarding(false);
+                                        localStorage.setItem("hasSeenOnboarding", "true");
+                                        return;
+                                    }
+                                    settingsActions.setDir(demoPath);
+                                    await apiWorkspaceAdd(demoPath);
+                                    await lib.index();
 											} catch (e) {
 												uiActions.setNote(
 													e instanceof Error ? e.message : "Demo setup failed",
@@ -2191,9 +2022,9 @@ export default function App() {
 											setShowOnboarding(false);
 											localStorage.setItem("hasSeenOnboarding", "true");
 										}}
-										onTour={() => {
-											setShowHelpModal(true);
-										}}
+                                onTour={() => {
+                                    modal.open("help");
+                                }}
 									/>
 
 									{/* Modern UX Integration - Enhanced Sidebar */}
@@ -2300,30 +2131,25 @@ export default function App() {
 												uiActions={uiActions}
 												toastTimerRef={toastTimerRef}
 												setToast={setToast}
-												isIndexing={isIndexing}
-												onIndex={doIndex}
+												isIndexing={libState.isIndexing}
+												onIndex={() => lib.index()}
 												activeJobs={
 													jobs.filter((j) => j.status === "running").length
 												}
 												onOpenJobs={() => setModal({ kind: "jobs" as any })}
-												progressPct={indexPct}
-												etaSeconds={indexEta}
-												paused={indexPaused}
-												tooltip={indexTip}
+                                            progressPct={libState.progressPct}
+                                            etaSeconds={libState.etaSeconds}
+                                            paused={libState.paused}
+                                            tooltip={libState.tip}
 												ocrReady={ocrReady}
+												onOpenSearchOverlay={() => modal.open("search")}
 												onPause={async () => {
-													try {
-														const { apiIndexPause } = await import("./api");
-														await apiIndexPause(dir);
-													} catch {}
+													try { await lib.pause?.(dir); } catch {}
 												}}
 												onResume={async () => {
-													try {
-														const { apiIndexResume } = await import("./api");
-														await apiIndexResume(dir);
-													} catch {}
+													try { await lib.resume?.(dir); } catch {}
 												}}
-												onOpenThemeModal={() => setShowThemeModal(true)}
+												onOpenThemeModal={() => modal.open("theme")}
 												onOpenDiagnostics={() =>
 													setModal({ kind: "diagnostics" as any })
 												}
@@ -2971,12 +2797,14 @@ export default function App() {
 											/>
 										)}
 										{modal?.kind === "enhanced-share" && (
-											<EnhancedSharingModal
-												selected={selected}
-												dir={dir}
-												onClose={() => setModal(null)}
-												uiActions={uiActions}
-											/>
+											<Suspense fallback={null}>
+												<EnhancedSharingModal
+													selected={selected}
+													dir={dir}
+													onClose={() => setModal(null)}
+													uiActions={uiActions}
+												/>
+											</Suspense>
 										)}
 										{modal?.kind === ("share" as any) && (
 											<div
@@ -3137,7 +2965,7 @@ export default function App() {
 													} as any
 												}
 												uiActions={uiActions}
-												doIndex={doIndex}
+                                            doIndex={() => lib.index()}
 												prepareFast={(kind: string) =>
 													prepareFast(kind as "annoy" | "faiss" | "hnsw")
 												}
@@ -3282,13 +3110,14 @@ export default function App() {
 										</button>
 
 										{modal?.kind === ("jobs" as any) && (
-											<JobsDrawer open={true} onClose={() => setModal(null)} />
+											<Suspense fallback={null}>
+												<JobsDrawer open={true} onClose={() => setModal(null)} />
+											</Suspense>
 										)}
 										{modal?.kind === ("diagnostics" as any) && (
-											<DiagnosticsDrawer
-												open={true}
-												onClose={() => setModal(null)}
-											/>
+											<Suspense fallback={null}>
+												<DiagnosticsDrawer open={true} onClose={() => setModal(null)} />
+											</Suspense>
 										)}
 										{modal?.kind === ("advanced" as any) && (
 											<AdvancedSearchModal
@@ -3321,16 +3150,31 @@ export default function App() {
 
 										{/* Help Modal */}
 										<HelpModal
-											isOpen={showHelpModal}
-											onClose={() => setShowHelpModal(false)}
+											isOpen={modalState.help}
+											onClose={() => modal.close("help")}
 											initialSection="getting-started"
 										/>
 
 										{/* Theme Settings Modal */}
+										<Suspense fallback={null}>
 										<ThemeSettingsModal
-											isOpen={showThemeModal}
-											onClose={() => setShowThemeModal(false)}
+											isOpen={modalState.theme}
+											onClose={() => modal.close("theme")}
 										/>
+										</Suspense>
+
+										{/* Search Command Center overlay */}
+										{searchCommandCenter && (
+											<Suspense fallback={null}>
+												<SearchOverlay
+													open={modalState.search}
+													onClose={() => modal.close("search")}
+													clusters={clusters}
+													allTags={allTags}
+													meta={meta}
+												/>
+											</Suspense>
+										)}
 
 										{/* Global progress overlay */}
 										{!!busy && (
@@ -3387,12 +3231,45 @@ export default function App() {
 										)}
 
 										{/* Status Bar */}
+										{/* Auth required banner */}
+										{authRequired && (
+											<div className="bg-amber-50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 px-4 py-2 flex items-center gap-2 border-b border-amber-200 dark:border-amber-800">
+												<span className="text-sm">API requires token</span>
+												<input
+													type="password"
+													className="px-2 py-1 text-sm rounded border border-amber-300 dark:border-amber-700 bg-white dark:bg-gray-900"
+													placeholder="Enter token"
+													value={authTokenInput}
+													onChange={(e) => setAuthTokenInput(e.target.value)}
+												/>
+												<button
+													type="button"
+													className="text-sm px-2 py-1 bg-amber-600 text-white rounded"
+													onClick={async () => {
+														const tok = authTokenInput.trim();
+														if (!tok) return;
+														try { localStorage.setItem("api_token", tok); } catch {}
+														const ok = await apiAuthCheck(tok);
+														if (ok) {
+															setAuthRequired(false);
+															setAuthTokenInput("");
+															uiActions.setNote("Token accepted.");
+														} else {
+															uiActions.setNote("Token rejected — check API_TOKEN.");
+														}
+													}}
+												>
+													Save
+												</button>
+											</div>
+										)}
+
 										<StatusBar
 											photoCount={library?.length || 0}
 											indexedCount={library?.length || 0}
 											searchProvider={engine}
-											isIndexing={isIndexing}
-											isConnected={true}
+											isIndexing={libState.isIndexing}
+											isConnected={isConnected}
 											currentDirectory={dir}
 											activeJobs={
 												jobs.filter((j) => j.status === "running").length
@@ -3504,7 +3381,7 @@ export default function App() {
 											} catch {}
 										}}
 										completedSteps={onboardingSteps}
-										inProgressStepId={isIndexing ? "index_photos" : undefined}
+                                inProgressStepId={libState.isIndexing ? "index_photos" : undefined}
 										onStepComplete={() => {
 											/* no-op: completion is event-based */
 										}}
@@ -3524,7 +3401,7 @@ export default function App() {
 														// If no directory yet, prompt to select one first
 														setModal({ kind: "folder" });
 													} else {
-														doIndex();
+                                                lib.index();
 													}
 													break;
 												}
@@ -3600,3 +3477,4 @@ export default function App() {
 		</ErrorBoundary>
 	);
 }
+	const { state: libState, actions: lib } = useLibraryContext();

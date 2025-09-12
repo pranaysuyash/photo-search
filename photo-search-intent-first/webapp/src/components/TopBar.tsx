@@ -16,8 +16,10 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { apiDelete, apiUndoDelete } from "../api";
+import { useSearchCommandCenter } from "../stores/settingsStore";
 import { useUIContext } from "../contexts/UIContext";
 import { SearchBar } from "./SearchBar";
+import { useSearchContext } from "../contexts/SearchContext";
 
 export type GridSize = "small" | "medium" | "large";
 export type ViewType =
@@ -30,9 +32,9 @@ export type ViewType =
 
 export interface TopBarProps {
 	// Search and filter state
-	searchText: string;
-	setSearchText: (text: string) => void;
-	onSearch: (text: string) => void;
+	searchText?: string;
+	setSearchText?: (text: string) => void;
+	onSearch?: (text: string) => void;
 	clusters: Array<{ name?: string }>;
 	allTags: string[];
 	meta: {
@@ -113,6 +115,8 @@ export interface TopBarProps {
 	// Theme modal
 	onOpenThemeModal?: () => void;
 	onOpenDiagnostics?: () => void;
+	// Search overlay (feature-flagged)
+	onOpenSearchOverlay?: () => void;
 }
 
 export function TopBar({
@@ -163,8 +167,17 @@ export function TopBar({
 	toastTimerRef,
 	setToast,
 	onOpenThemeModal,
+	onOpenSearchOverlay,
 }: TopBarProps) {
-	const { state: uiState } = useUIContext();
+    const { state: uiState } = useUIContext();
+    const searchCommandCenter = useSearchCommandCenter();
+    const searchCtx = useSearchContext();
+    const q = (searchText ?? searchCtx.state.query) || "";
+    const setQ = (t: string) => (setSearchText ? setSearchText(t) : searchCtx.actions.setQuery(t));
+    const doSearch = async (t: string) => {
+        if (onSearch) onSearch(t);
+        else await searchCtx.actions.performSearch(t);
+    };
 
 	return (
 		<div className="top-bar top-bar-mobile bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-700/50">
@@ -186,15 +199,30 @@ export function TopBar({
 					>
 						<Menu className="w-5 h-5 text-gray-600 dark:text-gray-400" />
 					</motion.button>
-					<SearchBar
-						searchText={searchText}
-						setSearchText={setSearchText}
-						onSearch={onSearch}
-						clusters={clusters}
-						allTags={allTags}
-						meta={meta}
-					/>
-					{/* Quick filter chips */}
+					{searchCommandCenter ? (
+						<motion.button
+							type="button"
+							className="ml-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+							onClick={() => onOpenSearchOverlay?.()}
+							aria-label="Open search"
+							whileHover={{ scale: 1.05 }}
+							whileTap={{ scale: 0.95 }}
+						>
+							<IconSearch className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+							<span className="text-sm text-gray-700 dark:text-gray-300">Search</span>
+						</motion.button>
+					) : (
+						<SearchBar
+							searchText={q}
+							setSearchText={setQ}
+							onSearch={doSearch}
+							clusters={clusters}
+							allTags={allTags}
+							meta={meta}
+						/>
+					)}
+					{/* Quick filter chips (hidden when Search Command Center is enabled) */}
+					{!searchCommandCenter && (
 					<div className="quick-filters hidden md:flex items-center gap-2 ml-2">
 						{(meta?.cameras || []).slice(0, 3).map((cam) => (
 							<button
@@ -203,10 +231,10 @@ export function TopBar({
 								className="chip"
 								onClick={() => {
 									const tok = `camera:"${cam}"`;
-									const next = (searchText || "").trim();
-									const q = next ? `${next} ${tok}` : tok;
-									setSearchText(q);
-									onSearch(q);
+									const next = q.trim();
+									const qq = next ? `${next} ${tok}` : tok;
+									setQ(qq);
+									doSearch(qq);
 								}}
 								title={`Filter camera: ${cam}`}
 							>
@@ -220,10 +248,10 @@ export function TopBar({
 								className="chip"
 								onClick={() => {
 									const tok = `tag:${tg}`;
-									const next = (searchText || "").trim();
-									const q = next ? `${next} ${tok}` : tok;
-									setSearchText(q);
-									onSearch(q);
+									const next = q.trim();
+									const qq = next ? `${next} ${tok}` : tok;
+									setQ(qq);
+									doSearch(qq);
 								}}
 								title={`Filter tag: ${tg}`}
 							>
@@ -241,10 +269,10 @@ export function TopBar({
 									onClick={() => {
 										const name = String(c.name);
 										const tok = `person:"${name}"`;
-										const next = (searchText || "").trim();
-										const q = next ? `${next} ${tok}` : tok;
-										setSearchText(q);
-										onSearch(q);
+									const next = q.trim();
+									const qq = next ? `${next} ${tok}` : tok;
+									setQ(qq);
+									doSearch(qq);
 									}}
 									title={`Filter person: ${String(c.name)}`}
 								>
@@ -256,10 +284,10 @@ export function TopBar({
 							className="chip"
 							onClick={() => {
 								const tok = `has_text:true`;
-								const next = (searchText || "").trim();
-								const q = next ? `${next} ${tok}` : tok;
-								setSearchText(q);
-								onSearch(q);
+								const next = q.trim();
+								const qq = next ? `${next} ${tok}` : tok;
+								setQ(qq);
+								doSearch(qq);
 							}}
 							title="Filter photos that contain text"
 						>
@@ -270,22 +298,24 @@ export function TopBar({
 							className="chip"
 							onClick={() => {
 								const tok = `(filetype:mp4 OR filetype:mov OR filetype:webm OR filetype:mkv OR filetype:avi) AND duration:>30`;
-								const next = (searchText || "").trim();
-								const q = next ? `${next} ${tok}` : tok;
-								setSearchText(q);
-								onSearch(q);
+								const next = q.trim();
+								const qq = next ? `${next} ${tok}` : tok;
+								setQ(qq);
+								doSearch(qq);
 							}}
 							title="Find videos longer than 30 seconds"
 						>
 							Videos &gt; 30s
 						</button>
 					</div>
+					)}
 
 					<motion.button
 						type="button"
 						className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
 						onClick={() => setShowFilters((v) => !v)}
 						aria-label="Show filters"
+						data-tour="filters-toggle"
 						whileHover={{ scale: 1.05 }}
 						whileTap={{ scale: 0.95 }}
 					>
@@ -294,24 +324,38 @@ export function TopBar({
 							Filters
 						</span>
 					</motion.button>
-					{/* Optional clear filters chip, if query looks filtery (basic heuristic via presence of tokens) */}
-					{/(camera:|tag:|person:|has_text:|iso:|fnumber:|width:|height:|place:)/i.test(
-						searchText || "",
+
+					{/* Quick action: Select library (for onboarding) */}
+					<motion.button
+						type="button"
+						className="ml-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+						onClick={() => setModal({ kind: "folder" as any })}
+						aria-label="Select photo folder"
+						data-tour="select-library"
+						whileHover={{ scale: 1.05 }}
+						whileTap={{ scale: 0.95 }}
+					>
+						<FolderOpen className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+						<span className="text-sm text-gray-700 dark:text-gray-300">Add Photos</span>
+					</motion.button>
+					{/* Optional clear filters chip (hidden when Search Command Center is enabled) */}
+					{!searchCommandCenter && /(camera:|tag:|person:|has_text:|iso:|fnumber:|width:|height:|place:)/i.test(
+						q || "",
 					) && (
 						<button
 							type="button"
 							className="chip"
 							onClick={() => {
 								// Clear baked-in tokens from the search text only; advanced panel handles full resets
-								const cleaned = (searchText || "")
+								const cleaned = (q || "")
 									.replace(
 										/\b(camera|tag|person|has_text|iso|fnumber|width|height|place):[^\s]+/gi,
 										"",
 									)
 									.replace(/\s{2,}/g, " ")
 									.trim();
-								setSearchText(cleaned);
-								onSearch(cleaned);
+								setQ(cleaned);
+								doSearch(cleaned);
 							}}
 							title="Clear filter tokens from query"
 							aria-label="Clear filter tokens"
@@ -343,6 +387,10 @@ export function TopBar({
 							<span className="indexed-count">
 								{diag.engines?.[0]?.count || 0}
 							</span>
+							{/* When command center is enabled, surface active jobs here to reduce chip noise */}
+							{searchCommandCenter && typeof activeJobs === "number" && activeJobs > 0 && (
+								<span className="ml-2 text-[11px] text-gray-600">• Jobs {activeJobs}</span>
+							)}
 							<button
 								type="button"
 								className="indexed-action"
@@ -428,8 +476,8 @@ export function TopBar({
 							OCR
 						</span>
 					)}
-					{/* Jobs quick link */}
-					{typeof activeJobs === "number" && activeJobs > 0 && (
+					{/* Jobs quick link (hidden when Search Command Center is enabled) */}
+					{!searchCommandCenter && typeof activeJobs === "number" && activeJobs > 0 && (
 						<button
 							type="button"
 							className="chip"
@@ -502,6 +550,8 @@ export function TopBar({
 				</div>
 			</div>
 
+			{/* Primary time-scope chips (hidden when Search Command Center is enabled) */}
+			{!searchCommandCenter && (
 			<div className="filter-chips">
 				{[
 					"All",
@@ -519,7 +569,7 @@ export function TopBar({
 							setCurrentFilter(f.toLowerCase());
 							if (f === "Favorites") {
 								photoActions.setFavOnly(true);
-								onSearch(searchText);
+								doSearch(q);
 							}
 						}}
 						className={`chip ${
@@ -531,8 +581,11 @@ export function TopBar({
 					</button>
 				))}
 			</div>
+			)}
 
 			{/* Rating filter */}
+			{/* Rating filter (hidden when Search Command Center is enabled) */}
+			{!searchCommandCenter && (
 			<div className="rating-filter">
 				<span>Min rating:</span>
 				{[0, 1, 2, 3, 4, 5].map((n) => (
@@ -547,8 +600,10 @@ export function TopBar({
 					</button>
 				))}
 			</div>
+			)}
 
 			{/* View mode toggle */}
+			{/* View mode toggle remains visible */}
 			<div className="view-toggle">
 				<span>View:</span>
 				<button
@@ -569,6 +624,8 @@ export function TopBar({
 				</button>
 			</div>
 			{/* Boolean query hints */}
+			{/* Boolean query hints (hidden when Search Command Center is enabled) */}
+			{!searchCommandCenter && (
 			<div className="text-[11px] text-gray-600 mt-1">
 				Boolean: AND, OR, NOT, ( ) • Fields:{" "}
 				<span className="font-mono">camera:</span>{" "}
@@ -590,8 +647,11 @@ export function TopBar({
 				<span className="font-mono">duration:</span> (supports &gt;=, &lt;=,
 				&gt;, &lt;, =)
 			</div>
+			)}
 
 			{/* Preset boolean filter chips */}
+			{/* Preset boolean filter chips (hidden when Search Command Center is enabled) */}
+			{!searchCommandCenter && (
 			<div className="preset-filters hidden md:flex flex-wrap gap-2 mt-1">
 				{[
 					{ label: "High ISO", expr: "iso:>=1600" },
@@ -615,10 +675,10 @@ export function TopBar({
 						className="chip"
 						onClick={() => {
 							const tok = p.expr;
-							const next = (searchText || "").trim();
-							const q = next ? `${next} ${tok}` : tok;
-							setSearchText(q);
-							onSearch(q);
+							const next = q.trim();
+							const qq = next ? `${next} ${tok}` : tok;
+							setQ(qq);
+							doSearch(qq);
 						}}
 						title={p.expr}
 					>
@@ -626,6 +686,7 @@ export function TopBar({
 					</button>
 				))}
 			</div>
+			)}
 			{resultView === "timeline" && (
 				<div className="view-toggle">
 					<span>Bucket:</span>
@@ -697,14 +758,15 @@ export function TopBar({
 						>
 							<Info className="w-4 h-4" /> Info
 						</button>
-						<button
-							type="button"
-							className="action-button"
-							onClick={() => setModal({ kind: "advanced" as any })}
-							aria-label="Open advanced search"
-						>
-							Advanced
-						</button>
+					<button
+						type="button"
+						className="action-button"
+						onClick={() => setModal({ kind: "advanced" as any })}
+						aria-label="Open advanced search"
+						data-tour="advanced-button"
+					>
+						Advanced
+					</button>
 						<button
 							type="button"
 							className="action-button"

@@ -126,7 +126,10 @@ export default function AdvancedSearchModal({
 				onClick={onClose}
 				aria-label="Close"
 			/>
-			<div className="relative z-[1081] bg-white dark:bg-gray-900 rounded-lg shadow p-4 w-full max-w-2xl">
+			<div
+				className="relative z-[1081] bg-white dark:bg-gray-900 rounded-lg shadow p-4 w-full max-w-2xl"
+				data-testid="advanced-modal"
+			>
 				<div className="text-lg font-semibold mb-2">Advanced Search</div>
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
 					<div>

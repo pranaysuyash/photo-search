@@ -1,12 +1,23 @@
-import { Clock, History, Search as IconSearch, TrendingUp } from "lucide-react";
-import type React from "react";
-import { memo, useEffect, useRef, useState } from "react";
-import { useSearchDebounce } from "../hooks/useDebounce";
+import clsx from "clsx";
 import {
-	type SearchSuggestion,
-	searchHistoryService,
-} from "../services/SearchHistoryService";
-import { SearchHistoryPanel } from "./SearchHistoryPanel";
+	Calendar as IconCalendar,
+	Clock,
+	History,
+	Search as IconSearch,
+	TrendingUp,
+} from "lucide-react";
+import type React from "react";
+import {
+	forwardRef,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
+import { apiSearch, apiSearchWorkspace, thumbUrl } from "../api";
+import { useSettingsStore } from "../stores/settingsStore";
+import { type SearchResult } from "../types";
 
 interface SearchBarProps {
 	searchText: string;
@@ -20,41 +31,96 @@ interface SearchBarProps {
 	};
 }
 
-type SuggestionItem = {
+interface SuggestionItem {
 	cat: string;
 	label: string;
 	icon?: React.ComponentType<any>;
 	subtitle?: string;
 	type?: "history" | "metadata" | "popular";
+}
+
+// Search history management
+const searchHistoryKey = "search-history";
+const maxHistoryItems = 10;
+
+const getSearchHistory = (): string[] => {
+	try {
+		const raw = localStorage.getItem(searchHistoryKey);
+		return raw ? JSON.parse(raw) : [];
+	} catch {
+		return [];
+	}
 };
 
-export const SearchBar = memo<SearchBarProps>(
-	({
-		searchText,
-		setSearchText,
-		onSearch,
-		clusters = [],
-		allTags = [],
-		meta = {},
-	}) => {
+const addToSearchHistory = (query: string) => {
+	if (!query?.trim()) return;
+	try {
+		const history = getSearchHistory();
+		const trimmed = query.trim();
+		const deduped = [trimmed, ...history.filter((q: string) => q !== trimmed)];
+		const pruned = deduped.slice(0, maxHistoryItems);
+		localStorage.setItem(searchHistoryKey, JSON.stringify(pruned));
+	} catch {}
+};
+
+export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
+	(
+		{
+			searchText,
+			setSearchText,
+			onSearch,
+			clusters = [],
+			allTags = [],
+			meta = {},
+		},
+		ref,
+	) => {
 		const [suggestOpen, setSuggestOpen] = useState(false);
-		const [historySuggestions, setHistorySuggestions] = useState<
-			SearchSuggestion[]
-		>([]);
 		const [showHistoryPanel, setShowHistoryPanel] = useState(false);
 		const searchInputRef = useRef<HTMLInputElement>(null);
+		const { dir, engine } = useSettingsStore();
+
+		// Focus management for accessibility
+		useEffect(() => {
+			// Auto-focus search input when component mounts and no text is present
+			if (searchInputRef.current && !searchText) {
+				searchInputRef.current.focus();
+			}
+		}, [searchText]);
 
 		// Debounce search suggestions loading
-		const debouncedSearchText = useSearchDebounce(searchText, 150);
+		const debouncedSearchText = useMemo(() => {
+			let timer: NodeJS.Timeout;
+			return (text: string, cb: () => void) => {
+				clearTimeout(timer);
+				timer = setTimeout(cb, 150);
+				return () => clearTimeout(timer);
+			};
+		}, []);
 
 		// Load search suggestions when debounced input changes
+		const [historySuggestions, setHistorySuggestions] = useState<
+			Array<{ query: string; type: "history"; metadata?: any }>
+		>([]);
+		
 		useEffect(() => {
 			if (suggestOpen) {
-				const suggestions =
-					searchHistoryService.getSuggestions(debouncedSearchText);
-				setHistorySuggestions(suggestions);
+				const cleanup = debouncedSearchText(searchText, () => {
+					const history = getSearchHistory()
+						.filter((q: string) => 
+							!searchText || q.toLowerCase().includes(searchText.toLowerCase())
+						)
+						.slice(0, 8)
+						.map((query) => ({
+							query,
+							type: "history" as const,
+							metadata: { lastUsed: Date.now(), useCount: 1 },
+						}));
+					setHistorySuggestions(history);
+				});
+				return cleanup;
 			}
-		}, [debouncedSearchText, suggestOpen]);
+		}, [debouncedSearchText, searchText, suggestOpen]);
 
 		const handleSearch = (text: string) => {
 			onSearch(text);
@@ -218,6 +284,19 @@ export const SearchBar = memo<SearchBarProps>(
 						}}
 						onKeyDown={(e) => {
 							if (e.key === "Enter") handleSearch(searchText);
+							else if (e.key === "Escape") {
+								setSuggestOpen(false);
+								if (searchInputRef.current) {
+									searchInputRef.current.blur();
+								}
+							} else if (e.key === "ArrowDown" && suggestOpen && suggestions.length > 0) {
+								e.preventDefault();
+								// Focus first suggestion item
+								const firstSuggestion = document.querySelector(".suggestion-item") as HTMLElement;
+								if (firstSuggestion) {
+									firstSuggestion.focus();
+								}
+							}
 						}}
 						onFocus={() => setSuggestOpen(true)}
 						onBlur={() => setTimeout(() => setSuggestOpen(false), 120)}
@@ -237,7 +316,8 @@ export const SearchBar = memo<SearchBarProps>(
 						<div
 							className="ml-2 text-red-600 text-xs"
 							title={warnings.join("\n")}
-							aria-label="Query warnings"
+							role="alert"
+							aria-live="polite"
 						>
 							!
 						</div>
@@ -261,19 +341,61 @@ export const SearchBar = memo<SearchBarProps>(
 									key={`${s.cat}:${s.label}`}
 									className="suggestion-item"
 									onMouseDown={(e) => {
-										e.preventDefault();
-										// Convert metadata suggestions into fielded tokens
-										let tok = s.label;
-										if (s.cat === "People") tok = `person:"${s.label}"`;
-										else if (s.cat === "Camera") tok = `camera:"${s.label}"`;
-										else if (s.cat === "Place") tok = `place:"${s.label}"`;
-										else if (s.cat === "Tag") tok = `tag:${s.label}`;
-										const next = (searchText || "").trim();
-										const q = next ? `${next} ${tok}` : tok;
-										setSearchText(q);
-										setSuggestOpen(false);
-										setTimeout(() => handleSearch(q), 0);
-									}}
+								e.preventDefault();
+								// Convert metadata suggestions into fielded tokens
+								let tok = s.label;
+								if (s.cat === "People") tok = `person:"${s.label}"`;
+								else if (s.cat === "Camera") tok = `camera:"${s.label}"`;
+								else if (s.cat === "Place") tok = `place:"${s.label}"`;
+								else if (s.cat === "Tag") tok = `tag:${s.label}`;
+								const next = (searchText || "").trim();
+								const q = next ? `${next} ${tok}` : tok;
+								setSearchText(q);
+								setSuggestOpen(false);
+								setTimeout(() => handleSearch(q), 0);
+							}}
+							onKeyDown={(e) => {
+								if (e.key === "Enter" || e.key === " ") {
+									e.preventDefault();
+									// Convert metadata suggestions into fielded tokens
+									let tok = s.label;
+									if (s.cat === "People") tok = `person:"${s.label}"`;
+									else if (s.cat === "Camera") tok = `camera:"${s.label}"`;
+									else if (s.cat === "Place") tok = `place:"${s.label}"`;
+									else if (s.cat === "Tag") tok = `tag:${s.label}`;
+									const next = (searchText || "").trim();
+									const q = next ? `${next} ${tok}` : tok;
+									setSearchText(q);
+									setSuggestOpen(false);
+									setTimeout(() => handleSearch(q), 0);
+								} else if (e.key === "Escape") {
+									e.preventDefault();
+									setSuggestOpen(false);
+									if (searchInputRef.current) {
+										searchInputRef.current.focus();
+									}
+								} else if (e.key === "ArrowUp") {
+									e.preventDefault();
+									// Focus previous item or input
+									const currentItem = e.currentTarget;
+									const prevItem = currentItem.previousElementSibling as HTMLElement;
+									if (prevItem && prevItem.classList.contains("suggestion-item")) {
+										prevItem.focus();
+									} else {
+										if (searchInputRef.current) {
+											searchInputRef.current.focus();
+										}
+									}
+								} else if (e.key === "ArrowDown") {
+									e.preventDefault();
+									// Focus next item
+									const currentItem = e.currentTarget;
+									const nextItem = currentItem.nextElementSibling as HTMLElement;
+									if (nextItem && nextItem.classList.contains("suggestion-item")) {
+										nextItem.focus();
+									}
+								}
+							}}
 								>
 									<div className="suggestion-content">
 										{s.icon && <s.icon className="suggestion-icon" />}

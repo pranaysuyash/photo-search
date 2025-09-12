@@ -92,11 +92,11 @@ export const useThemeActions = () =>
 	}));
 
 export const useSettingsStore = create<SettingsStore>()(
-	persist(
-		subscribeWithSelector((set, _get) => ({
-			// Initial state
-			dir: "",
-			engine: "local",
+    persist(
+        subscribeWithSelector((set, _get) => ({
+            // Initial state
+            dir: "",
+            engine: "local",
 			hfToken: "",
 			openaiKey: "",
 			useFast: false,
@@ -105,11 +105,13 @@ export const useSettingsStore = create<SettingsStore>()(
 			vlmModel: "Qwen/Qwen2-VL-2B-Instruct",
 			useOcr: false,
 			hasText: false,
-			useOsTrash: false,
-			// UI toggles
-			showExplain: false,
-			showInfoOverlay: false,
-			highContrast: false,
+            useOsTrash: false,
+            // Experiments / feature flags
+            searchCommandCenter: true,
+            // UI toggles
+            showExplain: false,
+            showInfoOverlay: false,
+            highContrast: false,
 
 			// EXIF filters
 			camera: "",
@@ -130,12 +132,15 @@ export const useSettingsStore = create<SettingsStore>()(
 			setVlmModel: (vlmModel) => set({ vlmModel }),
 			setUseOcr: (useOcr) => set({ useOcr }),
 			setHasText: (hasText) => set({ hasText }),
-			setUseOsTrash: (useOsTrash) => set({ useOsTrash }),
-			setShowExplain: (showExplain) => set({ showExplain }),
-			setShowInfoOverlay: (showInfoOverlay) => set({ showInfoOverlay }),
-			setHighContrast: (highContrast) => set({ highContrast }),
-			setCamera: (camera) => set({ camera }),
-			setIsoMin: (isoMin) => set({ isoMin }),
+            setUseOsTrash: (useOsTrash) => set({ useOsTrash }),
+            // Feature flags
+            setSearchCommandCenter: (searchCommandCenter: boolean) =>
+                set({ searchCommandCenter }),
+            setShowExplain: (showExplain) => set({ showExplain }),
+            setShowInfoOverlay: (showInfoOverlay) => set({ showInfoOverlay }),
+            setHighContrast: (highContrast) => set({ highContrast }),
+            setCamera: (camera) => set({ camera }),
+            setIsoMin: (isoMin) => set({ isoMin }),
 			setIsoMax: (isoMax) => set({ isoMax }),
 			setFMin: (fMin) => set({ fMin }),
 			setFMax: (fMax) => set({ fMax }),
@@ -144,21 +149,22 @@ export const useSettingsStore = create<SettingsStore>()(
 		{
 			name: "photo-search-settings", // unique name for localStorage key
 			// Only persist non-sensitive settings
-			partialize: (state) => ({
-				dir: state.dir,
-				engine: state.engine,
-				useFast: state.useFast,
-				fastKind: state.fastKind,
-				useCaps: state.useCaps,
-				vlmModel: state.vlmModel,
-				useOcr: state.useOcr,
-				hasText: state.hasText,
-				useOsTrash: state.useOsTrash,
-				showExplain: state.showExplain,
-				showInfoOverlay: state.showInfoOverlay,
-				camera: state.camera,
-				isoMin: state.isoMin,
-				isoMax: state.isoMax,
+            partialize: (state) => ({
+                dir: state.dir,
+                engine: state.engine,
+                useFast: state.useFast,
+                fastKind: state.fastKind,
+                useCaps: state.useCaps,
+                vlmModel: state.vlmModel,
+                useOcr: state.useOcr,
+                hasText: state.hasText,
+                useOsTrash: state.useOsTrash,
+                searchCommandCenter: state.searchCommandCenter,
+                showExplain: state.showExplain,
+                showInfoOverlay: state.showInfoOverlay,
+                camera: state.camera,
+                isoMin: state.isoMin,
+                isoMax: state.isoMax,
 				fMin: state.fMin,
 				fMax: state.fMax,
 				place: state.place,
@@ -183,13 +189,15 @@ export const useVlmModel = () => useSettingsStore((state) => state.vlmModel);
 export const useOcrEnabled = () => useSettingsStore((state) => state.useOcr);
 export const useHasText = () => useSettingsStore((state) => state.hasText);
 export const useOsTrashEnabled = () =>
-	useSettingsStore((state) => state.useOsTrash);
+    useSettingsStore((state) => state.useOsTrash);
+export const useSearchCommandCenter = () =>
+    useSettingsStore((state) => state.searchCommandCenter);
 export const useShowExplain = () =>
-	useSettingsStore((state) => state.showExplain);
+    useSettingsStore((state) => state.showExplain);
 export const useShowInfoOverlay = () =>
-	useSettingsStore((state) => state.showInfoOverlay);
+    useSettingsStore((state) => state.showInfoOverlay);
 export const useHighContrast = () =>
-	useSettingsStore((state) => state.highContrast);
+    useSettingsStore((state) => state.highContrast);
 export const useCamera = () => useSettingsStore((state) => state.camera);
 export const useIsoMin = () => useSettingsStore((state) => state.isoMin);
 export const useIsoMax = () => useSettingsStore((state) => state.isoMax);

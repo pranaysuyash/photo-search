@@ -171,50 +171,108 @@ export const useSearchLogic = (_options: SearchLogicOptions) => {
 			return `?${sp.toString()}`;
 		}, []);
 
-	const parseSearchParams = // biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency exclusion
-		useCallback((_searchParams: URLSearchParams) => {
-			const filters: any = {};
+    const parseSearchParams = // biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency exclusion
+        useCallback((_searchParams: URLSearchParams) => {
+            // Build a sparse filters object (only set keys that exist)
+            const f: Record<string, unknown> = {};
+            let hasAny = false;
 
-			// Parse basic filters
-			filters.favOnly = _searchParams.get("fav") === "1";
-			filters.tagFilter = _searchParams.get("tags") || "";
-			filters.dateFrom = _searchParams.get("date_from") || "";
-			filters.dateTo = _searchParams.get("date_to") || "";
-			filters.place = _searchParams.get("place") || "";
-			filters.hasText = _searchParams.get("has_text") === "1";
-			filters.camera = _searchParams.get("camera") || "";
+            // Basic filters
+            if (_searchParams.get("fav") === "1") {
+                f.favOnly = true;
+                hasAny = true;
+            }
+            const tags = _searchParams.get("tags");
+            if (tags) {
+                f.tagFilter = tags;
+                hasAny = true;
+            }
+            const df = _searchParams.get("date_from");
+            if (df) {
+                f.dateFrom = df;
+                hasAny = true;
+            }
+            const dt = _searchParams.get("date_to");
+            if (dt) {
+                f.dateTo = dt;
+                hasAny = true;
+            }
+            const place = _searchParams.get("place");
+            if (place) {
+                f.place = place;
+                hasAny = true;
+            }
+            if (_searchParams.get("has_text") === "1") {
+                f.hasText = true;
+                hasAny = true;
+            }
+            const camera = _searchParams.get("camera");
+            if (camera) {
+                f.camera = camera;
+                hasAny = true;
+            }
 
-			// Parse numeric filters
-			const isoMin = _searchParams.get("iso_min");
-			if (isoMin) filters.isoMin = parseFloat(isoMin);
+            // Numeric filters
+            const isoMin = _searchParams.get("iso_min");
+            if (isoMin) {
+                f.isoMin = parseFloat(isoMin);
+                hasAny = true;
+            }
+            const isoMax = _searchParams.get("iso_max");
+            if (isoMax) {
+                f.isoMax = parseFloat(isoMax);
+                hasAny = true;
+            }
+            const fMin = _searchParams.get("f_min");
+            if (fMin) {
+                f.fMin = parseFloat(fMin);
+                hasAny = true;
+            }
+            const fMax = _searchParams.get("f_max");
+            if (fMax) {
+                f.fMax = parseFloat(fMax);
+                hasAny = true;
+            }
 
-			const isoMax = _searchParams.get("iso_max");
-			if (isoMax) filters.isoMax = parseFloat(isoMax);
+            // Person filters
+            const person = _searchParams.get("person");
+            const personsCSV = _searchParams.get("persons");
+            if (personsCSV) {
+                const persons = personsCSV
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean);
+                if (persons.length) {
+                    f.persons = persons;
+                    hasAny = true;
+                }
+            } else if (person) {
+                f.persons = [person];
+                hasAny = true;
+            }
 
-			const fMin = _searchParams.get("f_min");
-			if (fMin) filters.fMin = parseFloat(fMin);
+            // View settings
+            const rv = _searchParams.get("rv");
+            if (rv) {
+                f.resultView = rv as unknown;
+                hasAny = true;
+            }
+            const tb = _searchParams.get("tb");
+            if (tb) {
+                f.timelineBucket = tb as unknown;
+                hasAny = true;
+            }
 
-			const fMax = _searchParams.get("f_max");
-			if (fMax) filters.fMax = parseFloat(fMax);
+            const q = _searchParams.get("q") || "";
 
-			// Parse person filters
-			const person = _searchParams.get("person");
-			const personsCSV = _searchParams.get("persons");
-			if (personsCSV) {
-				filters.persons = personsCSV
-					.split(",")
-					.map((s) => s.trim())
-					.filter(Boolean);
-			} else if (person) {
-				filters.persons = [person];
-			}
+            // For backwards compatibility in tests: when empty params, return {}
+            if (!hasAny && !q) return {} as any;
 
-			// Parse view settings
-			filters.resultView = _searchParams.get("rv") as unknown;
-			filters.timelineBucket = _searchParams.get("tb") as unknown;
-
-			return filters;
-		}, []);
+            // Return both flattened and nested shapes for convenience and test parity
+            const result: any = { ...f, filters: { ...f } };
+            if (q) result.query = q;
+            return result;
+        }, []);
 
 	const applyFiltersFromUrl = // biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency exclusion
 		useCallback(

@@ -81,3 +81,8 @@ Production auth
 - Ensure the deployed UI sends `Authorization: Bearer <token>` for write calls. See `docs/AUTH.md` for options and security notes.
 
 If you still see HMR reload errors, hard refresh the browser to clear stale modules and ensure API is running on `http://localhost:8000` (per `VITE_API_BASE`).
+
+Documentation
+- Frontend Demo Guide: `photo-search-intent-first/docs/FRONTEND_DEMO_GUIDE.md`
+- Intent-First Handbook: `photo-search-intent-first/docs/intent_first_handbook.md`
+- Visual Testing: `docs/VISUAL_TESTING.md`

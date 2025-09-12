@@ -29,6 +29,50 @@ function authHeaders() {
     return {} as Record<string, string>;
 }
 
+export async function apiPing(): Promise<boolean> {
+    try {
+        const r = await fetch(`${API_BASE}/api/ping`);
+        if (!r.ok) return false;
+        const js = await r.json();
+        return Boolean(js?.ok);
+    } catch {
+        return false;
+    }
+}
+
+export async function apiAuthStatus(): Promise<{ auth_required: boolean }> {
+    try {
+        const r = await fetch(`${API_BASE}/auth/status`);
+        if (!r.ok) return { auth_required: false };
+        return (await r.json()) as { auth_required: boolean };
+    } catch {
+        return { auth_required: false };
+    }
+}
+
+export async function apiAuthCheck(token: string): Promise<boolean> {
+    try {
+        const r = await fetch(`${API_BASE}/auth/check`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        });
+        return r.ok;
+    } catch {
+        return false;
+    }
+}
+
+export async function apiDemoDir(): Promise<string | null> {
+    try {
+        const r = await fetch(`${API_BASE}/demo/dir`);
+        if (!r.ok) return null;
+        const js = (await r.json()) as { ok?: boolean; dir?: string };
+        return js?.ok && js?.dir ? js.dir : null;
+    } catch {
+        return null;
+    }
+}
+
 async function post<T>(path: string, body: any): Promise<T> {
     const r = await fetch(`${API_BASE}${path}`, {
         method: "POST",

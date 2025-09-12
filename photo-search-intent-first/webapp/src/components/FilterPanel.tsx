@@ -166,7 +166,10 @@ export function FilterPanel({
 
 	return (
 		<div className="fixed inset-0 bg-black/40 z-40 flex">
-			<div className="ml-auto w-full max-w-md bg-white border-l flex flex-col">
+			<div
+				className="ml-auto w-full max-w-md bg-white border-l flex flex-col"
+				data-testid="filter-panel"
+			>
 				{/* Header */}
 				<div className="flex items-center justify-between p-4 border-b">
 					<h3 className="font-semibold flex items-center gap-2">

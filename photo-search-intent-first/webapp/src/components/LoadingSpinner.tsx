@@ -22,19 +22,27 @@ export function LoadingSpinner({
 
 	if (inline) {
 		return (
-			<span className={`inline-flex items-center gap-2 ${className}`}>
+			<span className={`inline-flex items-center gap-2 ${className}`} role="status" aria-live="polite">
 				<Loader2
 					className={`${sizeClasses[size]} animate-spin text-blue-600`}
 				/>
-				{message && <span className="text-sm text-gray-600">{message}</span>}
+				{message ? (
+					<span className="text-sm text-gray-600">{message}</span>
+				) : (
+					<span className="sr-only">Loading…</span>
+				)}
 			</span>
 		);
 	}
 
 	return (
-		<div className={`flex flex-col items-center justify-center ${className}`}>
+		<div className={`flex flex-col items-center justify-center ${className}`} role="status" aria-live="polite">
 			<Loader2 className={`${sizeClasses[size]} animate-spin text-blue-600`} />
-			{message && <p className="mt-2 text-sm text-gray-600">{message}</p>}
+			{message ? (
+				<p className="mt-2 text-sm text-gray-600">{message}</p>
+			) : (
+				<span className="sr-only">Loading…</span>
+			)}
 		</div>
 	);
 }

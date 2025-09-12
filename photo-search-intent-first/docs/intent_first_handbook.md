@@ -338,6 +338,27 @@ You are to apply the Intent-First UX Design Philosophy to the following design c
 #### Key Questions to Always Ask
 - **"What specific user problem does this solve?"**
 - **"How will we measure success?"**
+
+##### Pattern: Search Command Center (Overlay)
+- Intent: Make the primary intent (Find) the primary CTA; minimize upfront chrome; progressively reveal power.
+- Triggers:
+  - Visible Search button toggles overlay.
+  - Keyboard “/” focuses the search from anywhere (unless typing).
+- Structure:
+  - Prominent input with contextual suggestions (people, tags, cameras, time).
+  - Filters Drawer for optional controls (rating, filetype, size, quality presets).
+  - Advanced popover with boolean grammar, examples, and inline validation.
+- Interaction principles:
+  - Progressive disclosure: closed by default; filters/advanced hidden until requested.
+  - Tokenization: applied filters render as removable tokens adjacent to the input.
+  - Accessibility: focus trap, Esc closes, ARIA labels, visible focus states; keyboardable star rating.
+- Acceptance criteria:
+  - Users can open/close with mouse and keyboard.
+  - Enter runs the query; overlay closes and returns focus.
+  - Suggestions update within 150ms debounce; no layout shifts.
+  - No duplicate chips outside overlay when flag enabled.
+  - Works on mobile (touch targets ≥ 44px; virtual keyboard not obscuring input).
+
 - **"Can users with disabilities complete this task?"**
 - **"Does it fit our design system, and if not, why?"**
 - **"What's the simplest version that improves the experience?"**

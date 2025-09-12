@@ -4,23 +4,28 @@ import { LibraryProvider } from "./contexts/LibraryContext";
 import { SearchProvider } from "./contexts/SearchContext";
 import { SettingsProvider } from "./contexts/SettingsContext";
 import { UIProvider } from "./contexts/UIContext";
+import { ModalProvider } from "./contexts/ModalContext";
 import { PhotoVaultAPIProvider } from "./services/PhotoVaultAPIProvider";
 import { SimpleStoreProvider } from "./stores/SimpleStore";
 
 export function RootProviders({ children }: { children: React.ReactNode }) {
-	return (
-		<HashRouter>
-			<SimpleStoreProvider>
-				<SettingsProvider>
-					<UIProvider>
-						<PhotoVaultAPIProvider>
-							<LibraryProvider>
-								<SearchProvider>{children}</SearchProvider>
-							</LibraryProvider>
-						</PhotoVaultAPIProvider>
-					</UIProvider>
-				</SettingsProvider>
-			</SimpleStoreProvider>
-		</HashRouter>
-	);
+  return (
+    <HashRouter
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
+      <SimpleStoreProvider>
+        <SettingsProvider>
+          <UIProvider>
+            <PhotoVaultAPIProvider>
+              <LibraryProvider>
+                <SearchProvider>
+                  <ModalProvider>{children}</ModalProvider>
+                </SearchProvider>
+              </LibraryProvider>
+            </PhotoVaultAPIProvider>
+          </UIProvider>
+        </SettingsProvider>
+      </SimpleStoreProvider>
+    </HashRouter>
+  );
 }

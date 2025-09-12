@@ -99,12 +99,60 @@ if _static is not None:
     @app.get("/")
     def _root_redirect():
         return RedirectResponse(url="/app/")
+else:
+    # When frontend build is missing, serve a minimal helper page at root
+    @app.get("/", response_class=HTMLResponse)
+    def _root_fallback() -> HTMLResponse:
+        html = """
+<!doctype html>
+<html>
+  <head>
+    <meta charset=\"utf-8\" />
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
+    <title>Photo Search API</title>
+    <style> body { font-family: -apple-system, system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif; padding: 24px; line-height: 1.5; } code, pre { background:#f5f5f7; padding: 2px 4px; border-radius: 4px; } .tip{color:#555} </style>
+  </head>
+  <body>
+    <h1>Photo Search – API</h1>
+    <p>The frontend build was not found. You can still use the API and docs.</p>
+    <ul>
+      <li>Open API docs: <a href=\"/docs\">/docs</a></li>
+      <li>Build the web app: <pre>cd photo-search-intent-first/webapp\nnpm i\nnpm run build</pre></li>
+      <li>Then reload this page to serve the UI from <code>/app/</code>.</li>
+    </ul>
+    <p class=\"tip\">Tip: Configure auth with <code>API_TOKEN</code>. The web UI reads <code>VITE_API_TOKEN</code> or <code>localStorage.api_token</code>.</p>
+  </body>
+ </html>
+        """
+        return HTMLResponse(content=html)
 
 
 # Health check for webapp offline/online detection
 @app.get("/api/ping")
 def api_ping() -> Dict[str, Any]:
     return {"ok": True}
+
+# Demo directory locator (for onboarding/empty states)
+@app.get("/demo/dir")
+def api_demo_dir() -> Dict[str, Any]:
+    """Return a local demo photos directory if available.
+
+    Tries common locations within the repo: photo-search-intent-first/demo_photos and e2e_data.
+    """
+    try:
+        here = Path(__file__).resolve()
+        repo_root = here.parents[2]
+        candidates = [
+            repo_root / "photo-search-intent-first" / "demo_photos",
+            repo_root / "e2e_data",
+        ]
+        for p in candidates:
+            if p.exists() and p.is_dir():
+                # Return absolute path string for the client to use
+                return {"ok": True, "dir": str(p.resolve())}
+        return {"ok": False}
+    except Exception:
+        return {"ok": False}
 
 # Auth status (dev helper)
 @app.get("/auth/status")

@@ -7,6 +7,9 @@ import { HintManager, HintProvider } from "../components/HintSystem";
 import { MobileOptimizations } from "../components/MobileOptimizations";
 import { ThemeProvider } from "../components/ThemeProvider";
 import { UIProvider } from "../contexts/UIContext";
+import { SearchProvider } from "../contexts/SearchContext";
+import { ModalProvider } from "../contexts/ModalContext";
+import { LibraryProvider } from "../contexts/LibraryContext";
 import { initializeAPI } from "../services/PhotoVaultAPI";
 import { PhotoVaultAPIProvider } from "../services/PhotoVaultAPIProvider";
 import { SimpleStoreProvider } from "../stores/SimpleStore";
@@ -98,6 +101,7 @@ vi.mock("../stores/settingsStore", () => {
 
 	return {
 		useHighContrast: () => false,
+		useSearchCommandCenter: () => false,
 		useThemeMode: () => mockState.themeMode,
 		useColorScheme: () => mockState.colorScheme,
 		useDensity: () => mockState.density,
@@ -164,34 +168,40 @@ const AllTheProviders: React.FC<{ children: React.ReactNode }> = ({
 	// Initialize API singleton so usePhotoVaultAPI can fallback safely
 	initializeAPI({ dir: "/test", provider: "local" });
 
-	return (
-		<ErrorBoundary>
-			<BrowserRouter>
-				<ThemeProvider>
-					<UIProvider>
-						<SimpleStoreProvider>
-							<PhotoVaultAPIProvider>
-								<HintProvider>
-									<HintManager>
-										<MobileOptimizations
-											onSwipeLeft={vi.fn()}
-											onSwipeRight={vi.fn()}
-											onSwipeUp={vi.fn()}
-											enableSwipeGestures={false}
-											enablePullToRefresh={false}
-											onPullToRefresh={vi.fn()}
-										>
-											{children}
-										</MobileOptimizations>
-									</HintManager>
-								</HintProvider>
-							</PhotoVaultAPIProvider>
-						</SimpleStoreProvider>
-					</UIProvider>
-				</ThemeProvider>
-			</BrowserRouter>
-		</ErrorBoundary>
-	);
+    return (
+        <ErrorBoundary>
+          <BrowserRouter>
+            <ThemeProvider>
+              <UIProvider>
+                <SimpleStoreProvider>
+                  <PhotoVaultAPIProvider>
+                    <LibraryProvider>
+                      <SearchProvider>
+                        <ModalProvider>
+                          <HintProvider>
+                          <HintManager>
+                            <MobileOptimizations
+                          onSwipeLeft={vi.fn()}
+                          onSwipeRight={vi.fn()}
+                          onSwipeUp={vi.fn()}
+                          enableSwipeGestures={false}
+                          enablePullToRefresh={false}
+                          onPullToRefresh={vi.fn()}
+                        >
+                          {children}
+                        </MobileOptimizations>
+                          </HintManager>
+                          </HintProvider>
+                        </ModalProvider>
+                      </SearchProvider>
+                    </LibraryProvider>
+                  </PhotoVaultAPIProvider>
+                </SimpleStoreProvider>
+              </UIProvider>
+            </ThemeProvider>
+          </BrowserRouter>
+        </ErrorBoundary>
+      );
 };
 
 // Custom render function that includes all providers
