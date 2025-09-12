@@ -69,8 +69,10 @@
 	/* Transitions */
 	--transition-all: all var(--animation-base) cubic-bezier(0.4, 0, 0.2, 1);
 	--transition-colors: colors var(--animation-fast) cubic-bezier(0.4, 0, 0.2, 1);
-	--transition-transform: transform var(--animation-base) cubic-bezier(0.4, 0, 0.2, 1);
-	--transition-opacity: opacity var(--animation-base) cubic-bezier(0.4, 0, 0.2, 1);
+	--transition-transform: transform var(--animation-base)
+		cubic-bezier(0.4, 0, 0.2, 1);
+	--transition-opacity: opacity var(--animation-base)
+		cubic-bezier(0.4, 0, 0.2, 1);
 
 	/* Spacing */
 	--spacing-xs: 0.25rem;
@@ -312,7 +314,6 @@ body {
 }
 
 @keyframes pulse {
-
 	0%,
 	100% {
 		opacity: 1;
@@ -370,10 +371,12 @@ body {
 
 /* Loading Skeleton */
 .skeleton {
-	background: linear-gradient(90deg,
-			var(--bg-secondary) 0%,
-			var(--bg-tertiary) 50%,
-			var(--bg-secondary) 100%);
+	background: linear-gradient(
+		90deg,
+		var(--bg-secondary) 0%,
+		var(--bg-tertiary) 50%,
+		var(--bg-secondary) 100%
+	);
 	background-size: 2000px 100%;
 	animation: shimmer 2s infinite;
 	border-radius: var(--radius-md);
@@ -417,10 +420,12 @@ body {
 .photo-overlay {
 	position: absolute;
 	inset: 0;
-	background: linear-gradient(to bottom,
-			transparent 0%,
-			transparent 50%,
-			rgba(0, 0, 0, 0.7) 100%);
+	background: linear-gradient(
+		to bottom,
+		transparent 0%,
+		transparent 50%,
+		rgba(0, 0, 0, 0.7) 100%
+	);
 	opacity: 0;
 	transition: var(--transition-opacity);
 	display: flex;
@@ -504,7 +509,7 @@ body {
 	transition: var(--transition-colors);
 }
 
-.search-input:focus~.search-icon {
+.search-input:focus ~ .search-icon {
 	color: var(--color-primary-500);
 }
 
@@ -608,7 +613,6 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-
 	*,
 	*::before,
 	*::after {
@@ -1337,4 +1341,23 @@ body {
 	background-color: rgba(2, 6, 23, 0.65);
 	border-color: rgba(30, 41, 59, 0.6);
 	box-shadow: 0 10px 30px -14px rgba(148, 163, 184, 0.2);
+}
+/* Lightweight menu item styling for progressive disclosure menu */
+.menu-item {
+	display: flex;
+	align-items: center;
+	width: 100%;
+	padding: 0.375rem 0.5rem;
+	border-radius: 0.375rem;
+	font-size: 0.875rem;
+	color: var(--color-gray-800, #1f2937);
+}
+.dark .menu-item {
+	color: #e5e7eb;
+}
+.menu-item:hover {
+	background: rgba(107, 114, 128, 0.12);
+}
+.dark .menu-item:hover {
+	background: rgba(31, 41, 55, 0.6);
 }

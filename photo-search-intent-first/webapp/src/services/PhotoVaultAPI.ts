@@ -532,7 +532,7 @@ export class PhotoVaultAPI {
 		return api.apiFeedback(this.config.dir, searchId, query, positives, note);
 	}
 
-    // Developer-only TODOs removed
+	// Developer-only TODOs removed
 
 	// ============================================================
 	// UTILITIES

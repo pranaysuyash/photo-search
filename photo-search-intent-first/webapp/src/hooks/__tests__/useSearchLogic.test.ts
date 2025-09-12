@@ -543,9 +543,9 @@ describe("useSearchLogic", () => {
 				const { result } = createTestHook();
 
 				const params = new URLSearchParams("q=recent&rv=timeline&tb=week");
-        const filters = result.current.parseSearchParams(params);
-        expect(filters.resultView).toBe("timeline");
-        expect(filters.timelineBucket).toBe("week");
+				const filters = result.current.parseSearchParams(params);
+				expect(filters.resultView).toBe("timeline");
+				expect(filters.timelineBucket).toBe("week");
 			});
 
 			it("should handle complex combination of parameters", () => {
@@ -554,28 +554,28 @@ describe("useSearchLogic", () => {
 				const params = new URLSearchParams(
 					"q=professional%20photos&fav=1&tags=portrait%2Cstudio&camera=Canon%20EOS%20R5&iso_min=100&iso_max=800&f_min=1.4&f_max=5.6&rv=grid&tb=day",
 				);
-        const filters = result.current.parseSearchParams(params);
-        expect(filters.favOnly).toBe(true);
-        expect(filters.tagFilter).toBe("portrait,studio");
-        expect(filters.camera).toBe("Canon EOS R5");
-        expect(filters.isoMin).toBe(100);
-        expect(filters.isoMax).toBe(800);
-        expect(filters.fMin).toBe(1.4);
-        expect(filters.fMax).toBe(5.6);
-        expect(filters.resultView).toBe("grid");
-        expect(filters.timelineBucket).toBe("day");
+				const filters = result.current.parseSearchParams(params);
+				expect(filters.favOnly).toBe(true);
+				expect(filters.tagFilter).toBe("portrait,studio");
+				expect(filters.camera).toBe("Canon EOS R5");
+				expect(filters.isoMin).toBe(100);
+				expect(filters.isoMax).toBe(800);
+				expect(filters.fMin).toBe(1.4);
+				expect(filters.fMax).toBe(5.6);
+				expect(filters.resultView).toBe("grid");
+				expect(filters.timelineBucket).toBe("day");
 			});
 
 			it("should handle empty parameters gracefully", () => {
 				const { result } = createTestHook();
 
 				const params = new URLSearchParams("");
-        const filters = result.current.parseSearchParams(params);
-        expect(filters).toEqual({});
+				const filters = result.current.parseSearchParams(params);
+				expect(filters).toEqual({});
 			});
 		});
 	});
 
-// The hook no longer exposes clearSearch/performSearch; those behaviors
-// have moved to higher-level components (e.g., App/TopBar flows).
+	// The hook no longer exposes clearSearch/performSearch; those behaviors
+	// have moved to higher-level components (e.g., App/TopBar flows).
 });

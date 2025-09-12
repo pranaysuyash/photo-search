@@ -1,6 +1,14 @@
 import { AlertTriangle, Home, RefreshCw } from "lucide-react";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
+interface WindowWithErrorService extends Window {
+	logErrorToService?: (data: {
+		error: string;
+		errorInfo: string;
+		timestamp: string;
+	}) => void;
+}
+
 interface Props {
 	children: ReactNode;
 	fallback?: ReactNode;
@@ -43,8 +51,9 @@ export class ErrorBoundary extends Component<Props, State> {
 		}
 
 		// Log to external service if needed
-		if (typeof window !== "undefined" && (window as any).logErrorToService) {
-			(window as any).logErrorToService({
+		const windowWithService = window as WindowWithErrorService;
+		if (typeof window !== "undefined" && windowWithService.logErrorToService) {
+			windowWithService.logErrorToService({
 				error: error.toString(),
 				errorInfo: errorInfo.componentStack,
 				timestamp: new Date().toISOString(),

@@ -12,9 +12,14 @@ vi.mock("./stores/useStores", () => {
 	const mockTags: string[] = [];
 	const mockTagsMap: Record<string, string[]> = {};
 	const mockCollections: Record<string, string[]> = {};
-	const mockSmartCollections: Record<string, any> = {};
+	const mockSmartCollections: Record<string, { query: string; count?: number }> = {};
 	const mockLibrary: string[] = [];
-	const mockDiag = { engines: [], free_gb: 100 } as any;
+	const mockDiag = {
+		engines: [] as Array<{ key: string; index_dir: string; count: number }>,
+		free_gb: 100,
+		os: "test",
+		folder: "/test",
+	};
 
 	const photoActions = {
 		setCollections: vi.fn((c: Record<string, string[]>) => {
@@ -141,6 +146,8 @@ vi.mock("./stores/useStores", () => {
 });
 
 vi.mock("./api", () => ({
+	apiAuthStatus: vi.fn(async () => ({ auth_required: false })),
+	apiPing: vi.fn(async () => true),
 	apiGetCollections: vi.fn(async () => ({
 		collections: { Summer: ["/a.jpg"] },
 	})),
@@ -168,7 +175,7 @@ describe("App Collections wiring (mocked stores)", () => {
 		const { usePhotoActions } = await import("./stores/useStores");
 		render(<App />);
 		// Navigate to Collections view first
-    const collectionsNav = screen.getByRole("button", { name: /Collections/ });
+		const collectionsNav = screen.getByRole("button", { name: /Collections/ });
 		fireEvent.click(collectionsNav);
 		// Click the Collections Refresh button
 		const refreshBtn = await screen.findByRole("button", { name: "Refresh" });

@@ -135,77 +135,86 @@ const tourSteps: TourStep[] = [
 		showPrev: true,
 		canSkip: true,
 	},
-  {
-    id: "upload",
-    title: "Add Your Photos",
-    description: "Import photos from your computer or cloud storage.",
-    content: (
-      <div className="space-y-3">
-        <div className="flex items-center gap-3 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-          <Upload className="w-6 h-6 text-purple-500" />
-          <div>
-            <div className="font-medium text-purple-900 dark:text-purple-100">
-              Import Photos
-            </div>
-            <div className="text-sm text-purple-700 dark:text-purple-300">
-              Drag & drop or browse your files
-            </div>
-          </div>
-        </div>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          Supported formats: JPG, PNG, GIF, WebP, HEIC, and more.
-        </p>
-      </div>
-    ),
-    // Align with tests: point to the Select Library control
-    target: '[data-tour="select-library"]',
-    position: "top",
-    showNext: true,
-    showPrev: true,
-    canSkip: true,
-  },
-  {
-    id: "filters",
-    title: "Refine With Filters",
-    description: "Open the filters panel to narrow results by camera, date, or more.",
-    content: (
-      <div className="space-y-3">
-        <div className="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-          <Settings className="w-6 h-6 text-blue-500" />
-          <div>
-            <div className="font-medium text-blue-900 dark:text-blue-100">Filters</div>
-            <div className="text-sm text-blue-700 dark:text-blue-300">Open the panel to refine your search</div>
-          </div>
-        </div>
-      </div>
-    ),
-    target: '[data-tour="filters-toggle"]',
-    position: "bottom",
-    showNext: true,
-    showPrev: true,
-    canSkip: true,
-  },
-  {
-    id: "advanced",
-    title: "Advanced Search",
-    description: "Open the advanced search to build complex queries.",
-    content: (
-      <div className="space-y-3">
-        <div className="flex items-center gap-3 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
-          <Search className="w-6 h-6 text-indigo-500" />
-          <div>
-            <div className="font-medium text-indigo-900 dark:text-indigo-100">Advanced Search</div>
-            <div className="text-sm text-indigo-700 dark:text-indigo-300">Combine fields like camera:, place:, person:, rating:</div>
-          </div>
-        </div>
-      </div>
-    ),
-    target: '[data-tour="advanced-button"]',
-    position: "bottom",
-    showNext: true,
-    showPrev: true,
-    canSkip: true,
-  },
+	{
+		id: "upload",
+		title: "Add Your Photos",
+		description: "Import photos from your computer or cloud storage.",
+		content: (
+			<div className="space-y-3">
+				<div className="flex items-center gap-3 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+					<Upload className="w-6 h-6 text-purple-500" />
+					<div>
+						<div className="font-medium text-purple-900 dark:text-purple-100">
+							Import Photos
+						</div>
+						<div className="text-sm text-purple-700 dark:text-purple-300">
+							Drag & drop or browse your files
+						</div>
+					</div>
+				</div>
+				<p className="text-sm text-gray-600 dark:text-gray-400">
+					Supported formats: JPG, PNG, GIF, WebP, HEIC, and more.
+				</p>
+			</div>
+		),
+		// Align with tests: point to the Select Library control
+		target: '[data-tour="select-library"]',
+		position: "top",
+		showNext: true,
+		showPrev: true,
+		canSkip: true,
+	},
+	{
+		id: "filters",
+		title: "Refine With Filters",
+		description:
+			"Open the filters panel to narrow results by camera, date, or more.",
+		content: (
+			<div className="space-y-3">
+				<div className="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+					<Settings className="w-6 h-6 text-blue-500" />
+					<div>
+						<div className="font-medium text-blue-900 dark:text-blue-100">
+							Filters
+						</div>
+						<div className="text-sm text-blue-700 dark:text-blue-300">
+							Open the panel to refine your search
+						</div>
+					</div>
+				</div>
+			</div>
+		),
+		target: '[data-tour="filters-toggle"]',
+		position: "bottom",
+		showNext: true,
+		showPrev: true,
+		canSkip: true,
+	},
+	{
+		id: "advanced",
+		title: "Advanced Search",
+		description: "Open the advanced search to build complex queries.",
+		content: (
+			<div className="space-y-3">
+				<div className="flex items-center gap-3 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
+					<Search className="w-6 h-6 text-indigo-500" />
+					<div>
+						<div className="font-medium text-indigo-900 dark:text-indigo-100">
+							Advanced Search
+						</div>
+						<div className="text-sm text-indigo-700 dark:text-indigo-300">
+							Combine fields like camera:, place:, person:, rating:
+						</div>
+					</div>
+				</div>
+			</div>
+		),
+		target: '[data-tour="advanced-button"]',
+		position: "bottom",
+		showNext: true,
+		showPrev: true,
+		canSkip: true,
+	},
 	{
 		id: "shortcuts",
 		title: "Keyboard Shortcuts",
@@ -476,39 +485,39 @@ export function OnboardingTour({
 								)}
 							</div>
 
-								<div className="flex items-center gap-2">
-									{currentTourStep?.canSkip && step < tourSteps.length - 1 && (
+							<div className="flex items-center gap-2">
+								{currentTourStep?.canSkip && step < tourSteps.length - 1 && (
+									<button
+										type="button"
+										onClick={handleSkip}
+										className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+									>
+										Skip Tour
+									</button>
+								)}
+
+								{/* Contextual action: Do it for me */}
+								{(() => {
+									const ev = getActionEventForStep(currentTourStep?.id || "");
+									if (!ev) return null;
+									return (
 										<button
 											type="button"
-											onClick={handleSkip}
-											className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+											onClick={() => {
+												try {
+													window.dispatchEvent(new CustomEvent(ev));
+												} catch {}
+											}}
+											className="px-3 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+											aria-label="Do it for me"
 										>
-											Skip Tour
+											Do it for me
 										</button>
-									)}
+									);
+								})()}
 
-									{/* Contextual action: Do it for me */}
-									{(() => {
-										const ev = getActionEventForStep(currentTourStep?.id || "");
-										if (!ev) return null;
-										return (
-											<button
-												type="button"
-												onClick={() => {
-													try {
-														window.dispatchEvent(new CustomEvent(ev));
-													} catch {}
-												}}
-												className="px-3 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-												aria-label="Do it for me"
-											>
-												Do it for me
-											</button>
-										);
-									})()}
-
-									{currentTourStep?.showNext && (
-										<button
+								{currentTourStep?.showNext && (
+									<button
 										type="button"
 										onClick={handleNext}
 										className="flex items-center gap-1 px-4 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"

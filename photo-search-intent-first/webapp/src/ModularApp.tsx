@@ -249,10 +249,9 @@ export function ModularApp() {
 						<h2>Search Results for "{searchQuery}"</h2>
 						<div className="photo-grid">
 							{searchResults.map((result, i) => (
-								<div
-									key={`search-${result.path}-${i}`}
-									role="button"
-									tabIndex={0}
+								<button
+									type="button"
+									key={`search-${result.path}`}
 									className="photo-item"
 									onClick={() => {
 										setSelectedPath(result.path);
@@ -268,7 +267,7 @@ export function ModularApp() {
 								>
 									<img src={getAPI().getThumbnailUrl(result.path)} alt="" />
 									<div className="photo-score">{result.score.toFixed(2)}</div>
-								</div>
+								</button>
 							))}
 						</div>
 					</div>
@@ -285,10 +284,9 @@ export function ModularApp() {
 						</div>
 						<div className="photo-grid">
 							{libraryImages.map((path, i) => (
-								<div
-									key={`lib-${path}-${i}`}
-									role="button"
-									tabIndex={0}
+								<button
+									type="button"
+									key={`lib-${path}`}
 									className="photo-item"
 									onClick={() => {
 										setSelectedPath(path);
@@ -308,7 +306,7 @@ export function ModularApp() {
 											<Star className="w-4 h-4" fill="currentColor" />
 										</div>
 									)}
-								</div>
+								</button>
 							))}
 						</div>
 					</div>
@@ -378,9 +376,8 @@ export function ModularApp() {
 				</div>
 
 				<nav className="sidebar-nav">
-					<div
-						role="button"
-						tabIndex={0}
+					<button
+						type="button"
 						className={`nav-item ${currentView === "library" ? "active" : ""}`}
 						onClick={() => setCurrentView("library")}
 						onKeyDown={(e) => {
@@ -392,11 +389,10 @@ export function ModularApp() {
 					>
 						<Library className="w-5 h-5" />
 						Library
-					</div>
+					</button>
 
-					<div
-						role="button"
-						tabIndex={0}
+					<button
+						type="button"
 						className={`nav-item ${currentView === "collections" ? "active" : ""}`}
 						onClick={() => setCurrentView("collections")}
 						onKeyDown={(e) => {
@@ -408,11 +404,10 @@ export function ModularApp() {
 					>
 						<Grid3x3 className="w-5 h-5" />
 						Collections
-					</div>
+					</button>
 
-					<div
-						role="button"
-						tabIndex={0}
+					<button
+						type="button"
 						className={`nav-item ${currentView === "people" ? "active" : ""}`}
 						onClick={() => setCurrentView("people")}
 						onKeyDown={(e) => {
@@ -424,11 +419,10 @@ export function ModularApp() {
 					>
 						<Users className="w-5 h-5" />
 						People
-					</div>
+					</button>
 
-					<div
-						role="button"
-						tabIndex={0}
+					<button
+						type="button"
 						className={`nav-item ${currentView === "places" ? "active" : ""}`}
 						onClick={() => setCurrentView("places")}
 						onKeyDown={(e) => {
@@ -440,11 +434,10 @@ export function ModularApp() {
 					>
 						<MapPin className="w-5 h-5" />
 						Places
-					</div>
+					</button>
 
-					<div
-						role="button"
-						tabIndex={0}
+					<button
+						type="button"
 						className={`nav-item ${currentView === "favorites" ? "active" : ""}`}
 						onClick={() => setCurrentView("favorites")}
 						onKeyDown={(e) => {
@@ -456,11 +449,10 @@ export function ModularApp() {
 					>
 						<Star className="w-5 h-5" />
 						Favorites
-					</div>
+					</button>
 
-					<div
-						role="button"
-						tabIndex={0}
+					<button
+						type="button"
 						className={`nav-item ${currentView === "trips" ? "active" : ""}`}
 						onClick={() => setCurrentView("trips")}
 						onKeyDown={(e) => {
@@ -472,7 +464,7 @@ export function ModularApp() {
 					>
 						<MapIcon className="w-5 h-5" />
 						Trips
-					</div>
+					</button>
 				</nav>
 
 				<div className="sidebar-section">

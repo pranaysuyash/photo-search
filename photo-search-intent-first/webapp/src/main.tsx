@@ -1,6 +1,5 @@
 import { createRoot } from "react-dom/client";
 import App from "./App";
-import AppWrapper from "./AppWrapper";
 import TestApp from "./debug/TestApp";
 import { ModularApp } from "./ModularApp";
 import { RootProviders } from "./RootProviders";
@@ -11,43 +10,66 @@ import "./high-contrast.css";
 
 // Dev helper: surface a tip if no token is configured and API may enforce auth
 if (import.meta.env.DEV) {
-  try {
-    let token = localStorage.getItem("api_token") || (import.meta as any).env?.VITE_API_TOKEN;
-    // If no runtime token, seed from env to simplify dev
-    if (!localStorage.getItem("api_token") && (import.meta as any).env?.VITE_API_TOKEN) {
-      try { localStorage.setItem("api_token", (import.meta as any).env?.VITE_API_TOKEN); } catch {}
-      token = (import.meta as any).env?.VITE_API_TOKEN;
-    }
-    if (!token) {
-      // eslint-disable-next-line no-console
-      console.info(
-        "Tip: If your API sets API_TOKEN, add VITE_API_TOKEN in webapp .env or localStorage.setItem('api_token', '<value>').",
-      );
-    }
-    // Probe backend auth status to provide precise guidance
-    const base = (import.meta as any).env?.VITE_API_BASE || window.location.origin;
-    fetch(`${base}/auth/status`).then(async (r) => {
-      try {
-        const js = await r.json();
-        if (js?.auth_required && !token) {
-          // eslint-disable-next-line no-console
-          console.warn(
-            "Backend requires Authorization but no token is configured. Set localStorage.setItem('api_token','<value>') or VITE_API_TOKEN in .env, matching API_TOKEN used by the server.",
-          );
-        } else if (js?.auth_required && token) {
-          // Verify acceptance with a POST
-          fetch(`${base}/auth/check`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } })
-            .then((res) => {
-              if (!res.ok) {
-                // eslint-disable-next-line no-console
-                console.warn("Auth check failed (", res.status, ") — token mismatch? Ensure frontend and backend tokens match exactly.");
-              }
-            })
-            .catch(() => {});
-        }
-      } catch {}
-    }).catch(() => {});
-  } catch {}
+	try {
+		let token =
+			localStorage.getItem("api_token") ||
+			(import.meta as any).env?.VITE_API_TOKEN;
+		// If no runtime token, seed from env to simplify dev
+		if (
+			!localStorage.getItem("api_token") &&
+			(import.meta as any).env?.VITE_API_TOKEN
+		) {
+			try {
+				localStorage.setItem(
+					"api_token",
+					(import.meta as any).env?.VITE_API_TOKEN,
+				);
+			} catch {}
+			token = (import.meta as any).env?.VITE_API_TOKEN;
+		}
+		if (!token) {
+			// eslint-disable-next-line no-console
+			console.info(
+				"Tip: If your API sets API_TOKEN, add VITE_API_TOKEN in webapp .env or localStorage.setItem('api_token', '<value>').",
+			);
+		}
+		// Probe backend auth status to provide precise guidance
+		const base =
+			(import.meta as any).env?.VITE_API_BASE || window.location.origin;
+		fetch(`${base}/auth/status`)
+			.then(async (r) => {
+				try {
+					const js = await r.json();
+					if (js?.auth_required && !token) {
+						// eslint-disable-next-line no-console
+						console.warn(
+							"Backend requires Authorization but no token is configured. Set localStorage.setItem('api_token','<value>') or VITE_API_TOKEN in .env, matching API_TOKEN used by the server.",
+						);
+					} else if (js?.auth_required && token) {
+						// Verify acceptance with a POST
+						fetch(`${base}/auth/check`, {
+							method: "POST",
+							headers: {
+								"Content-Type": "application/json",
+								Authorization: `Bearer ${token}`,
+							},
+						})
+							.then((res) => {
+								if (!res.ok) {
+									// eslint-disable-next-line no-console
+									console.warn(
+										"Auth check failed (",
+										res.status,
+										") — token mismatch? Ensure frontend and backend tokens match exactly.",
+									);
+								}
+							})
+							.catch(() => {});
+					}
+				} catch {}
+			})
+			.catch(() => {});
+	} catch {}
 }
 
 // Register service worker for PWA functionality
@@ -101,7 +123,6 @@ function selectApp() {
 	const ui = params.get("ui") ?? (import.meta as any).env?.VITE_UI ?? "modern";
 	// Default to App (formerly ModernApp); allow forcing test via ?ui=test
 	if (ui === "test") return <TestApp />;
-	if (ui === "new") return <AppWrapper />;
 	if (ui === "modular") return <ModularApp />;
 	// Use the original App by default - it has all the features!
 	return <App />;

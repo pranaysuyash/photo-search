@@ -138,10 +138,7 @@ export function KeyboardShortcuts({ isOpen, onClose }: KeyboardShortcutsProps) {
 				<div className="p-6 overflow-y-auto max-h-[60vh]">
 					<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 						{shortcutGroups.map((group, idx) => (
-							<div
-								key={`group-${group.title}-${idx}`}
-								className="space-y-2"
-							>
+							<div key={`group-${group.title}-${idx}`} className="space-y-2">
 								<h3 className="font-semibold text-gray-900 dark:text-white mb-3">
 									{group.title}
 								</h3>

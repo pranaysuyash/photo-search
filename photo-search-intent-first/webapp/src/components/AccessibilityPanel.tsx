@@ -74,9 +74,9 @@ export function AccessibilityPanel({
 	useEffect(() => {
 		if (isOpen && panelRef.current) {
 			const firstFocusable = panelRef.current.querySelector(
-				'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+				'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
 			) as HTMLElement;
-			
+
 			if (firstFocusable) {
 				firstFocusable.focus();
 			}
@@ -180,7 +180,7 @@ export function AccessibilityPanel({
 						</span>
 						<select
 							value={settings.theme}
-							onChange={(e) => updateSetting("theme", e.target.value as any)}
+							onChange={(e) => updateSetting("theme", e.target.value as "light" | "dark" | "auto")}
 							className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
 						>
 							<option value="auto">Auto</option>
@@ -198,7 +198,7 @@ export function AccessibilityPanel({
 						</span>
 						<select
 							value={settings.fontSize}
-							onChange={(e) => updateSetting("fontSize", e.target.value as any)}
+							onChange={(e) => updateSetting("fontSize", e.target.value as "small" | "medium" | "large" | "xlarge")}
 							className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
 						>
 							<option value="small">Small</option>
@@ -598,7 +598,7 @@ export function AccessibilityPanel({
 									<button
 										type="button"
 										key={tab.id}
-										onClick={() => setActiveTab(tab.id as any)}
+										onClick={() => setActiveTab(tab.id as "vision" | "motor" | "cognitive" | "general")}
 										className={clsx(
 											"flex-1 px-4 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2",
 											activeTab === tab.id

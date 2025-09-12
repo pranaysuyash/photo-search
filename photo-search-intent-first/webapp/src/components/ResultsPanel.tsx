@@ -136,8 +136,8 @@ export default function ResultsPanel() {
 		toggleSelect,
 	]);
 
-    return (
-        <div className="glass-panel p-3">
+	return (
+		<div className="glass-panel p-3">
 			<div className="flex items-center justify-between">
 				<h2 className="font-semibold">Results</h2>
 				<div className="flex gap-2 text-sm">
@@ -146,7 +146,9 @@ export default function ResultsPanel() {
 						type="button"
 						onClick={() => {
 							const next = !showExplain;
-							settingsActions.setShowExplain(next);
+							if (settingsActions.setShowExplain) {
+								settingsActions.setShowExplain(next);
+							}
 							// If turning on explain chips, sample FPS for ~1s and log
 							if (next) {
 								try {

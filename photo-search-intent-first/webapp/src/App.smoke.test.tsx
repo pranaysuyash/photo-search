@@ -8,9 +8,14 @@ vi.mock("./stores/useStores", () => {
 	const mockTags: string[] = [];
 	const mockTagsMap: Record<string, string[]> = {};
 	const mockCollections: Record<string, string[]> = {};
-	const mockSmartCollections: Record<string, any> = {};
+	const mockSmartCollections: Record<string, { query: string; count?: number }> = {};
 	const mockLibrary: string[] = [];
-	const mockDiag = { engines: [], free_gb: 100 } as any;
+	const mockDiag = {
+		engines: [] as Array<{ key: string; index_dir: string; count: number }>,
+		free_gb: 100,
+		os: "test",
+		folder: "/test",
+	};
 
 	let mockQuery = "beach";
 
@@ -142,6 +147,8 @@ vi.mock("./stores/useStores", () => {
 
 // Mock APIs that App triggers
 vi.mock("./api", () => ({
+	apiAuthStatus: vi.fn(async () => ({ auth_required: false })),
+	apiPing: vi.fn(async () => true),
 	apiIndex: vi.fn(async () => ({ new: 1, updated: 0, total: 1 })),
 	apiSearch: vi.fn(async () => ({
 		search_id: "s1",
@@ -173,7 +180,34 @@ vi.mock("./api", () => ({
 		`mock://thumb${p}`,
 }));
 
+// Ensure App sees Search Command Center disabled so the TopBar renders SearchBar input
+// Merge with actual to preserve other selectors used by providers
+vi.mock("./stores/settingsStore", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./stores/settingsStore")>();
+  return {
+    ...actual,
+    useSearchCommandCenter: () => false,
+    useHighContrast: () => false,
+    useThemeStore: () => ({
+      themeMode: "light",
+      colorScheme: "blue",
+      density: "normal",
+      customColors: undefined,
+      setThemeMode: vi.fn(),
+      setColorScheme: vi.fn(),
+      setDensity: vi.fn(),
+      setCustomColors: vi.fn(),
+      resetTheme: vi.fn(),
+    }),
+  };
+});
+
 import { apiBuildMetadata, apiIndex, apiSearch } from "./api";
+
+// Avoid DOMException from ThemeProvider classList operations in jsdom; no-op wrapper suffices for smoke
+vi.mock("./components/ThemeProvider", () => ({
+  ThemeProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
 
 describe("App (smoke with mocked stores)", () => {
 	it("wires search and index actions without crashing", async () => {

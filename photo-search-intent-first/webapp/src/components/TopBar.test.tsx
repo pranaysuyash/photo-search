@@ -31,6 +31,16 @@ vi.mock("framer-motion", () => ({
 	},
 }));
 
+// Ensure the feature-flagged Search Command Center is disabled so TopBar renders SearchBar
+// Merge with actual module to avoid breaking other hooks used by providers
+vi.mock("../stores/settingsStore", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../stores/settingsStore")>();
+  return {
+    ...actual,
+    useSearchCommandCenter: () => false,
+  };
+});
+
 // Mock lucide-react icons (include icons used by ErrorBoundary as it is always imported in test wrapper)
 vi.mock("lucide-react", () => ({
 	BookmarkPlus: () => <div>BookmarkPlus</div>,
@@ -43,6 +53,7 @@ vi.mock("lucide-react", () => ({
 	Tag: () => <div>Tag</div>,
 	Info: () => <div>Info</div>,
 	Menu: () => <div>Menu</div>,
+	MoreHorizontal: () => <div>MoreHorizontal</div>,
 	Palette: () => <div>Palette</div>,
 	Settings: () => <div>Settings</div>,
 	Trash2: () => <div>Trash2</div>,

@@ -37,7 +37,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
 	onSwipeRight,
 	onSwipeUp,
 	onPullToRefresh,
-	accessibilitySettings,
+	accessibilitySettings: _accessibilitySettings,
 	onAccessibilitySettingsChange,
 }) => {
 	return (

@@ -13,30 +13,26 @@ const FocusTrap: React.FC<FocusTrapProps> = ({ onEscape, children }) => {
 
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
-			if (e.key === 'Escape') {
+			if (e.key === "Escape") {
 				onEscape();
 			}
 		};
 
 		const firstFocusable = modalRef.current?.querySelector(
-			'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+			'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
 		) as HTMLElement;
 
 		if (firstFocusable) {
 			firstFocusable.focus();
 		}
 
-		document.addEventListener('keydown', handleKeyDown);
+		document.addEventListener("keydown", handleKeyDown);
 		return () => {
-			document.removeEventListener('keydown', handleKeyDown);
+			document.removeEventListener("keydown", handleKeyDown);
 		};
 	}, [onEscape]);
 
-	return (
-		<div ref={modalRef}>
-			{children}
-		</div>
-	);
+	return <div ref={modalRef}>{children}</div>;
 };
 
 interface FolderModalProps {

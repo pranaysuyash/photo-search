@@ -7,7 +7,6 @@ import {
 	Search as IconSearch,
 	Sparkles as IconSparkles,
 	Tag as IconTag,
-	ListTodo as IconTasks,
 	Users as IconUsers,
 	X,
 } from "lucide-react";
@@ -110,8 +109,8 @@ export function Sidebar({
 			icon: IconSearch,
 			count: savedSearches?.length || 0,
 		},
-    // Tasks removed from user app
-];
+		// Tasks removed from user app
+	];
 
 	const renderNavItem = (item: NavItem) => (
 		<button
@@ -142,7 +141,10 @@ export function Sidebar({
 				/>
 			)}
 
-			<div className={`sidebar-container ${isOpen ? "open" : ""}`} data-tour="sidebar">
+			<div
+				className={`sidebar-container ${isOpen ? "open" : ""}`}
+				data-tour="sidebar"
+			>
 				<div className="sidebar-header">
 					<div>
 						<h1 className="sidebar-title">PhotoVault</h1>
@@ -153,7 +155,7 @@ export function Sidebar({
 					</button>
 				</div>
 
-				<nav className="sidebar-nav" role="navigation" aria-label="Main navigation">
+				<nav className="sidebar-nav" aria-label="Main navigation">
 					<div className="nav-section">
 						<h3 className="nav-section-title">Library</h3>
 						<div className="nav-items">{navItems.map(renderNavItem)}</div>

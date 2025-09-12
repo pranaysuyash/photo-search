@@ -157,11 +157,12 @@ export function BulkExportModal({
 
 					{/* Destination */}
 					<div className="mb-6">
-						<label className="block text-sm font-medium mb-2">
+						<label htmlFor="export-destination" className="block text-sm font-medium mb-2">
 							Destination Folder
 						</label>
 						<div className="flex gap-2">
 							<input
+								id="export-destination"
 								type="text"
 								value={exportConfig.destination}
 								onChange={(e) =>
@@ -186,10 +187,10 @@ export function BulkExportModal({
 					</div>
 
 					{/* Format Presets */}
-					<div className="mb-6">
-						<label className="block text-sm font-medium mb-2">
+					<fieldset className="mb-6">
+						<legend className="block text-sm font-medium mb-2">
 							Size Preset
-						</label>
+						</legend>
 						<div className="grid grid-cols-4 gap-2">
 							{Object.keys(formatSizes).map((preset) => (
 								<button
@@ -210,7 +211,7 @@ export function BulkExportModal({
 								</button>
 							))}
 						</div>
-					</div>
+					</fieldset>
 
 					{/* Advanced Settings */}
 					<details className="mb-6">
@@ -222,8 +223,9 @@ export function BulkExportModal({
 						<div className="space-y-4 pl-6">
 							{/* Format */}
 							<div>
-								<label className="block text-sm font-medium mb-2">Format</label>
+								<label htmlFor="export-format" className="block text-sm font-medium mb-2">Format</label>
 								<select
+									id="export-format"
 									value={exportConfig.format}
 									onChange={(e) =>
 										setExportConfig((prev) => ({
@@ -244,10 +246,11 @@ export function BulkExportModal({
 							{/* Quality */}
 							{exportConfig.format !== "original" && (
 								<div>
-									<label className="block text-sm font-medium mb-2">
+									<label htmlFor="export-quality" className="block text-sm font-medium mb-2">
 										Quality: {exportConfig.quality}%
 									</label>
 									<input
+										id="export-quality"
 										type="range"
 										min="10"
 										max="100"
@@ -268,10 +271,11 @@ export function BulkExportModal({
 							{/* Custom Size */}
 							<div className="grid grid-cols-2 gap-4">
 								<div>
-									<label className="block text-sm font-medium mb-2">
+									<label htmlFor="export-max-width" className="block text-sm font-medium mb-2">
 										Max Width (px)
 									</label>
 									<input
+										id="export-max-width"
 										type="number"
 										value={exportConfig.maxWidth || ""}
 										onChange={(e) =>
@@ -286,10 +290,11 @@ export function BulkExportModal({
 									/>
 								</div>
 								<div>
-									<label className="block text-sm font-medium mb-2">
+									<label htmlFor="export-max-height" className="block text-sm font-medium mb-2">
 										Max Height (px)
 									</label>
 									<input
+										id="export-max-height"
 										type="number"
 										value={exportConfig.maxHeight || ""}
 										onChange={(e) =>
@@ -307,10 +312,11 @@ export function BulkExportModal({
 
 							{/* Folder Structure */}
 							<div>
-								<label className="block text-sm font-medium mb-2">
+								<label htmlFor="export-structure" className="block text-sm font-medium mb-2">
 									Folder Structure
 								</label>
 								<select
+									id="export-structure"
 									value={exportConfig.folderStructure}
 									onChange={(e) =>
 										setExportConfig((prev) => ({
@@ -330,10 +336,11 @@ export function BulkExportModal({
 
 							{/* Naming */}
 							<div>
-								<label className="block text-sm font-medium mb-2">
+								<label htmlFor="export-naming" className="block text-sm font-medium mb-2">
 									File Naming
 								</label>
 								<select
+									id="export-naming"
 									value={exportConfig.naming}
 									onChange={(e) =>
 										setExportConfig((prev) => ({

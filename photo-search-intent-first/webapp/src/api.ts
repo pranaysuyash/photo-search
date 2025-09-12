@@ -1,93 +1,113 @@
 export type SearchResult = { path: string; score: number; reasons?: string[] };
 
+interface WindowWithElectron extends Window {
+	electronAPI?: unknown;
+	process?: {
+		type?: string;
+	};
+}
+
+interface ImportMetaWithEnv extends ImportMeta {
+	env?: {
+		VITE_API_BASE?: string;
+		VITE_API_TOKEN?: string;
+	};
+}
+
 // Utility function to detect Electron environment
 export function isElectron(): boolean {
+	const windowElectron = window as WindowWithElectron;
 	return (
 		typeof window !== "undefined" &&
-		((window as any).electronAPI !== undefined ||
-			(window as any).process?.type === "renderer" ||
+		(windowElectron.electronAPI !== undefined ||
+			windowElectron.process?.type === "renderer" ||
 			navigator.userAgent.toLowerCase().includes("electron"))
 	);
 }
 
 // Prefer current origin when running under dev/proxy/Electron; fallback to env; then sensible default.
 export const API_BASE =
-	(import.meta as any).env?.VITE_API_BASE ||
+	(import.meta as ImportMetaWithEnv).env?.VITE_API_BASE ||
 	(typeof window !== "undefined" &&
 		window.location &&
 		window.location.origin) ||
 	"http://127.0.0.1:8000";
 
 function authHeaders() {
-    try {
-        // Runtime token from localStorage should take precedence in dev
-        const ls = typeof window !== "undefined" ? localStorage.getItem("api_token") : null;
-        const envTok = (import.meta as any).env?.VITE_API_TOKEN;
-        const token = ls || envTok;
-        if (token) return { Authorization: `Bearer ${token}` } as Record<string, string>;
-    } catch {}
-    return {} as Record<string, string>;
+	try {
+		// Runtime token from localStorage should take precedence in dev
+		const ls =
+			typeof window !== "undefined" ? localStorage.getItem("api_token") : null;
+		const envTok = (import.meta as ImportMetaWithEnv).env?.VITE_API_TOKEN;
+		const token = ls || envTok;
+		if (token)
+			return { Authorization: `Bearer ${token}` } as Record<string, string>;
+	} catch {}
+	return {} as Record<string, string>;
 }
 
 export async function apiPing(): Promise<boolean> {
-    try {
-        const r = await fetch(`${API_BASE}/api/ping`);
-        if (!r.ok) return false;
-        const js = await r.json();
-        return Boolean(js?.ok);
-    } catch {
-        return false;
-    }
+	try {
+		const r = await fetch(`${API_BASE}/api/ping`);
+		if (!r.ok) return false;
+		const js = await r.json();
+		return Boolean(js?.ok);
+	} catch {
+		return false;
+	}
 }
 
 export async function apiAuthStatus(): Promise<{ auth_required: boolean }> {
-    try {
-        const r = await fetch(`${API_BASE}/auth/status`);
-        if (!r.ok) return { auth_required: false };
-        return (await r.json()) as { auth_required: boolean };
-    } catch {
-        return { auth_required: false };
-    }
+	try {
+		const r = await fetch(`${API_BASE}/auth/status`);
+		if (!r.ok) return { auth_required: false };
+		return (await r.json()) as { auth_required: boolean };
+	} catch {
+		return { auth_required: false };
+	}
 }
 
 export async function apiAuthCheck(token: string): Promise<boolean> {
-    try {
-        const r = await fetch(`${API_BASE}/auth/check`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        });
-        return r.ok;
-    } catch {
-        return false;
-    }
+	try {
+		const r = await fetch(`${API_BASE}/auth/check`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${token}`,
+			},
+		});
+		return r.ok;
+	} catch {
+		return false;
+	}
 }
 
 export async function apiDemoDir(): Promise<string | null> {
-    try {
-        const r = await fetch(`${API_BASE}/demo/dir`);
-        if (!r.ok) return null;
-        const js = (await r.json()) as { ok?: boolean; dir?: string };
-        return js?.ok && js?.dir ? js.dir : null;
-    } catch {
-        return null;
-    }
+	try {
+		const r = await fetch(`${API_BASE}/demo/dir`);
+		if (!r.ok) return null;
+		const js = (await r.json()) as { ok?: boolean; dir?: string };
+		return js?.ok && js?.dir ? js.dir : null;
+	} catch {
+		return null;
+	}
 }
 
-async function post<T>(path: string, body: any): Promise<T> {
-    const r = await fetch(`${API_BASE}${path}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify(body),
-    });
-    if (!r.ok) {
-        if (r.status === 401) {
-            throw new Error(
-                "401 Unauthorized: Configure API_TOKEN for the server and VITE_API_TOKEN (or localStorage `api_token`) for the webapp.",
-            );
-        }
-        throw new Error(await r.text());
-    }
-    return r.json();
+async function post<T>(path: string, body: unknown): Promise<T> {
+	const r = await fetch(`${API_BASE}${path}`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json", ...authHeaders() },
+		body: JSON.stringify(body),
+	});
+	if (!r.ok) {
+		if (r.status === 401) {
+			throw new Error(
+				"401 Unauthorized: Configure API_TOKEN for the server and VITE_API_TOKEN (or localStorage `api_token`) for the webapp.",
+			);
+		}
+		throw new Error(await r.text());
+	}
+	return r.json();
 }
 
 export async function apiIndex(
@@ -354,14 +374,14 @@ export async function apiAnalytics(dir: string, limit = 200) {
 	);
 	if (!r.ok) throw new Error(await r.text());
 	return r.json() as Promise<{
-		events: { type: string; time: string; [k: string]: any }[];
+		events: { type: string; time: string; [k: string]: unknown }[];
 	}>;
 }
 
 export async function apiLogEvent(
 	dir: string,
 	type: string,
-	data?: Record<string, any>,
+	data?: Record<string, unknown>,
 ) {
 	return post<{ ok: boolean }>("/analytics/log", { dir, type, data });
 }
@@ -430,7 +450,7 @@ export async function apiAddSaved(
 	query: string,
 	topK: number,
 ) {
-	return post<{ ok: boolean; saved: any[] }>("/saved", {
+	return post<{ ok: boolean; saved: Array<{ query: string; name: string }> }>("/saved", {
 		dir,
 		name,
 		query,
@@ -439,7 +459,7 @@ export async function apiAddSaved(
 }
 
 export async function apiDeleteSaved(dir: string, name: string) {
-	return post<{ ok: boolean; deleted: number; saved: any[] }>("/saved/delete", {
+	return post<{ ok: boolean; deleted: number; saved: Array<{ query: string; name: string }> }>("/saved/delete", {
 		dir,
 		name,
 	});
@@ -595,7 +615,7 @@ export async function apiMetadataDetail(dir: string, path: string) {
 		)}&path=${encodeURIComponent(path)}`,
 	);
 	if (!r.ok) throw new Error(await r.text());
-	return r.json() as Promise<{ meta: any }>;
+	return r.json() as Promise<{ meta: Record<string, unknown> }>;
 }
 
 export async function apiSearchWorkspace(
@@ -826,11 +846,11 @@ export async function apiGetSmart(dir: string) {
 		`${API_BASE}/smart_collections?dir=${encodeURIComponent(dir)}`,
 	);
 	if (!r.ok) throw new Error(await r.text());
-	return r.json() as Promise<{ smart: Record<string, any> }>;
+	return r.json() as Promise<{ smart: Record<string, { query: string; count?: number }> }>;
 }
 
-export async function apiSetSmart(dir: string, name: string, rules: any) {
-	return post<{ ok: boolean; smart: Record<string, any> }>(
+export async function apiSetSmart(dir: string, name: string, rules: { query: string; count?: number }) {
+	return post<{ ok: boolean; smart: Record<string, { query: string; count?: number }> }>(
 		"/smart_collections",
 		{ dir, name, rules },
 	);
@@ -909,7 +929,7 @@ export async function apiFacesName(
 	});
 }
 export async function apiTripsBuild(dir: string, provider: string) {
-	return post<{ trips: any[] }>("/trips/build", { dir, provider });
+	return post<{ trips: Array<{ id: string; name: string; startDate: string; endDate: string; photos: string[] }> }>("/trips/build", { dir, provider });
 }
 export async function apiTripsList(dir: string) {
 	const r = await fetch(`${API_BASE}/trips?dir=${encodeURIComponent(dir)}`);
@@ -1239,7 +1259,7 @@ export async function apiGetExcludes(_dir: string): Promise<string[]> {
 	throw new Error("Not implemented: apiGetExcludes");
 }
 
-export async function apiModelsCapabilities(): Promise<any> {
+export async function apiModelsCapabilities(): Promise<{ models: string[]; capabilities: Record<string, boolean> }> {
 	throw new Error("Not implemented: apiModelsCapabilities");
 }
 
@@ -1263,7 +1283,7 @@ export async function apiWatchStart(
 	throw new Error("Not implemented: apiWatchStart");
 }
 
-export async function apiWatchStatus(): Promise<any> {
+export async function apiWatchStatus(): Promise<{ watching: boolean; folders: string[] }> {
 	throw new Error("Not implemented: apiWatchStatus");
 }
 

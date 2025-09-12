@@ -192,7 +192,7 @@ export function DuplicateDetectionPanel({
 							<div className="flex items-center gap-4">
 								<select
 									value={deleteStrategy}
-									onChange={(e) => setDeleteStrategy(e.target.value as any)}
+									onChange={(e) => setDeleteStrategy(e.target.value as "best" | "newest" | "largest")}
 									className="px-3 py-1.5 border rounded text-sm"
 								>
 									<option value="best">Keep Best Quality</option>
@@ -251,10 +251,7 @@ export function DuplicateDetectionPanel({
 					<div className="px-6 py-3 bg-blue-50 border-b">
 						<div className="space-y-1">
 							{result.recommendations.map((rec, idx) => (
-								<p
-									key={`rec-${idx}`}
-									className="text-sm text-blue-800"
-								>
+								<p key={`rec-${idx}`} className="text-sm text-blue-800">
 									• {rec}
 								</p>
 							))}

@@ -6,7 +6,6 @@ import {
 	Brain,
 	Calendar,
 	ChevronLeft,
-	ClipboardList,
 	Database,
 	FolderOpen,
 	Globe,
@@ -104,10 +103,10 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 	];
 
 	const smartFeatures: SidebarItem[] = [
-    { id: "saved", label: "Saved Searches", icon: Bookmark },
-    { id: "memories", label: "Memories", icon: Heart, count: stats.favorites },
-    // Tasks removed from user app
-  ];
+		{ id: "saved", label: "Saved Searches", icon: Bookmark },
+		{ id: "memories", label: "Memories", icon: Heart, count: stats.favorites },
+		// Tasks removed from user app
+	];
 
 	const formatCount = (count?: number) => {
 		if (!count) return null;

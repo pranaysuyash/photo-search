@@ -10,16 +10,18 @@ import {
 	Tag as IconTag,
 	Info,
 	Menu,
+	MoreHorizontal,
 	Palette,
 	Settings,
 	Trash2,
 } from "lucide-react";
 import type React from "react";
+import { useState } from "react";
 import { apiDelete, apiUndoDelete } from "../api";
-import { useSearchCommandCenter } from "../stores/settingsStore";
-import { useUIContext } from "../contexts/UIContext";
-import { SearchBar } from "./SearchBar";
 import { useSearchContext } from "../contexts/SearchContext";
+import { useUIContext } from "../contexts/UIContext";
+import { useSearchCommandCenter } from "../stores/settingsStore";
+import { SearchBar } from "./SearchBar";
 
 export type GridSize = "small" | "medium" | "large";
 export type ViewType =
@@ -169,15 +171,17 @@ export function TopBar({
 	onOpenThemeModal,
 	onOpenSearchOverlay,
 }: TopBarProps) {
-    const { state: uiState } = useUIContext();
-    const searchCommandCenter = useSearchCommandCenter();
-    const searchCtx = useSearchContext();
-    const q = (searchText ?? searchCtx.state.query) || "";
-    const setQ = (t: string) => (setSearchText ? setSearchText(t) : searchCtx.actions.setQuery(t));
-    const doSearch = async (t: string) => {
-        if (onSearch) onSearch(t);
-        else await searchCtx.actions.performSearch(t);
-    };
+	const { state: uiState } = useUIContext();
+	const searchCommandCenter = useSearchCommandCenter();
+	const searchCtx = useSearchContext();
+	const [showMore, setShowMore] = useState(false);
+	const q = (searchText ?? searchCtx.state.query) || "";
+	const setQ = (t: string) =>
+		setSearchText ? setSearchText(t) : searchCtx.actions.setQuery(t);
+	const doSearch = async (t: string) => {
+		if (onSearch) onSearch(t);
+		else await searchCtx.actions.performSearch(t);
+	};
 
 	return (
 		<div className="top-bar top-bar-mobile bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-700/50">
@@ -209,7 +213,9 @@ export function TopBar({
 							whileTap={{ scale: 0.95 }}
 						>
 							<IconSearch className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-							<span className="text-sm text-gray-700 dark:text-gray-300">Search</span>
+							<span className="text-sm text-gray-700 dark:text-gray-300">
+								Search
+							</span>
 						</motion.button>
 					) : (
 						<SearchBar
@@ -223,91 +229,91 @@ export function TopBar({
 					)}
 					{/* Quick filter chips (hidden when Search Command Center is enabled) */}
 					{!searchCommandCenter && (
-					<div className="quick-filters hidden md:flex items-center gap-2 ml-2">
-						{(meta?.cameras || []).slice(0, 3).map((cam) => (
-							<button
-								key={`cam-${cam}`}
-								type="button"
-								className="chip"
-								onClick={() => {
-									const tok = `camera:"${cam}"`;
-									const next = q.trim();
-									const qq = next ? `${next} ${tok}` : tok;
-									setQ(qq);
-									doSearch(qq);
-								}}
-								title={`Filter camera: ${cam}`}
-							>
-								{String(cam)}
-							</button>
-						))}
-						{(allTags || []).slice(0, 6).map((tg) => (
-							<button
-								key={`tag-${tg}`}
-								type="button"
-								className="chip"
-								onClick={() => {
-									const tok = `tag:${tg}`;
-									const next = q.trim();
-									const qq = next ? `${next} ${tok}` : tok;
-									setQ(qq);
-									doSearch(qq);
-								}}
-								title={`Filter tag: ${tg}`}
-							>
-								#{tg}
-							</button>
-						))}
-						{(clusters || [])
-							.filter((c) => c.name)
-							.slice(0, 6)
-							.map((c) => (
+						<div className="quick-filters hidden md:flex items-center gap-2 ml-2">
+							{(meta?.cameras || []).slice(0, 3).map((cam) => (
 								<button
-									key={`person-${c.name}`}
+									key={`cam-${cam}`}
 									type="button"
 									className="chip"
 									onClick={() => {
-										const name = String(c.name);
-										const tok = `person:"${name}"`;
+										const tok = `camera:"${cam}"`;
+										const next = q.trim();
+										const qq = next ? `${next} ${tok}` : tok;
+										setQ(qq);
+										doSearch(qq);
+									}}
+									title={`Filter camera: ${cam}`}
+								>
+									{String(cam)}
+								</button>
+							))}
+							{(allTags || []).slice(0, 6).map((tg) => (
+								<button
+									key={`tag-${tg}`}
+									type="button"
+									className="chip"
+									onClick={() => {
+										const tok = `tag:${tg}`;
+										const next = q.trim();
+										const qq = next ? `${next} ${tok}` : tok;
+										setQ(qq);
+										doSearch(qq);
+									}}
+									title={`Filter tag: ${tg}`}
+								>
+									#{tg}
+								</button>
+							))}
+							{(clusters || [])
+								.filter((c) => c.name)
+								.slice(0, 6)
+								.map((c) => (
+									<button
+										key={`person-${c.name}`}
+										type="button"
+										className="chip"
+										onClick={() => {
+											const name = String(c.name);
+											const tok = `person:"${name}"`;
+											const next = q.trim();
+											const qq = next ? `${next} ${tok}` : tok;
+											setQ(qq);
+											doSearch(qq);
+										}}
+										title={`Filter person: ${String(c.name)}`}
+									>
+										{String(c.name)}
+									</button>
+								))}
+							<button
+								type="button"
+								className="chip"
+								onClick={() => {
+									const tok = `has_text:true`;
 									const next = q.trim();
 									const qq = next ? `${next} ${tok}` : tok;
 									setQ(qq);
 									doSearch(qq);
-									}}
-									title={`Filter person: ${String(c.name)}`}
-								>
-									{String(c.name)}
-								</button>
-							))}
-						<button
-							type="button"
-							className="chip"
-							onClick={() => {
-								const tok = `has_text:true`;
-								const next = q.trim();
-								const qq = next ? `${next} ${tok}` : tok;
-								setQ(qq);
-								doSearch(qq);
-							}}
-							title="Filter photos that contain text"
-						>
-							Text
-						</button>
-						<button
-							type="button"
-							className="chip"
-							onClick={() => {
-								const tok = `(filetype:mp4 OR filetype:mov OR filetype:webm OR filetype:mkv OR filetype:avi) AND duration:>30`;
-								const next = q.trim();
-								const qq = next ? `${next} ${tok}` : tok;
-								setQ(qq);
-								doSearch(qq);
-							}}
-							title="Find videos longer than 30 seconds"
-						>
-							Videos &gt; 30s
-						</button>
-					</div>
+								}}
+								title="Filter photos that contain text"
+							>
+								Text
+							</button>
+							<button
+								type="button"
+								className="chip"
+								onClick={() => {
+									const tok = `(filetype:mp4 OR filetype:mov OR filetype:webm OR filetype:mkv OR filetype:avi) AND duration:>30`;
+									const next = q.trim();
+									const qq = next ? `${next} ${tok}` : tok;
+									setQ(qq);
+									doSearch(qq);
+								}}
+								title="Find videos longer than 30 seconds"
+							>
+								Videos &gt; 30s
+							</button>
+						</div>
 					)}
 
 					<motion.button
@@ -336,33 +342,36 @@ export function TopBar({
 						whileTap={{ scale: 0.95 }}
 					>
 						<FolderOpen className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-						<span className="text-sm text-gray-700 dark:text-gray-300">Add Photos</span>
+						<span className="text-sm text-gray-700 dark:text-gray-300">
+							Add Photos
+						</span>
 					</motion.button>
 					{/* Optional clear filters chip (hidden when Search Command Center is enabled) */}
-					{!searchCommandCenter && /(camera:|tag:|person:|has_text:|iso:|fnumber:|width:|height:|place:)/i.test(
-						q || "",
-					) && (
-						<button
-							type="button"
-							className="chip"
-							onClick={() => {
-								// Clear baked-in tokens from the search text only; advanced panel handles full resets
-								const cleaned = (q || "")
-									.replace(
-										/\b(camera|tag|person|has_text|iso|fnumber|width|height|place):[^\s]+/gi,
-										"",
-									)
-									.replace(/\s{2,}/g, " ")
-									.trim();
-								setQ(cleaned);
-								doSearch(cleaned);
-							}}
-							title="Clear filter tokens from query"
-							aria-label="Clear filter tokens"
-						>
-							Clear filters
-						</button>
-					)}
+					{!searchCommandCenter &&
+						/(camera:|tag:|person:|has_text:|iso:|fnumber:|width:|height:|place:)/i.test(
+							q || "",
+						) && (
+							<button
+								type="button"
+								className="chip"
+								onClick={() => {
+									// Clear baked-in tokens from the search text only; advanced panel handles full resets
+									const cleaned = (q || "")
+										.replace(
+											/\b(camera|tag|person|has_text|iso|fnumber|width|height|place):[^\s]+/gi,
+											"",
+										)
+										.replace(/\s{2,}/g, " ")
+										.trim();
+									setQ(cleaned);
+									doSearch(cleaned);
+								}}
+								title="Clear filter tokens from query"
+								aria-label="Clear filter tokens"
+							>
+								Clear filters
+							</button>
+						)}
 					<motion.button
 						type="button"
 						className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
@@ -388,9 +397,13 @@ export function TopBar({
 								{diag.engines?.[0]?.count || 0}
 							</span>
 							{/* When command center is enabled, surface active jobs here to reduce chip noise */}
-							{searchCommandCenter && typeof activeJobs === "number" && activeJobs > 0 && (
-								<span className="ml-2 text-[11px] text-gray-600">• Jobs {activeJobs}</span>
-							)}
+							{searchCommandCenter &&
+								typeof activeJobs === "number" &&
+								activeJobs > 0 && (
+									<span className="ml-2 text-[11px] text-gray-600">
+										• Jobs {activeJobs}
+									</span>
+								)}
 							<button
 								type="button"
 								className="indexed-action"
@@ -477,17 +490,19 @@ export function TopBar({
 						</span>
 					)}
 					{/* Jobs quick link (hidden when Search Command Center is enabled) */}
-					{!searchCommandCenter && typeof activeJobs === "number" && activeJobs > 0 && (
-						<button
-							type="button"
-							className="chip"
-							onClick={() => onOpenJobs?.()}
-							title="View running tasks"
-							aria-label={`Open Jobs (${activeJobs})`}
-						>
-							Jobs ({activeJobs})
-						</button>
-					)}
+					{!searchCommandCenter &&
+						typeof activeJobs === "number" &&
+						activeJobs > 0 && (
+							<button
+								type="button"
+								className="chip"
+								onClick={() => onOpenJobs?.()}
+								title="View running tasks"
+								aria-label={`Open Jobs (${activeJobs})`}
+							>
+								Jobs ({activeJobs})
+							</button>
+						)}
 					<div className="grid-size-control">
 						{(["small", "medium", "large"] as GridSize[]).map((s) => (
 							<button
@@ -536,70 +551,106 @@ export function TopBar({
 					>
 						<Settings className="w-4 h-4 text-gray-600 dark:text-gray-400" />
 					</motion.button>
+					{/* Progressive disclosure: More menu toggles secondary actions */}
 					<motion.button
 						type="button"
-						className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-						title="Open theme settings"
-						aria-label="Open theme settings"
-						onClick={() => onOpenThemeModal?.()}
+						className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-1"
+						title="More actions"
+						aria-label="More actions"
+						aria-haspopup="true"
+						aria-expanded={showMore}
+						onClick={() => setShowMore((v) => !v)}
 						whileHover={{ scale: 1.05 }}
 						whileTap={{ scale: 0.95 }}
 					>
-						<Palette className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+						<MoreHorizontal className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+						<span className="text-sm">More</span>
 					</motion.button>
+					{showMore && (
+						<div className="absolute right-2 mt-12 z-40 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-2 w-56">
+							<button
+								type="button"
+								className="menu-item"
+								onClick={() => onOpenThemeModal?.()}
+							>
+								<Palette className="w-4 h-4 mr-2" /> Theme
+							</button>
+							<button
+								type="button"
+								className="menu-item"
+								onClick={() => setModal({ kind: "advanced" as any })}
+							>
+								<IconSearch className="w-4 h-4 mr-2" /> Advanced Search
+							</button>
+							<button
+								type="button"
+								className="menu-item"
+								onClick={() => setModal({ kind: "tag" })}
+							>
+								<IconTag className="w-4 h-4 mr-2" /> Tag Selected
+							</button>
+							<button
+								type="button"
+								className="menu-item"
+								onClick={() => setModal({ kind: "export" })}
+							>
+								<Download className="w-4 h-4 mr-2" /> Export
+							</button>
+						</div>
+					)}
 				</div>
 			</div>
 
 			{/* Primary time-scope chips (hidden when Search Command Center is enabled) */}
 			{!searchCommandCenter && (
-			<div className="filter-chips">
-				{[
-					"All",
-					"Today",
-					"This Week",
-					"This Month",
-					"Favorites",
-					"People",
-					"Screenshots",
-				].map((f) => (
-					<button
-						type="button"
-						key={f}
-						onClick={() => {
-							setCurrentFilter(f.toLowerCase());
-							if (f === "Favorites") {
-								photoActions.setFavOnly(true);
-								doSearch(q);
-							}
-						}}
-						className={`chip ${
-							currentFilter === f.toLowerCase() ? "active" : ""
-						}`}
-						aria-label={`Filter by ${f}`}
-					>
-						{f}
-					</button>
-				))}
-			</div>
+				<div className="filter-chips">
+					{[
+						"All",
+						"Today",
+						"This Week",
+						"This Month",
+						"Favorites",
+						"People",
+						"Screenshots",
+					].map((f) => (
+						<button
+							type="button"
+							key={f}
+							onClick={() => {
+								setCurrentFilter(f.toLowerCase());
+								if (f === "Favorites") {
+									photoActions.setFavOnly(true);
+									doSearch(q);
+								}
+							}}
+							className={`chip ${
+								currentFilter === f.toLowerCase() ? "active" : ""
+							}`}
+							aria-label={`Filter by ${f}`}
+						>
+							{f}
+						</button>
+					))}
+				</div>
 			)}
 
 			{/* Rating filter */}
 			{/* Rating filter (hidden when Search Command Center is enabled) */}
 			{!searchCommandCenter && (
-			<div className="rating-filter">
-				<span>Min rating:</span>
-				{[0, 1, 2, 3, 4, 5].map((n) => (
-					<button
-						key={n}
-						type="button"
-						className={`rating-button ${ratingMin === n ? "active" : ""}`}
-						onClick={() => setRatingMin(n)}
-						aria-label={`Filter by minimum rating of ${n}`}
-					>
-						{n === 0 ? "Any" : `${"★".repeat(n)}`}
-					</button>
-				))}
-			</div>
+				<div className="rating-filter">
+					<span>Min rating:</span>
+					{[0, 1, 2, 3, 4, 5].map((n) => (
+						<button
+							key={n}
+							type="button"
+							className={`rating-button ${ratingMin === n ? "active" : ""}`}
+							onClick={() => setRatingMin(n)}
+							aria-label={`Filter by minimum rating of ${n}`}
+						>
+							{n === 0 ? "Any" : `${"★".repeat(n)}`}
+						</button>
+					))}
+				</div>
 			)}
 
 			{/* View mode toggle */}
@@ -626,66 +677,66 @@ export function TopBar({
 			{/* Boolean query hints */}
 			{/* Boolean query hints (hidden when Search Command Center is enabled) */}
 			{!searchCommandCenter && (
-			<div className="text-[11px] text-gray-600 mt-1">
-				Boolean: AND, OR, NOT, ( ) • Fields:{" "}
-				<span className="font-mono">camera:</span>{" "}
-				<span className="font-mono">place:</span>{" "}
-				<span className="font-mono">tag:</span>{" "}
-				<span className="font-mono">rating:</span>{" "}
-				<span className="font-mono">person:</span>{" "}
-				<span className="font-mono">has_text:</span>{" "}
-				<span className="font-mono">filetype:</span> • Numeric:{" "}
-				<span className="font-mono">iso:</span>{" "}
-				<span className="font-mono">fnumber:</span>{" "}
-				<span className="font-mono">width:</span>{" "}
-				<span className="font-mono">height:</span>{" "}
-				<span className="font-mono">mtime:</span>{" "}
-				<span className="font-mono">brightness:</span>{" "}
-				<span className="font-mono">sharpness:</span>{" "}
-				<span className="font-mono">exposure:</span>{" "}
-				<span className="font-mono">focal:</span>{" "}
-				<span className="font-mono">duration:</span> (supports &gt;=, &lt;=,
-				&gt;, &lt;, =)
-			</div>
+				<div className="text-[11px] text-gray-600 mt-1">
+					Boolean: AND, OR, NOT, ( ) • Fields:{" "}
+					<span className="font-mono">camera:</span>{" "}
+					<span className="font-mono">place:</span>{" "}
+					<span className="font-mono">tag:</span>{" "}
+					<span className="font-mono">rating:</span>{" "}
+					<span className="font-mono">person:</span>{" "}
+					<span className="font-mono">has_text:</span>{" "}
+					<span className="font-mono">filetype:</span> • Numeric:{" "}
+					<span className="font-mono">iso:</span>{" "}
+					<span className="font-mono">fnumber:</span>{" "}
+					<span className="font-mono">width:</span>{" "}
+					<span className="font-mono">height:</span>{" "}
+					<span className="font-mono">mtime:</span>{" "}
+					<span className="font-mono">brightness:</span>{" "}
+					<span className="font-mono">sharpness:</span>{" "}
+					<span className="font-mono">exposure:</span>{" "}
+					<span className="font-mono">focal:</span>{" "}
+					<span className="font-mono">duration:</span> (supports &gt;=, &lt;=,
+					&gt;, &lt;, =)
+				</div>
 			)}
 
 			{/* Preset boolean filter chips */}
 			{/* Preset boolean filter chips (hidden when Search Command Center is enabled) */}
 			{!searchCommandCenter && (
-			<div className="preset-filters hidden md:flex flex-wrap gap-2 mt-1">
-				{[
-					{ label: "High ISO", expr: "iso:>=1600" },
-					{ label: "Shallow DoF", expr: "fnumber:<2.8" },
-					{ label: "Text in Image", expr: "has_text:true" },
-					{ label: "Large", expr: "width:>=3000 height:>=2000" },
-					{
-						label: "Recent (30d)",
-						expr: `mtime:>=${Math.floor(Date.now() / 1000 - 30 * 24 * 3600)}`,
-					},
-					{ label: "Underexposed", expr: "brightness:<50" },
-					{ label: "Sharp Only", expr: "sharpness:>=60" },
-					{
-						label: "Video > 30s",
-						expr: "filetype:mp4 OR filetype:mov OR filetype:webm OR filetype:mkv OR filetype:avi AND duration:>30",
-					},
-				].map((p) => (
-					<button
-						key={p.label}
-						type="button"
-						className="chip"
-						onClick={() => {
-							const tok = p.expr;
-							const next = q.trim();
-							const qq = next ? `${next} ${tok}` : tok;
-							setQ(qq);
-							doSearch(qq);
-						}}
-						title={p.expr}
-					>
-						{p.label}
-					</button>
-				))}
-			</div>
+				<div className="preset-filters hidden md:flex flex-wrap gap-2 mt-1">
+					{[
+						{ label: "High ISO", expr: "iso:>=1600" },
+						{ label: "Shallow DoF", expr: "fnumber:<2.8" },
+						{ label: "Text in Image", expr: "has_text:true" },
+						{ label: "Large", expr: "width:>=3000 height:>=2000" },
+						{
+							label: "Recent (30d)",
+							expr: `mtime:>=${Math.floor(Date.now() / 1000 - 30 * 24 * 3600)}`,
+						},
+						{ label: "Underexposed", expr: "brightness:<50" },
+						{ label: "Sharp Only", expr: "sharpness:>=60" },
+						{
+							label: "Video > 30s",
+							expr: "filetype:mp4 OR filetype:mov OR filetype:webm OR filetype:mkv OR filetype:avi AND duration:>30",
+						},
+					].map((p) => (
+						<button
+							key={p.label}
+							type="button"
+							className="chip"
+							onClick={() => {
+								const tok = p.expr;
+								const next = q.trim();
+								const qq = next ? `${next} ${tok}` : tok;
+								setQ(qq);
+								doSearch(qq);
+							}}
+							title={p.expr}
+						>
+							{p.label}
+						</button>
+					))}
+				</div>
 			)}
 			{resultView === "timeline" && (
 				<div className="view-toggle">
@@ -758,15 +809,15 @@ export function TopBar({
 						>
 							<Info className="w-4 h-4" /> Info
 						</button>
-					<button
-						type="button"
-						className="action-button"
-						onClick={() => setModal({ kind: "advanced" as any })}
-						aria-label="Open advanced search"
-						data-tour="advanced-button"
-					>
-						Advanced
-					</button>
+						<button
+							type="button"
+							className="action-button"
+							onClick={() => setModal({ kind: "advanced" as any })}
+							aria-label="Open advanced search"
+							data-tour="advanced-button"
+						>
+							Advanced
+						</button>
 						<button
 							type="button"
 							className="action-button"

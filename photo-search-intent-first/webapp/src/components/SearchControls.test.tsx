@@ -136,6 +136,9 @@ vi.mock("../stores/useStores", () => ({
 	usePhotoActions: () => photoActions,
 	useUIActions: () => uiActions,
 	useWorkspaceActions: () => workspaceActions,
+	// Provide library-related selectors required by LibraryProvider in test wrapper
+	useLibrary: () => [],
+	useLibHasMore: () => false,
 	useDir: () => settings.dir,
 	useEngine: () => settings.engine,
 	useHfToken: () => settings.hfToken,

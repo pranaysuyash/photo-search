@@ -210,9 +210,7 @@ export function CommandPalette({
 		if (!keys || keys.length === 0) return null;
 
 		return keys.map((key, idx) => (
-			<React.Fragment
-				key={`key-${idx}`}
-			>
+			<React.Fragment key={key}>
 				{idx > 0 && <span className="mx-0.5">+</span>}
 				<kbd className="px-1.5 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 rounded">
 					{key === "cmd" ? "⌘" : key === "ctrl" ? "Ctrl" : key}

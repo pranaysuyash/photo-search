@@ -6,11 +6,11 @@ import { ErrorBoundary } from "../components/ErrorBoundary";
 import { HintManager, HintProvider } from "../components/HintSystem";
 import { MobileOptimizations } from "../components/MobileOptimizations";
 import { ThemeProvider } from "../components/ThemeProvider";
-import { UIProvider } from "../contexts/UIContext";
-import { SearchProvider } from "../contexts/SearchContext";
-import { ModalProvider } from "../contexts/ModalContext";
-import { LibraryProvider } from "../contexts/LibraryContext";
 import { JobsProvider } from "../contexts/JobsContext";
+import { LibraryProvider } from "../contexts/LibraryContext";
+import { ModalProvider } from "../contexts/ModalContext";
+import { SearchProvider } from "../contexts/SearchContext";
+import { UIProvider } from "../contexts/UIContext";
 import { initializeAPI } from "../services/PhotoVaultAPI";
 import { PhotoVaultAPIProvider } from "../services/PhotoVaultAPIProvider";
 import { SimpleStoreProvider } from "../stores/SimpleStore";
@@ -18,13 +18,15 @@ import "@testing-library/jest-dom/vitest";
 
 // Helpful: surface a console hint if the API enforces auth but frontend lacks token
 if (typeof window !== "undefined") {
-  const token = (import.meta as any).env?.VITE_API_TOKEN || localStorage.getItem("api_token");
-  if (!token) {
-    // eslint-disable-next-line no-console
-    console.info(
-      "Tip: If your API sets API_TOKEN, add VITE_API_TOKEN in webapp .env or localStorage.setItem('api_token', '<value>').",
-    );
-  }
+	const token =
+		(import.meta as any).env?.VITE_API_TOKEN ||
+		localStorage.getItem("api_token");
+	if (!token) {
+		// eslint-disable-next-line no-console
+		console.info(
+			"Tip: If your API sets API_TOKEN, add VITE_API_TOKEN in webapp .env or localStorage.setItem('api_token', '<value>').",
+		);
+	}
 }
 
 // Mock the accessibility settings hook
@@ -114,9 +116,17 @@ vi.mock("../stores/settingsStore", () => {
 			setCustomColors: mockState.setCustomColors,
 			resetTheme: mockState.resetTheme,
 		}),
-		useThemeStore,
-		useSettingsStore,
-	};
+    useThemeStore,
+    useSettingsStore,
+    // Common selector hooks used throughout the app
+    useDir: () => "/test/dir",
+    useEngine: () => "local" as const,
+    useNeedsHf: () => false,
+    useHfToken: () => "",
+    useNeedsOAI: () => false,
+    useOpenaiKey: () => "",
+    useOsTrash: () => false,
+  };
 });
 
 // Mock mobile detection
@@ -169,42 +179,42 @@ const AllTheProviders: React.FC<{ children: React.ReactNode }> = ({
 	// Initialize API singleton so usePhotoVaultAPI can fallback safely
 	initializeAPI({ dir: "/test", provider: "local" });
 
-    return (
-        <ErrorBoundary>
-          <BrowserRouter>
-            <ThemeProvider>
-              <UIProvider>
-                <SimpleStoreProvider>
-                  <PhotoVaultAPIProvider>
-                    <LibraryProvider>
-                      <JobsProvider>
-                        <SearchProvider>
-                          <ModalProvider>
-                          <HintProvider>
-                          <HintManager>
-                            <MobileOptimizations
-                          onSwipeLeft={vi.fn()}
-                          onSwipeRight={vi.fn()}
-                          onSwipeUp={vi.fn()}
-                          enableSwipeGestures={false}
-                          enablePullToRefresh={false}
-                          onPullToRefresh={vi.fn()}
-                        >
-                          {children}
-                        </MobileOptimizations>
-                          </HintManager>
-                          </HintProvider>
-                          </ModalProvider>
-                        </SearchProvider>
-                      </JobsProvider>
-                    </LibraryProvider>
-                  </PhotoVaultAPIProvider>
-                </SimpleStoreProvider>
-              </UIProvider>
-            </ThemeProvider>
-          </BrowserRouter>
-        </ErrorBoundary>
-      );
+	return (
+		<ErrorBoundary>
+			<BrowserRouter>
+				<ThemeProvider>
+					<UIProvider>
+						<SimpleStoreProvider>
+							<PhotoVaultAPIProvider>
+								<JobsProvider>
+									<LibraryProvider>
+										<SearchProvider>
+											<ModalProvider>
+												<HintProvider>
+													<HintManager>
+														<MobileOptimizations
+															onSwipeLeft={vi.fn()}
+															onSwipeRight={vi.fn()}
+															onSwipeUp={vi.fn()}
+															enableSwipeGestures={false}
+															enablePullToRefresh={false}
+															onPullToRefresh={vi.fn()}
+														>
+															{children}
+														</MobileOptimizations>
+													</HintManager>
+												</HintProvider>
+											</ModalProvider>
+										</SearchProvider>
+									</LibraryProvider>
+								</JobsProvider>
+							</PhotoVaultAPIProvider>
+						</SimpleStoreProvider>
+					</UIProvider>
+				</ThemeProvider>
+			</BrowserRouter>
+		</ErrorBoundary>
+	);
 };
 
 // Custom render function that includes all providers

@@ -1,4 +1,3 @@
-// biome-ignore lint/suspicious/noExplicitAny: migration in progress
 /**
  * Loading and performance utilities for the photo search application
  */
@@ -41,7 +40,6 @@ export const ScrollLoader: React.FC<ScrollLoaderProps> = ({
 }) => {
 	const ref = useRef<HTMLDivElement>(null);
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency exclusion
 	useEffect(() => {
 		if (!ref.current || isLoading || !hasMore) return;
 
@@ -236,7 +234,6 @@ export const useLoading = (_options: UseLoadingOptions = {}) => {
 		}
 	};
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency exclusion
 	useEffect(() => {
 		return () => {
 			if (delayTimerRef.current) clearTimeout(delayTimerRef.current);
@@ -286,7 +283,6 @@ export const ProgressiveLoader: React.FC<ProgressiveLoaderProps> = ({
 	const [loadedCount, setLoadedCount] = useState(batchSize);
 	const [isLoading, setIsLoading] = useState(false);
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency exclusion
 	useEffect(() => {
 		if (loadedCount >= items.length) {
 			setIsLoading(false);
@@ -354,7 +350,6 @@ export const useContentLoading = () => {
 		setIsLoading(false);
 	};
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency exclusion
 	useEffect(() => {
 		return () => {
 			if (timeoutRef.current) clearTimeout(timeoutRef.current);

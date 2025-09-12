@@ -6,6 +6,15 @@
 import React from "react";
 
 /**
+ * Extended error type with additional properties
+ */
+interface ExtendedError extends Error {
+	userMessage?: string;
+	code?: string;
+	status?: number;
+}
+
+/**
  * Toast notification system that integrates with the app's custom toast state
  */
 export interface ToastOptions {
@@ -119,7 +128,7 @@ export const createAppError = (
 export const classifyError = (error: Error | unknown): ErrorType => {
 	if (!error) return ErrorType.UNKNOWN;
 
-	const err = error as any;
+	const err = error as ExtendedError;
 
 	// Network errors
 	if (err.name === "TypeError" && err.message?.includes("fetch")) {
@@ -167,7 +176,7 @@ export const classifyError = (error: Error | unknown): ErrorType => {
 export const getUserErrorMessage = (
 	error: AppError | Error | unknown,
 ): string => {
-	if ((error as any)?.userMessage) return (error as any).userMessage;
+	if ((error as ExtendedError)?.userMessage) return (error as ExtendedError).userMessage;
 
 	const type = classifyError(error);
 
@@ -188,7 +197,7 @@ export const getUserErrorMessage = (
 			return "Server error. Please try again later.";
 		default:
 			return (
-				(error as any)?.message ||
+				(error as ExtendedError)?.message ||
 				"An unexpected error occurred. Please try again."
 			);
 	}

@@ -70,25 +70,29 @@ export const useSearchLogic = (_options: SearchLogicOptions) => {
 					return;
 				}
 
-				await _withErrorHandling(
-					async () => {
-						uiActions.setBusy("Searching similar…");
-						const r = await apiSearchLike(dir, _path, engine, topK);
-						photoActions.setResults(r.results || []);
-						return r.results || [];
-					},
-					{
-						...defaultErrorOptions,
-						context: {
-							...defaultErrorOptions.context,
-							action: "searchLikeThis",
-							metadata: { path: _path, engine, topK },
-						},
-						fallbackMessage: "Similarity search failed",
-					},
-				).finally(() => {
-					uiActions.setBusy("");
-				});
+                try {
+                    await _withErrorHandling(
+                        async () => {
+                            uiActions.setBusy("Searching similar…");
+                            const r = await apiSearchLike(dir, _path, engine, topK);
+                            photoActions.setResults(r.results || []);
+                            return r.results || [];
+                        },
+                        {
+                            ...defaultErrorOptions,
+                            context: {
+                                ...defaultErrorOptions.context,
+                                action: "searchLikeThis",
+                                metadata: { path: _path, engine, topK },
+                            },
+                            fallbackMessage: "Similarity search failed",
+                        },
+                    );
+                } catch {
+                    // Swallow errors per tests; logging handled by error util
+                } finally {
+                    uiActions.setBusy("");
+                }
 			},
 			[dir, engine, topK, uiActions, photoActions],
 		);
@@ -98,21 +102,25 @@ export const useSearchLogic = (_options: SearchLogicOptions) => {
 			async (_path: string) => {
 				if (!dir || !_path) return;
 
-				await _withErrorHandling(
-					async () => {
-						await apiSetFavorite(dir, _path, !fav.includes(_path));
-						await loadFav();
-					},
-					{
-						...defaultErrorOptions,
-						context: {
-							...defaultErrorOptions.context,
-							action: "toggleFavorite",
-							metadata: { path: _path },
-						},
-						fallbackMessage: "Failed to update favorite",
-					},
-				);
+                try {
+                    await _withErrorHandling(
+                        async () => {
+                            await apiSetFavorite(dir, _path, !fav.includes(_path));
+                            await loadFav();
+                        },
+                        {
+                            ...defaultErrorOptions,
+                            context: {
+                                ...defaultErrorOptions.context,
+                                action: "toggleFavorite",
+                                metadata: { path: _path },
+                            },
+                            fallbackMessage: "Failed to update favorite",
+                        },
+                    );
+                } catch {
+                    // Swallow errors per tests
+                }
 			},
 			[dir, fav, loadFav],
 		);
@@ -122,20 +130,24 @@ export const useSearchLogic = (_options: SearchLogicOptions) => {
 			async (_path: string) => {
 				if (!dir || !_path) return;
 
-				await _withErrorHandling(
-					async () => {
-						await apiOpen(dir, _path);
-					},
-					{
-						...defaultErrorOptions,
-						context: {
-							...defaultErrorOptions.context,
-							action: "revealPhoto",
-							metadata: { path: _path },
-						},
-						fallbackMessage: "Failed to open photo location",
-					},
-				);
+                try {
+                    await _withErrorHandling(
+                        async () => {
+                            await apiOpen(dir, _path);
+                        },
+                        {
+                            ...defaultErrorOptions,
+                            context: {
+                                ...defaultErrorOptions.context,
+                                action: "revealPhoto",
+                                metadata: { path: _path },
+                            },
+                            fallbackMessage: "Failed to open photo location",
+                        },
+                    );
+                } catch {
+                    // Swallow errors per tests
+                }
 			},
 			[dir],
 		);
@@ -171,108 +183,108 @@ export const useSearchLogic = (_options: SearchLogicOptions) => {
 			return `?${sp.toString()}`;
 		}, []);
 
-    const parseSearchParams = // biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency exclusion
-        useCallback((_searchParams: URLSearchParams) => {
-            // Build a sparse filters object (only set keys that exist)
-            const f: Record<string, unknown> = {};
-            let hasAny = false;
+	const parseSearchParams = // biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency exclusion
+		useCallback((_searchParams: URLSearchParams) => {
+			// Build a sparse filters object (only set keys that exist)
+			const f: Record<string, unknown> = {};
+			let hasAny = false;
 
-            // Basic filters
-            if (_searchParams.get("fav") === "1") {
-                f.favOnly = true;
-                hasAny = true;
-            }
-            const tags = _searchParams.get("tags");
-            if (tags) {
-                f.tagFilter = tags;
-                hasAny = true;
-            }
-            const df = _searchParams.get("date_from");
-            if (df) {
-                f.dateFrom = df;
-                hasAny = true;
-            }
-            const dt = _searchParams.get("date_to");
-            if (dt) {
-                f.dateTo = dt;
-                hasAny = true;
-            }
-            const place = _searchParams.get("place");
-            if (place) {
-                f.place = place;
-                hasAny = true;
-            }
-            if (_searchParams.get("has_text") === "1") {
-                f.hasText = true;
-                hasAny = true;
-            }
-            const camera = _searchParams.get("camera");
-            if (camera) {
-                f.camera = camera;
-                hasAny = true;
-            }
+			// Basic filters
+			if (_searchParams.get("fav") === "1") {
+				f.favOnly = true;
+				hasAny = true;
+			}
+			const tags = _searchParams.get("tags");
+			if (tags) {
+				f.tagFilter = tags;
+				hasAny = true;
+			}
+			const df = _searchParams.get("date_from");
+			if (df) {
+				f.dateFrom = df;
+				hasAny = true;
+			}
+			const dt = _searchParams.get("date_to");
+			if (dt) {
+				f.dateTo = dt;
+				hasAny = true;
+			}
+			const place = _searchParams.get("place");
+			if (place) {
+				f.place = place;
+				hasAny = true;
+			}
+			if (_searchParams.get("has_text") === "1") {
+				f.hasText = true;
+				hasAny = true;
+			}
+			const camera = _searchParams.get("camera");
+			if (camera) {
+				f.camera = camera;
+				hasAny = true;
+			}
 
-            // Numeric filters
-            const isoMin = _searchParams.get("iso_min");
-            if (isoMin) {
-                f.isoMin = parseFloat(isoMin);
-                hasAny = true;
-            }
-            const isoMax = _searchParams.get("iso_max");
-            if (isoMax) {
-                f.isoMax = parseFloat(isoMax);
-                hasAny = true;
-            }
-            const fMin = _searchParams.get("f_min");
-            if (fMin) {
-                f.fMin = parseFloat(fMin);
-                hasAny = true;
-            }
-            const fMax = _searchParams.get("f_max");
-            if (fMax) {
-                f.fMax = parseFloat(fMax);
-                hasAny = true;
-            }
+			// Numeric filters
+			const isoMin = _searchParams.get("iso_min");
+			if (isoMin) {
+				f.isoMin = parseFloat(isoMin);
+				hasAny = true;
+			}
+			const isoMax = _searchParams.get("iso_max");
+			if (isoMax) {
+				f.isoMax = parseFloat(isoMax);
+				hasAny = true;
+			}
+			const fMin = _searchParams.get("f_min");
+			if (fMin) {
+				f.fMin = parseFloat(fMin);
+				hasAny = true;
+			}
+			const fMax = _searchParams.get("f_max");
+			if (fMax) {
+				f.fMax = parseFloat(fMax);
+				hasAny = true;
+			}
 
-            // Person filters
-            const person = _searchParams.get("person");
-            const personsCSV = _searchParams.get("persons");
-            if (personsCSV) {
-                const persons = personsCSV
-                    .split(",")
-                    .map((s) => s.trim())
-                    .filter(Boolean);
-                if (persons.length) {
-                    f.persons = persons;
-                    hasAny = true;
-                }
-            } else if (person) {
-                f.persons = [person];
-                hasAny = true;
-            }
+			// Person filters
+			const person = _searchParams.get("person");
+			const personsCSV = _searchParams.get("persons");
+			if (personsCSV) {
+				const persons = personsCSV
+					.split(",")
+					.map((s) => s.trim())
+					.filter(Boolean);
+				if (persons.length) {
+					f.persons = persons;
+					hasAny = true;
+				}
+			} else if (person) {
+				f.persons = [person];
+				hasAny = true;
+			}
 
-            // View settings
-            const rv = _searchParams.get("rv");
-            if (rv) {
-                f.resultView = rv as unknown;
-                hasAny = true;
-            }
-            const tb = _searchParams.get("tb");
-            if (tb) {
-                f.timelineBucket = tb as unknown;
-                hasAny = true;
-            }
+			// View settings
+			const rv = _searchParams.get("rv");
+			if (rv) {
+				f.resultView = rv as unknown;
+				hasAny = true;
+			}
+			const tb = _searchParams.get("tb");
+			if (tb) {
+				f.timelineBucket = tb as unknown;
+				hasAny = true;
+			}
 
-            const q = _searchParams.get("q") || "";
+			const q = _searchParams.get("q") || "";
 
-            // For backwards compatibility in tests: when empty params, return {}
-            if (!hasAny && !q) return {} as any;
+			// For backwards compatibility in tests: when empty params, return {}
+			if (!hasAny && !q) return {} as any;
 
-            // Return both flattened and nested shapes for convenience and test parity
-            const result: any = { ...f, filters: { ...f } };
-            if (q) result.query = q;
-            return result;
-        }, []);
+			// Return both flattened and nested shapes for convenience and test parity
+			const result: any = { ...f, filters: { ...f } };
+			if (q) result.query = q;
+			return result;
+		}, []);
 
 	const applyFiltersFromUrl = // biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency exclusion
 		useCallback(

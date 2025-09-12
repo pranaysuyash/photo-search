@@ -62,14 +62,14 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 	} | null>(null);
 
 	// Library state
-	const [photos, setPhotos] = useState<any[]>([]);
+	const [photos, setPhotos] = useState<Array<{ path: string; name: string; size: number; modified: Date }>>([]);
 	const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set());
 	const [searchQuery, setSearchQuery] = useState("");
-	const [searchResults, setSearchResults] = useState<any[]>([]);
+	const [searchResults, setSearchResults] = useState<Array<{ path: string; score: number }>>([]);
 
 	// Collections state
 	const [collections, setCollections] = useState<Record<string, string[]>>({});
-	const [smartCollections, setSmartCollections] = useState<Record<string, any>>(
+	const [smartCollections, setSmartCollections] = useState<Record<string, { query: string; count?: number }>>(
 		{},
 	);
 	const [_selectedCollection, _setSelectedCollection] = useState<string | null>(
@@ -77,29 +77,29 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 	);
 
 	// People state
-	const [faceClusters, setFaceClusters] = useState<any[]>([]);
+	const [faceClusters, setFaceClusters] = useState<Array<{ id: string; photos: string[]; name?: string }>>([]);
 	const [_namedPeople, setNamedPeople] = useState<Map<string, string>>(
-		() => new (Map as any)(),
+		new Map(),
 	);
 
 	// Places state
-	const [trips, setTrips] = useState<any[]>([]);
-	const [_mapData, setMapData] = useState<any>(null);
+	const [trips, setTrips] = useState<Array<{ id: string; name: string; startDate: string; endDate: string; photos: string[] }>>([]);
+	const [_mapData, setMapData] = useState<{ markers: Array<{ lat: number; lng: number; photos: string[] }> } | null>(null);
 
 	// Metadata state
 	const [_tags, setTags] = useState<string[]>([]);
-	const [_metadata, setMetadata] = useState<any>(null);
+	const [_metadata, setMetadata] = useState<Record<string, { width?: number; height?: number; date?: string; camera?: string }> | null>(null);
 	const [favorites, setFavorites] = useState<string[]>([]);
-	const [_savedSearches, setSavedSearches] = useState<any[]>([]);
+	const [_savedSearches, setSavedSearches] = useState<Array<{ name: string; query: string }>>([]);
 
 	// Edit state
 	const [_editMode, _setEditMode] = useState(false);
 	const [_editingPhoto, _setEditingPhoto] = useState<string | null>(null);
 
 	// System state
-	const [diagnostics, setDiagnostics] = useState<any>(null);
-    // Developer-only TODOs removed
-	const [lookalikes, setLookalikes] = useState<any[]>([]);
+	const [diagnostics, setDiagnostics] = useState<{ engines: Array<{ key: string; index_dir: string; count: number }>; free_gb: number; os: string; folder: string } | null>(null);
+	// Developer-only TODOs removed
+	const [lookalikes, setLookalikes] = useState<Array<{ group: string[]; similarity: number }>>([]);
 
 	// Notification handler
 	const showNotification = useCallback((type: string, message: string) => {
@@ -114,29 +114,29 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 		setLoading(true);
 		try {
 			// Load all data in parallel
-            const [
-                libraryData,
-                collectionsData,
-                smartData,
-                facesData,
-                tripsData,
-                mapData,
-                tagsData,
-                metadataData,
-                favoritesData,
-                savedData,
-            ] = await Promise.all([
-                api.current.getLibrary(),
-                api.current.getCollections(),
-                api.current.getSmartCollections(),
-                api.current.getFaceClusters(),
-                api.current.getTrips(),
-                api.current.getMapData(),
-                api.current.getTags(),
-                api.current.getMetadata(),
-                api.current.getFavorites(),
-                api.current.getSavedSearches(),
-            ]);
+			const [
+				libraryData,
+				collectionsData,
+				smartData,
+				facesData,
+				tripsData,
+				mapData,
+				tagsData,
+				metadataData,
+				favoritesData,
+				savedData,
+			] = await Promise.all([
+				api.current.getLibrary(),
+				api.current.getCollections(),
+				api.current.getSmartCollections(),
+				api.current.getFaceClusters(),
+				api.current.getTrips(),
+				api.current.getMapData(),
+				api.current.getTags(),
+				api.current.getMetadata(),
+				api.current.getFavorites(),
+				api.current.getSavedSearches(),
+			]);
 
 			setPhotos(libraryData.paths || []);
 			setCollections(collectionsData.collections || {});
@@ -147,11 +147,11 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 			setTags(tagsData.all || []);
 			setMetadata(metadataData);
 			setFavorites(favoritesData.favorites || []);
-            setSavedSearches(savedData.saved || []);
+			setSavedSearches(savedData.saved || []);
 
 			showNotification("success", "All data loaded successfully");
-		} catch (err: any) {
-			setError(err.message);
+		} catch (err: unknown) {
+			setError(err instanceof Error ? err.message : "Failed to load data");
 			showNotification("error", "Failed to load data");
 		} finally {
 			setLoading(false);
@@ -184,7 +184,7 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 				"success",
 				`Found ${results.results?.length || 0} results`,
 			);
-		} catch (_err: any) {
+		} catch (_err: unknown) {
 			showNotification("error", "Search failed");
 		} finally {
 			setLoading(false);

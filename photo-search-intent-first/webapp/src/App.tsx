@@ -1,15 +1,18 @@
 import clsx from "clsx";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import React, {
+	lazy,
+	Suspense,
 	useCallback,
 	useEffect,
 	useMemo,
 	useRef,
 	useState,
-	lazy,
-	Suspense,
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import type { AccessibilitySettings } from "./components/AccessibilityPanel";
+import type { ModalKey } from "./contexts/ModalContext";
+import type { SettingsActions } from "./stores/types";
 import {
 	API_BASE,
 	apiAuthCheck,
@@ -40,7 +43,9 @@ import {
 import { AccessibilityPanel } from "./components/AccessibilityPanel";
 import { BottomNavigation } from "./components/BottomNavigation";
 import Collections from "./components/Collections";
+
 const DiagnosticsDrawer = lazy(() => import("./components/DiagnosticsDrawer"));
+
 import {
 	QuickActions,
 	SampleSearchSuggestions,
@@ -57,9 +62,12 @@ import {
 	HintProvider,
 	useHintTriggers,
 } from "./components/HintSystem";
-import { type Job, JobsCenter } from "./components/JobsCenter";
+import { JobsCenter } from "./components/JobsCenter";
 import { useJobsContext } from "./contexts/JobsContext";
+import { useModalContext } from "./contexts/ModalContext";
+
 const JobsDrawer = lazy(() => import("./components/JobsDrawer"));
+
 // Reuse existing feature components
 import JustifiedResults from "./components/JustifiedResults";
 import LibraryBrowser from "./components/LibraryBrowser";
@@ -82,10 +90,16 @@ import {
 	SaveModal,
 	TagModal,
 } from "./components/modals";
-const AdvancedSearchModal = lazy(() => import("./components/modals/AdvancedSearchModal"));
-const EnhancedSharingModal = lazy(() =>
-    import("./components/modals/EnhancedSharingModal").then((m) => ({ default: m.EnhancedSharingModal })),
+
+const AdvancedSearchModal = lazy(
+	() => import("./components/modals/AdvancedSearchModal"),
 );
+const EnhancedSharingModal = lazy(() =>
+	import("./components/modals/EnhancedSharingModal").then((m) => ({
+		default: m.EnhancedSharingModal,
+	})),
+);
+
 import FirstRunSetup from "./components/modals/FirstRunSetup";
 import { OfflineIndicator } from "./components/OfflineIndicator";
 import { OnboardingTour, useOnboarding } from "./components/OnboardingTour";
@@ -97,29 +111,37 @@ import {
 } from "./components/ProgressiveOnboarding";
 import SavedSearches from "./components/SavedSearches";
 import ShareViewer from "./components/ShareViewer";
-import { Sidebar } from "./components/Sidebar";
 import SmartCollections from "./components/SmartCollections";
 import { StatsBar } from "./components/StatsBar";
 import { StatusBar } from "./components/StatusBar";
 // TasksView removed (developer-only)
 import { ThemeProvider } from "./components/ThemeProvider";
+
 const ThemeSettingsModal = lazy(() =>
-    import("./components/ThemeSettingsModal").then((m) => ({ default: m.ThemeSettingsModal })),
+	import("./components/ThemeSettingsModal").then((m) => ({
+		default: m.ThemeSettingsModal,
+	})),
 );
+
 import TimelineResults from "./components/TimelineResults";
 import { TopBar } from "./components/TopBar";
+
 const SearchOverlay = lazy(() => import("./components/SearchOverlay"));
+
 import ToastPortal from "./components/ToastPortal";
 import TripsView from "./components/TripsView";
 import { VideoLightbox } from "./components/VideoLightbox";
 import { VideoManager } from "./components/VideoManager";
 import { Welcome } from "./components/Welcome";
-import { useDebouncedCallback } from "./hooks/useDebounce";
 import { useLibraryContext } from "./contexts/LibraryContext";
+import { useDebouncedCallback } from "./hooks/useDebounce";
 import { ShareManager } from "./modules/ShareManager";
 import { VideoService } from "./services/VideoService";
-import { useHighContrast, useThemeStore, useSearchCommandCenter } from "./stores/settingsStore";
-import { useModalContext } from "./contexts/ModalContext";
+import {
+	useHighContrast,
+	useSearchCommandCenter,
+	useThemeStore,
+} from "./stores/settingsStore";
 import {
 	useAllTags,
 	// Individual UI hooks
@@ -187,7 +209,7 @@ export type View =
 	| "memories"
 	| "tasks"
 	| "videos";
-type IconType = React.ComponentType<React.SVGProps<SVGSVGElement>>;
+type _IconType = React.ComponentType<React.SVGProps<SVGSVGElement>>;
 type ViewType = "results" | "library" | "map" | "people" | "tasks" | "trips";
 
 // Minimal focus trap for modals
@@ -281,7 +303,7 @@ function _ScrollLoader({
 
 export default function App() {
 	// Skip to content link for keyboard users
-	const skipToContentRef = useRef<HTMLAnchorElement>(null);
+	const _skipToContentRef = useRef<HTMLAnchorElement>(null);
 
 	// Safety check to prevent infinite loops on initial render
 	const [isMounted, setIsMounted] = useState(false);
@@ -292,7 +314,7 @@ export default function App() {
 	}, []);
 
 	// Modern UX Integration - Mobile detection and haptic feedback
-	const { isMobile, isTablet, screenSize } = useMobileDetection();
+	const { isMobile, isTablet: _isTablet, screenSize: _screenSize } = useMobileDetection();
 	const { trigger: hapticTrigger } = useHapticFeedback();
 
 	// Modern UX Integration - Onboarding and hints
@@ -306,7 +328,7 @@ export default function App() {
 	);
 	const [showModernSidebar, setShowModernSidebar] = useState(false);
 	const [_useAnimatedGrid, _setUseAnimatedGrid] = useState(true);
-	const [accessibilitySettings, setAccessibilitySettings] = useState<any>(null);
+	const [accessibilitySettings, setAccessibilitySettings] = useState<AccessibilitySettings | null>(null);
 
 	// Individual hooks for settings
 	const dir = useDir();
@@ -338,16 +360,16 @@ export default function App() {
 	const favOnly = useFavOnly();
 	const topK = useTopK();
 	const saved = useSavedSearches();
-	const savedSearches = saved; // alias for compatibility
+	const _savedSearches = saved; // alias for compatibility
 	const collections = useCollections();
 	const smart = useSmartCollections();
-	const trips: any[] = []; // TODO: implement trips
+	const _trips: Array<{ id: string; name: string; startDate: string; endDate: string; photos: string[] }> = []; // TODO: implement trips
 	const library = useLibrary();
 	const _libHasMore = useLibHasMore();
 	const tagsMap = useTagsMap();
 
-    // Individual hooks for UI
-    const busy = useBusy();
+	// Individual hooks for UI
+	const busy = useBusy();
 	const note = useNote();
 	// const viewMode = useViewMode()
 	const showWelcome = useShowWelcome();
@@ -368,11 +390,11 @@ export default function App() {
 	const uiActions = useUIActions();
 	const workspaceActions = useWorkspaceActions();
 
-    // Theme controls
-    const themeMode = useThemeStore((s) => s.themeMode);
-    const setThemeMode = useThemeStore((s) => s.setThemeMode);
+	// Theme controls
+	const themeMode = useThemeStore((s) => s.themeMode);
+	const setThemeMode = useThemeStore((s) => s.setThemeMode);
 
-    // Local UI state
+	// Local UI state
 	const [selectedView, setSelectedView] = useState<View>("library");
 	const location = useLocation();
 	const navigate = useNavigate();
@@ -388,24 +410,13 @@ export default function App() {
 	const [showFilters, setShowFilters] = useState(false);
 	const [dateFrom, setDateFrom] = useState("");
 	const [dateTo, setDateTo] = useState("");
-	const [modal, setModal] = useState<null | {
-		kind:
-			| "export"
-			| "enhanced-share"
-			| "tag"
-			| "folder"
-			| "likeplus"
-			| "save"
-			| "collect"
-			| "removeCollect";
-	}>(null);
 	const [showShortcuts, setShowShortcuts] = useState(false);
-    const { state: modalState, actions: modal } = useModalContext();
+	const { state: modalState, actions: modal } = useModalContext();
 	const [detailIdx, setDetailIdx] = useState<number | null>(null);
 	const [focusIdx, setFocusIdx] = useState<number | null>(null);
 	const [layoutRows, setLayoutRows] = useState<number[][]>([]);
 	const layoutRowsRef = useRef(layoutRows);
-	const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+	const [_isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 	const [bottomNavTab, setBottomNavTab] = useState<
 		"home" | "search" | "favorites" | "settings"
 	>("home");
@@ -415,7 +426,7 @@ export default function App() {
 	}, [layoutRows]);
 
 	// Modern UX Integration - Enhanced handlers
-	const handleAccessibilitySettingsChange = useCallback((settings: any) => {
+	const handleAccessibilitySettingsChange = useCallback((settings: AccessibilitySettings) => {
 		setAccessibilitySettings(settings);
 		// Apply accessibility settings to the app
 		console.log("Accessibility settings changed:", settings);
@@ -435,9 +446,11 @@ export default function App() {
 	});
 
 	const [showOnboarding, setShowOnboarding] = useState(false);
-const { state: jobsState, actions: jobsActions } = useJobsContext();
-const jobs = jobsState.jobs;
-// Indexing state moved to LibraryProvider
+	const { state: jobsState, actions: jobsActions } = useJobsContext();
+	const jobs = jobsState.jobs;
+	// Library state and actions (indexing, etc.)
+	const { state: libState, actions: lib } = useLibraryContext();
+	// Indexing state moved to LibraryProvider
 	const [ocrReady, setOcrReady] = useState<boolean>(false);
 	const [ratingMin, setRatingMin] = useState(0);
 	const [toast, setToast] = useState<null | {
@@ -532,9 +545,9 @@ const jobs = jobsState.jobs;
 
 	// Onboarding tour action listeners ("Do it for me")
 	useEffect(() => {
-		const openAdvanced = () => setModal({ kind: "advanced" as any });
+		const openAdvanced = () => modal.open("advanced");
 		const openFilters = () => setShowFilters(true);
-		const openFolder = () => setModal({ kind: "folder" as any });
+		const openFolder = () => modal.open("folder");
 
 		window.addEventListener("tour-action-open-advanced", openAdvanced);
 		window.addEventListener("tour-action-open-filters", openFilters);
@@ -545,7 +558,7 @@ const jobs = jobsState.jobs;
 			window.removeEventListener("tour-action-open-filters", openFilters);
 			window.removeEventListener("tour-action-select-library", openFolder);
 		};
-	}, []);
+	}, [modal.open]);
 
 	// Connectivity ping + auth status
 	useEffect(() => {
@@ -590,12 +603,12 @@ const jobs = jobsState.jobs;
 					ae.isContentEditable)
 			)
 				return;
-            // Open Search Overlay (/)
-            if (searchCommandCenter && e.key === "/") {
-                e.preventDefault();
-                modal.open("search");
-                return;
-            }
+			// Open Search Overlay (/)
+			if (searchCommandCenter && e.key === "/") {
+				e.preventDefault();
+				modal.open("search");
+				return;
+			}
 			// Toggle info overlay (I)
 			if (e.key.toLowerCase() === "i") {
 				e.preventDefault();
@@ -605,15 +618,15 @@ const jobs = jobsState.jobs;
 			// Open Advanced (A)
 			if (e.key.toLowerCase() === "a") {
 				e.preventDefault();
-				setModal({ kind: "advanced" as any });
+				modal.open("advanced");
 				return;
 			}
-            // Help (?): toggle Help modal
-            if (e.key === "?") {
-                e.preventDefault();
-                modal.toggle("help");
-                return;
-            }
+			// Help (?): toggle Help modal
+			if (e.key === "?") {
+				e.preventDefault();
+				modal.toggle("help");
+				return;
+			}
 			// Timeline jumps only when viewing results timeline
 			if (selectedView === "results" && (resultView as string) === "timeline") {
 				const dispatch = (kind: string) =>
@@ -644,7 +657,15 @@ const jobs = jobsState.jobs;
 		};
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
-	}, [showInfoOverlay, settingsActions, selectedView, resultView, searchCommandCenter]);
+	}, [
+		showInfoOverlay,
+		settingsActions,
+		selectedView,
+		resultView,
+		searchCommandCenter,
+		modal.open,
+		modal.toggle,
+	]);
 
 	useEffect(() => {
 		const body = document.body;
@@ -760,10 +781,10 @@ const jobs = jobsState.jobs;
 						.filter(Boolean),
 				);
 			else if (person) workspaceActions.setPersons([person]);
-			const rv = sp.get("rv") as any;
+			const rv = sp.get("rv") as "grid" | "timeline" | "map" | null;
 			if (rv && settingsActions.setResultView)
 				settingsActions.setResultView(rv);
-			const tb = sp.get("tb") as any;
+			const tb = sp.get("tb") as "day" | "week" | "month" | "year" | null;
 			if (tb && settingsActions.setTimelineBucket)
 				settingsActions.setTimelineBucket(tb);
 		} catch {}
@@ -906,12 +927,12 @@ const jobs = jobsState.jobs;
 		} catch {}
 	}, [dir]);
 
-    // Index status polling moved to LibraryProvider
+	// Index status polling moved to LibraryProvider
 
 	// Compute index coverage from diagnostics + library
 	const _indexCoverage = useMemo(() => {
 		try {
-			const count = (diag as any)?.engines?.[0]?.count || 0;
+			const count = diag?.engines?.[0]?.count || 0;
 			const total = library?.length || 0;
 			return total > 0 ? count / total : undefined;
 		} catch {
@@ -1016,27 +1037,29 @@ const jobs = jobsState.jobs;
 		};
 	}, [dir]);
 
-    // Actions migrated: indexing managed by LibraryProvider
+	// Actions migrated: indexing managed by LibraryProvider
 
 	const doSearchImmediate = useCallback(
 		async (text?: string) => {
 			const q = (text ?? searchText ?? "").trim();
 			if (!q) return;
 			// If no directory is selected, automatically load the demo library
-            if (!dir) {
-                try {
-                    const demoPath = await apiDemoDir();
-                    if (!demoPath) {
-                        uiActions.setNote("Demo library not available.");
-                        return;
-                    }
-                    settingsActions.setDir(demoPath);
-                    uiActions.setNote("Loading demo library… indexing will run once.");
-                    try { await apiWorkspaceAdd(demoPath); } catch {}
-                    await lib.index({ dir: demoPath, provider: engine });
-                    await loadLibrary(120, 0);
-                } catch {}
-            }
+			if (!dir) {
+				try {
+					const demoPath = await apiDemoDir();
+					if (!demoPath) {
+						uiActions.setNote("Demo library not available.");
+						return;
+					}
+					settingsActions.setDir(demoPath);
+					uiActions.setNote("Loading demo library… indexing will run once.");
+					try {
+						await apiWorkspaceAdd(demoPath);
+					} catch {}
+					await lib.index({ dir: demoPath, provider: engine });
+					await loadLibrary(120, 0);
+				} catch {}
+			}
 			photoActions.setQuery(q);
 			// Push URL state for deep linking including filters
 			try {
@@ -1411,7 +1434,7 @@ const jobs = jobsState.jobs;
 
 	// Modern UX Integration - Enhanced photo action handler with haptic feedback
 	const _handlePhotoAction = useCallback(
-		(action: string, photo: any) => {
+		(action: string, photo: { path: string }) => {
 			switch (action) {
 				case "favorite":
 					// Toggle favorite with haptic feedback
@@ -1730,28 +1753,32 @@ const jobs = jobsState.jobs;
 				<div className="p-4">
 					<EnhancedEmptyState
 						type="no-directory"
-						onAction={() => setModal({ kind: "folder" })}
+						onAction={() => modal.open("folder")}
 						onDemoAction={async () => {
 							try {
 								const demoPath = await apiDemoDir();
 								if (!demoPath) {
-									uiActions.setNote("Demo library not available on this install.");
+									uiActions.setNote(
+										"Demo library not available on this install.",
+									);
 									return;
 								}
-                            settingsActions.setDir(demoPath);
-                            await lib.index();
+								settingsActions.setDir(demoPath);
+								await lib.index();
 								uiActions.setNote(
 									"Demo library loaded! Try 'beach sunset' or 'family photos'",
 								);
 							} catch (error) {
 								console.error("Failed to setup demo:", error);
 								uiActions.setNote(
-									error instanceof Error ? error.message : "Failed to setup demo",
+									error instanceof Error
+										? error.message
+										: "Failed to setup demo",
 								);
 							}
 						}}
-						onOpenHelp={() => setShowHelpModal(true)}
-						onStartTour={() => setShowHelpModal(true)}
+						onOpenHelp={() => modal.open("help")}
+						onStartTour={() => modal.open("help")}
 						sampleQueries={[
 							"beach sunset",
 							"birthday cake",
@@ -1761,11 +1788,11 @@ const jobs = jobsState.jobs;
 						onRunSample={(q) => doSearchImmediate(q)}
 					/>
 					<QuickActions
-						onSelectDirectory={() => setModal({ kind: "folder" })}
+						onSelectDirectory={() => modal.open("folder")}
 						onImport={() => {
 							/* TODO: Implement import */
 						}}
-						onHelp={() => setShowHelpModal(true)}
+						onHelp={() => modal.open("help")}
 					/>
 				</div>
 			);
@@ -1777,8 +1804,8 @@ const jobs = jobsState.jobs;
 				<div className="p-4">
 					<EnhancedEmptyState
 						type="no-photos"
-						onAction={() => setModal({ kind: "folder" })}
-						onOpenHelp={() => setShowHelpModal(true)}
+						onAction={() => modal.open("folder")}
+						onOpenHelp={() => modal.open("help")}
 					/>
 				</div>
 			);
@@ -1819,7 +1846,7 @@ const jobs = jobsState.jobs;
 		selected: Set<string>;
 		showAccessibilityPanel: boolean;
 		setShowAccessibilityPanel: (v: boolean) => void;
-		handleAccessibilitySettingsChange: (settings: any) => void;
+		handleAccessibilitySettingsChange: (settings: AccessibilitySettings) => void;
 		showOnboardingTour: boolean;
 		handleOnboardingComplete: () => void;
 		setShowOnboardingTour: (v: boolean) => void;
@@ -1832,9 +1859,9 @@ const jobs = jobsState.jobs;
 			showAccessibilityPanel,
 			setShowAccessibilityPanel,
 			handleAccessibilitySettingsChange,
-			showOnboardingTour,
-			handleOnboardingComplete,
-			setShowOnboardingTour,
+			showOnboardingTour: _showOnboardingTour,
+			handleOnboardingComplete: _handleOnboardingComplete,
+			setShowOnboardingTour: _setShowOnboardingTour,
 		} = props;
 		const { triggerHint } = useHintTriggers();
 
@@ -1885,7 +1912,9 @@ const jobs = jobsState.jobs;
 							onPullToRefresh={handlePullToRefresh}
 						>
 							{/* Dedicated share viewer route (full screen, minimal chrome) */}
-							{(location.pathname || "").startsWith("/share/") && <ShareViewer />}
+							{(location.pathname || "").startsWith("/share/") && (
+								<ShareViewer />
+							)}
 							{(location.pathname || "").startsWith("/mobile-test") && (
 								<MobilePWATest />
 							)}
@@ -1901,784 +1930,735 @@ const jobs = jobsState.jobs;
 									},
 								)}
 							>
-							<a
-								href="#main-content"
-								className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 bg-blue-600 text-white px-4 py-2 rounded-md"
-							>
-								Skip to main content
-							</a>
-							<OfflineIndicator />
-									{showWelcome && (
-										<Welcome
-											onStartDemo={async () => {
-												// Set demo photos directory and close welcome
-                                    let demoPath = await apiDemoDir();
-                                    if (!demoPath) {
-                                        uiActions.setNote("Demo data is not available on this system.");
-                                        return;
-                                    }
-                                    settingsActions.setDir(demoPath);
-												uiActions.setShowWelcome(false);
+								<a
+									href="#main-content"
+									className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 bg-blue-600 text-white px-4 py-2 rounded-md"
+								>
+									Skip to main content
+								</a>
+								<OfflineIndicator />
+								{showWelcome && (
+									<Welcome
+										onStartDemo={async () => {
+											// Set demo photos directory and close welcome
+											const demoPath = await apiDemoDir();
+											if (!demoPath) {
+												uiActions.setNote(
+													"Demo data is not available on this system.",
+												);
+												return;
+											}
+											settingsActions.setDir(demoPath);
+											uiActions.setShowWelcome(false);
 
-												// Add demo path to workspace and index it
-												try {
-                                        await apiWorkspaceAdd(demoPath);
-                                        await lib.index();
-												} catch (error) {
-													console.error(
-														"Failed to add demo path or index:",
-														error,
-													);
-													uiActions.setNote(
-														error instanceof Error
-															? error.message
-															: "Failed to setup demo",
-													);
-												}
-											}}
-											onSelectFolder={() => {
-												setModal({ kind: "folder" });
-												uiActions.setShowWelcome(false);
-											}}
-											onClose={() => uiActions.setShowWelcome(false)}
-										/>
-									)}
-
-									{/* First-run setup */}
-									<FirstRunSetup
-										open={!dir && showOnboarding}
-										onClose={() => {
-											setShowOnboarding(false);
-											localStorage.setItem("hasSeenOnboarding", "true");
-										}}
-										onQuickStart={async (paths) => {
+											// Add demo path to workspace and index it
 											try {
-												// Add each path to workspace; set first as current dir; index each
-												const existing: string[] = [];
-												for (const p of paths) {
-													try {
-														const st = await fetch(`${API_BASE}/scan_count`, {
-															method: "POST",
-															headers: { "Content-Type": "application/json" },
-															body: JSON.stringify([p]),
-														});
-														if (st.ok) {
-															const js = await st.json();
-															if (js.items?.[0]?.exists) existing.push(p);
-														}
-													} catch {}
-												}
-												if (existing.length === 0) {
-													setShowOnboarding(false);
-													localStorage.setItem("hasSeenOnboarding", "true");
-													return;
-												}
-												settingsActions.setDir(existing[0]);
-												// Kick off background indexing without blocking
-												for (const p of existing) {
-													try {
-														await apiWorkspaceAdd(p);
-													} catch {}
-													(async () => {
-														try {
-															await apiIndex(
-																p,
-																engine,
-																24,
-																needsHf ? hfToken : undefined,
-																needsOAI ? openaiKey : undefined,
-															);
-														} catch {}
-													})();
-												}
+												await apiWorkspaceAdd(demoPath);
+												await lib.index();
+											} catch (error) {
+												console.error(
+													"Failed to add demo path or index:",
+													error,
+												);
+												uiActions.setNote(
+													error instanceof Error
+														? error.message
+														: "Failed to setup demo",
+												);
+											}
+										}}
+										onSelectFolder={() => {
+											modal.open("folder");
+											uiActions.setShowWelcome(false);
+										}}
+										onClose={() => uiActions.setShowWelcome(false)}
+									/>
+								)}
+
+								{/* First-run setup */}
+								<FirstRunSetup
+									open={!dir && showOnboarding}
+									onClose={() => {
+										setShowOnboarding(false);
+										localStorage.setItem("hasSeenOnboarding", "true");
+									}}
+									onQuickStart={async (paths) => {
+										try {
+											// Add each path to workspace; set first as current dir; index each
+											const existing: string[] = [];
+											for (const p of paths) {
+												try {
+													const st = await fetch(`${API_BASE}/scan_count`, {
+														method: "POST",
+														headers: { "Content-Type": "application/json" },
+														body: JSON.stringify([p]),
+													});
+													if (st.ok) {
+														const js = await st.json();
+														if (js.items?.[0]?.exists) existing.push(p);
+													}
+												} catch {}
+											}
+											if (existing.length === 0) {
 												setShowOnboarding(false);
 												localStorage.setItem("hasSeenOnboarding", "true");
-											} catch (e) {
-												uiActions.setNote(
-													e instanceof Error ? e.message : "Quick start failed",
-												);
+												return;
 											}
-										}}
-										onCustom={() => {
-											setModal({ kind: "folder" });
-											setShowOnboarding(false);
-											localStorage.setItem("hasSeenOnboarding", "true");
-										}}
-										onDemo={async () => {
-											try {
-                                    let demoPath = await apiDemoDir();
-                                    if (!demoPath) {
-                                        uiActions.setNote("Demo data is not available on this system.");
-                                        setShowOnboarding(false);
-                                        localStorage.setItem("hasSeenOnboarding", "true");
-                                        return;
-                                    }
-                                    settingsActions.setDir(demoPath);
-                                    await apiWorkspaceAdd(demoPath);
-                                    await lib.index();
-											} catch (e) {
-												uiActions.setNote(
-													e instanceof Error ? e.message : "Demo setup failed",
-												);
+											settingsActions.setDir(existing[0]);
+											// Kick off background indexing without blocking
+											for (const p of existing) {
+												try {
+													await apiWorkspaceAdd(p);
+												} catch {}
+												(async () => {
+													try {
+														await apiIndex(
+															p,
+															engine,
+															24,
+															needsHf ? hfToken : undefined,
+															needsOAI ? openaiKey : undefined,
+														);
+													} catch {}
+												})();
 											}
 											setShowOnboarding(false);
 											localStorage.setItem("hasSeenOnboarding", "true");
-										}}
-                                onTour={() => {
-                                    modal.open("help");
-                                }}
-									/>
+										} catch (e) {
+											uiActions.setNote(
+												e instanceof Error ? e.message : "Quick start failed",
+											);
+										}
+									}}
+									onCustom={() => {
+										modal.open("folder");
+										setShowOnboarding(false);
+										localStorage.setItem("hasSeenOnboarding", "true");
+									}}
+									onDemo={async () => {
+										try {
+											const demoPath = await apiDemoDir();
+											if (!demoPath) {
+												uiActions.setNote(
+													"Demo data is not available on this system.",
+												);
+												setShowOnboarding(false);
+												localStorage.setItem("hasSeenOnboarding", "true");
+												return;
+											}
+											settingsActions.setDir(demoPath);
+											await apiWorkspaceAdd(demoPath);
+											await lib.index();
+										} catch (e) {
+											uiActions.setNote(
+												e instanceof Error ? e.message : "Demo setup failed",
+											);
+										}
+										setShowOnboarding(false);
+										localStorage.setItem("hasSeenOnboarding", "true");
+									}}
+									onTour={() => {
+										modal.open("help");
+									}}
+								/>
 
-									{/* Modern UX Integration - Enhanced Sidebar */}
-									{isMobile ? (
-										<ModernSidebar
-											selectedView={selectedView}
-											onViewChange={(view: string) =>
+								{/* Modern UX Integration - Enhanced Sidebar */}
+								{isMobile ? (
+									<ModernSidebar
+										selectedView={selectedView}
+										onViewChange={(view: string) =>
+											setSelectedView(view as View)
+										}
+										stats={{
+											totalPhotos: library?.length || 0,
+											collections: Object.keys(collections || {}).length,
+											people: (clusters || []).length,
+											favorites: fav.length,
+										}}
+										aiStatus={{
+											indexReady: true,
+											fastIndexType: "FAISS",
+											freeSpace: 0,
+										}}
+										darkMode={themeMode === "dark"}
+										onDarkModeToggle={() =>
+											setThemeMode(themeMode === "dark" ? "light" : "dark")
+										}
+										onSettingsClick={() => setShowAccessibilityPanel(true)}
+										onSelectLibrary={() => modal.open("folder")}
+									/>
+								) : (
+									<ModernSidebar
+										selectedView={selectedView}
+										onViewChange={(view: string) =>
+											setSelectedView(view as View)
+										}
+										stats={{
+											totalPhotos: library?.length || 0,
+											collections: Object.keys(collections || {}).length,
+											people: (clusters || []).length,
+											favorites: fav.length,
+										}}
+										aiStatus={{
+											indexReady: true,
+											fastIndexType: "FAISS",
+											freeSpace: 0,
+										}}
+										darkMode={themeMode === "dark"}
+										onDarkModeToggle={() =>
+											setThemeMode(themeMode === "dark" ? "light" : "dark")
+										}
+										onSettingsClick={() => setShowAccessibilityPanel(true)}
+										onSelectLibrary={() => modal.open("folder")}
+									/>
+								)}
+
+								<div className="flex-1 flex flex-col overflow-hidden">
+									{/* Modern Header Wrapper */}
+									<header className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-700/50 px-4 md:px-8 py-4 md:py-6">
+										<TopBar
+											searchText={searchText}
+											setSearchText={setSearchText}
+											onSearch={doSearchImmediate}
+											clusters={clusters}
+											allTags={allTags}
+											meta={meta}
+											diag={diag}
+											busy={!!busy}
+											gridSize={gridSize}
+											setGridSize={setGridSize}
+											selectedView={selectedView as ViewType}
+											setSelectedView={(view: string) =>
 												setSelectedView(view as View)
 											}
-											stats={{
-												totalPhotos: library?.length || 0,
-												collections: Object.keys(collections || {}).length,
-												people: (clusters || []).length,
-												favorites: fav.length,
+											currentFilter={currentFilter}
+											setCurrentFilter={setCurrentFilter}
+											ratingMin={ratingMin}
+											setRatingMin={setRatingMin}
+											setModal={(m: { kind: string } | null) =>
+												m ? modal.open(m.kind as ModalKey) : undefined
+											}
+											setIsMobileMenuOpen={setIsMobileMenuOpen}
+											setShowFilters={setShowFilters}
+											selected={selected}
+											setSelected={setSelected}
+											dir={dir}
+											engine={engine}
+											topK={topK}
+											useOsTrash={useOsTrash}
+											showInfoOverlay={showInfoOverlay}
+											onToggleInfoOverlay={() =>
+												settingsActions.setShowInfoOverlay
+													? settingsActions.setShowInfoOverlay(!showInfoOverlay)
+													: undefined
+											}
+											resultView={resultView as "grid" | "timeline"}
+											onChangeResultView={(view) =>
+												settingsActions.setResultView?.(view)
+											}
+											timelineBucket={timelineBucket}
+											onChangeTimelineBucket={(b) =>
+												settingsActions.setTimelineBucket?.(b)
+											}
+											photoActions={photoActions}
+											uiActions={uiActions}
+											toastTimerRef={toastTimerRef}
+											setToast={setToast}
+											isIndexing={libState.isIndexing}
+											onIndex={() => lib.index()}
+											activeJobs={
+												jobs.filter((j) => j.status === "running").length
+											}
+											onOpenJobs={() => modal.open("jobs")}
+											progressPct={libState.progressPct}
+											etaSeconds={libState.etaSeconds}
+											paused={libState.paused}
+											tooltip={libState.tip}
+											ocrReady={ocrReady}
+											onOpenSearchOverlay={() => modal.open("search")}
+											onPause={async () => {
+												try {
+													await lib.pause?.(dir);
+												} catch {}
 											}}
-											aiStatus={{
-												indexReady: true,
-												fastIndexType: "FAISS",
-												freeSpace: 0,
+											onResume={async () => {
+												try {
+													await lib.resume?.(dir);
+												} catch {}
 											}}
-                            darkMode={themeMode === "dark"}
-                            onDarkModeToggle={() =>
-                                setThemeMode(themeMode === "dark" ? "light" : "dark")
-                            }
-											onSettingsClick={() => setShowAccessibilityPanel(true)}
-											onSelectLibrary={() => setModal({ kind: "folder" })}
+											onOpenThemeModal={() => modal.open("theme")}
+											onOpenDiagnostics={() => modal.open("diagnostics")}
 										/>
-                ) : (
-                    <ModernSidebar
-                        selectedView={selectedView}
-                        onViewChange={(view: string) =>
-                            setSelectedView(view as View)
-                        }
-                        stats={{
-                            totalPhotos: library?.length || 0,
-                            collections: Object.keys(collections || {}).length,
-                            people: (clusters || []).length,
-                            favorites: fav.length,
-                        }}
-                        aiStatus={{
-                            indexReady: true,
-                            fastIndexType: "FAISS",
-                            freeSpace: 0,
-                        }}
-                        darkMode={themeMode === "dark"}
-                        onDarkModeToggle={() =>
-                            setThemeMode(themeMode === "dark" ? "light" : "dark")
-                        }
-                        onSettingsClick={() => setShowAccessibilityPanel(true)}
-                        onSelectLibrary={() => setModal({ kind: "folder" })}
-                    />
-                )}
+									</header>
 
-									<div className="flex-1 flex flex-col overflow-hidden">
-										{/* Modern Header Wrapper */}
-										<header className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-700/50 px-4 md:px-8 py-4 md:py-6">
-											<TopBar
-												searchText={searchText}
-												setSearchText={setSearchText}
-												onSearch={doSearchImmediate}
-												clusters={clusters}
-												allTags={allTags}
-												meta={meta}
-												diag={diag}
-												busy={!!busy}
-												gridSize={gridSize}
-												setGridSize={setGridSize}
-												selectedView={selectedView as ViewType}
-												setSelectedView={(view: string) =>
-													setSelectedView(view as View)
-												}
-												currentFilter={currentFilter}
-												setCurrentFilter={setCurrentFilter}
-												ratingMin={ratingMin}
-												setRatingMin={setRatingMin}
-												setModal={(modal: { kind: string } | null) =>
-													setModal(modal as any)
-												}
-												setIsMobileMenuOpen={setIsMobileMenuOpen}
-												setShowFilters={setShowFilters}
-												selected={selected}
-												setSelected={setSelected}
-												dir={dir}
-												engine={engine}
-												topK={topK}
-												useOsTrash={useOsTrash}
-												showInfoOverlay={showInfoOverlay}
-												onToggleInfoOverlay={() =>
-													settingsActions.setShowInfoOverlay
-														? settingsActions.setShowInfoOverlay(
-																!showInfoOverlay,
-															)
-														: undefined
-												}
-												resultView={resultView as "grid" | "timeline"}
-												onChangeResultView={(view) =>
-													settingsActions.setResultView?.(view)
-												}
-												timelineBucket={timelineBucket}
-												onChangeTimelineBucket={(b) =>
-													settingsActions.setTimelineBucket?.(b)
-												}
-												photoActions={photoActions}
-												uiActions={uiActions}
-												toastTimerRef={toastTimerRef}
-												setToast={setToast}
-												isIndexing={libState.isIndexing}
-												onIndex={() => lib.index()}
-												activeJobs={
-													jobs.filter((j) => j.status === "running").length
-												}
-												onOpenJobs={() => setModal({ kind: "jobs" as any })}
-                                            progressPct={libState.progressPct}
-                                            etaSeconds={libState.etaSeconds}
-                                            paused={libState.paused}
-                                            tooltip={libState.tip}
-												ocrReady={ocrReady}
-												onOpenSearchOverlay={() => modal.open("search")}
-												onPause={async () => {
-													try { await lib.pause?.(dir); } catch {}
-												}}
-												onResume={async () => {
-													try { await lib.resume?.(dir); } catch {}
-												}}
-												onOpenThemeModal={() => modal.open("theme")}
-												onOpenDiagnostics={() =>
-													setModal({ kind: "diagnostics" as any })
-												}
-											/>
-										</header>
+									{/* Modern UX Integration - Accessibility Button */}
+									<div className="px-4 pt-2 flex items-center gap-2">
+										<motion.button
+											whileHover={{ scale: 1.05 }}
+											whileTap={{ scale: 0.95 }}
+											onClick={() => setShowAccessibilityPanel(true)}
+											className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+											aria-label="Accessibility settings"
+										>
+											<span className="text-sm">♿</span>
+										</motion.button>
 
-										{/* Modern UX Integration - Accessibility Button */}
-										<div className="px-4 pt-2 flex items-center gap-2">
-											<motion.button
-												whileHover={{ scale: 1.05 }}
-												whileTap={{ scale: 0.95 }}
-												onClick={() => setShowAccessibilityPanel(true)}
-												className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-												aria-label="Accessibility settings"
-											>
-												<span className="text-sm">♿</span>
-											</motion.button>
+										<motion.button
+											whileHover={{ scale: 1.05 }}
+											whileTap={{ scale: 0.95 }}
+											onClick={() => setShowOnboardingTour(true)}
+											className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+											aria-label="Help and onboarding"
+										>
+											<span className="text-sm">?</span>
+										</motion.button>
 
-											<motion.button
-												whileHover={{ scale: 1.05 }}
-												whileTap={{ scale: 0.95 }}
-												onClick={() => setShowOnboardingTour(true)}
-												className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-												aria-label="Help and onboarding"
-											>
-												<span className="text-sm">?</span>
-											</motion.button>
-
-											{showHelpHint && (
-												<div className="flex-1 bg-yellow-50 text-yellow-800 border border-yellow-200 rounded px-3 py-1 text-xs flex items-center justify-between">
-													<span>
-														Press <span className="font-mono">?</span> for help
-														and shortcuts
-													</span>
-													<button
-														type="button"
-														className="text-yellow-800 hover:text-yellow-900"
-														aria-label="Dismiss help hint"
-														onClick={() => {
-															setShowHelpHint(false);
-															try {
-																localStorage.setItem("ps_hint_help_seen", "1");
-															} catch {}
-														}}
-													>
-														×
-													</button>
-									</div>
+										{showHelpHint && (
+											<div className="flex-1 bg-yellow-50 text-yellow-800 border border-yellow-200 rounded px-3 py-1 text-xs flex items-center justify-between">
+												<span>
+													Press <span className="font-mono">?</span> for help
+													and shortcuts
+												</span>
+												<button
+													type="button"
+													className="text-yellow-800 hover:text-yellow-900"
+													aria-label="Dismiss help hint"
+													onClick={() => {
+														setShowHelpHint(false);
+														try {
+															localStorage.setItem("ps_hint_help_seen", "1");
+														} catch {}
+													}}
+												>
+													×
+												</button>
+											</div>
 										)}
 									</div>
-                            <main
-                                id="main-content"
-                                className="flex-1 overflow-auto"
-                                ref={scrollContainerRef}
-                                role="main"
-                                aria-label="Main content"
-                            >
-                                
-                                {selectedView === "results" && (
-												<SectionErrorBoundary sectionName="Search Results">
-													<div className="p-4">
-														{/* Results context toolbar */}
-														{results &&
-															results.length > 0 &&
-															(searchText || "").trim() && (
-																<div className="mb-2 flex items-center justify-between">
-																	<div className="text-sm text-gray-600">
-																		{results.length} results
-																	</div>
-																	<button
-																		type="button"
-																		className="chip"
-																		title="Save this search as a Smart Collection"
-																		onClick={async () => {
-																			const name = (
-																				prompt(
-																					"Save current search as Smart (name):",
-																				) || ""
-																			).trim();
-																			if (!name) return;
-																			try {
-																				const tags = (tagFilter || "")
-																					.split(",")
-																					.map((s) => s.trim())
-																					.filter(Boolean);
-																				const rules: any = {
-																					query: (searchText || "").trim(),
-																					favoritesOnly: favOnly,
-																					tags,
-																					useCaptions: useCaps,
-																					useOcr,
-																					hasText,
-																					camera: camera || undefined,
-																					isoMin: isoMin || undefined,
-																					isoMax: isoMax || undefined,
-																					fMin: fMin || undefined,
-																					fMax: fMax || undefined,
-																					place: place || undefined,
-																				};
-																				const ppl = (persons || []).filter(
-																					Boolean,
-																				);
-																				if (ppl.length === 1)
-																					rules.person = ppl[0];
-																				else if (ppl.length > 1)
-																					rules.persons = ppl;
-																				const { apiSetSmart, apiGetSmart } =
-																					await import("./api");
-																				await apiSetSmart(dir, name, rules);
-																				try {
-																					const r = await apiGetSmart(dir);
-																					photoActions.setSmart(r.smart || {});
-																				} catch {}
-																				uiActions.setNote(
-																					`Saved smart collection: ${name}`,
-																				);
-																			} catch (e: any) {
-																				uiActions.setNote(
-																					e?.message ||
-																						"Failed to save smart collection",
-																				);
-																			}
-																		}}
-																	>
-																		Save as Smart Collection
-																	</button>
+									<main
+										id="main-content"
+										className="flex-1 overflow-auto"
+										ref={scrollContainerRef}
+										aria-label="Main content"
+									>
+										{selectedView === "results" && (
+											<SectionErrorBoundary sectionName="Search Results">
+												<div className="p-4">
+													{/* Results context toolbar */}
+													{results &&
+														results.length > 0 &&
+														(searchText || "").trim() && (
+															<div className="mb-2 flex items-center justify-between">
+																<div className="text-sm text-gray-600">
+																	{results.length} results
 																</div>
-															)}
-														{results && results.length === 0 && searchText ? (
-															<div className="flex flex-col items-center justify-center min-h-[400px]">
-																<EnhancedEmptyState
-																	type="no-results"
-																	searchQuery={searchText}
-																	onAction={() => {
-																		setSearchText("");
-																		photoActions.setQuery("");
-																	}}
-																	onOpenFilters={() => setShowFilters(true)}
-																	onOpenAdvanced={() =>
-																		setModal({ kind: "advanced" as any })
-																	}
-																	onClearSearch={() => {
-																		// Clear common filters
-																		if (favOnly) photoActions.setFavOnly(false);
-																		if (tagFilter)
-																			photoActions.setTagFilter("");
-																		setDateFrom("");
-																		setDateTo("");
-																		settingsActions.setPlace("");
-																		settingsActions.setCamera("");
-																		settingsActions.setIsoMin(0);
-																		settingsActions.setIsoMax(0);
-																		settingsActions.setFMin(0);
-																		settingsActions.setFMax(0);
-																		settingsActions.setHasText(false);
-																		workspaceActions.setPersons([]);
-																	}}
-																	hasActiveFilters={hasAnyFilters}
-																	sampleQueries={[
-																		"golden hour",
-																		"city skyline",
-																		"family dinner",
-																		"blue car",
-																	]}
-																	onRunSample={(q) => doSearchImmediate(q)}
-																	onOpenHelp={() => setShowHelpModal(true)}
-																/>
-																<SampleSearchSuggestions
-																	onSearch={doSearchImmediate}
-																/>
-															</div>
-														) : resultView === "grid" ? (
-															<JustifiedResults
-																dir={dir}
-																engine={engine}
-																items={(results || []).map((r) => ({
-																	path: r.path,
-																	score: r.score,
-																}))}
-																selected={selected}
-																onToggleSelect={toggleSelect}
-																onOpen={(p) => openDetailByPath(p)}
-																scrollContainerRef={scrollContainerRef}
-																focusIndex={focusIdx ?? undefined}
-																onLayout={(rows) =>
-																	setLayoutRows((prev) =>
-																		rowsEqual(prev, rows) ? prev : rows,
-																	)
-																}
-																ratingMap={ratingMap}
-																showInfoOverlay={showInfoOverlay}
-															/>
-														) : (
-															<TimelineResults
-																dir={dir}
-																engine={engine}
-																items={(results || []).map((r) => ({
-																	path: r.path,
-																	score: r.score,
-																}))}
-																selected={selected}
-																onToggleSelect={toggleSelect}
-																onOpen={(p) => openDetailByPath(p)}
-																showInfoOverlay={showInfoOverlay}
-																bucket={timelineBucket}
-															/>
-                                )}
-                                
-                            </div>
-												</SectionErrorBoundary>
-											)}
-											{selectedView === "library" && (
-												<SectionErrorBoundary sectionName="Library">
-													<LibraryView />
-												</SectionErrorBoundary>
-											)}
-											{selectedView === "people" && (
-												<div className="p-4">
-													<PeopleView
-														dir={dir}
-														engine={engine}
-														clusters={clusters || []}
-														persons={persons}
-														setPersons={workspaceActions.setPersons}
-														busy={busy}
-														setBusy={uiActions.setBusy}
-														setNote={uiActions.setNote}
-														onLoadFaces={loadFaces}
-														onOpenPhotos={(photos) => {
-															// Convert paths to search results and switch to results view
-															photoActions.setResults(
-																photos.map((path) => ({ path, score: 0 })),
-															);
-															setSelectedView("results");
-															uiActions.setNote(
-																`Viewing ${photos.length} photos from face cluster`,
-															);
-														}}
-													/>
-												</div>
-											)}
-											{selectedView === "map" && (
-												<div className="p-4">
-													<MapView points={points || []} onLoadMap={loadMap} />
-												</div>
-											)}
-											{selectedView === "collections" && (
-												<div className="p-4">
-													<Collections
-														dir={dir}
-														engine={engine}
-														collections={collections}
-														onLoadCollections={async () => {
-															const { apiGetCollections } = await import(
-																"./api"
-															);
-															const r = await apiGetCollections(dir);
-															photoActions.setCollections(r.collections || {});
-														}}
-														onOpen={(name: string) => {
-															const paths = collections?.[name] || [];
-															photoActions.setResults(
-																paths.map((p) => ({ path: p, score: 0 })),
-															);
-															setSelectedView("results");
-															uiActions.setNote(`${paths.length} in ${name}`);
-														}}
-														onDelete={async (name: string) => {
-															try {
-																const {
-																	apiDeleteCollection,
-																	apiGetCollections,
-																} = await import("./api");
-																await apiDeleteCollection(dir, name);
-																const r = await apiGetCollections(dir);
-																photoActions.setCollections(
-																	r.collections || {},
-																);
-																setToast({
-																	message: `Deleted collection ${name}`,
-																});
-															} catch (e) {
-																uiActions.setNote(
-																	e instanceof Error
-																		? e.message
-																		: "Delete failed",
-																);
-															}
-														}}
-													/>
-												</div>
-											)}
-											{selectedView === "saved" && (
-												<div className="p-4">
-													<SavedSearches
-														saved={saved}
-														onRun={(_name: string, q: string, k?: number) => {
-															setSearchText(q);
-															if (k) photoActions.setTopK(k);
-															doSearchImmediate(q);
-														}}
-														onDelete={async (name: string) => {
-															try {
-																const { apiDeleteSaved, apiGetSaved } =
-																	await import("./api");
-																await apiDeleteSaved(dir, name);
-																const r = await apiGetSaved(dir);
-																photoActions.setSaved(r.saved || []);
-															} catch (e) {
-																uiActions.setNote(
-																	e instanceof Error
-																		? e.message
-																		: "Delete failed",
-																);
-															}
-														}}
-													/>
-													<div className="mt-4 bg-white border rounded p-3">
-														<div className="flex items-center justify-between">
-															<h2 className="font-semibold">Presets</h2>
-															<div className="flex items-center gap-2">
 																<button
 																	type="button"
-																	className="px-2 py-1 rounded border"
-																	onClick={loadPresets}
-																>
-																	Refresh
-																</button>
-																<button
-																	type="button"
-																	className="px-2 py-1 rounded border"
-																	onClick={() => {
+																	className="chip"
+																	title="Save this search as a Smart Collection"
+																	onClick={async () => {
+																		const name = (
+																			prompt(
+																				"Save current search as Smart (name):",
+																			) || ""
+																		).trim();
+																		if (!name) return;
 																		try {
-																			const data = JSON.stringify(
-																				presets || [],
-																				null,
-																				2,
+																			const tags = (tagFilter || "")
+																				.split(",")
+																				.map((s) => s.trim())
+																				.filter(Boolean);
+																			const rules: { query: string; count?: number } = {
+																				query: (searchText || "").trim(),
+																				favoritesOnly: favOnly,
+																				tags,
+																				useCaptions: useCaps,
+																				useOcr,
+																				hasText,
+																				camera: camera || undefined,
+																				isoMin: isoMin || undefined,
+																				isoMax: isoMax || undefined,
+																				fMin: fMin || undefined,
+																				fMax: fMax || undefined,
+																				place: place || undefined,
+																			};
+																			const ppl = (persons || []).filter(
+																				Boolean,
 																			);
-																			const blob = new Blob([data], {
-																				type: "application/json",
-																			});
-																			const url = URL.createObjectURL(blob);
-																			const a = document.createElement("a");
-																			a.href = url;
-																			a.download = "photo-search-presets.json";
-																			document.body.appendChild(a);
-																			a.click();
-																			document.body.removeChild(a);
-																			URL.revokeObjectURL(url);
-																		} catch {}
+																			if (ppl.length === 1)
+																				rules.person = ppl[0];
+																			else if (ppl.length > 1)
+																				rules.persons = ppl;
+																			const { apiSetSmart, apiGetSmart } =
+																				await import("./api");
+																			await apiSetSmart(dir, name, rules);
+																			try {
+																				const r = await apiGetSmart(dir);
+																				photoActions.setSmart(r.smart || {});
+																			} catch {}
+																			uiActions.setNote(
+																				`Saved smart collection: ${name}`,
+																			);
+																		} catch (e: unknown) {
+																			uiActions.setNote(
+																				(e instanceof Error ? e.message : null) ||
+																					"Failed to save smart collection",
+																			);
+																		}
 																	}}
 																>
-																	Export
+																	Save as Smart Collection
 																</button>
-																<label className="px-2 py-1 rounded border cursor-pointer">
-																	Import
-																	<input
-																		type="file"
-																		accept="application/json"
-																		className="hidden"
-																		onChange={async (e) => {
-																			const file = e.target.files?.[0];
-																			if (!file) return;
-																			try {
-																				const txt = await file.text();
-																				const arr = JSON.parse(txt);
-																				if (Array.isArray(arr)) {
-																					const { apiAddPreset } = await import(
-																						"./api"
-																					);
-																					for (const it of arr) {
-																						if (
-																							it &&
-																							typeof it.name === "string" &&
-																							typeof it.query === "string"
-																						) {
-																							await apiAddPreset(
-																								dir,
-																								it.name,
-																								it.query,
-																							);
-																						}
-																					}
-																					await loadPresets();
-																					setToast({
-																						message: `Imported ${arr.length} preset(s)`,
-																					});
-																				} else {
-																					uiActions.setNote(
-																						"Invalid JSON format",
-																					);
-																				}
-																			} catch {
-																				uiActions.setNote("Import failed");
-																			} finally {
-																				e.currentTarget.value = "";
-																			}
-																		}}
-																	/>
-																</label>
-															</div>
-														</div>
-														{presets.length === 0 ? (
-															<div className="text-sm text-gray-600 mt-2">
-																No presets yet. Use Advanced Search to create
-																one.
-															</div>
-														) : (
-															<div className="mt-2 divide-y">
-																{presets.map((p) => (
-																	<div
-																		key={p.name}
-																		className="py-2 flex items-center justify-between gap-3"
-																	>
-																		<div className="min-w-0">
-																			<div
-																				className="font-medium truncate"
-																				title={p.name}
-																			>
-																				{p.name}
-																			</div>
-																			<div
-																				className="text-xs text-gray-600 truncate"
-																				title={p.query}
-																			>
-																				{p.query}
-																			</div>
-																		</div>
-																		<div className="flex gap-2 shrink-0">
-																			<button
-																				type="button"
-																				onClick={() => {
-																					setSearchText(p.query);
-																					doSearch(p.query);
-																				}}
-																				className="px-2 py-1 rounded bg-blue-600 text-white text-sm"
-																			>
-																				Run
-																			</button>
-																			<button
-																				type="button"
-																				onClick={async () => {
-																					try {
-																						const { apiDeletePreset } =
-																							await import("./api");
-																						await apiDeletePreset(dir, p.name);
-																						await loadPresets();
-																					} catch {}
-																				}}
-																				className="px-2 py-1 rounded bg-red-600 text-white text-sm"
-																			>
-																				Delete
-																			</button>
-																		</div>
-																	</div>
-																))}
 															</div>
 														)}
-													</div>
-												</div>
-											)}
-											{selectedView === "memories" && (
-												<div className="p-4 space-y-4">
-													<div className="bg-white border rounded p-3">
-														<div className="flex items-center justify-between">
-															<div className="font-semibold">
-																Recent Favorites
-															</div>
+													{results && results.length === 0 && searchText ? (
+														<div className="flex flex-col items-center justify-center min-h-[400px]">
+															<EnhancedEmptyState
+																type="no-results"
+																searchQuery={searchText}
+																onAction={() => {
+																	setSearchText("");
+																	photoActions.setQuery("");
+																}}
+																onOpenFilters={() => setShowFilters(true)}
+																onOpenAdvanced={() => modal.open("advanced")}
+																onClearSearch={() => {
+																	// Clear common filters
+																	if (favOnly) photoActions.setFavOnly(false);
+																	if (tagFilter) photoActions.setTagFilter("");
+																	setDateFrom("");
+																	setDateTo("");
+																	settingsActions.setPlace("");
+																	settingsActions.setCamera("");
+																	settingsActions.setIsoMin(0);
+																	settingsActions.setIsoMax(0);
+																	settingsActions.setFMin(0);
+																	settingsActions.setFMax(0);
+																	settingsActions.setHasText(false);
+																	workspaceActions.setPersons([]);
+																}}
+																hasActiveFilters={hasAnyFilters}
+																sampleQueries={[
+																	"golden hour",
+																	"city skyline",
+																	"family dinner",
+																	"blue car",
+																]}
+																onRunSample={(q) => doSearchImmediate(q)}
+																onOpenHelp={() => modal.open("help")}
+															/>
+															<SampleSearchSuggestions
+																onSearch={doSearchImmediate}
+															/>
 														</div>
-														{fav.length === 0 ? (
-															<div className="text-sm text-gray-600 mt-2">
-																No favorites yet.
-															</div>
-														) : (
-															<div className="mt-2 grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-2">
-																{fav.slice(0, 24).map((p) => (
-																	<img
-																		key={p}
-																		src={thumbUrl(dir, engine, p, 196)}
-																		alt={basename(p)}
-																		className="w-full h-24 object-cover rounded"
-																	/>
-																))}
-															</div>
-														)}
-													</div>
-													<div>
-														<TripsView
+													) : resultView === "grid" ? (
+														<JustifiedResults
 															dir={dir}
 															engine={engine}
-															setBusy={uiActions.setBusy}
-															setNote={uiActions.setNote}
-															setResults={photoActions.setResults}
+															items={(results || []).map((r) => ({
+																path: r.path,
+																score: r.score,
+															}))}
+															selected={selected}
+															onToggleSelect={toggleSelect}
+															onOpen={(p) => openDetailByPath(p)}
+															scrollContainerRef={scrollContainerRef}
+															focusIndex={focusIdx ?? undefined}
+															onLayout={(rows) =>
+																setLayoutRows((prev) =>
+																	rowsEqual(prev, rows) ? prev : rows,
+																)
+															}
+															ratingMap={ratingMap}
+															showInfoOverlay={showInfoOverlay}
 														/>
+													) : (
+														<TimelineResults
+															dir={dir}
+															engine={engine}
+															items={(results || []).map((r) => ({
+																path: r.path,
+																score: r.score,
+															}))}
+															selected={selected}
+															onToggleSelect={toggleSelect}
+															onOpen={(p) => openDetailByPath(p)}
+															showInfoOverlay={showInfoOverlay}
+															bucket={timelineBucket}
+														/>
+													)}
+												</div>
+											</SectionErrorBoundary>
+										)}
+										{selectedView === "library" && (
+											<SectionErrorBoundary sectionName="Library">
+												<LibraryView />
+											</SectionErrorBoundary>
+										)}
+										{selectedView === "people" && (
+											<div className="p-4">
+												<PeopleView
+													dir={dir}
+													engine={engine}
+													clusters={clusters || []}
+													persons={persons}
+													setPersons={workspaceActions.setPersons}
+													busy={busy}
+													setBusy={uiActions.setBusy}
+													setNote={uiActions.setNote}
+													onLoadFaces={loadFaces}
+													onOpenPhotos={(photos) => {
+														// Convert paths to search results and switch to results view
+														photoActions.setResults(
+															photos.map((path) => ({ path, score: 0 })),
+														);
+														setSelectedView("results");
+														uiActions.setNote(
+															`Viewing ${photos.length} photos from face cluster`,
+														);
+													}}
+												/>
+											</div>
+										)}
+										{selectedView === "map" && (
+											<div className="p-4">
+												<MapView points={points || []} onLoadMap={loadMap} />
+											</div>
+										)}
+										{selectedView === "collections" && (
+											<div className="p-4">
+												<Collections
+													dir={dir}
+													engine={engine}
+													collections={collections}
+													onLoadCollections={async () => {
+														const { apiGetCollections } = await import("./api");
+														const r = await apiGetCollections(dir);
+														photoActions.setCollections(r.collections || {});
+													}}
+													onOpen={(name: string) => {
+														const paths = collections?.[name] || [];
+														photoActions.setResults(
+															paths.map((p) => ({ path: p, score: 0 })),
+														);
+														setSelectedView("results");
+														uiActions.setNote(`${paths.length} in ${name}`);
+													}}
+													onDelete={async (name: string) => {
+														try {
+															const { apiDeleteCollection, apiGetCollections } =
+																await import("./api");
+															await apiDeleteCollection(dir, name);
+															const r = await apiGetCollections(dir);
+															photoActions.setCollections(r.collections || {});
+															setToast({
+																message: `Deleted collection ${name}`,
+															});
+														} catch (e) {
+															uiActions.setNote(
+																e instanceof Error
+																	? e.message
+																	: "Delete failed",
+															);
+														}
+													}}
+												/>
+											</div>
+										)}
+										{selectedView === "saved" && (
+											<div className="p-4">
+												<SavedSearches
+													saved={saved}
+													onRun={(_name: string, q: string, k?: number) => {
+														setSearchText(q);
+														if (k) photoActions.setTopK(k);
+														doSearchImmediate(q);
+													}}
+													onDelete={async (name: string) => {
+														try {
+															const { apiDeleteSaved, apiGetSaved } =
+																await import("./api");
+															await apiDeleteSaved(dir, name);
+															const r = await apiGetSaved(dir);
+															photoActions.setSaved(r.saved || []);
+														} catch (e) {
+															uiActions.setNote(
+																e instanceof Error
+																	? e.message
+																	: "Delete failed",
+															);
+														}
+													}}
+												/>
+												<div className="mt-4 bg-white border rounded p-3">
+													<div className="flex items-center justify-between">
+														<h2 className="font-semibold">Presets</h2>
+														<div className="flex items-center gap-2">
+															<button
+																type="button"
+																className="px-2 py-1 rounded border"
+																onClick={loadPresets}
+															>
+																Refresh
+															</button>
+															<button
+																type="button"
+																className="px-2 py-1 rounded border"
+																onClick={() => {
+																	try {
+																		const data = JSON.stringify(
+																			presets || [],
+																			null,
+																			2,
+																		);
+																		const blob = new Blob([data], {
+																			type: "application/json",
+																		});
+																		const url = URL.createObjectURL(blob);
+																		const a = document.createElement("a");
+																		a.href = url;
+																		a.download = "photo-search-presets.json";
+																		document.body.appendChild(a);
+																		a.click();
+																		document.body.removeChild(a);
+																		URL.revokeObjectURL(url);
+																	} catch {}
+																}}
+															>
+																Export
+															</button>
+															<label className="px-2 py-1 rounded border cursor-pointer">
+																Import
+																<input
+																	type="file"
+																	accept="application/json"
+																	className="hidden"
+																	onChange={async (e) => {
+																		const file = e.target.files?.[0];
+																		if (!file) return;
+																		try {
+																			const txt = await file.text();
+																			const arr = JSON.parse(txt);
+																			if (Array.isArray(arr)) {
+																				const { apiAddPreset } = await import(
+																					"./api"
+																				);
+																				for (const it of arr) {
+																					if (
+																						it &&
+																						typeof it.name === "string" &&
+																						typeof it.query === "string"
+																					) {
+																						await apiAddPreset(
+																							dir,
+																							it.name,
+																							it.query,
+																						);
+																					}
+																				}
+																				await loadPresets();
+																				setToast({
+																					message: `Imported ${arr.length} preset(s)`,
+																				});
+																			} else {
+																				uiActions.setNote(
+																					"Invalid JSON format",
+																				);
+																			}
+																		} catch {
+																			uiActions.setNote("Import failed");
+																		} finally {
+																			e.currentTarget.value = "";
+																		}
+																	}}
+																/>
+															</label>
+														</div>
 													</div>
+													{presets.length === 0 ? (
+														<div className="text-sm text-gray-600 mt-2">
+															No presets yet. Use Advanced Search to create one.
+														</div>
+													) : (
+														<div className="mt-2 divide-y">
+															{presets.map((p) => (
+																<div
+																	key={p.name}
+																	className="py-2 flex items-center justify-between gap-3"
+																>
+																	<div className="min-w-0">
+																		<div
+																			className="font-medium truncate"
+																			title={p.name}
+																		>
+																			{p.name}
+																		</div>
+																		<div
+																			className="text-xs text-gray-600 truncate"
+																			title={p.query}
+																		>
+																			{p.query}
+																		</div>
+																	</div>
+																	<div className="flex gap-2 shrink-0">
+																		<button
+																			type="button"
+																			onClick={() => {
+																				setSearchText(p.query);
+																				doSearch(p.query);
+																			}}
+																			className="px-2 py-1 rounded bg-blue-600 text-white text-sm"
+																		>
+																			Run
+																		</button>
+																		<button
+																			type="button"
+																			onClick={async () => {
+																				try {
+																					const { apiDeletePreset } =
+																						await import("./api");
+																					await apiDeletePreset(dir, p.name);
+																					await loadPresets();
+																				} catch {}
+																			}}
+																			className="px-2 py-1 rounded bg-red-600 text-white text-sm"
+																		>
+																			Delete
+																		</button>
+																	</div>
+																</div>
+															))}
+														</div>
+													)}
 												</div>
-											)}
-                            {/* tasks view removed */}
-											{selectedView === "smart" && (
-												<div className="p-4">
-													<SmartCollections
-														dir={dir}
-														engine={engine}
-														topK={topK}
-														smart={smart}
-														setSmart={photoActions.setSmart}
-														setResults={photoActions.setResults}
-														setSearchId={photoActions.setSearchId}
-														setNote={uiActions.setNote}
-														query={query}
-														favOnly={favOnly}
-														tagFilter={tagFilter}
-														useCaps={useCaps}
-														useOcr={useOcr}
-														hasText={hasText}
-														camera={camera}
-														isoMin={String(isoMin || "")}
-														isoMax={String(isoMax || "")}
-														fMin={String(fMin || "")}
-														fMax={String(fMax || "")}
-														place={place}
-														persons={persons}
-													/>
+											</div>
+										)}
+										{selectedView === "memories" && (
+											<div className="p-4 space-y-4">
+												<div className="bg-white border rounded p-3">
+													<div className="flex items-center justify-between">
+														<div className="font-semibold">
+															Recent Favorites
+														</div>
+													</div>
+													{fav.length === 0 ? (
+														<div className="text-sm text-gray-600 mt-2">
+															No favorites yet.
+														</div>
+													) : (
+														<div className="mt-2 grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-2">
+															{fav.slice(0, 24).map((p) => (
+																<img
+																	key={p}
+																	src={thumbUrl(dir, engine, p, 196)}
+																	alt={basename(p)}
+																	className="w-full h-24 object-cover rounded"
+																/>
+															))}
+														</div>
+													)}
 												</div>
-											)}
-											{selectedView === "trips" && (
-												<div className="p-4">
+												<div>
 													<TripsView
 														dir={dir}
 														engine={engine}
@@ -2687,13 +2667,53 @@ const jobs = jobsState.jobs;
 														setResults={photoActions.setResults}
 													/>
 												</div>
-											)}
-											{selectedView === "videos" && (
-												<div className="p-4">
-													<VideoManager currentDir={dir} provider={engine} />
-												</div>
-											)}
-											<StatsBar
+											</div>
+										)}
+										{/* tasks view removed */}
+										{selectedView === "smart" && (
+											<div className="p-4">
+												<SmartCollections
+													dir={dir}
+													engine={engine}
+													topK={topK}
+													smart={smart}
+													setSmart={photoActions.setSmart}
+													setResults={photoActions.setResults}
+													setSearchId={photoActions.setSearchId}
+													setNote={uiActions.setNote}
+													query={query}
+													favOnly={favOnly}
+													tagFilter={tagFilter}
+													useCaps={useCaps}
+													useOcr={useOcr}
+													hasText={hasText}
+													camera={camera}
+													isoMin={String(isoMin || "")}
+													isoMax={String(isoMax || "")}
+													fMin={String(fMin || "")}
+													fMax={String(fMax || "")}
+													place={place}
+													persons={persons}
+												/>
+											</div>
+										)}
+										{selectedView === "trips" && (
+											<div className="p-4">
+												<TripsView
+													dir={dir}
+													engine={engine}
+													setBusy={uiActions.setBusy}
+													setNote={uiActions.setNote}
+													setResults={photoActions.setResults}
+												/>
+											</div>
+										)}
+										{selectedView === "videos" && (
+											<div className="p-4">
+												<VideoManager currentDir={dir} provider={engine} />
+											</div>
+										)}
+										<StatsBar
 											items={items}
 											note={note}
 											diag={diag}
@@ -2760,14 +2780,14 @@ const jobs = jobsState.jobs;
 												console.log("Delete preset:", presetId);
 											}}
 										/>
-										{modal?.kind === ("shareManage" as any) && (
+										{modalState.shareManage && (
 											<div
 												className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
 												onKeyDown={(e) => {
-													if (e.key === "Escape") setModal(null);
+													if (e.key === "Escape") modal.close("shareManage");
 												}}
 											>
-												<FocusTrap onEscape={() => setModal(null)}>
+												<FocusTrap onEscape={() => modal.close("shareManage")}>
 													<div
 														className="bg-white rounded-lg p-4 w-full max-w-2xl"
 														role="dialog"
@@ -2778,7 +2798,7 @@ const jobs = jobsState.jobs;
 															<button
 																type="button"
 																className="px-2 py-1 border rounded"
-																onClick={() => setModal(null)}
+																onClick={() => modal.close("shareManage")}
 															>
 																Close
 															</button>
@@ -2790,32 +2810,32 @@ const jobs = jobsState.jobs;
 										)}
 
 										{/* Modals */}
-										{modal?.kind === "export" && (
+										{modalState.export && (
 											<ExportModal
 												selected={selected}
 												dir={dir}
-												onClose={() => setModal(null)}
+												onClose={() => modal.close("export")}
 												uiActions={uiActions}
 											/>
 										)}
-										{modal?.kind === "enhanced-share" && (
+										{modalState["enhanced-share"] && (
 											<Suspense fallback={null}>
 												<EnhancedSharingModal
 													selected={selected}
 													dir={dir}
-													onClose={() => setModal(null)}
+													onClose={() => modal.close("enhanced-share")}
 													uiActions={uiActions}
 												/>
 											</Suspense>
 										)}
-										{modal?.kind === ("share" as any) && (
+										{modalState.share && (
 											<div
 												className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
 												onKeyDown={(e) => {
-													if (e.key === "Escape") setModal(null);
+													if (e.key === "Escape") modal.close("share");
 												}}
 											>
-												<FocusTrap onEscape={() => setModal(null)}>
+												<FocusTrap onEscape={() => modal.close("share")}>
 													<div
 														className="bg-white rounded-lg p-4 w-full max-w-md"
 														role="dialog"
@@ -2877,7 +2897,7 @@ const jobs = jobsState.jobs;
 																			: "Share failed",
 																	);
 																}
-																setModal(null);
+																modal.close("share");
 															}}
 														>
 															<div className="grid gap-3">
@@ -2925,7 +2945,7 @@ const jobs = jobsState.jobs;
 																<button
 																	type="button"
 																	className="px-3 py-1 rounded border"
-																	onClick={() => setModal(null)}
+																	onClick={() => modal.close("share")}
 																	aria-label="Cancel sharing"
 																>
 																	Cancel
@@ -2943,13 +2963,13 @@ const jobs = jobsState.jobs;
 												</FocusTrap>
 											</div>
 										)}
-										{modal?.kind === "tag" && (
+										{modalState.tag && (
 											<TagModal
-												onClose={() => setModal(null)}
+												onClose={() => modal.close("tag")}
 												onTagSelected={tagSelected}
 											/>
 										)}
-										{modal?.kind === "folder" && (
+										{modalState.folder && (
 											<FolderModal
 												dir={dir}
 												useOsTrash={useOsTrash}
@@ -2959,15 +2979,15 @@ const jobs = jobsState.jobs;
 												useOcr={useOcr}
 												hasText={hasText}
 												highContrast={highContrast}
-												onClose={() => setModal(null)}
+												onClose={() => modal.close("folder")}
 												settingsActions={
 													{
 														...settingsActions,
 														setHighContrast: () => {}, // Dummy implementation
-													} as any
+													} as SettingsActions
 												}
 												uiActions={uiActions}
-                                            doIndex={() => lib.index()}
+												doIndex={() => lib.index()}
 												prepareFast={(kind: string) =>
 													prepareFast(kind as "annoy" | "faiss" | "hnsw")
 												}
@@ -2975,13 +2995,13 @@ const jobs = jobsState.jobs;
 												buildMetadata={buildMetadata}
 											/>
 										)}
-										{modal?.kind === "likeplus" && (
+										{modalState.likeplus && (
 											<LikePlusModal
 												selected={selected}
 												dir={dir}
 												engine={engine}
 												topK={topK}
-												onClose={() => setModal(null)}
+												onClose={() => modal.close("likeplus")}
 												setSelectedView={(view: string) =>
 													setSelectedView(view as View)
 												}
@@ -2989,13 +3009,13 @@ const jobs = jobsState.jobs;
 												uiActions={uiActions}
 											/>
 										)}
-										{modal?.kind === "save" && (
+										{modalState.save && (
 											<SaveModal
 												dir={dir}
 												searchText={searchText}
 												query={query}
 												topK={topK}
-												onClose={() => setModal(null)}
+												onClose={() => modal.close("save")}
 												setSelectedView={(view: string) =>
 													setSelectedView(view as View)
 												}
@@ -3003,23 +3023,23 @@ const jobs = jobsState.jobs;
 												uiActions={uiActions}
 											/>
 										)}
-										{modal?.kind === "collect" && (
+										{modalState.collect && (
 											<CollectionModal
 												selected={selected}
 												dir={dir}
 												collections={collections}
-												onClose={() => setModal(null)}
+												onClose={() => modal.close("collect")}
 												setToast={setToast}
 												photoActions={photoActions}
 												uiActions={uiActions}
 											/>
 										)}
-										{modal?.kind === "removeCollect" && (
+										{modalState.removeCollect && (
 											<RemoveCollectionModal
 												selected={selected}
 												dir={dir}
 												collections={collections}
-												onClose={() => setModal(null)}
+												onClose={() => modal.close("removeCollect")}
 												setToast={setToast}
 												photoActions={photoActions}
 												uiActions={uiActions}
@@ -3103,7 +3123,7 @@ const jobs = jobsState.jobs;
 										{/* Floating Jobs button + drawer */}
 										<button
 											type="button"
-											onClick={() => setModal({ kind: "jobs" as any })}
+											onClick={() => modal.open("jobs")}
 											className="fixed bottom-4 right-4 bg-blue-600 text-white rounded-full shadow px-4 py-2"
 											title="Open Jobs"
 											aria-label="Open the jobs panel"
@@ -3111,24 +3131,30 @@ const jobs = jobsState.jobs;
 											Jobs
 										</button>
 
-										{modal?.kind === ("jobs" as any) && (
+										{modalState.jobs && (
 											<Suspense fallback={null}>
-												<JobsDrawer open={true} onClose={() => setModal(null)} />
+												<JobsDrawer
+													open={true}
+													onClose={() => modal.close("jobs")}
+												/>
 											</Suspense>
 										)}
-										{modal?.kind === ("diagnostics" as any) && (
+										{modalState.diagnostics && (
 											<Suspense fallback={null}>
-												<DiagnosticsDrawer open={true} onClose={() => setModal(null)} />
+												<DiagnosticsDrawer
+													open={true}
+													onClose={() => modal.close("diagnostics")}
+												/>
 											</Suspense>
 										)}
-										{modal?.kind === ("advanced" as any) && (
+										{modalState.advanced && (
 											<AdvancedSearchModal
 												open={true}
-												onClose={() => setModal(null)}
+												onClose={() => modal.close("advanced")}
 												onApply={(q) => {
 													setSearchText(q);
 													doSearch(q);
-													setModal(null);
+													modal.close("advanced");
 												}}
 												onSave={async (n, q) => {
 													try {
@@ -3159,10 +3185,10 @@ const jobs = jobsState.jobs;
 
 										{/* Theme Settings Modal */}
 										<Suspense fallback={null}>
-										<ThemeSettingsModal
-											isOpen={modalState.theme}
-											onClose={() => modal.close("theme")}
-										/>
+											<ThemeSettingsModal
+												isOpen={modalState.theme}
+												onClose={() => modal.close("theme")}
+											/>
 										</Suspense>
 
 										{/* Search Command Center overlay */}
@@ -3201,7 +3227,11 @@ const jobs = jobsState.jobs;
 										)}
 										{toast && (
 											<ToastPortal>
-												<div className="pv-toast" role="status" aria-live="polite">
+												<div
+													className="pv-toast"
+													role="status"
+													aria-live="polite"
+												>
 													<div className="flex items-center gap-3 bg-gray-900 text-white px-4 py-2 rounded shadow">
 														<span className="text-sm">{toast.message}</span>
 														{toast.actionLabel && toast.onAction && (
@@ -3250,14 +3280,18 @@ const jobs = jobsState.jobs;
 													onClick={async () => {
 														const tok = authTokenInput.trim();
 														if (!tok) return;
-														try { localStorage.setItem("api_token", tok); } catch {}
+														try {
+															localStorage.setItem("api_token", tok);
+														} catch {}
 														const ok = await apiAuthCheck(tok);
 														if (ok) {
 															setAuthRequired(false);
 															setAuthTokenInput("");
 															uiActions.setNote("Token accepted.");
 														} else {
-															uiActions.setNote("Token rejected — check API_TOKEN.");
+															uiActions.setNote(
+																"Token rejected — check API_TOKEN.",
+															);
 														}
 													}}
 												>
@@ -3279,15 +3313,23 @@ const jobs = jobsState.jobs;
 										/>
 
 										{/* Jobs Center */}
-            <JobsCenter
-                jobs={jobs}
-                onPause={(jobId) => jobsActions.setStatus(jobId, "paused")}
-                onResume={(jobId) => jobsActions.setStatus(jobId, "running")}
-                onCancel={(jobId) => jobsActions.setStatus(jobId, "cancelled")}
-                onRetry={(jobId) => jobsActions.setStatus(jobId, "queued")}
-                onClear={(jobId) => jobsActions.remove(jobId)}
-                onClearAll={() => jobsActions.clearStopped()}
-            />
+										<JobsCenter
+											jobs={jobs}
+											onPause={(jobId) =>
+												jobsActions.setStatus(jobId, "paused")
+											}
+											onResume={(jobId) =>
+												jobsActions.setStatus(jobId, "running")
+											}
+											onCancel={(jobId) =>
+												jobsActions.setStatus(jobId, "cancelled")
+											}
+											onRetry={(jobId) =>
+												jobsActions.setStatus(jobId, "queued")
+											}
+											onClear={(jobId) => jobsActions.remove(jobId)}
+											onClearAll={() => jobsActions.clearStopped()}
+										/>
 
 										{/* Bottom Navigation */}
 										<BottomNavigation
@@ -3312,130 +3354,129 @@ const jobs = jobsState.jobs;
 												}
 											}}
 											onShowFilters={() => setShowFilters(true)}
-											onShowUpload={() => setModal({ kind: "folder" })}
-											onShowLibrary={() => setModal({ kind: "folder" })}
+											onShowUpload={() => modal.open("folder")}
+											onShowLibrary={() => modal.open("folder")}
 											showSecondaryActions={true}
 										/>
 
-									{/* Progressive Onboarding Components */}
-									<ContextualHelp
-										isVisible={showContextualHelp}
-										onDismiss={() => setShowContextualHelp(false)}
-										context={
-											selectedView as
-												| "search"
-												| "library"
-												| "results"
-												| "settings"
-												| "collections"
-										}
-										userActions={userActions}
-									/>
-
-									<OnboardingChecklist
-										isVisible={showOnboardingChecklist}
-										onComplete={() => {
-											setShowOnboardingChecklist(false);
-											// Mark onboarding as complete
-											try {
-												localStorage.setItem("onboardingComplete", "true");
-											} catch {}
-										}}
-										completedSteps={onboardingSteps}
-                                inProgressStepId={libState.isIndexing ? "index_photos" : undefined}
-										onStepComplete={() => {
-											/* no-op: completion is event-based */
-										}}
-										onStepAction={(step) => {
-											// Navigate to the appropriate task/page and keep current completion behavior
-											switch (step) {
-												case "select_directory": {
-													// Open the folder picker and ensure we're on Library
-													setSelectedView("library");
-													setModal({ kind: "folder" });
-													break;
-												}
-												case "index_photos": {
-													// Kick off indexing and surface progress UI
-													setSelectedView("library");
-													if (!dir) {
-														// If no directory yet, prompt to select one first
-														setModal({ kind: "folder" });
-													} else {
-                                                lib.index();
-													}
-													break;
-												}
-												case "first_search": {
-													// Jump to search view; hint with a helpful toast
-													setSelectedView("results");
-													setToast({
-														message:
-															"Try searching: beach sunset, birthday cake, mountain hike",
-													});
-													break;
-												}
-												case "explore_features": {
-													// Take users to Collections to explore features
-													setSelectedView("collections" as any);
-													setToast({
-														message:
-															"Explore collections, favorites, and sharing",
-													});
-													break;
-												}
+										{/* Progressive Onboarding Components */}
+										<ContextualHelp
+											isVisible={showContextualHelp}
+											onDismiss={() => setShowContextualHelp(false)}
+											context={
+												selectedView as
+													| "search"
+													| "library"
+													| "results"
+													| "settings"
+													| "collections"
 											}
-										}}
-									/>
+											userActions={userActions}
+										/>
 
-									{/* Removed blocking GuidedIndexingFlow - indexing now runs in background */}
+										<OnboardingChecklist
+											isVisible={showOnboardingChecklist}
+											onComplete={() => {
+												setShowOnboardingChecklist(false);
+												// Mark onboarding as complete
+												try {
+													localStorage.setItem("onboardingComplete", "true");
+												} catch {}
+											}}
+											completedSteps={onboardingSteps}
+											inProgressStepId={
+												libState.isIndexing ? "index_photos" : undefined
+											}
+											onStepComplete={() => {
+												/* no-op: completion is event-based */
+											}}
+											onStepAction={(step) => {
+												// Navigate to the appropriate task/page and keep current completion behavior
+												switch (step) {
+													case "select_directory": {
+														// Open the folder picker and ensure we're on Library
+														setSelectedView("library");
+														modal.open("folder");
+														break;
+													}
+													case "index_photos": {
+														// Kick off indexing and surface progress UI
+														setSelectedView("library");
+														if (!dir) {
+															// If no directory yet, prompt to select one first
+															modal.open("folder");
+														} else {
+															lib.index();
+														}
+														break;
+													}
+													case "first_search": {
+														// Jump to search view; hint with a helpful toast
+														setSelectedView("results");
+														setToast({
+															message:
+																"Try searching: beach sunset, birthday cake, mountain hike",
+														});
+														break;
+													}
+													case "explore_features": {
+														// Take users to Collections to explore features
+														setSelectedView("collections");
+														setToast({
+															message:
+																"Explore collections, favorites, and sharing",
+														});
+														break;
+													}
+												}
+											}}
+										/>
 
-									{/* Performance Monitor for development */}
-									<PerformanceMonitor />
-							</main>
+										{/* Removed blocking GuidedIndexingFlow - indexing now runs in background */}
 
-							{/* Close main containers returned by the content layout */}
+										{/* Performance Monitor for development */}
+										<PerformanceMonitor />
+									</main>
+
+									{/* Close main containers returned by the content layout */}
+								</div>
 							</div>
-						</div>
 
+							{/* Modern UX Integration - Accessibility Panel */}
+							{showAccessibilityPanel && (
+								<AccessibilityPanel
+									isOpen={showAccessibilityPanel}
+									onClose={() => setShowAccessibilityPanel(false)}
+									onSettingsChange={handleAccessibilitySettingsChange}
+								/>
+							)}
 
-									{/* Modern UX Integration - Accessibility Panel */}
-									{showAccessibilityPanel && (
-										<AccessibilityPanel
-											isOpen={showAccessibilityPanel}
-											onClose={() => setShowAccessibilityPanel(false)}
-											onSettingsChange={handleAccessibilitySettingsChange}
-										/>
-									)}
+							{/* Modern UX Integration - Onboarding Tour */}
+							{showOnboardingTour && (
+								<OnboardingTour
+									isActive={showOnboardingTour}
+									onComplete={handleOnboardingComplete}
+									onSkip={() => setShowOnboardingTour(false)}
+								/>
+							)}
 
-									{/* Modern UX Integration - Onboarding Tour */}
-									{showOnboardingTour && (
-										<OnboardingTour
-											isActive={showOnboardingTour}
-											onComplete={handleOnboardingComplete}
-											onSkip={() => setShowOnboardingTour(false)}
-										/>
-									)}
-
-									{/* Modern UX Integration - Hint System is already provided by HintProvider above */}
-									<AppWithHints
-										searchText={searchText}
-										selected={selected}
-										showAccessibilityPanel={showAccessibilityPanel}
-										setShowAccessibilityPanel={setShowAccessibilityPanel}
-										handleAccessibilitySettingsChange={
-											handleAccessibilitySettingsChange
-										}
-										showOnboardingTour={showOnboardingTour}
-										handleOnboardingComplete={handleOnboardingComplete}
-										setShowOnboardingTour={setShowOnboardingTour}
-									/>
-
-							</MobileOptimizations>
+							{/* Modern UX Integration - Hint System is already provided by HintProvider above */}
+							<AppWithHints
+								searchText={searchText}
+								selected={selected}
+								showAccessibilityPanel={showAccessibilityPanel}
+								setShowAccessibilityPanel={setShowAccessibilityPanel}
+								handleAccessibilitySettingsChange={
+									handleAccessibilitySettingsChange
+								}
+								showOnboardingTour={showOnboardingTour}
+								handleOnboardingComplete={handleOnboardingComplete}
+								setShowOnboardingTour={setShowOnboardingTour}
+							/>
+						</MobileOptimizations>
 					</HintManager>
 				</HintProvider>
 			</ThemeProvider>
 		</ErrorBoundary>
 	);
 }
-	const { state: libState, actions: lib } = useLibraryContext();

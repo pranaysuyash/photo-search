@@ -276,7 +276,7 @@ export function BackupDashboard({ isOpen, onClose }: BackupDashboardProps) {
 											<ul className="space-y-1">
 												{health.recommendations.map((rec, idx) => (
 													<li
-														key={`rec-${idx}`}
+														key={rec}
 														className="text-sm text-gray-600 dark:text-gray-400"
 													>
 														• {rec}
@@ -403,7 +403,7 @@ function BackupSettings({
 							type="button"
 							key={option.value}
 							onClick={() =>
-								onChange({ ...config, frequency: option.value as any })
+								onChange({ ...config, frequency: option.value as BackupFrequency })
 							}
 							className={`p-3 rounded-lg border text-left ${
 								config.frequency === option.value

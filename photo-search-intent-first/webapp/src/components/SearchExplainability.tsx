@@ -133,10 +133,7 @@ export function SearchExplainability({
 			</div>
 			<div className="space-y-1">
 				{topReasons.map((reason, idx) => (
-					<div
-						key={`reason-${idx}`}
-						className="flex items-start gap-2 text-sm"
-					>
+					<div key={`reason-${idx}`} className="flex items-start gap-2 text-sm">
 						<div
 							className={`mt-0.5 p-1 rounded ${getConfidenceColor(reason.confidence)}`}
 						>
@@ -190,11 +187,7 @@ function HighlightedText({
 						{part}
 					</mark>
 				) : (
-					<span
-						key={`part-${idx}`}
-					>
-						{part}
-					</span>
+					<span key={`part-${idx}`}>{part}</span>
 				),
 			)}
 		</>

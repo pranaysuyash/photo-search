@@ -1,6 +1,6 @@
+import { useMemo } from "react";
 import { create } from "zustand";
 import { persist, subscribeWithSelector } from "zustand/middleware";
-import { useShallow } from "zustand/react/shallow";
 import type { SettingsActions, SettingsState } from "./types";
 
 interface SettingsStore extends SettingsState, SettingsActions {}
@@ -92,11 +92,11 @@ export const useThemeActions = () =>
 	}));
 
 export const useSettingsStore = create<SettingsStore>()(
-    persist(
-        subscribeWithSelector((set, _get) => ({
-            // Initial state
-            dir: "",
-            engine: "local",
+	persist(
+		subscribeWithSelector((set, _get) => ({
+			// Initial state
+			dir: "",
+			engine: "local",
 			hfToken: "",
 			openaiKey: "",
 			useFast: false,
@@ -105,13 +105,13 @@ export const useSettingsStore = create<SettingsStore>()(
 			vlmModel: "Qwen/Qwen2-VL-2B-Instruct",
 			useOcr: false,
 			hasText: false,
-            useOsTrash: false,
-            // Experiments / feature flags
-            searchCommandCenter: true,
-            // UI toggles
-            showExplain: false,
-            showInfoOverlay: false,
-            highContrast: false,
+			useOsTrash: false,
+			// Experiments / feature flags
+			searchCommandCenter: true,
+			// UI toggles
+			showExplain: false,
+			showInfoOverlay: false,
+			highContrast: false,
 
 			// EXIF filters
 			camera: "",
@@ -132,15 +132,15 @@ export const useSettingsStore = create<SettingsStore>()(
 			setVlmModel: (vlmModel) => set({ vlmModel }),
 			setUseOcr: (useOcr) => set({ useOcr }),
 			setHasText: (hasText) => set({ hasText }),
-            setUseOsTrash: (useOsTrash) => set({ useOsTrash }),
-            // Feature flags
-            setSearchCommandCenter: (searchCommandCenter: boolean) =>
-                set({ searchCommandCenter }),
-            setShowExplain: (showExplain) => set({ showExplain }),
-            setShowInfoOverlay: (showInfoOverlay) => set({ showInfoOverlay }),
-            setHighContrast: (highContrast) => set({ highContrast }),
-            setCamera: (camera) => set({ camera }),
-            setIsoMin: (isoMin) => set({ isoMin }),
+			setUseOsTrash: (useOsTrash) => set({ useOsTrash }),
+			// Feature flags
+			setSearchCommandCenter: (searchCommandCenter: boolean) =>
+				set({ searchCommandCenter }),
+			setShowExplain: (showExplain) => set({ showExplain }),
+			setShowInfoOverlay: (showInfoOverlay) => set({ showInfoOverlay }),
+			setHighContrast: (highContrast) => set({ highContrast }),
+			setCamera: (camera) => set({ camera }),
+			setIsoMin: (isoMin) => set({ isoMin }),
 			setIsoMax: (isoMax) => set({ isoMax }),
 			setFMin: (fMin) => set({ fMin }),
 			setFMax: (fMax) => set({ fMax }),
@@ -149,22 +149,22 @@ export const useSettingsStore = create<SettingsStore>()(
 		{
 			name: "photo-search-settings", // unique name for localStorage key
 			// Only persist non-sensitive settings
-            partialize: (state) => ({
-                dir: state.dir,
-                engine: state.engine,
-                useFast: state.useFast,
-                fastKind: state.fastKind,
-                useCaps: state.useCaps,
-                vlmModel: state.vlmModel,
-                useOcr: state.useOcr,
-                hasText: state.hasText,
-                useOsTrash: state.useOsTrash,
-                searchCommandCenter: state.searchCommandCenter,
-                showExplain: state.showExplain,
-                showInfoOverlay: state.showInfoOverlay,
-                camera: state.camera,
-                isoMin: state.isoMin,
-                isoMax: state.isoMax,
+			partialize: (state) => ({
+				dir: state.dir,
+				engine: state.engine,
+				useFast: state.useFast,
+				fastKind: state.fastKind,
+				useCaps: state.useCaps,
+				vlmModel: state.vlmModel,
+				useOcr: state.useOcr,
+				hasText: state.hasText,
+				useOsTrash: state.useOsTrash,
+				searchCommandCenter: state.searchCommandCenter,
+				showExplain: state.showExplain,
+				showInfoOverlay: state.showInfoOverlay,
+				camera: state.camera,
+				isoMin: state.isoMin,
+				isoMax: state.isoMax,
 				fMin: state.fMin,
 				fMax: state.fMax,
 				place: state.place,
@@ -189,15 +189,15 @@ export const useVlmModel = () => useSettingsStore((state) => state.vlmModel);
 export const useOcrEnabled = () => useSettingsStore((state) => state.useOcr);
 export const useHasText = () => useSettingsStore((state) => state.hasText);
 export const useOsTrashEnabled = () =>
-    useSettingsStore((state) => state.useOsTrash);
+	useSettingsStore((state) => state.useOsTrash);
 export const useSearchCommandCenter = () =>
-    useSettingsStore((state) => state.searchCommandCenter);
+	useSettingsStore((state) => state.searchCommandCenter);
 export const useShowExplain = () =>
-    useSettingsStore((state) => state.showExplain);
+	useSettingsStore((state) => state.showExplain);
 export const useShowInfoOverlay = () =>
-    useSettingsStore((state) => state.showInfoOverlay);
+	useSettingsStore((state) => state.showInfoOverlay);
 export const useHighContrast = () =>
-    useSettingsStore((state) => state.highContrast);
+	useSettingsStore((state) => state.highContrast);
 export const useCamera = () => useSettingsStore((state) => state.camera);
 export const useIsoMin = () => useSettingsStore((state) => state.isoMin);
 export const useIsoMax = () => useSettingsStore((state) => state.isoMax);
@@ -226,30 +226,73 @@ export const useExifFilters = () =>
 		place: state.place,
 	}));
 
-// Stable actions selector
-const settingsActionsSelector = (state: any) => ({
-	setDir: state.setDir,
-	setEngine: state.setEngine,
-	setHfToken: state.setHfToken,
-	setOpenaiKey: state.setOpenaiKey,
-	setUseFast: state.setUseFast,
-	setFastKind: state.setFastKind,
-	setUseCaps: state.setUseCaps,
-	setVlmModel: state.setVlmModel,
-	setUseOcr: state.setUseOcr,
-	setHasText: state.setHasText,
-	setUseOsTrash: state.setUseOsTrash,
-	setShowExplain: state.setShowExplain,
-	setShowInfoOverlay: state.setShowInfoOverlay,
-	setHighContrast: state.setHighContrast,
-	setCamera: state.setCamera,
-	setIsoMin: state.setIsoMin,
-	setIsoMax: state.setIsoMax,
-	setFMin: state.setFMin,
-	setFMax: state.setFMax,
-	setPlace: state.setPlace,
-});
+// Actions selector - memoize to avoid update-depth loops in tests
+export const useSettingsActions = () => {
+	const setDir = useSettingsStore((s) => s.setDir);
+	const setEngine = useSettingsStore((s) => s.setEngine);
+	const setHfToken = useSettingsStore((s) => s.setHfToken);
+	const setOpenaiKey = useSettingsStore((s) => s.setOpenaiKey);
+	const setUseFast = useSettingsStore((s) => s.setUseFast);
+	const setFastKind = useSettingsStore((s) => s.setFastKind);
+	const setUseCaps = useSettingsStore((s) => s.setUseCaps);
+	const setVlmModel = useSettingsStore((s) => s.setVlmModel);
+	const setUseOcr = useSettingsStore((s) => s.setUseOcr);
+	const setHasText = useSettingsStore((s) => s.setHasText);
+	const setUseOsTrash = useSettingsStore((s) => s.setUseOsTrash);
+	const setShowExplain = useSettingsStore((s) => s.setShowExplain);
+	const setShowInfoOverlay = useSettingsStore((s) => s.setShowInfoOverlay);
+	const setHighContrast = useSettingsStore((s) => s.setHighContrast);
+	const setCamera = useSettingsStore((s) => s.setCamera);
+	const setIsoMin = useSettingsStore((s) => s.setIsoMin);
+	const setIsoMax = useSettingsStore((s) => s.setIsoMax);
+	const setFMin = useSettingsStore((s) => s.setFMin);
+	const setFMax = useSettingsStore((s) => s.setFMax);
+	const setPlace = useSettingsStore((s) => s.setPlace);
 
-// Actions selector - use shallow comparison
-export const useSettingsActions = () =>
-	useSettingsStore(useShallow(settingsActionsSelector));
+	return useMemo(
+		() => ({
+			setDir,
+			setEngine,
+			setHfToken,
+			setOpenaiKey,
+			setUseFast,
+			setFastKind,
+			setUseCaps,
+			setVlmModel,
+			setUseOcr,
+			setHasText,
+			setUseOsTrash,
+			setShowExplain,
+			setShowInfoOverlay,
+			setHighContrast,
+			setCamera,
+			setIsoMin,
+			setIsoMax,
+			setFMin,
+			setFMax,
+			setPlace,
+		}),
+		[
+			setDir,
+			setEngine,
+			setHfToken,
+			setOpenaiKey,
+			setUseFast,
+			setFastKind,
+			setUseCaps,
+			setVlmModel,
+			setUseOcr,
+			setHasText,
+			setUseOsTrash,
+			setShowExplain,
+			setShowInfoOverlay,
+			setHighContrast,
+			setCamera,
+			setIsoMin,
+			setIsoMax,
+			setFMin,
+			setFMax,
+			setPlace,
+		],
+	);
+};

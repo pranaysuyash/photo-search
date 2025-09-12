@@ -245,8 +245,8 @@ export default function Collections({
 		},
 		[onExport, collections, dir],
 	);
-    return (
-        <div className="glass-panel p-3">
+	return (
+		<div className="glass-panel p-3">
 			{/* Header */}
 			<div className="flex items-center justify-between mb-3">
 				<div className="flex items-center gap-2">

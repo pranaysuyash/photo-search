@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import type { WorkspaceActions, WorkspaceState } from "./types";
@@ -77,19 +78,40 @@ export const useFastIndexStatus = () => {
 	return firstEngine?.fast || undefined;
 };
 
-// Stable actions selector
-const workspaceActionsSelector = (state: any) => ({
-	setWorkspace: state.setWorkspace,
-	setWsToggle: state.setWsToggle,
-	setPersons: state.setPersons,
-	addPerson: state.addPerson,
-	removePerson: state.removePerson,
-	setClusters: state.setClusters,
-	setGroups: state.setGroups,
-	setPoints: state.setPoints,
-	setDiag: state.setDiag,
-});
+// Actions selector - memoize to avoid infinite update loops
+export const useWorkspaceActions = () => {
+	const setWorkspace = useWorkspaceStore((s) => s.setWorkspace);
+	const setWsToggle = useWorkspaceStore((s) => s.setWsToggle);
+	const setPersons = useWorkspaceStore((s) => s.setPersons);
+	const addPerson = useWorkspaceStore((s) => s.addPerson);
+	const removePerson = useWorkspaceStore((s) => s.removePerson);
+	const setClusters = useWorkspaceStore((s) => s.setClusters);
+	const setGroups = useWorkspaceStore((s) => s.setGroups);
+	const setPoints = useWorkspaceStore((s) => s.setPoints);
+	const setDiag = useWorkspaceStore((s) => s.setDiag);
 
-// Actions selector - use shallow comparison
-export const useWorkspaceActions = () =>
-	useWorkspaceStore(workspaceActionsSelector);
+	return useMemo(
+		() => ({
+			setWorkspace,
+			setWsToggle,
+			setPersons,
+			addPerson,
+			removePerson,
+			setClusters,
+			setGroups,
+			setPoints,
+			setDiag,
+		}),
+		[
+			setWorkspace,
+			setWsToggle,
+			setPersons,
+			addPerson,
+			removePerson,
+			setClusters,
+			setGroups,
+			setPoints,
+			setDiag,
+		],
+	);
+};

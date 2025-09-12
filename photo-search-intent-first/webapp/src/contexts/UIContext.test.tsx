@@ -5,16 +5,19 @@ import { UIProvider, useUIContext } from "./UIContext";
 
 // Mock the usePhotoActions hook
 vi.mock("../stores/useStores", () => ({
-	usePhotoActions: () => ({
-		setResults: vi.fn(),
-		setQuery: vi.fn(),
-	}),
-	useDir: () => "/test/dir",
-	useEngine: () => "local",
-	useHfToken: () => "",
-	useOpenaiKey: () => "",
-	useNeedsHf: () => false,
-	useNeedsOAI: () => false,
+    usePhotoActions: () => ({
+        setResults: vi.fn(),
+        setQuery: vi.fn(),
+    }),
+    useDir: () => "/test/dir",
+    useEngine: () => "local",
+    useHfToken: () => "",
+    useOpenaiKey: () => "",
+    useNeedsHf: () => false,
+    useNeedsOAI: () => false,
+    useLibrary: () => [],
+    useLibHasMore: () => false,
+    useSettingsActions: () => ({ state: { dir: "/test/dir", engine: "local" } }),
 }));
 
 function Probe() {

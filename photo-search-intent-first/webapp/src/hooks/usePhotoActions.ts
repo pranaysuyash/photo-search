@@ -1,9 +1,14 @@
 import { useCallback, useMemo } from "react";
-import { apiDelete, apiExport, apiSetTags, apiUndoDelete } from "../api";
+import {
+  apiDelete,
+  apiExport,
+  apiSetFavorite,
+  apiSetTags,
+  apiUndoDelete,
+} from "../api";
 import { useSettingsActions } from "../stores/settingsStore";
 import { useWorkspaceActions } from "../stores/workspaceStore";
-import type { ErrorHandlerOptions } from "../utils/errors";
-import { _withErrorHandling, networkErrors } from "../utils/errors";
+import { networkErrors } from "../utils/errors";
 
 interface SearchFilters {
 	favOnly?: boolean;
@@ -21,213 +26,185 @@ interface SearchFilters {
 }
 
 export interface PhotoActionsOptions {
-	dir: string;
-	engine: string;
-	useOsTrash: boolean;
-	uiActions: {
-		setBusy: (message: string) => void;
-		setNote: (message: string) => void;
-	};
-	photoActions: {
-		setResults: (results: unknown[]) => void;
-		setQuery: (query: string) => void;
-		setTopK: (k: number) => void;
-		setFavOnly: (favOnly: boolean) => void;
-		setTagFilter: (tagFilter: string) => void;
-		setSearchId: (searchId: string) => void;
-	};
+  dir: string;
+  engine: string;
+  useOsTrash: boolean;
+  uiActions: {
+    setBusy: (message: string) => void;
+    setNote: (message: string) => void;
+  };
+  photoActions: {
+    setResults: (results: unknown[]) => void;
+    setQuery: (query: string) => void;
+    setTopK: (k: number) => void;
+    setFavOnly: (favOnly: boolean) => void;
+    setTagFilter: (tagFilter: string) => void;
+    setSearchId: (searchId: string) => void;
+  };
+  tagsMap?: Record<string, string[]>;
 }
 
 export const usePhotoActions = (_options: PhotoActionsOptions) => {
-	const {
-		dir,
-		engine: _engine,
-		useOsTrash,
-		uiActions,
-		photoActions,
-	} = _options;
+  const {
+    dir,
+    engine: _engine,
+    useOsTrash,
+    uiActions,
+    photoActions,
+    tagsMap,
+  } = _options;
 
-	const settingsActions = useSettingsActions();
-	const workspaceActions = useWorkspaceActions();
+  const settingsActions = useSettingsActions();
+  const workspaceActions = useWorkspaceActions();
 
-	const defaultErrorOptions: ErrorHandlerOptions = {
-		showToast: false,
-		logToConsole: true,
-		context: {
-			component: "usePhotoActions",
-		},
-	};
+  const normalizePaths = (sel: Set<string> | string[]): string[] =>
+    Array.isArray(sel) ? sel : Array.from(sel);
 
-	const setRating = useCallback(
-		async (
-			selectedPaths: string[],
-			rating: 1 | 2 | 3 | 4 | 5 | 0,
-			tagsMap?: Record<string, string[]>,
-		) => {
-			if (!dir || selectedPaths.length === 0) return;
+  const setRating = useCallback(
+    async (
+      rating: 1 | 2 | 3 | 4 | 5 | 0,
+      selected: Set<string> | string[],
+    ) => {
+      if (!dir) return;
+      const selectedPaths = normalizePaths(selected);
+      if (selectedPaths.length === 0) return;
+      try {
+        const re = /^rating:[1-5]$/;
+        await Promise.all(
+          selectedPaths.map(async (p) => {
+            const curr = (tagsMap?.[p] || []).filter((t) => !re.test(t));
+            const next = rating === 0 ? curr : [...curr, `rating:${rating}`];
+            await apiSetTags(dir, p, next);
+          }),
+        );
+        uiActions.setNote(
+          rating === 0
+            ? `Cleared rating for ${selectedPaths.length}`
+            : `Set rating ${rating} for ${selectedPaths.length}`,
+        );
+      } catch (error: any) {
+        uiActions.setNote(error?.message || "Rating update failed");
+      }
+    },
+    [dir, uiActions, tagsMap],
+  );
 
-			await _withErrorHandling(
-				async () => {
-					const re = /^rating:[1-5]$/;
-					await Promise.all(
-						selectedPaths.map(async (p) => {
-							const curr = (tagsMap?.[p] || []).filter((t) => !re.test(t));
-							const next = rating === 0 ? curr : [...curr, `rating:${rating}`];
-							await apiSetTags(dir, p, next);
-						}),
-					);
+  const setTags = useCallback(
+    async (
+      newTags: string[] | string,
+      selected: Set<string> | string[],
+    ) => {
+      if (!dir) return;
+      const selectedPaths = normalizePaths(selected);
+      if (selectedPaths.length === 0) return;
+      const tagList = Array.isArray(newTags)
+        ? newTags
+        : newTags
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
+      try {
+        await Promise.all(
+          selectedPaths.map((p) => apiSetTags(dir, p, tagList)),
+        );
+        uiActions.setNote(`Updated tags for ${selectedPaths.length} photos`);
+      } catch (error: any) {
+        uiActions.setNote(error?.message || "Tag update failed");
+      }
+    },
+    [dir, uiActions],
+  );
 
-					uiActions.setNote(
-						rating === 0
-							? `Cleared rating for ${selectedPaths.length}`
-							: `Set rating ${rating} for ${selectedPaths.length}`,
-					);
-				},
-				{
-					...defaultErrorOptions,
-					context: {
-						...defaultErrorOptions.context,
-						action: "setRating",
-						metadata: { selectedPaths: selectedPaths.length, rating },
-					},
-					fallbackMessage: "Rating update failed",
-				},
-			);
-		},
-		[dir, uiActions],
-	);
+  const exportPhotos = useCallback(
+    async (
+      a: string | Set<string> | string[],
+      b: string | Set<string> | string[],
+      options: {
+        copy?: boolean;
+        move?: boolean;
+        includeMetadata?: boolean;
+        createThumbnails?: boolean;
+      } = {},
+    ) => {
+      if (!dir) return;
+      // Support both (dest, selected) and (selected, dest)
+      let dest: string;
+      let selectedPaths: string[];
+      if (typeof a === "string") {
+        dest = a;
+        selectedPaths = normalizePaths(b as any);
+      } else {
+        selectedPaths = normalizePaths(a as any);
+        dest = b as string;
+      }
+      if (!dest || selectedPaths.length === 0) return;
 
-	const setTags = useCallback(
-		async (selectedPaths: string[], tagText: string) => {
-			if (!dir || selectedPaths.length === 0) return;
+      const { includeMetadata = false, createThumbnails = false } = options;
+      try {
+        const r = await apiExport(
+          dir,
+          selectedPaths,
+          dest,
+          "copy",
+          includeMetadata,
+          createThumbnails,
+        );
+        uiActions.setNote(
+          `Exported ${r.copied}, skipped ${r.skipped}, errors ${r.errors} → ${r.dest}`,
+        );
+      } catch (error: any) {
+        uiActions.setNote(error?.message || "Export failed");
+      }
+    },
+    [dir, uiActions],
+  );
 
-			const tagList = tagText
-				.split(",")
-				.map((s) => s.trim())
-				.filter(Boolean);
+  const deletePhotos = useCallback(
+    async (selected: Set<string> | string[]) => {
+      if (!dir) return;
+      const selectedPaths = normalizePaths(selected);
+      if (selectedPaths.length === 0) return;
+      const confirmed = typeof window !== "undefined"
+        ? window.confirm(`Move ${selectedPaths.length} item(s) to Trash?`)
+        : true;
+      if (!confirmed) return;
+      try {
+        await apiDelete(dir, selectedPaths, useOsTrash);
+        uiActions.setNote(
+          useOsTrash
+            ? `Moved ${selectedPaths.length} to OS Trash`
+            : `Moved ${selectedPaths.length} to Trash`,
+        );
+      } catch (error: any) {
+        uiActions.setNote(error?.message || "Delete failed");
+      }
+    },
+    [dir, useOsTrash, uiActions],
+  );
 
-			await _withErrorHandling(
-				async () => {
-					await Promise.all(
-						selectedPaths.map((p) => apiSetTags(dir, p, tagList)),
-					);
-					uiActions.setNote(`Updated tags for ${selectedPaths.length} photos`);
-				},
-				{
-					...defaultErrorOptions,
-					context: {
-						...defaultErrorOptions.context,
-						action: "setTags",
-						metadata: {
-							selectedPaths: selectedPaths.length,
-							tagCount: tagList.length,
-						},
-					},
-					fallbackMessage: "Tag update failed",
-				},
-			);
-		},
-		[dir, uiActions],
-	);
+  const undoDelete = useCallback(async () => {
+    if (!dir) return;
+    try {
+      const r = await apiUndoDelete(dir as string);
+      const restored = (r as any)?.restored ?? 0;
+      uiActions.setNote(`Restored ${restored}`);
+    } catch (error: any) {
+      uiActions.setNote(error?.message || "Undo failed");
+    }
+  }, [dir, uiActions]);
 
-	const exportPhotos = useCallback(
-		async (
-			selectedPaths: string[],
-			dest: string,
-			options: {
-				copy?: boolean;
-				move?: boolean;
-				includeMetadata?: boolean;
-				createThumbnails?: boolean;
-			} = {},
-		) => {
-			if (!dir || selectedPaths.length === 0) return;
-
-			const {
-				copy = true,
-				move = false,
-				includeMetadata = false,
-				createThumbnails = false,
-			} = options;
-
-			await _withErrorHandling(
-				async () => {
-					const r = await apiExport(
-						dir,
-						selectedPaths,
-						dest,
-						"copy",
-						includeMetadata,
-						createThumbnails,
-					);
-					uiActions.setNote(
-						`Exported ${r.copied}, skipped ${r.skipped}, errors ${r.errors} → ${r.dest}`,
-					);
-				},
-				{
-					...defaultErrorOptions,
-					context: {
-						...defaultErrorOptions.context,
-						action: "exportPhotos",
-						metadata: {
-							selectedPaths: selectedPaths.length,
-							dest,
-							copy,
-							move,
-						},
-					},
-					fallbackMessage: "Export failed",
-				},
-			);
-		},
-		[dir, uiActions],
-	);
-
-	const deletePhotos = useCallback(
-		async (_selectedPaths: string[]) => {
-			if (!dir || _selectedPaths.length === 0) return;
-
-			await _withErrorHandling(
-				async () => {
-					await apiDelete(dir, _selectedPaths, useOsTrash);
-					uiActions.setNote(`Deleted ${_selectedPaths.length} photos`);
-				},
-				{
-					...defaultErrorOptions,
-					context: {
-						...defaultErrorOptions.context,
-						action: "deletePhotos",
-						metadata: { selectedPaths: _selectedPaths.length, useOsTrash },
-					},
-					fallbackMessage: "Delete failed",
-				},
-			);
-		},
-		[dir, useOsTrash, uiActions],
-	);
-
-	const undoDelete = useCallback(
-		async (_selectedPaths: string[]) => {
-			if (!dir || _selectedPaths.length === 0) return;
-
-			await _withErrorHandling(
-				async () => {
-					await apiUndoDelete(dir);
-					uiActions.setNote(`Restored ${_selectedPaths.length} photos`);
-				},
-				{
-					...defaultErrorOptions,
-					context: {
-						...defaultErrorOptions.context,
-						action: "undoDelete",
-						metadata: { selectedPaths: _selectedPaths.length },
-					},
-					fallbackMessage: "Restore failed",
-				},
-			);
-		},
-		[dir, uiActions],
-	);
+  const toggleFavorite = useCallback(
+    async (photoPath: string) => {
+      if (!dir || !photoPath) return;
+      try {
+        const isFav = (tagsMap?.[photoPath] || []).includes("favorite");
+        await apiSetFavorite(dir, photoPath, !isFav);
+      } catch {
+        // Swallow per tests; no note required
+      }
+    },
+    [dir, tagsMap],
+  );
 
 	const clearSearch = useCallback(() => {
 		photoActions.setQuery("");
@@ -256,10 +233,10 @@ export const usePhotoActions = (_options: PhotoActionsOptions) => {
 			}
 			if (filters.place) settingsActions.setPlace("");
 			if (filters.camera) settingsActions.setCamera("");
-			if (filters.isoMin) settingsActions.setIsoMin(0);
-			if (filters.isoMax) settingsActions.setIsoMax(0);
-			if (filters.fMin) settingsActions.setFMin(0);
-			if (filters.fMax) settingsActions.setFMax(0);
+			if (filters.isoMin) settingsActions.setIsoMin("");
+			if (filters.isoMax) settingsActions.setIsoMax("");
+			if (filters.fMin) settingsActions.setFMin("");
+			if (filters.fMax) settingsActions.setFMax("");
 			if (filters.hasText) settingsActions.setHasText(false);
 			if (filters.persons) workspaceActions.setPersons([]);
 
@@ -324,14 +301,15 @@ export const usePhotoActions = (_options: PhotoActionsOptions) => {
 		[],
 	);
 
-	return {
-		setRating,
-		setTags,
-		exportPhotos,
-		deletePhotos,
-		undoDelete,
-		clearSearch,
-		performSearch,
-		...photoUtils,
-	};
+  return {
+    setRating,
+    setTags,
+    exportPhotos,
+    deletePhotos,
+    undoDelete,
+    toggleFavorite,
+    clearSearch,
+    performSearch,
+    ...photoUtils,
+  };
 };

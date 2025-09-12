@@ -5,6 +5,8 @@ import { render } from "./test/test-utils";
 
 // Mock the API module
 vi.mock("./api", () => ({
+	apiAuthStatus: vi.fn(),
+	apiPing: vi.fn(),
 	apiSearch: vi.fn(),
 	apiSetFavorite: vi.fn(),
 	apiSetTags: vi.fn(),
@@ -30,6 +32,8 @@ import {
 	apiSetTags,
 	apiUndoDelete,
 	thumbUrl,
+  apiAuthStatus,
+  apiPing,
 } from "./api";
 
 // Mock data
@@ -174,6 +178,7 @@ vi.mock("./stores/useStores", () => ({
 // Mock the settingsStore hooks
 vi.mock("./stores/settingsStore", () => ({
 	useHighContrast: () => false,
+	useSearchCommandCenter: () => false,
 	useThemeMode: () => "light",
 	useColorScheme: () => "blue",
 	useDensity: () => "normal",
@@ -308,6 +313,10 @@ Object.defineProperty(window, "location", {
 describe("App Integration Tests", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+
+		// Ensure connectivity/auth mock resolves sanely
+		vi.mocked(apiAuthStatus).mockResolvedValue({ auth_required: false });
+		vi.mocked(apiPing).mockResolvedValue(true);
 
 		// Mock API calls
 		vi.mocked(apiSearch).mockResolvedValue(mockApiData);
