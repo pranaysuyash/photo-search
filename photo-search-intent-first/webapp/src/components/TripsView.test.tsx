@@ -33,7 +33,7 @@ describe("TripsView", () => {
 		await fireEvent.click(screen.getByText("Refresh"));
 		// open may not render trip cards immediately in test jsdom — ensure no throw and handlers called
 		// Simulate window._trips populated from refresh
-		(window as any)._trips = [
+		(window as unknown)._trips = [
 			{ id: "tX", count: 1, place: "X", paths: ["/x.jpg"] },
 		];
 		// Rerender to show card

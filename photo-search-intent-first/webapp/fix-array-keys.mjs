@@ -1,116 +1,77 @@
 #!/usr/bin/env node
 
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import { execSync } from "child_process";
+import fs from "fs";
+import path from "path";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-// Find all TypeScript/React files
-function findFiles(dir) {
-  let results = [];
-  const files = fs.readdirSync(dir);
-  
-  for (const file of files) {
-    const filePath = path.join(dir, file);
-    const stat = fs.statSync(filePath);
-    
-    if (stat.isDirectory() && !file.includes('node_modules') && !file.includes('.git')) {
-      results = results.concat(findFiles(filePath));
-    } else if (stat.isFile() && (file.endsWith('.tsx') || file.endsWith('.jsx'))) {
-      results.push(filePath);
-    }
-  }
-  
-  return results;
+// Get all noArrayIndexKey errors
+let output;
+try {
+	output = execSync(
+		"npx @biomejs/biome check src --max-diagnostics=1000 2>&1",
+		{ encoding: "utf8" },
+	);
+} catch (e) {
+	output = e.stdout || e.output?.toString() || "";
 }
 
-// Fix array index keys
-function fixArrayKeys(filePath) {
-  let content = fs.readFileSync(filePath, 'utf8');
-  let modified = false;
-  const originalContent = content;
+const lines = output.split("\n");
+const errors = [];
 
-  // Pattern for .map((item, index) => with key={index}
-  // This regex looks for map functions with index and then key={index}
-  const mapPattern = /(\w+)\.map\s*\(\s*\(([^,)]+)\s*,\s*(\w+)\)\s*=>\s*[\s\S]*?key=\{?\3\}?/g;
-  
-  content = content.replace(mapPattern, (match, arrayName, itemName, indexName) => {
-    modified = true;
-    
-    // Generate unique key based on item properties
-    let newKey = `key={\`\${${itemName}.id || ${itemName}.path || ${itemName}.name || ${itemName}.key || JSON.stringify(${itemName})}-\${${indexName}}\`}`;
-    
-    // Replace key={index} with the new key
-    return match.replace(/key=\{?\w+\}?/, newKey);
-  });
-
-  // Another pattern: key={i} or key={idx} or key={index}
-  const lines = content.split('\n');
-  let inMapFunction = false;
-  let mapItemName = '';
-  let mapIndexName = '';
-  
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    
-    // Detect .map((item, index) =>
-    const mapMatch = line.match(/(\w+)\.map\s*\(\s*\(([^,)]+)\s*,\s*(\w+)\)/);
-    if (mapMatch) {
-      inMapFunction = true;
-      mapItemName = mapMatch[2].trim();
-      mapIndexName = mapMatch[3].trim();
-    }
-    
-    // Look for key={index} pattern within map
-    if (inMapFunction && line.match(new RegExp(`key=\\{?${mapIndexName}\\}?`))) {
-      modified = true;
-      
-      // Try to generate a better key
-      if (mapItemName.includes('.')) {
-        // Handle destructured items
-        lines[i] = line.replace(
-          new RegExp(`key=\\{?${mapIndexName}\\}?`),
-          `key={\`item-\${${mapIndexName}}\`}`
-        );
-      } else {
-        lines[i] = line.replace(
-          new RegExp(`key=\\{?${mapIndexName}\\}?`),
-          `key={${mapItemName}.id || ${mapItemName}.path || ${mapItemName}.name || \`${mapItemName}-\${${mapIndexName}}\`}`
-        );
-      }
-    }
-    
-    // Reset when we exit the map function (rough heuristic)
-    if (inMapFunction && (line.includes('))') || line.includes('})'))) {
-      inMapFunction = false;
-    }
-  }
-  
-  if (modified) {
-    content = lines.join('\n');
-  }
-
-  if (content !== originalContent) {
-    fs.writeFileSync(filePath, content);
-    console.log(`Fixed array keys in: ${path.relative(process.cwd(), filePath)}`);
-    return 1;
-  }
-  
-  return 0;
+for (let i = 0; i < lines.length; i++) {
+	const line = lines[i];
+	if (line.includes("lint/suspicious/noArrayIndexKey")) {
+		// Get the file path from the line before
+		const match = line.match(/^(src\/.*?):(\d+):(\d+)/);
+		if (match) {
+			errors.push({
+				file: match[1],
+				line: parseInt(match[2]),
+				column: parseInt(match[3]),
+			});
+		}
+	}
 }
 
-// Main execution
-const srcDir = path.join(__dirname, 'src');
-const files = findFiles(srcDir);
+console.log(`Found ${errors.length} noArrayIndexKey errors to fix`);
 
-console.log(`Found ${files.length} React files`);
+// Process each error
+for (const error of errors) {
+	try {
+		const fullPath = path.resolve(error.file);
+		const content = fs.readFileSync(fullPath, "utf8");
+		const lines = content.split("\n");
+		const lineIndex = error.line - 1;
 
-let totalFixed = 0;
-for (const file of files) {
-  totalFixed += fixArrayKeys(file);
+		if (lineIndex >= 0 && lineIndex < lines.length) {
+			let line = lines[lineIndex];
+
+			// Fix various key patterns - use the item itself when possible
+			line = line.replace(
+				/key={[`"']?[^}]*\${?(index|idx|i)\}?[^}]*[`"']?}/g,
+				(match) => {
+					// Extract what's being mapped
+					const prevLines = lines
+						.slice(Math.max(0, lineIndex - 10), lineIndex)
+						.join("\n");
+					const mapMatch = prevLines.match(/\.map\(\(([^,\s]+)/);
+
+					if (mapMatch) {
+						const item = mapMatch[1];
+						// Use a unique property of the item
+						return `key={\`item-\${String(${item})}\`}`;
+					}
+					return match;
+				},
+			);
+
+			lines[lineIndex] = line;
+		}
+
+		fs.writeFileSync(fullPath, lines.join("\n"));
+	} catch (error) {
+		console.error(`Error fixing ${error.file}:${error.line}:`, error.message);
+	}
 }
 
-console.log(`\nFixed array keys in ${totalFixed} files`);
+console.log("Done!");

@@ -274,7 +274,7 @@ export function BackupDashboard({ isOpen, onClose }: BackupDashboardProps) {
 												Ways to improve your backup
 											</h3>
 											<ul className="space-y-1">
-												{health.recommendations.map((rec, idx) => (
+												{health.recommendations.map((rec, _idx) => (
 													<li
 														key={rec}
 														className="text-sm text-gray-600 dark:text-gray-400"
@@ -403,7 +403,10 @@ function BackupSettings({
 							type="button"
 							key={option.value}
 							onClick={() =>
-								onChange({ ...config, frequency: option.value as BackupFrequency })
+								onChange({
+									...config,
+									frequency: option.value as BackupFrequency,
+								})
 							}
 							className={`p-3 rounded-lg border text-left ${
 								config.frequency === option.value

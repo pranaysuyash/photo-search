@@ -1,7 +1,9 @@
 import { Clock, History, Search as IconSearch, TrendingUp } from "lucide-react";
+import type { LucideProps } from "lucide-react";
 import type React from "react";
 import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
 import { useSettingsStore } from "../stores/settingsStore";
+import { synonymAlternates } from "../utils/searchSynonyms";
 
 interface SearchBarProps {
 	searchText: string;
@@ -18,7 +20,7 @@ interface SearchBarProps {
 interface SuggestionItem {
 	cat: string;
 	label: string;
-	icon?: React.ComponentType<any>;
+	icon?: React.ComponentType<LucideProps>;
 	subtitle?: string;
 	type?: "history" | "metadata" | "popular";
 }
@@ -60,6 +62,7 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 		_ref,
 	) => {
 		const [suggestOpen, setSuggestOpen] = useState(false);
+		const [activeIdx, setActiveIdx] = useState<number>(-1);
 		const [showHistoryPanel, setShowHistoryPanel] = useState(false);
 		const searchInputRef = useRef<HTMLInputElement>(null);
 		const { dir, engine } = useSettingsStore();
@@ -84,7 +87,11 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 
 		// Load search suggestions when debounced input changes
 		const [historySuggestions, setHistorySuggestions] = useState<
-			Array<{ query: string; type: "history"; metadata?: any }>
+			Array<{
+				query: string;
+				type: "history";
+				metadata?: { lastUsed?: number; useCount?: number };
+			}>
 		>([]);
 
 		useEffect(() => {
@@ -111,6 +118,7 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 		const handleSearch = (text: string) => {
 			onSearch(text);
 			setSuggestOpen(false);
+			setActiveIdx(-1);
 		};
 
 		const formatRelativeTime = (timestamp: number): string => {
@@ -267,26 +275,43 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 						onChange={(e) => {
 							setSearchText(e.target.value);
 							setSuggestOpen(true);
+							setActiveIdx(-1);
 						}}
 						onKeyDown={(e) => {
-							if (e.key === "Enter") handleSearch(searchText);
-							else if (e.key === "Escape") {
+							if (e.key === "Enter") {
+								if (activeIdx >= 0 && suggestions.length > 0) {
+									// Apply the active suggestion
+									const s = suggestions[activeIdx];
+									let tok = s.label;
+									if (s.cat === "People") tok = `person:"${s.label}"`;
+									else if (s.cat === "Camera") tok = `camera:"${s.label}"`;
+									else if (s.cat === "Place") tok = `place:"${s.label}"`;
+									else if (s.cat === "Tag") tok = `tag:${s.label}`;
+									const next = (searchText || "").trim();
+									const q = next ? `${next} ${tok}` : tok;
+									setSearchText(q);
+									setTimeout(() => handleSearch(q), 0);
+									e.preventDefault();
+									return;
+								}
+								handleSearch(searchText);
+							} else if (e.key === "Escape") {
 								setSuggestOpen(false);
 								if (searchInputRef.current) {
 									searchInputRef.current.blur();
 								}
-							} else if (
-								e.key === "ArrowDown" &&
-								suggestOpen &&
-								suggestions.length > 0
-							) {
+							} else if (e.key === "ArrowDown") {
 								e.preventDefault();
-								// Focus first suggestion item
-								const firstSuggestion = document.querySelector(
-									".suggestion-item",
-								) as HTMLElement;
-								if (firstSuggestion) {
-									firstSuggestion.focus();
+								if (!suggestOpen) setSuggestOpen(true);
+								if (suggestions.length > 0) {
+									setActiveIdx((idx) =>
+										Math.min(idx < 0 ? 0 : idx + 1, suggestions.length - 1),
+									);
+								}
+							} else if (e.key === "ArrowUp") {
+								e.preventDefault();
+								if (suggestions.length > 0) {
+									setActiveIdx((idx) => (idx <= 0 ? -1 : idx - 1));
 								}
 							}
 						}}
@@ -294,6 +319,13 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 						onBlur={() => setTimeout(() => setSuggestOpen(false), 120)}
 						ref={searchInputRef}
 						className="search-input"
+						role="combobox"
+						aria-expanded={suggestOpen}
+						aria-autocomplete="list"
+						aria-controls={suggestOpen ? "suggestions-listbox" : undefined}
+						aria-activedescendant={
+							activeIdx >= 0 ? `sug-${activeIdx}` : undefined
+						}
 						data-tour="search-bar"
 					/>
 					<button
@@ -317,21 +349,65 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 				</div>
 				{warnings.length > 0 && (
 					<div className="text-[11px] text-red-600 mt-1 px-1">
-						{warnings.slice(0, 2).map((w, i) => (
-							<div key={`item-${i}`}>{w}</div>
+						{warnings.slice(0, 2).map((w, _i) => (
+							<div key={`item-${String(w)}`}>{w}</div>
 						))}
 					</div>
 				)}
 				{suggestOpen && (
-					<div className="suggestions-dropdown">
+					<div
+						className="suggestions-dropdown"
+						role="listbox"
+						aria-label="Search suggestions"
+						id="suggestions-listbox"
+					>
 						{suggestions.length === 0 ? (
-							<div className="px-3 py-2 text-gray-500">No suggestions</div>
+							<div className="px-3 py-2 text-gray-700">
+								<div className="text-xs text-gray-500 mb-1">Suggestions</div>
+								<div className="flex flex-wrap gap-1">
+									{(() => {
+										const alts = synonymAlternates(searchText || "");
+										const fallback = [
+											"family dinner",
+											"golden hour",
+											"mountain hike",
+										];
+										const merged = Array.from(
+											new Set([...(alts || []), ...fallback]),
+										);
+										return merged.slice(0, 6);
+									})().map((s) => (
+										<button
+											key={`alt-${s}`}
+											type="button"
+											className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
+											role="option"
+											onMouseDown={(e) => {
+												e.preventDefault();
+												const next = (searchText || "").trim();
+												const q2 = next ? `${next} ${s}` : s;
+												setSearchText(q2);
+												setSuggestOpen(false);
+												setTimeout(() => handleSearch(q2), 0);
+											}}
+											aria-label={`Try suggestion ${s}`}
+										>
+											{s}
+										</button>
+									))}
+								</div>
+							</div>
 						) : (
-							suggestions.map((s) => (
+							suggestions.map((s, i) => (
 								<button
 									type="button"
 									key={`${s.cat}:${s.label}`}
+									id={`sug-${i}`}
 									className="suggestion-item"
+									role="option"
+									aria-selected={activeIdx === i}
+									data-active={activeIdx === i ? "true" : undefined}
+									onMouseEnter={() => setActiveIdx(i)}
 									onMouseDown={(e) => {
 										e.preventDefault();
 										// Convert metadata suggestions into fielded tokens

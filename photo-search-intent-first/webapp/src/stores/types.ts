@@ -15,7 +15,7 @@ export interface PhotoState {
 	};
 	saved: Array<{ name: string; query: string; top_k?: number }>;
 	collections: Record<string, string[]>;
-	smart: Record<string, any>;
+	smart: Record<string, unknown>;
 	library: string[];
 	libHasMore: boolean;
 }
@@ -34,7 +34,7 @@ export interface PhotoActions {
 		saved: Array<{ name: string; query: string; top_k?: number }>,
 	) => void;
 	setCollections: (collections: Record<string, string[]>) => void;
-	setSmart: (smart: Record<string, any>) => void;
+	setSmart: (smart: Record<string, unknown>) => void;
 	setLibrary: (library: string[]) => void;
 	setLibHasMore: (hasMore: boolean) => void;
 	appendLibrary: (paths: string[]) => void;
@@ -79,13 +79,14 @@ export interface SettingsState {
 
 	// EXIF filters
 	camera: string;
-	isoMin: string;
-	isoMax: string;
-	fMin: string;
-	fMax: string;
+	isoMin: number;
+	isoMax: number;
+	fMin: number;
+	fMax: number;
 	place: string;
-	resultView?: "grid" | "film" | "timeline";
-	timelineBucket?: "day" | "week" | "month";
+	resultView?: "grid" | "film" | "timeline" | "map";
+	timelineBucket?: "day" | "week" | "month" | "year";
+	includeVideos?: boolean;
 }
 
 export interface SettingsActions {
@@ -104,13 +105,13 @@ export interface SettingsActions {
 	setShowInfoOverlay?: (show: boolean) => void;
 	setSearchCommandCenter?: (searchCommandCenter: boolean) => void;
 	setCamera: (camera: string) => void;
-	setIsoMin: (iso: string) => void;
-	setIsoMax: (iso: string) => void;
-	setFMin: (f: string) => void;
-	setFMax: (f: string) => void;
+	setIsoMin: (iso: number | string) => void;
+	setIsoMax: (iso: number | string) => void;
+	setFMin: (f: number | string) => void;
+	setFMax: (f: number | string) => void;
 	setPlace: (place: string) => void;
-	setResultView?: (view: "grid" | "film" | "timeline") => void;
-	setTimelineBucket?: (b: "day" | "week" | "month") => void;
+	setResultView?: (view: "grid" | "film" | "timeline" | "map") => void;
+	setTimelineBucket?: (b: "day" | "week" | "month" | "year") => void;
 	setHighContrast?: (highContrast: boolean) => void;
 }
 

@@ -80,11 +80,15 @@ export default function FolderPicker({
 	return (
 		<div className="space-y-4">
 			<div className="space-y-2">
-				<label className="block text-sm font-medium text-gray-700">
+				<label
+					htmlFor="folder-path-input"
+					className="block text-sm font-medium text-gray-700"
+				>
 					Folder Path
 				</label>
 				<div className="flex gap-2">
 					<input
+						id="folder-path-input"
 						type="text"
 						value={inputPath}
 						onChange={(e) => setInputPath(e.target.value)}

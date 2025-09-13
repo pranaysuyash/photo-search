@@ -39,7 +39,11 @@ let photo = {
 	library: [],
 };
 let ui = { viewMode: "grid" as "grid" | "film", note: "" };
-let workspace = { wsToggle: false, persons: [] as string[], diag: null as any };
+let workspace = {
+	wsToggle: false,
+	persons: [] as string[],
+	diag: null as unknown,
+};
 
 const settingsActions = {
 	setDir: (v: string) => {
@@ -57,7 +61,7 @@ const settingsActions = {
 	setUseFast: (v: boolean) => {
 		settings.useFast = v;
 	},
-	setFastKind: (v: any) => {
+	setFastKind: (v: unknown) => {
 		settings.fastKind = v;
 	},
 	setUseCaps: (v: boolean) => {
@@ -102,14 +106,14 @@ const photoActions = {
 	setTagFilter: (v: string) => {
 		photo.tags.tagFilter = v;
 	},
-	setResults: (_: any) => {},
+	setResults: (_: unknown) => {},
 	setSearchId: (_: string) => {},
 	setFavorites: (_: string[]) => {},
 	setAllTags: (_: string[]) => {},
-	setTagsMap: (_: any) => {},
-	setSaved: (_: any) => {},
-	setCollections: (_: any) => {},
-	setSmart: (_: any) => {},
+	setTagsMap: (_: unknown) => {},
+	setSaved: (_: unknown) => {},
+	setCollections: (_: unknown) => {},
+	setSmart: (_: unknown) => {},
 	setLibrary: (_: string[]) => {},
 	resetSearch: () => {},
 };

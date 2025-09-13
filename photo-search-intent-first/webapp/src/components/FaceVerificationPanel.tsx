@@ -6,7 +6,7 @@ import {
 
 interface FaceVerificationPanelProps {
 	imagePath: string;
-	detectedFaces?: any[];
+	detectedFaces?: Array<{ id: string; bbox: number[]; confidence: number }>;
 	knownPeople: Map<string, { name: string; photos: string[] }>;
 	onVerify: (clusterId: string, verified: boolean) => void;
 	onCreateNew: (name: string) => void;
@@ -95,10 +95,10 @@ export function FaceVerificationPanel({
 			{/* Face selector */}
 			{detectedFaces.length > 1 && (
 				<div className="flex gap-2 overflow-x-auto pb-2">
-					{detectedFaces.map((_face, idx) => (
+					{detectedFaces.map((face, idx) => (
 						<button
 							type="button"
-							key={`face-${idx}`}
+							key={`face-${face.id}`}
 							onClick={() => setSelectedFace(idx)}
 							className={`relative w-16 h-16 rounded overflow-hidden border-2 transition-colors ${
 								selectedFace === idx ? "border-blue-500" : "border-gray-300"

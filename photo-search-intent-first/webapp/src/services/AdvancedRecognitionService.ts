@@ -1,3 +1,4 @@
+// biome-ignore lint/complexity/noStaticOnlyClass: Service pattern
 /**
  * Advanced Recognition Service
  * Face verification, pet detection, scene analysis, and quality assessment
@@ -63,8 +64,8 @@ export class AdvancedRecognitionService {
 	 */
 	static async verifyFaces(
 		_imagePath: string,
-		detectedFaces: any[],
-		knownClusters: Map<string, any>,
+		detectedFaces: unknown[],
+		knownClusters: Map<string, unknown>,
 	): Promise<FaceVerification[]> {
 		const verifications: FaceVerification[] = [];
 

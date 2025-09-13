@@ -10,7 +10,7 @@ export interface PhotoCacheEntry {
 	path: string;
 	thumbnailUrl: string;
 	fullUrl: string;
-	metadata: any;
+	metadata: unknown;
 	cachedAt: number;
 	size: number;
 	priority: "high" | "medium" | "low";
@@ -281,7 +281,7 @@ export class OfflinePhotoService {
 	}
 
 	// Get offline photo metadata
-	async getOfflineMetadata(path: string): Promise<any | null> {
+	async getOfflineMetadata(path: string): Promise<unknown | null> {
 		try {
 			const db = this.db;
 			if (!db) return null;
@@ -303,7 +303,7 @@ export class OfflinePhotoService {
 	}
 
 	// Store offline action for sync when online
-	async queueOfflineAction(action: any) {
+	async queueOfflineAction(action: unknown) {
 		try {
 			const db = this.db;
 			if (!db) return;
@@ -368,7 +368,7 @@ export class OfflinePhotoService {
 		}
 	}
 
-	private async processOfflineAction(action: any) {
+	private async processOfflineAction(action: unknown) {
 		// Process different types of offline actions
 		switch (action.type) {
 			case "favorite":
@@ -467,7 +467,7 @@ export class OfflinePhotoService {
 export function useOfflinePhotos() {
 	const [offlineService] = React.useState(() => new OfflinePhotoService());
 	const [isOnline, setIsOnline] = React.useState(navigator.onLine);
-	const [cacheStats, setCacheStats] = React.useState<any>(null);
+	const [cacheStats, setCacheStats] = React.useState<unknown>(null);
 
 	React.useEffect(() => {
 		const handleOnline = () => {

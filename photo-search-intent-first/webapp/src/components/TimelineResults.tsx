@@ -188,24 +188,50 @@ export default function TimelineResults({
 	useEffect(() => {
 		const el = containerRef.current;
 		if (!el) return;
-		const io = new IntersectionObserver(
-			(entries) => {
-				for (const entry of entries) {
-					if (entry.isIntersecting) {
-						const label = (entry.target as HTMLElement).dataset.month || null;
-						if (label) setActiveMonth(label);
-					}
+		try {
+			if (typeof IntersectionObserver !== "undefined") {
+				const io = new IntersectionObserver(
+					(entries) => {
+						for (const entry of entries) {
+							if (entry.isIntersecting) {
+								const label =
+									(entry.target as HTMLElement).dataset.month || null;
+								if (label) setActiveMonth(label);
+							}
+						}
+					},
+					{ root: el, threshold: 0.1 },
+				);
+				Object.values(sectionRefs.current).forEach(
+					(sec) => sec && io.observe(sec),
+				);
+				return () => io.disconnect();
+			}
+		} catch {
+			// Fallback below
+		}
+		// Fallback: update activeMonth on scroll if IO is unavailable
+		const onScroll = () => {
+			let bestLabel: string | null = null;
+			let minTop = Infinity;
+			for (const [label, node] of Object.entries(sectionRefs.current)) {
+				if (!node) continue;
+				const rect = node.getBoundingClientRect();
+				if (rect.top >= 0 && rect.top < minTop) {
+					minTop = rect.top;
+					bestLabel = label.split(" ").slice(0, 2).join(" ");
 				}
-			},
-			{ root: el, threshold: 0.1 },
-		);
-		Object.values(sectionRefs.current).forEach((sec) => sec && io.observe(sec));
-		return () => io.disconnect();
+			}
+			if (bestLabel) setActiveMonth(bestLabel);
+		};
+		el.addEventListener("scroll", onScroll);
+		onScroll();
+		return () => el.removeEventListener("scroll", onScroll);
 	}, []);
 
 	// Listen for global jump events dispatched by the app for keyboard shortcuts
 	useEffect(() => {
-		const onJump = (e: any) => {
+		const onJump = (e: unknown) => {
 			try {
 				const kind = e?.detail?.kind as string;
 				if (!kind) return;
@@ -269,8 +295,8 @@ export default function TimelineResults({
 				}
 			} catch {}
 		};
-		window.addEventListener("timeline-jump", onJump as any);
-		return () => window.removeEventListener("timeline-jump", onJump as any);
+		window.addEventListener("timeline-jump", onJump as unknown);
+		return () => window.removeEventListener("timeline-jump", onJump as unknown);
 	}, [bucket]);
 
 	return (
@@ -421,17 +447,24 @@ export default function TimelineResults({
 							const m = meta[it.path];
 							return (
 								<div
+									role="button"
+									tabIndex={0}
 									key={it.path}
 									className={`relative group cursor-pointer rounded-lg overflow-hidden border ${isSel ? "ring-2 ring-blue-500" : "border-transparent"}`}
 									onClick={() => onToggleSelect(it.path)}
+									onKeyDown={(e) => {
+										if (e.key === "Enter" || e.key === " ") {
+											e.preventDefault();
+											onToggleSelect(it.path);
+										}
+									}}
 									onDoubleClick={() => onOpen(it.path)}
 									title={it.path}
 								>
 									<LazyImage
 										src={thumbUrl(dir, engine, it.path, 256)}
-										alt={it.path}
+										alt={base}
 										className="w-full h-[160px] object-cover"
-										enableProgressiveLoading={true}
 									/>
 									{showInfoOverlay && (
 										<div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent text-white px-1.5 py-1 text-[10px] flex items-center justify-between">

@@ -199,7 +199,7 @@ export class PhotoVaultAPI {
 	/**
 	 * Create smart collection with rules
 	 */
-	async setSmartCollection(name: string, rules: any) {
+	async setSmartCollection(name: string, rules: unknown) {
 		return api.apiSetSmart(this.config.dir, name, rules);
 	}
 

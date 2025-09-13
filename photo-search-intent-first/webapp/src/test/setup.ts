@@ -5,10 +5,10 @@ import { afterEach } from "vitest";
 afterEach(() => cleanup());
 
 // jsdom lacks ResizeObserver; provide a minimal stub for components that use it
-if (typeof (globalThis as any).ResizeObserver === "undefined") {
+if (typeof (globalThis as unknown).ResizeObserver === "undefined") {
 	class ResizeObserver {
-		callback: any;
-		constructor(cb: any) {
+		callback: unknown;
+		constructor(cb: unknown) {
 			this.callback = cb;
 		}
 		observe() {
@@ -21,5 +21,5 @@ if (typeof (globalThis as any).ResizeObserver === "undefined") {
 			/* no-op */
 		}
 	}
-	(globalThis as any).ResizeObserver = ResizeObserver as any;
+	(globalThis as unknown).ResizeObserver = ResizeObserver as unknown;
 }

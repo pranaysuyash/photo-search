@@ -12,6 +12,12 @@ export const usePhotoStore = create<PhotoStore>()(
 		searchId: "",
 		query: "",
 		topK: 24,
+		// Soft synonym search banner state
+		altSearch: { active: false, original: "", applied: "" } as {
+			active: boolean;
+			original: string;
+			applied: string;
+		},
 		fav: [],
 		favOnly: false,
 		tags: {
@@ -43,8 +49,9 @@ export const usePhotoStore = create<PhotoStore>()(
 		setQuery: (query) => {
 			console.log("🔄 PHOTO STORE: setQuery called with", query);
 			console.trace("setQuery stack trace:");
-			set({ query });
+			set({ query, altSearch: { active: false, original: "", applied: "" } });
 		},
+		setAltSearch: (alt) => set({ altSearch: alt }),
 		setTopK: (topK) => {
 			console.log("🔄 PHOTO STORE: setTopK called with", topK);
 			console.trace("setTopK stack trace:");
@@ -102,6 +109,7 @@ export const usePhotoStore = create<PhotoStore>()(
 // Selectors for optimized subscriptions
 export const useSearchResults = () => usePhotoStore((state) => state.results);
 export const useSearchQuery = () => usePhotoStore((state) => state.query);
+export const useAltSearch = () => usePhotoStore((state) => state.altSearch);
 export const useSearchId = () => usePhotoStore((state) => state.searchId);
 export const useFavorites = () => usePhotoStore((state) => state.fav);
 export const useFavOnly = () => usePhotoStore((state) => state.favOnly);
@@ -118,10 +126,11 @@ export const useLibrary = () => usePhotoStore((state) => state.library);
 export const useLibHasMore = () => usePhotoStore((state) => state.libHasMore);
 
 // Stable actions selector
-const photoActionsSelector = (state: any) => ({
+const photoActionsSelector = (state: unknown) => ({
 	setResults: state.setResults,
 	setSearchId: state.setSearchId,
 	setQuery: state.setQuery,
+	setAltSearch: state.setAltSearch,
 	setTopK: state.setTopK,
 	setFavorites: state.setFavorites,
 	setFavOnly: state.setFavOnly,

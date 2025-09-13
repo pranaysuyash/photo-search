@@ -1,5 +1,5 @@
 export interface StatsBarProps {
-	items: any[];
+	items: unknown[];
 	note: string;
 	diag: {
 		engines?: Array<{

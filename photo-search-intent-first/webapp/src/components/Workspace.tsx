@@ -17,9 +17,9 @@ export default function Workspace({ workspace, setWorkspace }: WorkspaceProps) {
 					<div className="text-gray-600">No extra folders yet.</div>
 				) : (
 					<div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-						{workspace.map((p, i) => (
+						{workspace.map((p, _i) => (
 							<div
-								key={`folder-${i}`}
+								key={`item-${String(p)}`}
 								className="border rounded p-2 flex items-center justify-between"
 							>
 								<div className="font-mono text-xs truncate" title={p}>

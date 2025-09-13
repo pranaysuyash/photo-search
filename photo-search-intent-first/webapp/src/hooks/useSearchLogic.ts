@@ -70,29 +70,29 @@ export const useSearchLogic = (_options: SearchLogicOptions) => {
 					return;
 				}
 
-                try {
-                    await _withErrorHandling(
-                        async () => {
-                            uiActions.setBusy("Searching similar…");
-                            const r = await apiSearchLike(dir, _path, engine, topK);
-                            photoActions.setResults(r.results || []);
-                            return r.results || [];
-                        },
-                        {
-                            ...defaultErrorOptions,
-                            context: {
-                                ...defaultErrorOptions.context,
-                                action: "searchLikeThis",
-                                metadata: { path: _path, engine, topK },
-                            },
-                            fallbackMessage: "Similarity search failed",
-                        },
-                    );
-                } catch {
-                    // Swallow errors per tests; logging handled by error util
-                } finally {
-                    uiActions.setBusy("");
-                }
+				try {
+					await _withErrorHandling(
+						async () => {
+							uiActions.setBusy("Searching similar…");
+							const r = await apiSearchLike(dir, _path, engine, topK);
+							photoActions.setResults(r.results || []);
+							return r.results || [];
+						},
+						{
+							...defaultErrorOptions,
+							context: {
+								...defaultErrorOptions.context,
+								action: "searchLikeThis",
+								metadata: { path: _path, engine, topK },
+							},
+							fallbackMessage: "Similarity search failed",
+						},
+					);
+				} catch {
+					// Swallow errors per tests; logging handled by error util
+				} finally {
+					uiActions.setBusy("");
+				}
 			},
 			[dir, engine, topK, uiActions, photoActions],
 		);
@@ -102,25 +102,25 @@ export const useSearchLogic = (_options: SearchLogicOptions) => {
 			async (_path: string) => {
 				if (!dir || !_path) return;
 
-                try {
-                    await _withErrorHandling(
-                        async () => {
-                            await apiSetFavorite(dir, _path, !fav.includes(_path));
-                            await loadFav();
-                        },
-                        {
-                            ...defaultErrorOptions,
-                            context: {
-                                ...defaultErrorOptions.context,
-                                action: "toggleFavorite",
-                                metadata: { path: _path },
-                            },
-                            fallbackMessage: "Failed to update favorite",
-                        },
-                    );
-                } catch {
-                    // Swallow errors per tests
-                }
+				try {
+					await _withErrorHandling(
+						async () => {
+							await apiSetFavorite(dir, _path, !fav.includes(_path));
+							await loadFav();
+						},
+						{
+							...defaultErrorOptions,
+							context: {
+								...defaultErrorOptions.context,
+								action: "toggleFavorite",
+								metadata: { path: _path },
+							},
+							fallbackMessage: "Failed to update favorite",
+						},
+					);
+				} catch {
+					// Swallow errors per tests
+				}
 			},
 			[dir, fav, loadFav],
 		);
@@ -130,30 +130,30 @@ export const useSearchLogic = (_options: SearchLogicOptions) => {
 			async (_path: string) => {
 				if (!dir || !_path) return;
 
-                try {
-                    await _withErrorHandling(
-                        async () => {
-                            await apiOpen(dir, _path);
-                        },
-                        {
-                            ...defaultErrorOptions,
-                            context: {
-                                ...defaultErrorOptions.context,
-                                action: "revealPhoto",
-                                metadata: { path: _path },
-                            },
-                            fallbackMessage: "Failed to open photo location",
-                        },
-                    );
-                } catch {
-                    // Swallow errors per tests
-                }
+				try {
+					await _withErrorHandling(
+						async () => {
+							await apiOpen(dir, _path);
+						},
+						{
+							...defaultErrorOptions,
+							context: {
+								...defaultErrorOptions.context,
+								action: "revealPhoto",
+								metadata: { path: _path },
+							},
+							fallbackMessage: "Failed to open photo location",
+						},
+					);
+				} catch {
+					// Swallow errors per tests
+				}
 			},
 			[dir],
 		);
 
 	const buildSearchUrl = // biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency exclusion
-		useCallback((searchText: string, filters: any = {}) => {
+		useCallback((searchText: string, filters: unknown = {}) => {
 			const sp = new URLSearchParams();
 
 			if (searchText?.trim()) {
@@ -278,10 +278,10 @@ export const useSearchLogic = (_options: SearchLogicOptions) => {
 			const q = _searchParams.get("q") || "";
 
 			// For backwards compatibility in tests: when empty params, return {}
-			if (!hasAny && !q) return {} as any;
+			if (!hasAny && !q) return {} as unknown;
 
 			// Return both flattened and nested shapes for convenience and test parity
-			const result: any = { ...f, filters: { ...f } };
+			const result: unknown = { ...f, filters: { ...f } };
 			if (q) result.query = q;
 			return result;
 		}, []);

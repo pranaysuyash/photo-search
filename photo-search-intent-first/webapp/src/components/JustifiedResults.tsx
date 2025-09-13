@@ -16,7 +16,7 @@ interface TouchState {
 	longPressTimer: number | null;
 }
 
-const JustifiedResults = memo<{
+interface JustifiedResultsProps {
 	dir: string;
 	engine: string;
 	items: Item[];
@@ -30,7 +30,9 @@ const JustifiedResults = memo<{
 	onLayout?: (rows: number[][]) => void;
 	ratingMap?: Record<string, number>;
 	showInfoOverlay?: boolean;
-}>(
+}
+
+const JustifiedResults = memo(
 	({
 		dir,
 		engine,
@@ -45,7 +47,7 @@ const JustifiedResults = memo<{
 		onLayout,
 		ratingMap,
 		showInfoOverlay,
-	}) => {
+	}: JustifiedResultsProps) => {
 		const contentRef = useRef<HTMLDivElement>(null);
 		const [width, setWidth] = useState<number>(0);
 		const [ratios, setRatios] = useState<Record<string, number>>({});
@@ -56,7 +58,7 @@ const JustifiedResults = memo<{
 			{},
 		);
 		const defaultRatio = 4 / 3;
-		const [metaCache, setMetaCache] = useState<Record<string, any>>({});
+		const [metaCache, setMetaCache] = useState<Record<string, import("../models/PhotoMeta").PhotoMeta>>({});
 
 		// Observe container width
 		useEffect(() => {
@@ -97,7 +99,7 @@ const JustifiedResults = memo<{
 			const rows: { items: Item[]; height: number }[] = [];
 			let row: Item[] = [];
 			let sumRatios = 0;
-			const innerWidth = Math.max(0, width - 2 * 16); // account for page padding if any
+			const innerWidth = Math.max(0, width - 2 * 16); // account for page padding if unknown
 			const maxW = innerWidth;
 			items.forEach((it, _idx) => {
 				const r = ratios[it.path] || defaultRatio;
@@ -146,7 +148,7 @@ const JustifiedResults = memo<{
 			const touch = e.touches[0];
 			const now = Date.now();
 
-			// Clear any existing timer for this item
+			// Clear unknown existing timer for this item
 			if (touchState[path]?.longPressTimer) {
 				clearTimeout(touchState[path].longPressTimer);
 			}
@@ -311,7 +313,7 @@ const JustifiedResults = memo<{
 					try {
 						const r = await apiMetadataDetail(dir, p);
 						if (!cancelled && r && r.meta) {
-							setMetaCache((m) => (m[p] ? m : { ...m, [p]: r.meta }));
+							setMetaCache((m) => (m[p] ? m : { ...m, [p]: r.meta as Partial<import("../models/PhotoMeta").PhotoMeta> }));
 						}
 					} catch {
 						// ignore
@@ -337,7 +339,7 @@ const JustifiedResults = memo<{
 					try {
 						const r = await apiMetadataDetail(dir, p);
 						if (!cancelled && r && r.meta)
-							setMetaCache((m) => (m[p] ? m : { ...m, [p]: r.meta }));
+							setMetaCache((m) => (m[p] ? m : { ...m, [p]: r.meta as Partial<import("../models/PhotoMeta").PhotoMeta> }));
 					} catch {}
 				}),
 			);
@@ -396,6 +398,12 @@ const JustifiedResults = memo<{
 											style={{ width: w, height: h }}
 											onClick={() => onToggleSelect(it.path)}
 											onDoubleClick={() => onOpen(it.path)}
+											onKeyDown={(e) => {
+												if (e.key === "Enter" || e.key === " ") {
+													e.preventDefault();
+													onToggleSelect(it.path);
+												}
+											}}
 											onTouchStart={(e) => handleTouchStart(it.path, e)}
 											onTouchMove={(e) => handleTouchMove(it.path, e)}
 											onTouchEnd={(e) => handleTouchEnd(it.path, e)}
@@ -408,9 +416,8 @@ const JustifiedResults = memo<{
 										>
 											<LazyImage
 												src={thumbUrl(dir, engine, it.path, 256)}
-												alt={it.path}
+												alt={base}
 												className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
-												enableProgressiveLoading={true}
 											/>
 											{/* Video indicator */}
 											{VideoService.isVideoFile(it.path) && (
@@ -439,9 +446,9 @@ const JustifiedResults = memo<{
 															}
 															if (typeof it.score === "number")
 																chips.push(it.score.toFixed(2));
-															return chips.slice(0, 3).map((c, idx) => (
+															return chips.slice(0, 3).map((c, _idx) => (
 																<span
-																	key={`item-${idx}`}
+																	key={`item-${String(c)}`}
 																	className="bg-white/20 rounded px-1 whitespace-nowrap"
 																>
 																	{c}
@@ -454,9 +461,10 @@ const JustifiedResults = memo<{
 											{/* Rating overlay */}
 											{ratingMap &&
 												typeof ratingMap[it.path] === "number" &&
-												ratingMap[it.path]! > 0 && (
+												ratingMap[it.path] > 0 && (
 													<div className="absolute bottom-1 left-1 px-1 py-0.5 rounded bg-black/50 text-yellow-300 text-[10px] flex items-center gap-0.5">
 														<svg
+															aria-label="Rating star"
 															width="10"
 															height="10"
 															viewBox="0 0 24 24"
@@ -472,6 +480,7 @@ const JustifiedResults = memo<{
 											{isSel && (
 												<div className="absolute top-2 right-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
 													<svg
+														aria-label="Selected"
 														className="w-4 h-4 text-white"
 														viewBox="0 0 20 20"
 														fill="currentColor"
@@ -489,6 +498,13 @@ const JustifiedResults = memo<{
 												<div
 													className="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center gap-3"
 													onClick={() => setShowTouchOverlay(null)}
+													onKeyDown={(e) => {
+														if (e.key === "Escape") {
+															setShowTouchOverlay(null);
+														}
+													}}
+													role="dialog"
+													tabIndex={-1}
 												>
 													<div className="text-white text-sm font-medium mb-2">
 														Quick Actions

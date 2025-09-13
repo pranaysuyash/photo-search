@@ -14,7 +14,7 @@ import {
 	Heart,
 	Info,
 	Loader2,
-	Map,
+	Map as MapIcon,
 	MessageSquare,
 	Moon,
 	Navigation,
@@ -62,44 +62,72 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 	} | null>(null);
 
 	// Library state
-	const [photos, setPhotos] = useState<Array<{ path: string; name: string; size: number; modified: Date }>>([]);
+	const [photos, setPhotos] = useState<
+		Array<{ path: string; name: string; size: number; modified: Date }>
+	>([]);
 	const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set());
 	const [searchQuery, setSearchQuery] = useState("");
-	const [searchResults, setSearchResults] = useState<Array<{ path: string; score: number }>>([]);
+	const [searchResults, setSearchResults] = useState<
+		Array<{ path: string; score: number }>
+	>([]);
 
 	// Collections state
 	const [collections, setCollections] = useState<Record<string, string[]>>({});
-	const [smartCollections, setSmartCollections] = useState<Record<string, { query: string; count?: number }>>(
-		{},
-	);
+	const [smartCollections, setSmartCollections] = useState<
+		Record<string, { query: string; count?: number }>
+	>({});
 	const [_selectedCollection, _setSelectedCollection] = useState<string | null>(
 		null,
 	);
 
 	// People state
-	const [faceClusters, setFaceClusters] = useState<Array<{ id: string; photos: string[]; name?: string }>>([]);
+	const [faceClusters, setFaceClusters] = useState<
+		Array<{ id: string; photos: string[]; name?: string }>
+	>([]);
 	const [_namedPeople, setNamedPeople] = useState<Map<string, string>>(
 		new Map(),
 	);
 
 	// Places state
-	const [trips, setTrips] = useState<Array<{ id: string; name: string; startDate: string; endDate: string; photos: string[] }>>([]);
-	const [_mapData, setMapData] = useState<{ markers: Array<{ lat: number; lng: number; photos: string[] }> } | null>(null);
+	const [trips, setTrips] = useState<
+		Array<{
+			id: string;
+			name: string;
+			startDate: string;
+			endDate: string;
+			photos: string[];
+		}>
+	>([]);
+	const [_mapData, setMapData] = useState<{
+		markers: Array<{ lat: number; lng: number; photos: string[] }>;
+	} | null>(null);
 
 	// Metadata state
 	const [_tags, setTags] = useState<string[]>([]);
-	const [_metadata, setMetadata] = useState<Record<string, { width?: number; height?: number; date?: string; camera?: string }> | null>(null);
+	const [_metadata, setMetadata] = useState<Record<
+		string,
+		{ width?: number; height?: number; date?: string; camera?: string }
+	> | null>(null);
 	const [favorites, setFavorites] = useState<string[]>([]);
-	const [_savedSearches, setSavedSearches] = useState<Array<{ name: string; query: string }>>([]);
+	const [_savedSearches, setSavedSearches] = useState<
+		Array<{ name: string; query: string }>
+	>([]);
 
 	// Edit state
 	const [_editMode, _setEditMode] = useState(false);
 	const [_editingPhoto, _setEditingPhoto] = useState<string | null>(null);
 
 	// System state
-	const [diagnostics, setDiagnostics] = useState<{ engines: Array<{ key: string; index_dir: string; count: number }>; free_gb: number; os: string; folder: string } | null>(null);
+	const [diagnostics, setDiagnostics] = useState<{
+		engines: Array<{ key: string; index_dir: string; count: number }>;
+		free_gb: number;
+		os: string;
+		folder: string;
+	} | null>(null);
 	// Developer-only TODOs removed
-	const [lookalikes, setLookalikes] = useState<Array<{ group: string[]; similarity: number }>>([]);
+	const [lookalikes, setLookalikes] = useState<
+		Array<{ group: string[]; similarity: number }>
+	>([]);
 
 	// Notification handler
 	const showNotification = useCallback((type: string, message: string) => {
@@ -213,7 +241,7 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 		try {
 			await api.current.nameFaceCluster(clusterId, name);
 			setNamedPeople((prev: Map<string, string>) => {
-				const newMap = new (Map as any)(prev);
+				const newMap = new Map(prev);
 				newMap.set(clusterId, name);
 				return newMap;
 			});
@@ -224,7 +252,10 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 	};
 
 	// Image editing
-	const _editImage = async (path: string, operations: any) => {
+	const _editImage = async (
+		path: string,
+		operations: Record<string, unknown>,
+	) => {
 		if (!api.current) return;
 
 		try {
@@ -416,7 +447,7 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 						onClick={() => setActiveView("places")}
 						className={`w-full text-left p-2 rounded ${activeView === "places" ? "bg-blue-600" : "hover:bg-gray-800"}`}
 					>
-						<Map className="inline w-4 h-4 mr-2" />
+						<MapIcon className="inline w-4 h-4 mr-2" />
 						Places & Trips ({trips.length})
 					</button>
 
@@ -600,7 +631,8 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 					{activeView === "library" && (
 						<div className="grid grid-cols-6 gap-2">
 							{photos.map((photo) => (
-								<div
+								<button
+									type="button"
 									key={photo}
 									className={`relative cursor-pointer ${selectedPhotos.has(photo) ? "ring-2 ring-blue-500" : ""}`}
 									onClick={() => {
@@ -612,6 +644,20 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 										}
 										setSelectedPhotos(newSelection);
 									}}
+									onKeyDown={(e) => {
+										if (e.key === "Enter" || e.key === " ") {
+											e.preventDefault();
+											const newSelection = new Set(selectedPhotos);
+											if (newSelection.has(photo)) {
+												newSelection.delete(photo);
+											} else {
+												newSelection.add(photo);
+											}
+											setSelectedPhotos(newSelection);
+										}
+									}}
+									aria-pressed={selectedPhotos.has(photo)}
+									aria-label={`Select photo ${photo}`}
 								>
 									<img
 										src={api.current?.getThumbnailUrl(photo) || ""}
@@ -623,7 +669,7 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 											<Check className="w-4 h-4 text-white" />
 										</div>
 									)}
-								</div>
+								</button>
 							))}
 						</div>
 					)}

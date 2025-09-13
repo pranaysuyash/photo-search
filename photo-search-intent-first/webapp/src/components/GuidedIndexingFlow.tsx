@@ -32,8 +32,8 @@ export function GuidedIndexingFlow({
 	isVisible,
 	onComplete,
 	onCancel,
-	directory,
-	engine,
+	directory: _directory,
+	engine: _engine,
 }: GuidedIndexingFlowProps) {
 	const [status, setStatus] = useState<IndexingStatus>({
 		phase: "scanning",

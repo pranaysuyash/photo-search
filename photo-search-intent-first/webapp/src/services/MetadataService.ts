@@ -168,7 +168,7 @@ class MetadataService {
 		return metadata;
 	}
 
-	private parseNumber(value: any): number | undefined {
+	private parseNumber(value: unknown): number | undefined {
 		if (typeof value === "number") return value;
 		if (typeof value === "string") {
 			const parsed = parseFloat(value);
@@ -177,7 +177,7 @@ class MetadataService {
 		return undefined;
 	}
 
-	private parseKeywords(value: any): string[] | undefined {
+	private parseKeywords(value: unknown): string[] | undefined {
 		if (Array.isArray(value)) return value.filter((k) => typeof k === "string");
 		if (typeof value === "string")
 			return value
@@ -204,7 +204,7 @@ class MetadataService {
 	}
 
 	// Format EXIF values for display
-	formatExifValue(key: string, value: any): string {
+	formatExifValue(key: string, value: unknown): string {
 		if (value === null || value === undefined) return "N/A";
 
 		switch (key) {

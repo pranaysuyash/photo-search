@@ -1,13 +1,5 @@
 import type React from "react";
-
-interface FocusTrapProps {
-	onEscape: () => void;
-	children: React.ReactNode;
-}
-
-const FocusTrap: React.FC<FocusTrapProps> = ({ onEscape, children }) => {
-	return <div>{children}</div>;
-};
+import { FocusTrap } from "../../utils/accessibility";
 
 interface SaveModalProps {
 	dir: string;
@@ -17,7 +9,7 @@ interface SaveModalProps {
 	onClose: () => void;
 	setSelectedView: (view: string) => void;
 	photoActions: {
-		setSaved: (saved: any[]) => void;
+		setSaved: (saved: Array<{ name: string; query: string; top_k?: number }>) => void;
 	};
 	uiActions: {
 		setNote: (message: string) => void;

@@ -20,7 +20,7 @@ describe("ResultsGrid", () => {
 			<ResultsGrid
 				dir="/pics"
 				engine="local"
-				results={results as any}
+				results={results as unknown}
 				selected={{}}
 				onToggleSelect={onToggle}
 				onOpen={onOpen}
@@ -38,7 +38,7 @@ describe("ResultsGrid", () => {
 			<ResultsGrid
 				dir="/pics"
 				engine="local"
-				results={[{ path: "/c.jpg", score: 0.123 }] as any}
+				results={[{ path: "/c.jpg", score: 0.123 }] as unknown}
 				selected={{}}
 				onToggleSelect={() => {}}
 				onOpen={() => {}}

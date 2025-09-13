@@ -40,7 +40,7 @@ MemoizedButton.displayName = "MemoizedButton";
 
 // Memoized icon wrapper to prevent icon re-renders
 export const MemoizedIcon = memo<{
-	Icon: React.ComponentType<any>;
+	Icon: React.ComponentType<unknown>;
 	className?: string;
 	size?: number;
 }>(({ Icon, className, size }) => <Icon className={className} size={size} />);

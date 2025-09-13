@@ -24,14 +24,15 @@ const PerformanceMonitor = memo(() => {
 
 		const updateStats = () => {
 			const cacheStats = imageLoadingService.getCacheStats();
-			const memory = (performance as any).memory;
+			const memory = (performance as unknown).memory;
 
 			const newStats: PerformanceStats = {
 				renderTime: performance.now(),
 				memoryUsage: memory ? memory.usedJSHeapSize / 1024 / 1024 : 0,
 				imageCache: cacheStats,
 				networkRequests:
-					(performance as any).getEntriesByType?.("navigation")?.length || 0,
+					(performance as unknown).getEntriesByType?.("navigation")?.length ||
+					0,
 			};
 
 			setStats(newStats);

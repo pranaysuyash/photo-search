@@ -22,7 +22,13 @@ import {
 	ZoomIn,
 	ZoomOut,
 } from "lucide-react";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 
 export interface AppCommand {
 	id: string;
@@ -132,19 +138,22 @@ export function CommandPalette({
 		}
 	}, [isOpen]);
 
-	const executeCommand = (command: AppCommand) => {
-		command.action();
-		onClose();
+	const executeCommand = useCallback(
+		(command: AppCommand) => {
+			command.action();
+			onClose();
 
-		// Track command usage
-		const stored = localStorage.getItem("recent-commands") || "[]";
-		const recent = JSON.parse(stored) as string[];
-		const updated = [
-			command.id,
-			...recent.filter((id) => id !== command.id),
-		].slice(0, 5);
-		localStorage.setItem("recent-commands", JSON.stringify(updated));
-	};
+			// Track command usage
+			const stored = localStorage.getItem("recent-commands") || "[]";
+			const recent = JSON.parse(stored) as string[];
+			const updated = [
+				command.id,
+				...recent.filter((id) => id !== command.id),
+			].slice(0, 5);
+			localStorage.setItem("recent-commands", JSON.stringify(updated));
+		},
+		[onClose],
+	);
 
 	// Keyboard navigation
 	useEffect(() => {
@@ -361,7 +370,13 @@ export const defaultCommands: AppCommand[] = [
 		icon: <Grid className="w-4 h-4" />,
 		shortcut: ["g", "h"],
 		category: "navigate",
-		action: () => (window.location.href = "/"),
+		action: () => {
+			try {
+				window.location.hash = "#/";
+			} catch {
+				window.location.href = "/";
+			}
+		},
 		keywords: ["main", "start", "beginning"],
 	},
 	{

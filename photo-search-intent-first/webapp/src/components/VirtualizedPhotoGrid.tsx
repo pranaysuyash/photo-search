@@ -19,7 +19,7 @@ interface Photo {
 	selected?: boolean;
 	type?: "image" | "video";
 	duration?: number;
-	matchReasons?: any[];
+	matchReasons?: unknown[];
 }
 
 interface VirtualizedPhotoGridProps {
@@ -196,6 +196,14 @@ export function VirtualizedPhotoGrid({
 				onMouseEnter={() => setHoveredPhoto(photo.id)}
 				onMouseLeave={() => setHoveredPhoto(null)}
 				onClick={() => onPhotoClick?.(photo, index)}
+				onKeyDown={(e) => {
+					if (e.key === "Enter" || e.key === " ") {
+						e.preventDefault();
+						onPhotoClick?.(photo, index);
+					}
+				}}
+				role="button"
+				tabIndex={0}
 			>
 				<div
 					className={`
@@ -246,6 +254,8 @@ export function VirtualizedPhotoGrid({
 							e.stopPropagation();
 							onPhotoSelect?.(photo, !isSelected);
 						}}
+						role="button"
+						tabIndex={0}
 					>
 						<div
 							className={`

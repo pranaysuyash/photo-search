@@ -147,10 +147,14 @@ export function QuickFilters({
 					</div>
 					<div className="grid grid-cols-2 gap-2">
 						<div>
-							<label className="block text-xs text-gray-600 mb-1">
+							<label
+								htmlFor="min-fstop"
+								className="block text-xs text-gray-600 mb-1"
+							>
 								Min f-stop
 							</label>
 							<input
+								id="min-fstop"
 								type="number"
 								step="0.1"
 								min="0.7"
@@ -162,10 +166,14 @@ export function QuickFilters({
 							/>
 						</div>
 						<div>
-							<label className="block text-xs text-gray-600 mb-1">
+							<label
+								htmlFor="max-fstop"
+								className="block text-xs text-gray-600 mb-1"
+							>
 								Max f-stop
 							</label>
 							<input
+								id="max-fstop"
 								type="number"
 								step="0.1"
 								min="0.7"
@@ -260,10 +268,14 @@ export function QuickFilters({
 					</div>
 					<div className="grid grid-cols-2 gap-2">
 						<div>
-							<label className="block text-xs text-gray-600 mb-1">
+							<label
+								htmlFor="min-iso"
+								className="block text-xs text-gray-600 mb-1"
+							>
 								Min ISO
 							</label>
 							<input
+								id="min-iso"
 								type="number"
 								min="50"
 								max="102400"
@@ -275,10 +287,14 @@ export function QuickFilters({
 							/>
 						</div>
 						<div>
-							<label className="block text-xs text-gray-600 mb-1">
+							<label
+								htmlFor="max-iso"
+								className="block text-xs text-gray-600 mb-1"
+							>
 								Max ISO
 							</label>
 							<input
+								id="max-iso"
 								type="number"
 								min="50"
 								max="102400"
@@ -346,8 +362,14 @@ export function QuickFilters({
 					)}
 					<div className="grid grid-cols-2 gap-2">
 						<div>
-							<label className="block text-xs text-gray-600 mb-1">From</label>
+							<label
+								htmlFor="date-from"
+								className="block text-xs text-gray-600 mb-1"
+							>
+								From
+							</label>
 							<input
+								id="date-from"
 								type="date"
 								value={dateFrom}
 								onChange={(e) => setDateFrom(e.target.value)}
@@ -355,8 +377,14 @@ export function QuickFilters({
 							/>
 						</div>
 						<div>
-							<label className="block text-xs text-gray-600 mb-1">To</label>
+							<label
+								htmlFor="date-to"
+								className="block text-xs text-gray-600 mb-1"
+							>
+								To
+							</label>
 							<input
+								id="date-to"
 								type="date"
 								value={dateTo}
 								onChange={(e) => setDateTo(e.target.value)}

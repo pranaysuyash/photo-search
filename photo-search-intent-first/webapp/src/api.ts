@@ -1,16 +1,11 @@
 export type SearchResult = { path: string; score: number; reasons?: string[] };
 
 interface WindowWithElectron extends Window {
-	electronAPI?: unknown;
+	electronAPI?: {
+		selectFolder: () => Promise<string | null>;
+	};
 	process?: {
 		type?: string;
-	};
-}
-
-interface ImportMetaWithEnv extends ImportMeta {
-	env?: {
-		VITE_API_BASE?: string;
-		VITE_API_TOKEN?: string;
 	};
 }
 
@@ -25,20 +20,29 @@ export function isElectron(): boolean {
 	);
 }
 
-// Prefer current origin when running under dev/proxy/Electron; fallback to env; then sensible default.
-export const API_BASE =
-	(import.meta as ImportMetaWithEnv).env?.VITE_API_BASE ||
-	(typeof window !== "undefined" &&
-		window.location &&
-		window.location.origin) ||
-	"http://127.0.0.1:8000";
+// Compute API base URL robustly across web, dev, and Electron (file://) contexts
+function computeApiBase(): string {
+  const envBase = (import.meta as unknown).env?.VITE_API_BASE;
+  if (envBase) return envBase;
+  try {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    // Use real HTTP origin only
+    if (origin && origin.startsWith("http")) return origin;
+  } catch {}
+  // In Electron packaged builds (file:// origin), talk to the bundled API server
+  if (isElectron()) return "http://127.0.0.1:8000";
+  // Fallback sensible default for dev server
+  return "http://127.0.0.1:5173"; // overridden by env in real deployments
+}
+
+export const API_BASE = computeApiBase();
 
 function authHeaders() {
 	try {
 		// Runtime token from localStorage should take precedence in dev
 		const ls =
 			typeof window !== "undefined" ? localStorage.getItem("api_token") : null;
-		const envTok = (import.meta as ImportMetaWithEnv).env?.VITE_API_TOKEN;
+			const envTok = (import.meta as unknown).env?.VITE_API_TOKEN;
 		const token = ls || envTok;
 		if (token)
 			return { Authorization: `Bearer ${token}` } as Record<string, string>;
@@ -450,16 +454,23 @@ export async function apiAddSaved(
 	query: string,
 	topK: number,
 ) {
-	return post<{ ok: boolean; saved: Array<{ query: string; name: string }> }>("/saved", {
-		dir,
-		name,
-		query,
-		top_k: topK,
-	});
+	return post<{ ok: boolean; saved: Array<{ query: string; name: string }> }>(
+		"/saved",
+		{
+			dir,
+			name,
+			query,
+			top_k: topK,
+		},
+	);
 }
 
 export async function apiDeleteSaved(dir: string, name: string) {
-	return post<{ ok: boolean; deleted: number; saved: Array<{ query: string; name: string }> }>("/saved/delete", {
+	return post<{
+		ok: boolean;
+		deleted: number;
+		saved: Array<{ query: string; name: string }>;
+	}>("/saved/delete", {
 		dir,
 		name,
 	});
@@ -846,14 +857,20 @@ export async function apiGetSmart(dir: string) {
 		`${API_BASE}/smart_collections?dir=${encodeURIComponent(dir)}`,
 	);
 	if (!r.ok) throw new Error(await r.text());
-	return r.json() as Promise<{ smart: Record<string, { query: string; count?: number }> }>;
+	return r.json() as Promise<{
+		smart: Record<string, { query: string; count?: number }>;
+	}>;
 }
 
-export async function apiSetSmart(dir: string, name: string, rules: { query: string; count?: number }) {
-	return post<{ ok: boolean; smart: Record<string, { query: string; count?: number }> }>(
-		"/smart_collections",
-		{ dir, name, rules },
-	);
+export async function apiSetSmart(
+	dir: string,
+	name: string,
+	rules: { query: string; count?: number } & Record<string, unknown>,
+) {
+	return post<{
+		ok: boolean;
+		smart: Record<string, { query: string; count?: number }>;
+	}>("/smart_collections", { dir, name, rules });
 }
 
 export async function apiDeleteSmart(dir: string, name: string) {
@@ -929,7 +946,15 @@ export async function apiFacesName(
 	});
 }
 export async function apiTripsBuild(dir: string, provider: string) {
-	return post<{ trips: Array<{ id: string; name: string; startDate: string; endDate: string; photos: string[] }> }>("/trips/build", { dir, provider });
+	return post<{
+		trips: Array<{
+			id: string;
+			name: string;
+			startDate: string;
+			endDate: string;
+			photos: string[];
+		}>;
+	}>("/trips/build", { dir, provider });
 }
 export async function apiTripsList(dir: string) {
 	const r = await fetch(`${API_BASE}/trips?dir=${encodeURIComponent(dir)}`);
@@ -1259,7 +1284,10 @@ export async function apiGetExcludes(_dir: string): Promise<string[]> {
 	throw new Error("Not implemented: apiGetExcludes");
 }
 
-export async function apiModelsCapabilities(): Promise<{ models: string[]; capabilities: Record<string, boolean> }> {
+export async function apiModelsCapabilities(): Promise<{
+	models: string[];
+	capabilities: Record<string, boolean>;
+}> {
 	throw new Error("Not implemented: apiModelsCapabilities");
 }
 
@@ -1283,7 +1311,10 @@ export async function apiWatchStart(
 	throw new Error("Not implemented: apiWatchStart");
 }
 
-export async function apiWatchStatus(): Promise<{ watching: boolean; folders: string[] }> {
+export async function apiWatchStatus(): Promise<{
+	watching: boolean;
+	folders: string[];
+}> {
 	throw new Error("Not implemented: apiWatchStatus");
 }
 

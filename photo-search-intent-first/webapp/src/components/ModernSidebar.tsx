@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
 	Activity,
 	Bookmark,
@@ -189,6 +189,7 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 		);
 	};
 
+	const prefersReducedMotion = useReducedMotion();
 	return (
 		<>
 			{/* Sidebar */}
@@ -203,17 +204,21 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 				<div className="p-6 border-b border-gray-200/50 dark:border-gray-700/50 bg-gradient-to-r from-blue-500/5 to-purple-500/5 dark:from-blue-600/10 dark:to-purple-600/10">
 					<div className="flex items-center gap-4">
 						<motion.div
-							whileHover={{ rotate: 360 }}
-							transition={{ duration: 0.5 }}
+							{...(prefersReducedMotion
+								? {}
+								: {
+										whileHover: { rotate: 360 },
+										transition: { duration: 0.5 },
+									})}
 							className="w-12 h-12 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg"
 						>
 							<Brain className="w-7 h-7 text-white" />
 						</motion.div>
 						{!isCollapsed && (
 							<motion.div
-								initial={{ opacity: 0 }}
+								initial={prefersReducedMotion ? false : { opacity: 0 }}
 								animate={{ opacity: 1 }}
-								exit={{ opacity: 0 }}
+								exit={prefersReducedMotion ? false : { opacity: 0 }}
 							>
 								<h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
 									PhotoVault
@@ -302,7 +307,7 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 				{/* AI Status Panel */}
 				{!isCollapsed && (
 					<motion.div
-						initial={{ opacity: 0, y: 20 }}
+						initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
 						animate={{ opacity: 1, y: 0 }}
 						className="p-6 border-t border-gray-200/50 dark:border-gray-700/50"
 					>
@@ -349,8 +354,9 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 					{!isCollapsed ? (
 						<>
 							<motion.button
-								whileHover={{ scale: 1.02 }}
-								whileTap={{ scale: 0.98 }}
+								{...(prefersReducedMotion
+									? {}
+									: { whileHover: { scale: 1.02 }, whileTap: { scale: 0.98 } })}
 								onClick={onSelectLibrary}
 								className="w-full flex items-center justify-center gap-3 px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-2xl hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-lg shadow-blue-500/25 font-semibold"
 							>
@@ -359,8 +365,12 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 							</motion.button>
 							<div className="grid grid-cols-2 gap-2">
 								<motion.button
-									whileHover={{ scale: 1.05 }}
-									whileTap={{ scale: 0.95 }}
+									{...(prefersReducedMotion
+										? {}
+										: {
+												whileHover: { scale: 1.05 },
+												whileTap: { scale: 0.95 },
+											})}
 									onClick={onSettingsClick}
 									className="flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
 								>
@@ -368,8 +378,12 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 									<span className="text-sm">Settings</span>
 								</motion.button>
 								<motion.button
-									whileHover={{ scale: 1.05 }}
-									whileTap={{ scale: 0.95 }}
+									{...(prefersReducedMotion
+										? {}
+										: {
+												whileHover: { scale: 1.05 },
+												whileTap: { scale: 0.95 },
+											})}
 									onClick={onDarkModeToggle}
 									className="flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
 								>
@@ -384,16 +398,18 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 					) : (
 						<div className="space-y-2">
 							<motion.button
-								whileHover={{ scale: 1.1 }}
-								whileTap={{ scale: 0.9 }}
+								{...(prefersReducedMotion
+									? {}
+									: { whileHover: { scale: 1.1 }, whileTap: { scale: 0.9 } })}
 								onClick={onSelectLibrary}
 								className="w-full flex items-center justify-center p-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-2xl hover:from-blue-600 hover:to-purple-700 transition-all duration-200"
 							>
 								<HardDrive className="w-6 h-6" />
 							</motion.button>
 							<motion.button
-								whileHover={{ scale: 1.1 }}
-								whileTap={{ scale: 0.9 }}
+								{...(prefersReducedMotion
+									? {}
+									: { whileHover: { scale: 1.1 }, whileTap: { scale: 0.9 } })}
 								onClick={onSettingsClick}
 								className="w-full flex items-center justify-center p-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
 							>
@@ -405,14 +421,15 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 
 				{/* Collapse Toggle Button */}
 				<motion.button
-					whileHover={{ scale: 1.1 }}
-					whileTap={{ scale: 0.9 }}
+					{...(prefersReducedMotion
+						? {}
+						: { whileHover: { scale: 1.1 }, whileTap: { scale: 0.9 } })}
 					onClick={() => setIsCollapsed(!isCollapsed)}
 					className="absolute -right-4 top-24 w-8 h-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 shadow-lg hover:shadow-xl transition-all duration-200 z-10"
 				>
 					<motion.div
 						animate={{ rotate: isCollapsed ? 180 : 0 }}
-						transition={{ duration: 0.3 }}
+						transition={prefersReducedMotion ? undefined : { duration: 0.3 }}
 					>
 						<ChevronLeft className="w-4 h-4" />
 					</motion.div>
@@ -422,9 +439,9 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 			{/* Mobile Overlay */}
 			{isCompact && !isCollapsed && (
 				<motion.div
-					initial={{ opacity: 0 }}
+					initial={prefersReducedMotion ? false : { opacity: 0 }}
 					animate={{ opacity: 1 }}
-					exit={{ opacity: 0 }}
+					exit={prefersReducedMotion ? false : { opacity: 0 }}
 					onClick={() => setIsCollapsed(true)}
 					className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
 				/>

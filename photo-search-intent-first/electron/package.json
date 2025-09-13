@@ -4,7 +4,7 @@
   "main": "main.js",
   "private": true,
   "scripts": {
-    "dev": "electron .",
+    "dev": "node run-electron.js",
     "build:ui": "cd ../webapp && npm install && npm run build",
     "pack": "npm run build:ui && electron-builder --dir",
     "dist": "npm run build:ui && electron-builder -mwl"

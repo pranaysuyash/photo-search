@@ -64,7 +64,7 @@ interface UseAsyncReturn<T> {
  * // Execute the operation
  * execute(userId);
  */
-export function useAsync<T = any>(
+export function useAsync<T = unknown>(
 	asyncFunction: (...args: unknown[]) => Promise<T>,
 	options: UseAsyncOptions<T> = {},
 ): UseAsyncReturn<T> {
@@ -277,7 +277,7 @@ export function useAsync<T = any>(
 /**
  * Specialized hook for API operations with common error patterns
  */
-export function useApi<T = any>(
+export function useApi<T = unknown>(
 	apiFunction: (...args: unknown[]) => Promise<T>,
 	options: UseAsyncOptions<T> & {
 		resourceName?: string;
@@ -419,7 +419,7 @@ export function useAsyncOperations<
 /**
  * Hook for debounced async operations
  */
-export function useDebouncedAsync<T = any>(
+export function useDebouncedAsync<T = unknown>(
 	asyncFunction: (...args: unknown[]) => Promise<T>,
 	delay: number,
 	options: UseAsyncOptions<T> = {},

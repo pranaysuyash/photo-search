@@ -1,14 +1,8 @@
 import type React from "react";
 import { apiExport } from "../../api";
+import { announce, FocusTrap } from "../../utils/accessibility";
 
-interface FocusTrapProps {
-	onEscape: () => void;
-	children: React.ReactNode;
-}
-
-const FocusTrap: React.FC<FocusTrapProps> = ({ onEscape, children }) => {
-	return <div>{children}</div>;
-};
+// Use shared FocusTrap from utils/accessibility
 
 interface ExportModalProps {
 	selected: Set<string>;
@@ -67,7 +61,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 							(async () => {
 								try {
 									const paths = Array.from(selected);
-									const preset = _preset as any;
+									const preset = _preset as unknown;
 									let resizeLong: number | undefined;
 									let quality: number | undefined;
 									if (preset === "custom") {
@@ -105,6 +99,10 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 									);
 									uiActions.setNote(
 										`Exported ${r.copied}, skipped ${r.skipped}, errors ${r.errors} → ${r.dest}`,
+									);
+									announce(
+										`Exported ${r.copied} photo${r.copied === 1 ? "" : "s"}`,
+										"polite",
 									);
 								} catch (e) {
 									uiActions.setNote(

@@ -1,3 +1,4 @@
+// biome-ignore lint/complexity/noStaticOnlyClass: Service pattern
 /**
  * User Management Service
  * Handles user profiles, permissions, sharing, and collaboration
@@ -63,7 +64,7 @@ export interface Activity {
 	action: "view" | "edit" | "comment" | "share" | "favorite" | "delete";
 	resourceId: string;
 	resourceType: string;
-	metadata?: any;
+	metadata?: unknown;
 	timestamp: Date;
 }
 
@@ -270,7 +271,7 @@ export class UserManagementService {
 		action: Activity["action"],
 		resourceId: string,
 		resourceType: string,
-		metadata?: any,
+		metadata?: unknown,
 	): void {
 		if (!UserManagementService.currentUser) return;
 

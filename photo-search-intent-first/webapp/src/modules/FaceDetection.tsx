@@ -72,6 +72,8 @@ export function FaceDetection() {
 		<div
 			className={`face-cluster-card ${selectedCluster === cluster.id ? "selected" : ""}`}
 			onClick={() => setSelectedCluster(cluster.id)}
+			role="button"
+			tabIndex={0}
 		>
 			<div className="cluster-header">
 				{editingCluster === cluster.id ? (
@@ -132,7 +134,7 @@ export function FaceDetection() {
 
 			<div className="face-examples">
 				{cluster.examples.slice(0, 4).map(([path, embIdx], i) => (
-					<div key={`item-${i}`} className="face-thumbnail">
+					<div key={`item-${String(path)}`} className="face-thumbnail">
 						<img
 							src={api.getFaceThumbnailUrl(path, embIdx, 96)}
 							alt={`Face ${i + 1}`}

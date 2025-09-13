@@ -57,6 +57,19 @@ export default function FirstRunSetup({
 	const [starting, setStarting] = useState(false);
 	const [status, setStatus] = useState("");
 
+	const chooseWithOS = async () => {
+		try {
+			const p = await (window as unknown).electronAPI?.selectFolder?.();
+			if (typeof p === "string" && p.trim()) {
+				try {
+					(window as unknown).electronAPI?.setAllowedRoot?.(p);
+				} catch {}
+				onQuickStart([p]);
+				onClose();
+			}
+		} catch {}
+	};
+
 	useEffect(() => {
 		if (!open) return;
 		let cancelled = false;
@@ -167,9 +180,9 @@ export default function FirstRunSetup({
 												)}&limit=5`,
 											);
 											if (r.ok) {
-												const js = (await r.json()) as any;
+												const js = (await r.json()) as unknown;
 												const ev = (js.events || []).find(
-													(e: any) => e.type === "index",
+													(e: unknown) => e.type === "index",
 												);
 												if (ev) {
 													setStatus(
@@ -215,6 +228,17 @@ export default function FirstRunSetup({
 						>
 							Select Folders…
 						</button>
+						{typeof (window as unknown).electronAPI?.selectFolder ===
+							"function" && (
+							<button
+								type="button"
+								className="ml-2 px-3 py-1 rounded border text-sm"
+								onClick={chooseWithOS}
+								title="Choose a folder with the system dialog"
+							>
+								Choose with OS…
+							</button>
+						)}
 						<div className="mt-4 font-medium mb-1">📂 Demo Mode</div>
 						<div className="text-xs text-gray-600 mb-2">
 							Try with sample photos first

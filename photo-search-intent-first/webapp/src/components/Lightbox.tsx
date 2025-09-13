@@ -3,8 +3,9 @@ import type {
 	TouchEvent as ReactTouchEvent,
 	WheelEvent as ReactWheelEvent,
 } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiMetadataDetail, thumbUrl } from "../api";
+import type { PhotoMeta } from "../models/PhotoMeta";
 import { ImageEditor } from "../modules/ImageEditor";
 import { useTouchGestures } from "../services/TouchGestureService";
 import { FaceVerificationPanel } from "./FaceVerificationPanel";
@@ -31,7 +32,6 @@ export function Lightbox({
 	onFavorite: () => void;
 	onMoreLikeThis?: () => void;
 }) {
-	if (!path) return null;
 	const containerRef = useRef<HTMLDivElement>(null);
 	const imgRef = useRef<HTMLImageElement>(null);
 	const [scale, setScale] = useState(1);
@@ -46,7 +46,7 @@ export function Lightbox({
 	});
 	const [showInfo, setShowInfo] = useState(false);
 	const [infoLoading, setInfoLoading] = useState(false);
-	const [info, setInfo] = useState<any>(null);
+	const [info, setInfo] = useState<PhotoMeta | null>(null);
 	const [showEditor, setShowEditor] = useState(false);
 	const [_editedImagePath, setEditedImagePath] = useState<string>(path);
 	const [showQuality, setShowQuality] = useState(false);
@@ -66,40 +66,27 @@ export function Lightbox({
 		enablePullToRefresh: false,
 	});
 
-	// Set up gesture callbacks
-	useEffect(() => {
-		if (!touchGestureService) return;
+    // Gesture callbacks are registered after zoom/resetZoom are defined below
 
-		touchGestureService
-			.onSwipe((direction) => {
-				if (direction.left) onNext();
-				else if (direction.right) onPrev();
-			})
-			.onPinch((newScale, centerX, centerY) => {
-				zoom(newScale - scale, centerX, centerY);
-			})
-			.onDoubleTap((x, y) => {
-				if (scale === 1) zoom(1, x, y);
-				else resetZoom();
-			});
-	}, [touchGestureService, onPrev, onNext, scale, resetZoom, zoom]);
-
-	function zoom(delta: number, cx?: number, cy?: number) {
-		const prev = scale;
-		const next = Math.min(5, Math.max(1, +(prev + delta).toFixed(2)));
-		if (next === prev) return;
-		// Zoom towards cursor point
-		const img = imgRef.current;
-		if (img && cx !== undefined && cy !== undefined) {
-			const rect = img.getBoundingClientRect();
-			const px = cx - rect.left;
-			const py = cy - rect.top;
-			const k = next / prev;
-			setTx(tx + (px - px * k));
-			setTy(ty + (py - py * k));
-		}
-		setScale(next);
-	}
+	const zoom = useCallback(
+		(delta: number, cx?: number, cy?: number) => {
+			const prev = scale;
+			const next = Math.min(5, Math.max(1, +(prev + delta).toFixed(2)));
+			if (next === prev) return;
+			// Zoom towards cursor point
+			const img = imgRef.current;
+			if (img && cx !== undefined && cy !== undefined) {
+				const rect = img.getBoundingClientRect();
+				const px = cx - rect.left;
+				const py = cy - rect.top;
+				const k = next / prev;
+				setTx(tx + (px - px * k));
+				setTy(ty + (py - py * k));
+			}
+			setScale(next);
+		},
+		[scale, tx, ty],
+	);
 
 	function onWheel(e: ReactWheelEvent) {
 		e.preventDefault();
@@ -126,17 +113,35 @@ export function Lightbox({
 		setPanning(false);
 	}
 
-	function resetZoom() {
+	const resetZoom = useCallback(() => {
 		setScale(1);
 		setTx(0);
 		setTy(0);
-	}
+	}, []);
 	function zoomIn() {
 		zoom(0.2);
 	}
-	function zoomOut() {
-		zoom(-0.2);
-	}
+  function zoomOut() {
+    zoom(-0.2);
+  }
+
+  // Set up gesture callbacks (after zoom/resetZoom are declared)
+  useEffect(() => {
+    if (!touchGestureService) return;
+
+    touchGestureService
+      .onSwipe((direction) => {
+        if (direction.left) onNext();
+        else if (direction.right) onPrev();
+      })
+      .onPinch((newScale, centerX, centerY) => {
+        zoom(newScale - scale, centerX, centerY);
+      })
+      .onDoubleTap((x, y) => {
+        if (scale === 1) zoom(1, x, y);
+        else resetZoom();
+      });
+  }, [touchGestureService, onPrev, onNext, scale, resetZoom, zoom]);
 
 	function onDblClick(e: ReactMouseEvent) {
 		if (scale === 1) zoom(1, e.clientX, e.clientY);
@@ -205,7 +210,7 @@ export function Lightbox({
 			try {
 				setInfoLoading(true);
 				const r = await apiMetadataDetail(dir, path);
-				if (!cancelled) setInfo(r.meta || {});
+				if (!cancelled) setInfo((r?.meta as Partial<PhotoMeta>) || null);
 			} catch {
 				if (!cancelled) setInfo(null);
 			} finally {
@@ -218,6 +223,8 @@ export function Lightbox({
 		};
 	}, [showInfo, dir, path]);
 
+	if (!path) return null;
+
 	return (
 		<div
 			className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center"
@@ -228,10 +235,13 @@ export function Lightbox({
 					onClose();
 				}
 			}}
+			role="dialog"
+			tabIndex={-1}
 		>
 			<div
 				className="relative max-w-6xl w-full p-4"
 				onClick={(e) => e.stopPropagation()}
+				onKeyDown={(e) => e.stopPropagation()}
 				ref={containerRef}
 				role="dialog"
 				aria-modal="true"
@@ -296,6 +306,12 @@ export function Lightbox({
 					onTouchStart={onTouchStart}
 					onTouchMove={onTouchMove}
 					onTouchEnd={onTouchEnd}
+					onKeyDown={(e) => {
+						if (e.key === "ArrowLeft") onPrev();
+						else if (e.key === "ArrowRight") onNext();
+					}}
+					role="img"
+					aria-label="Image viewer"
 					style={{
 						cursor:
 							scale > 1 && panning
@@ -413,7 +429,7 @@ export function Lightbox({
 										<div className="font-medium">{info.shutter}</div>
 									</div>
 								)}
-								{info.datetime && (
+								{typeof info.datetime === "number" && (
 									<div>
 										<div className="text-gray-500">Date</div>
 										<div className="font-medium">
@@ -421,13 +437,13 @@ export function Lightbox({
 										</div>
 									</div>
 								)}
-								{info.place && (
+          {info.place && (
 									<div className="col-span-2">
 										<div className="text-gray-500">Place</div>
 										<div className="font-medium">{info.place}</div>
 									</div>
 								)}
-								{Array.isArray(info.tags) && info.tags.length > 0 && (
+          {Array.isArray(info.tags) && info.tags.length > 0 && (
 									<div className="col-span-2">
 										<div className="text-gray-500">Tags</div>
 										<div className="mt-1 flex flex-wrap gap-1">

@@ -59,7 +59,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
 	const [etaSeconds, setEtaSeconds] = useState<number | undefined>(undefined);
 	const [paused, setPaused] = useState<boolean>(false);
 	const [tip, setTip] = useState<string | undefined>(undefined);
-	const settings = useSettingsActions() as any;
+	const settings = useSettingsActions() as unknown;
 	const dir = useDir();
 	const engine = useEngine();
 	const needsHf = useNeedsHf();
@@ -79,23 +79,26 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
 				// Announce job start
 				jobs.add({
 					id: jobId,
-					type: "index" as any,
+					type: "index" as unknown,
 					title: "Indexing Photos",
 					description: `Analyzing photos in ${d}`,
-					status: "running" as any,
+					status: "running" as unknown,
 					startTime: new Date(),
 					canCancel: true,
 					total: (lib || []).length || undefined,
-				} as any);
+				} as unknown);
 				await apiIndex(d, provider);
-				jobs.update(jobId, { status: "completed", endTime: new Date() } as any);
+				jobs.update(jobId, {
+					status: "completed",
+					endTime: new Date(),
+				} as unknown);
 			} catch (e) {
 				const err = e instanceof Error ? e.message : "Index failed";
 				jobs.update(jobId, {
 					status: "failed",
 					endTime: new Date(),
 					error: err,
-				} as any);
+				} as unknown);
 			} finally {
 				setIsIndexing(false);
 			}
@@ -124,9 +127,19 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
 			try {
 				const { apiIndexPause } = await import("../api");
 				await apiIndexPause(d || settings?.state?.dir);
-			} catch {}
+				setPaused(true);
+				jobs.add({
+					id: `idx-pause-${Date.now()}`,
+					type: "index" as unknown,
+					title: "Indexing paused",
+					status: "completed" as unknown,
+				} as unknown);
+			} catch (e) {
+				// bubble as note only; do not crash UI
+				console.warn("Index pause failed", e);
+			}
 		},
-		[settings],
+		[settings, jobs],
 	);
 
 	const resume = useCallback(
@@ -134,9 +147,18 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
 			try {
 				const { apiIndexResume } = await import("../api");
 				await apiIndexResume(d || settings?.state?.dir);
-			} catch {}
+				setPaused(false);
+				jobs.add({
+					id: `idx-resume-${Date.now()}`,
+					type: "index" as unknown,
+					title: "Indexing resumed",
+					status: "completed" as unknown,
+				} as unknown);
+			} catch (e) {
+				console.warn("Index resume failed", e);
+			}
 		},
-		[settings],
+		[settings, jobs],
 	);
 
 	// Poll index status to compute progress/ETA/paused/tip while indexing
@@ -153,7 +175,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
 		const poll = async () => {
 			try {
 				const { apiIndexStatus } = await import("../api");
-				const s: any = await apiIndexStatus(
+				const s: unknown = await apiIndexStatus(
 					dir,
 					engine,
 					needsHf ? hfToken : undefined,

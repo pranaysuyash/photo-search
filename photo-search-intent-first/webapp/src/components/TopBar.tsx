@@ -16,12 +16,14 @@ import {
 	Trash2,
 } from "lucide-react";
 import type React from "react";
+import type { SearchResult } from "../api";
 import { useState } from "react";
 import { apiDelete, apiUndoDelete } from "../api";
 import { useSearchContext } from "../contexts/SearchContext";
 import { useUIContext } from "../contexts/UIContext";
 import { useSearchCommandCenter } from "../stores/settingsStore";
 import { SearchBar } from "./SearchBar";
+import type { PhotoActions, UIActions } from "../stores/types";
 
 export type GridSize = "small" | "medium" | "large";
 export type ViewType =
@@ -94,15 +96,9 @@ export interface TopBarProps {
 	tooltip?: string;
 	ocrReady?: boolean;
 
-	// Actions
-	photoActions: {
-		setFavOnly: (favOnly: boolean) => void;
-		setResults: (results: any[]) => void;
-	};
-	uiActions: {
-		setBusy: (message: string) => void;
-		setNote: (note: string) => void;
-	};
+    // Actions
+    photoActions: Pick<PhotoActions, "setFavOnly" | "setResults">;
+    uiActions: Pick<UIActions, "setBusy" | "setNote">;
 
 	// Toast system
 	toastTimerRef: React.MutableRefObject<number | null>;
@@ -243,6 +239,7 @@ export function TopBar({
 										doSearch(qq);
 									}}
 									title={`Filter camera: ${cam}`}
+									aria-label={`Filter results by camera ${String(cam)}`}
 								>
 									{String(cam)}
 								</button>
@@ -260,8 +257,9 @@ export function TopBar({
 										doSearch(qq);
 									}}
 									title={`Filter tag: ${tg}`}
+									aria-label={`Filter results by tag ${String(tg)}`}
 								>
-									#{tg}
+									{String(tg)}
 								</button>
 							))}
 							{(clusters || [])
@@ -335,7 +333,7 @@ export function TopBar({
 					<motion.button
 						type="button"
 						className="ml-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
-						onClick={() => setModal({ kind: "folder" as any })}
+						onClick={() => setModal({ kind: "folder" as unknown })}
 						aria-label="Select photo folder"
 						data-tour="select-library"
 						whileHover={{ scale: 1.05 }}
@@ -474,8 +472,8 @@ export function TopBar({
 							{/* Hover card for detailed tooltip */}
 							{tooltip && (
 								<div className="tooltip-card" role="tooltip" aria-hidden>
-									{(tooltip.split(" • ") || []).map((line, i) => (
-										<div key={`item-${i}`} className="tooltip-line">
+									{(tooltip.split(" • ") || []).map((line, _i) => (
+										<div key={`item-${String(line)}`} className="tooltip-line">
 											{line}
 										</div>
 									))}
@@ -578,7 +576,7 @@ export function TopBar({
 							<button
 								type="button"
 								className="menu-item"
-								onClick={() => setModal({ kind: "advanced" as any })}
+								onClick={() => setModal({ kind: "advanced" as unknown })}
 							>
 								<IconSearch className="w-4 h-4 mr-2" /> Advanced Search
 							</button>
@@ -780,21 +778,21 @@ export function TopBar({
 							Share
 						</button>
 						{/* Feature-flagged: Sharing v1 (stubbed UI) */}
-						{(import.meta as any).env?.VITE_FF_SHARING_V1 === "1" && (
+						{(import.meta as unknown).env?.VITE_FF_SHARING_V1 === "1" && (
 							<button
 								type="button"
 								className="action-button"
-								onClick={() => setModal({ kind: "share" as any })}
+								onClick={() => setModal({ kind: "share" as unknown })}
 								aria-label="Share selected photos"
 							>
 								<IconSearch className="w-4 h-4" /> Share
 							</button>
 						)}
-						{(import.meta as any).env?.VITE_FF_SHARING_V1 === "1" && (
+						{(import.meta as unknown).env?.VITE_FF_SHARING_V1 === "1" && (
 							<button
 								type="button"
 								className="action-button"
-								onClick={() => setModal({ kind: "shareManage" as any })}
+								onClick={() => setModal({ kind: "shareManage" as unknown })}
 								aria-label="Manage shared links"
 							>
 								Manage Shares
@@ -812,7 +810,7 @@ export function TopBar({
 						<button
 							type="button"
 							className="action-button"
-							onClick={() => setModal({ kind: "advanced" as any })}
+							onClick={() => setModal({ kind: "advanced" as unknown })}
 							aria-label="Open advanced search"
 							data-tour="advanced-button"
 						>
@@ -873,7 +871,7 @@ export function TopBar({
 						<button
 							type="button"
 							className="action-button"
-							onClick={() => setModal({ kind: "removeCollect" as any })}
+							onClick={() => setModal({ kind: "removeCollect" as unknown })}
 							aria-label="Remove selected photos from a collection"
 						>
 							<FolderOpen className="w-4 h-4 rotate-180" /> Remove from

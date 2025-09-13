@@ -1,5 +1,6 @@
 const { app, BrowserWindow, dialog, Menu, ipcMain, protocol } = require('electron')
 const isDev = process.env.NODE_ENV === 'development'
+const isProd = !isDev && app.isPackaged
 const path = require('path')
 const { spawn } = require('child_process')
 const { autoUpdater } = require('electron-updater')
@@ -7,10 +8,16 @@ const { loadLicense, licenseAllowsMajor } = require('./license')
 const http = require('http')
 const crypto = require('crypto')
 
+// In some environments, GPU acceleration can cause a blank window. Disable in dev.
+if (isDev) {
+  try { app.disableHardwareAcceleration() } catch {}
+}
+
 let apiProc = null
 let viteProc = null
 let mainWindow = null
 let apiToken = null
+let currentTarget = null
 
 function checkAPIRunning(port = 5001) {
   return new Promise((resolve) => {
@@ -48,9 +55,15 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
-      webSecurity: false // Allow file:// protocol access for local images
+      // In production, keep webSecurity enabled. During dev we may relax for local testing.
+      webSecurity: isProd ? true : false
     },
     show: false // Don't show until page is loaded
+  })
+
+  // Safety: show when ready even if did-finish-load never fires
+  mainWindow.once('ready-to-show', () => {
+    try { mainWindow.show() } catch {}
   })
 }
 
@@ -68,9 +81,21 @@ function httpPing(url) {
   })
 }
 
-async function ensureViteDevServer() {
+async function determineUiTarget() {
   const devUrl = 'http://127.0.0.1:5173/'
-  // If already running, use it
+  const apiUrl = 'http://127.0.0.1:8000/app/'
+  const builtIndex = path.resolve(__dirname, '../api/web/index.html')
+  const fs = require('fs')
+  // If API HTTP UI is available, prefer it (most reliable)
+  if (await httpPing(apiUrl)) {
+    return { type: 'http', url: apiUrl }
+  }
+  // Prefer built UI if present for offline/stable loading
+  if (fs.existsSync(builtIndex)) {
+    console.log('Found built UI; loading from file for stability')
+    return { type: 'file', file: builtIndex }
+  }
+  // Otherwise, if dev server already running, use it
   if (await httpPing(devUrl)) return { type: 'dev', url: devUrl }
   // Try to start Vite dev server
   try {
@@ -85,20 +110,27 @@ async function ensureViteDevServer() {
     if (await httpPing(devUrl)) return { type: 'dev', url: devUrl }
     await new Promise((r) => setTimeout(r, 500))
   }
-  // Fall back to built files, if present
-  const builtIndex = path.resolve(__dirname, '../api/web/index.html')
+  // Final fallback to built index (even if not present we handle later)
   return { type: 'file', file: builtIndex }
 }
 
 function loadUI(target) {
   if (!mainWindow) return
-  if (target.type === 'dev') {
+  if (target.type === 'dev' || target.type === 'http') {
     mainWindow.loadURL(target.url)
   } else {
     const fs = require('fs')
     if (fs.existsSync(target.file)) {
-      console.log('Loading built UI from', target.file)
-      mainWindow.loadFile(target.file)
+      console.log('Loading built UI via app:// from', target.file)
+      // Use custom app:// scheme to avoid file:// module/CORS issues
+      const abs = path.resolve(target.file)
+      const asPosix = process.platform === 'win32' ? abs.replace(/\\/g, '/') : abs
+      const posixNoLeading = process.platform === 'win32' ? asPosix : asPosix.replace(/^\//, '')
+      const url = (process.platform === 'win32')
+        ? `app://${encodeURI(posixNoLeading)}`
+        : `app:///${encodeURI(posixNoLeading)}`
+      console.log('[Loader] Navigating to', url)
+      mainWindow.loadURL(url)
     } else {
       dialog.showErrorBox('UI Not Available', 'Vite dev server is not running and no built UI was found. Run "npm --prefix ../webapp run dev" or "npm --prefix ../webapp run build" and try again.')
     }
@@ -111,16 +143,36 @@ function loadUI(target) {
     mainWindow.webContents.openDevTools()
   })
   
-  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
-    console.error('Failed to load page:', errorCode, errorDescription)
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    console.error('Failed to load page:', errorCode, errorDescription, validatedURL)
+    // If dev URL failed, try falling back to built files
+    try {
+      const fs = require('fs')
+      const builtIndex = path.resolve(__dirname, '../api/web/index.html')
+      if (target?.type === 'dev') {
+        if (fs.existsSync(builtIndex)) {
+          console.log('Falling back to built UI at', builtIndex)
+          currentTarget = { type: 'file', file: builtIndex }
+          mainWindow.loadFile(builtIndex)
+          return
+        }
+      } else if (target?.type === 'file') {
+        // If app:// load fails, try direct file:// load as a last resort
+        if (fs.existsSync(target.file)) {
+          console.log('Retrying direct file load for', target.file)
+          mainWindow.loadFile(target.file)
+          return
+        }
+      }
+    } catch (e) {
+      console.warn('Fallback load error:', e?.message)
+    }
+    // Show the window and leave DevTools open for visibility
+    try { mainWindow.show() } catch {}
   })
   
   mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
     console.log(`[Web ${level}] ${message}`)
-  })
-  
-  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
-    console.error('Failed to load:', errorCode, errorDescription, validatedURL)
   })
   
   mainWindow.webContents.on('crashed', (event, killed) => {
@@ -184,6 +236,18 @@ ipcMain.handle('get-api-token', async () => {
   return apiToken || ''
 })
 
+// IPC to set allowed root for app:// protocol restriction (production)
+ipcMain.handle('set-allowed-root', async (_e, p) => {
+  try {
+    if (typeof p === 'string' && p.trim()) {
+      process.env.PHOTOVAULT_ALLOWED_ROOT = p
+      console.log('[Protocol] Allowed root set to:', p)
+      return true
+    }
+  } catch {}
+  return false
+})
+
 async function checkForUpdates(userTriggered = false) {
   try {
     const { updateInfo } = await autoUpdater.checkForUpdatesAndNotify()
@@ -196,14 +260,37 @@ async function checkForUpdates(userTriggered = false) {
 }
 
 app.whenReady().then(async () => {
-  // Register custom file protocol handler
+  // Register custom file protocol handler with basic root restriction
   protocol.registerFileProtocol('app', (request, callback) => {
     try {
       console.log('[Protocol Handler] Received request:', request.url)
-      const url = request.url.replace('app://', '')
-      const filePath = path.normalize(decodeURIComponent(url))
+      let filePath = ''
+      try {
+        const parsed = new URL(request.url)
+        filePath = decodeURIComponent(parsed.pathname)
+        // On Windows, pathname can be like /C:/path — strip leading slash
+        if (process.platform === 'win32' && /^\/[A-Za-z]:\//.test(filePath)) {
+          filePath = filePath.slice(1)
+        }
+      } catch {
+        // Fallback: previous replacement method
+        const url = request.url.replace('app://', '')
+        filePath = decodeURIComponent(url)
+      }
+      filePath = path.normalize(filePath)
       console.log('[Protocol Handler] Resolved file path:', filePath)
-      
+      // Restrict served files to an allowed root in production
+      const allowedRoot = process.env.PHOTOVAULT_ALLOWED_ROOT
+      if (isProd && allowedRoot) {
+        const root = path.resolve(allowedRoot) + path.sep
+        const target = path.resolve(filePath)
+        if (!target.startsWith(root)) {
+          console.warn('[Protocol Handler] Blocked path outside allowed root:', target)
+          callback({ error: -10 }) // net::ERR_ACCESS_DENIED
+          return
+        }
+      }
+
       // Check if file exists
       const fs = require('fs')
       if (fs.existsSync(filePath)) {
@@ -231,11 +318,23 @@ app.whenReady().then(async () => {
   
   setupMenu()
   createWindow()
-  const uiTarget = await ensureViteDevServer()
+  // Show a quick splash while resolving UI target
+  try { mainWindow.loadFile(path.join(__dirname, 'splash.html')) } catch {}
+  const uiTarget = await determineUiTarget()
+  currentTarget = uiTarget
   loadUI(uiTarget)
   
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+  app.on('activate', async () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow()
+      try {
+        // Reuse last target; if not present, re-evaluate
+        if (!currentTarget) currentTarget = await ensureViteDevServer()
+        loadUI(currentTarget)
+      } catch (e) {
+        console.error('Failed to load UI on activate:', e)
+      }
+    }
   })
 })
 

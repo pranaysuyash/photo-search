@@ -1,3 +1,4 @@
+// biome-ignore lint/complexity/noStaticOnlyClass: Service pattern
 /**
  * Search Performance Optimization
  * Query caching, suggestion history, and performance monitoring
@@ -27,7 +28,7 @@ interface PerformanceMetrics {
 }
 
 export class SearchCache {
-	private static cache = new Map<string, CacheEntry<any>>();
+	private static cache = new Map<string, CacheEntry<unknown>>();
 	private static suggestions = new Map<string, SearchSuggestion>();
 	private static queryHistory: string[] = [];
 	private static metrics = {
@@ -235,7 +236,7 @@ export class SearchCache {
 	 */
 	static async preload(
 		queries: string[],
-		searchFn: (query: string) => Promise<any>,
+		searchFn: (query: string) => Promise<unknown>,
 	): Promise<void> {
 		const promises = queries.map(async (query) => {
 			const cached = SearchCache.get(query);
@@ -289,7 +290,7 @@ export class SearchCache {
 		}
 	}
 
-	private static updateSuggestions(query: string, data: any): void {
+	private static updateSuggestions(query: string, data: unknown): void {
 		const existing = SearchCache.suggestions.get(query);
 
 		if (existing) {

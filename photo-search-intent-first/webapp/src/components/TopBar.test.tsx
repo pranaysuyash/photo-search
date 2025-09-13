@@ -2,15 +2,29 @@ import { describe, expect, it, vi } from "vitest";
 import { TopBar } from "../components/TopBar";
 import { render, screen } from "../test/test-utils";
 
-// Mock the UIContext
-vi.mock("../src/contexts/UIContext", () => ({
-	useUIContext: () => ({
-		state: {},
-	}),
-}));
+// Mock the UIContext (partial: keep UIProvider export)
+vi.mock("../contexts/UIContext", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../contexts/UIContext")>();
+	return {
+		...actual,
+		useUIContext: () => ({
+			state: {
+				sidebarOpen: true,
+				theme: "light",
+				modals: { help: false, onboarding: false },
+			},
+			actions: {
+				toggleSidebar: vi.fn(),
+				setTheme: vi.fn(),
+				openModal: vi.fn(),
+				closeModal: vi.fn(),
+			},
+		}),
+	};
+});
 
 // Mock the SearchBar component
-vi.mock("../src/components/SearchBar", () => ({
+vi.mock("../components/SearchBar", () => ({
 	SearchBar: () => <div data-testid="search-bar">SearchBar</div>,
 }));
 
@@ -34,11 +48,12 @@ vi.mock("framer-motion", () => ({
 // Ensure the feature-flagged Search Command Center is disabled so TopBar renders SearchBar
 // Merge with actual module to avoid breaking other hooks used by providers
 vi.mock("../stores/settingsStore", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../stores/settingsStore")>();
-  return {
-    ...actual,
-    useSearchCommandCenter: () => false,
-  };
+	const actual =
+		await importOriginal<typeof import("../stores/settingsStore")>();
+	return {
+		...actual,
+		useSearchCommandCenter: () => false,
+	};
 });
 
 // Mock lucide-react icons (include icons used by ErrorBoundary as it is always imported in test wrapper)
@@ -145,11 +160,8 @@ describe("TopBar", () => {
 
 	it("renders without crashing", () => {
 		render(<TopBar {...defaultProps} />);
-		expect(
-			screen.getByPlaceholderText(
-				"What are you looking for? Try 'kids at the park' or 'last summer'",
-			),
-		).toBeInTheDocument();
+		// SearchBar is mocked in this test suite
+		expect(screen.getByTestId("search-bar")).toBeInTheDocument();
 	});
 
 	it("shows indexed chip when diag is provided", () => {

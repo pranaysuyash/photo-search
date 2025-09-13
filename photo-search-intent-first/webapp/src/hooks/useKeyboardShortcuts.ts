@@ -259,7 +259,11 @@ const DEFAULT_SHORTCUTS: KeyboardShortcut[] = [
 		key: "h",
 		description: "Go home",
 		action: () => {
-			window.location.href = "/";
+			try {
+				window.location.hash = "#/";
+			} catch {
+				window.location.href = "/";
+			}
 		},
 	},
 	{

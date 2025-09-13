@@ -281,11 +281,19 @@ export default function LibraryBrowser({
 
 						return (
 							<div
+								role="button"
+								tabIndex={0}
 								key={p}
 								className={`relative group cursor-pointer rounded overflow-hidden ${
 									isSelected ? "ring-2 ring-blue-500" : ""
 								}`}
 								onClick={() => (onOpen ? onOpen(p) : undefined)}
+								onKeyDown={(e) => {
+									if (e.key === "Enter" || e.key === " ") {
+										e.preventDefault();
+										if (onOpen) onOpen(p);
+									}
+								}}
 							>
 								{/* Selection checkbox */}
 								{onToggleSelect && (

@@ -10,24 +10,25 @@ import {
 	Users as IconUsers,
 	X,
 } from "lucide-react";
+import type { LucideProps } from "lucide-react";
 
 interface NavItem {
 	id: string;
 	label: string;
-	icon: any;
+	icon: React.ComponentType<LucideProps>;
 	count?: number;
 }
 
 interface SidebarProps {
 	selectedView: string;
 	onViewChange: (view: string) => void;
-	library?: any[];
+	library?: unknown[];
 	favorites?: string[];
-	collections?: any[];
-	clusters?: any[];
-	savedSearches?: any[];
-	smart?: any[];
-	trips?: any[];
+	collections?: unknown[];
+	clusters?: unknown[];
+	savedSearches?: unknown[];
+	smart?: unknown[];
+	trips?: unknown[];
 	isOpen?: boolean;
 	onClose?: () => void;
 }
@@ -136,8 +137,16 @@ export function Sidebar({
 			{/* Mobile overlay */}
 			{isOpen && (
 				<div
+					role="button"
+					tabIndex={0}
 					className="fixed inset-0 bg-black/50 z-40 md:hidden"
-					onClick={onClose}
+					onClick={() => onClose?.()}
+					onKeyDown={(e) => {
+						if (e.key === "Enter" || e.key === " ") {
+							e.preventDefault();
+							onClose();
+						}
+					}}
 				/>
 			)}
 
@@ -150,7 +159,17 @@ export function Sidebar({
 						<h1 className="sidebar-title">PhotoVault</h1>
 						<p className="sidebar-subtitle">AI-Powered Photo Management</p>
 					</div>
-					<button type="button" onClick={onClose} className="sidebar-close">
+					<button
+						type="button"
+						onClick={() => onClose?.()}
+						className="sidebar-close"
+						onKeyDown={(e) => {
+							if (e.key === "Enter" || e.key === " ") {
+								e.preventDefault();
+								onClose?.();
+							}
+						}}
+					>
 						<X className="w-5 h-5" />
 					</button>
 				</div>
@@ -176,7 +195,14 @@ export function Sidebar({
 					<button
 						type="button"
 						className="sidebar-settings-button"
-						onClick={() => (window.location.href = "/settings")}
+						onClick={() => {
+							// Use HashRouter-friendly navigation to avoid full reloads/404s
+							try {
+								window.location.hash = "#/settings";
+							} catch {
+								// Fallback: keep SPA by toggling view if provided in future
+							}
+						}}
 					>
 						Settings
 					</button>

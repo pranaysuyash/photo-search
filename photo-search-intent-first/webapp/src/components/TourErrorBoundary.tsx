@@ -171,8 +171,8 @@ export const _useTourErrorHandler = () => {
 		console.error("Tour error occurred:", error, errorInfo);
 
 		// Log to analytics if available
-		if ((window as any).gtag) {
-			(window as any).gtag("event", "tour_error", {
+		if ((window as unknown).gtag) {
+			(window as unknown).gtag("event", "tour_error", {
 				error_message: error.message,
 				error_stack: error.stack,
 			});

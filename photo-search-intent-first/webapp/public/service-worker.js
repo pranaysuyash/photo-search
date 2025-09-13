@@ -13,7 +13,7 @@ const STATIC_ASSETS = [
 	"/index.html",
 	"/manifest.json",
 	"/favicon.ico",
-	"/icons/icon-192x192.png",
+  "/icons/icon-192x192.svg",
 	"/icons/icon-512x512.svg",
 ];
 
@@ -302,8 +302,8 @@ async function syncCollections() {
 self.addEventListener("push", (event) => {
 	const options = {
 		body: event.data ? event.data.text() : "New updates available",
-		icon: "/icons/icon-192x192.png",
-		badge: "/icons/icon-192x192.png",
+        icon: "/icons/icon-512x512.svg",
+        badge: "/icons/icon-512x512.svg",
 		vibrate: [100, 50, 100],
 		data: {
 			dateOfArrival: Date.now(),

@@ -1,5 +1,5 @@
 import type React from "react";
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 export type ModalKey =
 	| "help"
@@ -53,6 +53,13 @@ const initialState: ModalState = {
 
 export function ModalProvider({ children }: { children: React.ReactNode }) {
 	const [modals, setModals] = useState<ModalState>(initialState);
+
+	// Close all modals when a global error is announced
+	useEffect(() => {
+		const onGlobalError = () => setModals(initialState);
+		window.addEventListener("global-error", onGlobalError);
+		return () => window.removeEventListener("global-error", onGlobalError);
+	}, []);
 
 	const value = useMemo(
 		() => ({

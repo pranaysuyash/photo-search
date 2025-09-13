@@ -401,7 +401,7 @@ export const useSearch = (options: UseSearchOptions = {}): UseSearchReturn => {
 
 					const ppl = persons.filter(Boolean);
 
-					const rules: any = {
+					const rules: unknown = {
 						query: searchText.trim(),
 						favoritesOnly: favOnly,
 						tags,

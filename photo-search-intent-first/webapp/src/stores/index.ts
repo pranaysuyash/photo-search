@@ -13,7 +13,7 @@ import { useUIStore } from "./uiStore";
 import { useWorkspaceStore } from "./workspaceStore";
 
 // Shallow equality checks for performance
-export const useShallow = <T>(selector: (state: any) => T) => selector;
+export const useShallow = <T>(selector: (state: unknown) => T) => selector;
 
 // Combined state selector for components that need multiple stores
 export const useCombinedState = () => ({

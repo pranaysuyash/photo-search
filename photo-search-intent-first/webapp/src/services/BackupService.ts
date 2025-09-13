@@ -188,7 +188,7 @@ class BackupService extends EventEmitter {
 	// Add a backup provider
 	public async addProvider(
 		provider: BackupProvider,
-		credentials?: any,
+		credentials?: unknown,
 	): Promise<boolean> {
 		try {
 			// Validate credentials and test connection
@@ -215,7 +215,7 @@ class BackupService extends EventEmitter {
 	// Validate provider credentials
 	private async validateProvider(
 		provider: BackupProvider,
-		credentials?: any,
+		credentials?: unknown,
 	): Promise<boolean> {
 		// Provider-specific validation
 		switch (provider) {
@@ -238,24 +238,28 @@ class BackupService extends EventEmitter {
 		}
 	}
 
-	private async validateGoogleCredentials(_credentials: any): Promise<boolean> {
+	private async validateGoogleCredentials(
+		_credentials: unknown,
+	): Promise<boolean> {
 		// TODO: Implement Google OAuth validation
 		return true;
 	}
 
 	private async validateDropboxCredentials(
-		_credentials: any,
+		_credentials: unknown,
 	): Promise<boolean> {
 		// TODO: Implement Dropbox validation
 		return true;
 	}
 
-	private async validateS3Credentials(_credentials: any): Promise<boolean> {
+	private async validateS3Credentials(_credentials: unknown): Promise<boolean> {
 		// TODO: Implement S3 validation
 		return true;
 	}
 
-	private async validateiCloudCredentials(_credentials: any): Promise<boolean> {
+	private async validateiCloudCredentials(
+		_credentials: unknown,
+	): Promise<boolean> {
 		// TODO: Implement iCloud validation
 		return true;
 	}

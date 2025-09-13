@@ -1,3 +1,4 @@
+// biome-ignore lint/complexity/noStaticOnlyClass: Service pattern
 /**
  * Video Support Service
  * Handles video file detection, metadata extraction, and playback
@@ -65,9 +66,9 @@ export class VideoService {
 					fps: 30, // Default, would need MediaInfo for accurate FPS
 					bitrate: 0, // Would need server-side extraction
 					hasAudio:
-						(video as any).mozHasAudio ||
-						(video as any).webkitAudioDecodedByteCount > 0 ||
-						(video as any).audioTracks?.length > 0 ||
+						(video as unknown).mozHasAudio ||
+						(video as unknown).webkitAudioDecodedByteCount > 0 ||
+						(video as unknown).audioTracks?.length > 0 ||
 						true, // Assume true if can't detect
 				};
 
@@ -201,8 +202,9 @@ export class VideoService {
 		videoUrl: string,
 	): Promise<VideoFile> {
 		// Check cache first
-		if (VideoService.videoCache.has(path)) {
-			return VideoService.videoCache.get(path)!;
+		const cached = VideoService.videoCache.get(path);
+		if (cached) {
+			return cached;
 		}
 
 		try {

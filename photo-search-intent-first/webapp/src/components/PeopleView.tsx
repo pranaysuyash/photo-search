@@ -32,7 +32,7 @@ export default function PeopleView({
 	clusters,
 	persons,
 	setPersons,
-	busy,
+	busy: _busy,
 	setBusy,
 	setNote,
 	onLoadFaces,
@@ -53,7 +53,7 @@ export default function PeopleView({
 			setShowClusterPhotos(true);
 			setBusy("");
 			setNote(`Found ${result.photos.length} photos in cluster`);
-		} catch (e: any) {
+		} catch (e: unknown) {
 			setBusy("");
 			setNote(e.message);
 		}
@@ -66,7 +66,7 @@ export default function PeopleView({
 			setBusy("");
 			setNote("Clusters merged successfully");
 			await onLoadFaces();
-		} catch (e: any) {
+		} catch (e: unknown) {
 			setBusy("");
 			setNote(e.message);
 		}
@@ -102,6 +102,12 @@ export default function PeopleView({
 							alt={`Photo ${index + 1}`}
 							className="w-full h-24 object-cover rounded cursor-pointer hover:ring-2 hover:ring-blue-500"
 							onClick={() => onOpenPhotos?.([photo])}
+							onKeyDown={(e) => {
+								if (e.key === "Enter" || e.key === " ") {
+									e.preventDefault();
+									onOpenPhotos?.([photo]);
+								}
+							}}
 						/>
 					))}
 				</div>
@@ -123,7 +129,7 @@ export default function PeopleView({
 								setBusy("");
 								setNote(`Faces: ${r.faces}, clusters: ${r.clusters}`);
 								await onLoadFaces();
-							} catch (e: any) {
+							} catch (e: unknown) {
 								setBusy("");
 								setNote(e.message);
 							}
@@ -157,9 +163,9 @@ export default function PeopleView({
 								<div className="text-xs text-gray-600">{c.size}</div>
 							</div>
 							<div className="mt-2 grid grid-cols-2 gap-1">
-								{c.examples.map(([p, emb], i) => (
+								{c.examples.map(([p, emb], _i) => (
 									<img
-										key={`item-${i}`}
+										key={`item-${String(p)}`}
 										src={thumbFaceUrl(dir, engine, p, emb, 196)}
 										className="w-full h-16 object-cover rounded"
 									/>

@@ -41,8 +41,8 @@ export const PhotoGridSkeleton: React.FC<PhotoGridSkeletonProps> = ({
 		<div
 			className={`grid grid-cols-3 ${gridCols[columns as keyof typeof gridCols] || "lg:grid-cols-8"} gap-2`}
 		>
-			{Array.from({ length: count }).map((_, i) => (
-				<div key={`item-${i}`} className="aspect-square">
+			{Array.from({ length: count }).map((_, _i) => (
+				<div key={`item-${String(_)}`} className="aspect-square">
 					<Skeleton className="w-full h-full rounded-lg" />
 				</div>
 			))}

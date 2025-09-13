@@ -2,7 +2,7 @@
 export interface OfflineAction {
 	id: string;
 	type: "search" | "collection" | "tag" | "delete";
-	payload: any;
+	payload: unknown;
 	timestamp: number;
 	retries: number;
 }
@@ -237,7 +237,7 @@ class OfflineService {
 
 		try {
 			const registration = await navigator.serviceWorker.ready;
-			await (registration as any).sync.register(tag);
+			await (registration as unknown).sync.register(tag);
 			console.log(`[Offline Service] Background sync registered: ${tag}`);
 		} catch (error) {
 			console.error(

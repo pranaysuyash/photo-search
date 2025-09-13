@@ -8,7 +8,10 @@ vi.mock("./stores/useStores", () => {
 	const mockTags: string[] = [];
 	const mockTagsMap: Record<string, string[]> = {};
 	const mockCollections: Record<string, string[]> = {};
-	const mockSmartCollections: Record<string, { query: string; count?: number }> = {};
+	const mockSmartCollections: Record<
+		string,
+		{ query: string; count?: number }
+	> = {};
 	const mockLibrary: string[] = [];
 	const mockDiag = {
 		engines: [] as Array<{ key: string; index_dir: string; count: number }>,
@@ -183,30 +186,33 @@ vi.mock("./api", () => ({
 // Ensure App sees Search Command Center disabled so the TopBar renders SearchBar input
 // Merge with actual to preserve other selectors used by providers
 vi.mock("./stores/settingsStore", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./stores/settingsStore")>();
-  return {
-    ...actual,
-    useSearchCommandCenter: () => false,
-    useHighContrast: () => false,
-    useThemeStore: () => ({
-      themeMode: "light",
-      colorScheme: "blue",
-      density: "normal",
-      customColors: undefined,
-      setThemeMode: vi.fn(),
-      setColorScheme: vi.fn(),
-      setDensity: vi.fn(),
-      setCustomColors: vi.fn(),
-      resetTheme: vi.fn(),
-    }),
-  };
+	const actual =
+		await importOriginal<typeof import("./stores/settingsStore")>();
+	return {
+		...actual,
+		useSearchCommandCenter: () => false,
+		useHighContrast: () => false,
+		useThemeStore: () => ({
+			themeMode: "light",
+			colorScheme: "blue",
+			density: "normal",
+			customColors: undefined,
+			setThemeMode: vi.fn(),
+			setColorScheme: vi.fn(),
+			setDensity: vi.fn(),
+			setCustomColors: vi.fn(),
+			resetTheme: vi.fn(),
+		}),
+	};
 });
 
 import { apiBuildMetadata, apiIndex, apiSearch } from "./api";
 
 // Avoid DOMException from ThemeProvider classList operations in jsdom; no-op wrapper suffices for smoke
 vi.mock("./components/ThemeProvider", () => ({
-  ThemeProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+	ThemeProvider: ({ children }: { children: React.ReactNode }) => (
+		<>{children}</>
+	),
 }));
 
 describe("App (smoke with mocked stores)", () => {

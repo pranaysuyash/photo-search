@@ -230,9 +230,9 @@ export function HelpModal({
 						Most Useful
 					</h3>
 					<div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-						{shortcuts.slice(0, 12).map((s, i) => (
+						{shortcuts.slice(0, 12).map((s) => (
 							<div
-								key={`item-${i}`}
+								key={`shortcut-${s.action}`}
 								className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-50 dark:bg-gray-800"
 							>
 								<span className="text-sm text-gray-800 dark:text-gray-200">

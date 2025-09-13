@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { getAPI } from "../services/PhotoVaultAPI";
+import { LazyImage } from "../components/LazyImage";
 
 interface ImageEditorProps {
 	imagePath: string;
@@ -355,7 +356,7 @@ export function ImageEditor({ imagePath, onClose, onSave }: ImageEditorProps) {
 			<div className="adjustment-panel">
 				<div className="adjustment-control">
 					<Sun className="w-4 h-4" />
-					<label>Brightness</label>
+					<label htmlFor="brightness-slider">Brightness</label>
 					<input
 						type="range"
 						min="0"
@@ -373,7 +374,7 @@ export function ImageEditor({ imagePath, onClose, onSave }: ImageEditorProps) {
 				</div>
 				<div className="adjustment-control">
 					<Contrast className="w-4 h-4" />
-					<label>Contrast</label>
+					<label htmlFor="contrast-slider">Contrast</label>
 					<input
 						type="range"
 						min="0"
@@ -391,7 +392,7 @@ export function ImageEditor({ imagePath, onClose, onSave }: ImageEditorProps) {
 				</div>
 				<div className="adjustment-control">
 					<Palette className="w-4 h-4" />
-					<label>Saturation</label>
+					<label htmlFor="saturation-slider">Saturation</label>
 					<input
 						type="range"
 						min="0"
@@ -430,11 +431,14 @@ export function ImageEditor({ imagePath, onClose, onSave }: ImageEditorProps) {
 						<div className="before-after-container">
 							<div className="before-after-panel">
 								<h3>Before</h3>
-								<img src={api.getThumbnailUrl(originalPath)} alt="Original" />
+								<LazyImage
+									src={api.getThumbnailUrl(originalPath)}
+									alt="Original"
+								/>
 							</div>
 							<div className="before-after-panel">
 								<h3>After</h3>
-								<img src={api.getThumbnailUrl(editedPath)} alt="Edited" />
+								<LazyImage src={api.getThumbnailUrl(editedPath)} alt="Edited" />
 							</div>
 						</div>
 					) : (

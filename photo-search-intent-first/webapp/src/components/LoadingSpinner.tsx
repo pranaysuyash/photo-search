@@ -65,9 +65,9 @@ export function SkeletonLoader({
 }) {
 	return (
 		<div className={`animate-pulse ${className}`}>
-			{Array.from({ length: lines }).map((_, i) => (
+			{Array.from({ length: lines }).map((_, _i) => (
 				<div
-					key={`item-${i}`}
+					key={`item-${String(_)}`}
 					className="h-4 bg-gray-200 rounded mb-2"
 					style={{
 						width: `${Math.random() * 40 + 60}%`,

@@ -513,6 +513,14 @@ body {
 	color: var(--color-primary-500);
 }
 
+/* Combobox suggestion focus/active styles */
+.suggestion-item[data-active="true"],
+.suggestion-item[aria-selected="true"] {
+	outline: 2px solid var(--color-primary-500);
+	outline-offset: 2px;
+	background: var(--color-primary-100);
+}
+
 /* Modal Enhancements */
 .modal-backdrop {
 	position: fixed;
@@ -620,6 +628,15 @@ body {
 		animation-iteration-count: 1 !important;
 		transition-duration: 0.01ms !important;
 	}
+}
+
+/* Respect app-level reduced motion toggle */
+[data-reduced-motion="true"] *,
+[data-reduced-motion="true"] *::before,
+[data-reduced-motion="true"] *::after {
+	animation-duration: 0.01ms !important;
+	animation-iteration-count: 1 !important;
+	transition-duration: 0.01ms !important;
 }
 
 /* TopBar Component Styles */
@@ -1360,4 +1377,31 @@ body {
 }
 .dark .menu-item:hover {
 	background: rgba(31, 41, 55, 0.6);
+}
+/* Skeleton loading styles */
+.skeleton-box {
+	position: relative;
+	overflow: hidden;
+	background-color: rgba(0, 0, 0, 0.06);
+}
+.dark .skeleton-box {
+	background-color: rgba(255, 255, 255, 0.08);
+}
+.skeleton-box::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	transform: translateX(-100%);
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(255, 255, 255, 0.4),
+		transparent
+	);
+	animation: skeleton-shimmer 1.25s infinite;
+}
+@keyframes skeleton-shimmer {
+	100% {
+		transform: translateX(100%);
+	}
 }

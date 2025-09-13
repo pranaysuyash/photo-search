@@ -4,7 +4,7 @@
 interface ErrorReport {
 	message: string;
 	stack?: string;
-	context?: Record<string, any>;
+	context?: Record<string, unknown>;
 	severity: "low" | "medium" | "high" | "critical";
 	timestamp: number;
 	userAgent: string;
@@ -24,7 +24,7 @@ interface UserEvent {
 	category: string;
 	label?: string;
 	value?: number;
-	metadata?: Record<string, any>;
+	metadata?: Record<string, unknown>;
 	timestamp: number;
 }
 
@@ -93,7 +93,7 @@ class MonitoringService {
 					const fid = entry as PerformanceEventTiming;
 					this.trackMetric("fid", fid.processingStart - fid.startTime);
 				} else if (entry.entryType === "layout-shift") {
-					const cls = entry as any;
+					const cls = entry as unknown;
 					if (!cls.hadRecentInput) {
 						this.trackMetric("cls", cls.value, "count");
 					}
@@ -191,7 +191,7 @@ class MonitoringService {
 		category: string,
 		label?: string,
 		value?: number,
-		metadata?: Record<string, any>,
+		metadata?: Record<string, unknown>,
 	) {
 		const event: UserEvent = {
 			action,
@@ -210,10 +210,10 @@ class MonitoringService {
 
 		// Send to Google Analytics if configured
 		if (
-			typeof (window as any).gtag !== "undefined" &&
+			typeof (window as unknown).gtag !== "undefined" &&
 			import.meta.env.VITE_GA_MEASUREMENT_ID
 		) {
-			(window as any).gtag("event", action, {
+			(window as unknown).gtag("event", action, {
 				event_category: category,
 				event_label: label,
 				value: value,
@@ -227,13 +227,17 @@ class MonitoringService {
 
 		// Send to Google Analytics
 		if (
-			typeof (window as any).gtag !== "undefined" &&
+			typeof (window as unknown).gtag !== "undefined" &&
 			import.meta.env.VITE_GA_MEASUREMENT_ID
 		) {
-			(window as any).gtag("config", import.meta.env.VITE_GA_MEASUREMENT_ID, {
-				page_path: path,
-				page_title: title,
-			});
+			(window as unknown).gtag(
+				"config",
+				import.meta.env.VITE_GA_MEASUREMENT_ID,
+				{
+					page_path: path,
+					page_title: title,
+				},
+			);
 		}
 	}
 
@@ -314,14 +318,16 @@ class MonitoringService {
 	public trackWebVitals() {
 		// Track Core Web Vitals
 		if ("web-vital" in window) {
-			const webVital = window["web-vital"] as any;
+			const webVital = window["web-vital"] as unknown;
 			const { onCLS, onFID, onLCP, onFCP, onTTFB } = webVital;
 
-			onCLS((metric: any) => this.trackMetric("cls", metric.value, "count"));
-			onFID((metric: any) => this.trackMetric("fid", metric.value));
-			onLCP((metric: any) => this.trackMetric("lcp", metric.value));
-			onFCP((metric: any) => this.trackMetric("fcp", metric.value));
-			onTTFB((metric: any) => this.trackMetric("ttfb", metric.value));
+			onCLS((metric: unknown) =>
+				this.trackMetric("cls", metric.value, "count"),
+			);
+			onFID((metric: unknown) => this.trackMetric("fid", metric.value));
+			onLCP((metric: unknown) => this.trackMetric("lcp", metric.value));
+			onFCP((metric: unknown) => this.trackMetric("fcp", metric.value));
+			onTTFB((metric: unknown) => this.trackMetric("ttfb", metric.value));
 		}
 	}
 
@@ -367,7 +373,7 @@ class MonitoringService {
 export const monitoringService = new MonitoringService();
 
 // React Error Boundary integration
-export function logErrorToService(error: Error, errorInfo: any) {
+export function logErrorToService(error: Error, errorInfo: unknown) {
 	monitoringService.logError({
 		message: error.message,
 		stack: error.stack,

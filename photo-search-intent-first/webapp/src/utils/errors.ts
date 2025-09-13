@@ -176,7 +176,8 @@ export const classifyError = (error: Error | unknown): ErrorType => {
 export const getUserErrorMessage = (
 	error: AppError | Error | unknown,
 ): string => {
-	if ((error as ExtendedError)?.userMessage) return (error as ExtendedError).userMessage;
+	if ((error as ExtendedError)?.userMessage)
+		return (error as ExtendedError).userMessage;
 
 	const type = classifyError(error);
 
@@ -224,9 +225,15 @@ export const handleError = (
 	const appError =
 		error instanceof Error
 			? error
-			: createAppError((error as any)?.message || String(error), errorType, {
-					details: error,
-				});
+			: createAppError(
+					typeof error === "object" && error !== null && "message" in error
+						? String(error.message)
+						: String(error),
+					errorType,
+					{
+						details: error,
+					},
+				);
 
 	// Log to console for debugging
 	if (logToConsole) {

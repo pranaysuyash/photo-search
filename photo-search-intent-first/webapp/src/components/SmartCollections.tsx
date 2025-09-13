@@ -4,8 +4,8 @@ interface SmartCollectionsProps {
 	dir: string;
 	engine: string;
 	topK: number;
-	smart: Record<string, any>;
-	setSmart: (smart: Record<string, any>) => void;
+	smart: Record<string, unknown>;
+	setSmart: (smart: Record<string, unknown>) => void;
 	setResults: (results: SearchResult[]) => void;
 	setSearchId: (searchId: string) => void;
 	setNote: (note: string) => void;
@@ -58,7 +58,7 @@ export default function SmartCollections({
 				.split(",")
 				.map((s) => s.trim())
 				.filter(Boolean);
-			const rules: any = {
+			const rules: unknown = {
 				query,
 				favoritesOnly: favOnly,
 				tags,
@@ -82,7 +82,7 @@ export default function SmartCollections({
 			const r = await apiGetSmart(dir);
 			setSmart(r.smart || {});
 			setNote("Saved smart collection");
-		} catch (e: any) {
+		} catch (e: unknown) {
 			setNote(e.message || "Failed to save smart");
 		}
 	};
@@ -92,7 +92,7 @@ export default function SmartCollections({
 			const { apiGetSmart } = await import("../api");
 			const r = await apiGetSmart(dir);
 			setSmart(r.smart || {});
-		} catch (e: any) {
+		} catch (e: unknown) {
 			setNote(e.message || "Failed to load smart");
 		}
 	};
@@ -104,7 +104,7 @@ export default function SmartCollections({
 			setResults(r.results || []);
 			setSearchId(r.search_id || "");
 			setNote(`Opened smart: ${name}`);
-		} catch (e: any) {
+		} catch (e: unknown) {
 			setNote(e.message);
 		}
 	};
@@ -116,7 +116,7 @@ export default function SmartCollections({
 			await apiDeleteSmart(dir, name);
 			const r = await apiGetSmart(dir);
 			setSmart(r.smart || {});
-		} catch (e: any) {
+		} catch (e: unknown) {
 			setNote(e.message);
 		}
 	};
@@ -172,7 +172,30 @@ export default function SmartCollections({
 								</div>
 							</div>
 							<div className="mt-1 text-xs text-gray-600 truncate">
-								{JSON.stringify(smart[name])}
+								{/* Show a concise summary instead of raw JSON */}
+								{(() => {
+									try {
+										const rules = smart[name] || {};
+										const parts: string[] = [];
+										if (typeof rules.query === "string" && rules.query.trim())
+											parts.push(`q: "${rules.query.trim()}"`);
+										if (Array.isArray(rules.tags) && rules.tags.length)
+											parts.push(`tags: ${rules.tags.length}`);
+										if (rules.favoritesOnly) parts.push("favorites");
+										if (
+											rules.person ||
+											(Array.isArray(rules.persons) && rules.persons.length)
+										)
+											parts.push(
+												rules.person
+													? `person: ${rules.person}`
+													: `people: ${(rules.persons || []).length}`,
+											);
+										return parts.length ? parts.join(" • ") : "Smart rules";
+									} catch {
+										return "Smart rules";
+									}
+								})()}
 							</div>
 						</div>
 					))}

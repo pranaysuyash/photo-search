@@ -29,6 +29,13 @@ export function HintProvider({ children }: { children: React.ReactNode }) {
 	const { settings } = useAccessibilitySettings();
 
 	const showHint = (hint: HintConfig) => {
+		// Respect dismissed hints stored by onboarding
+		try {
+			const dismissed = JSON.parse(
+				localStorage.getItem("dismissed-hints") || "[]",
+			) as string[];
+			if (Array.isArray(dismissed) && dismissed.includes(hint.id)) return;
+		} catch {}
 		// Don't show hints if reduced motion is enabled and it's not critical
 		if (settings.reducedMotion && hint.priority !== "high") return;
 
@@ -103,7 +110,7 @@ export const HINTS = {
 		position: "bottom" as const,
 		target: '[data-tour="search-bar"]',
 		priority: "high" as const,
-		autoHide: 10,
+		autoHide: 8,
 	},
 
 	UPLOAD_PHOTOS: {
@@ -202,13 +209,25 @@ export const HINTS = {
 export function useHintTriggers() {
 	const { showHint } = useHints();
 
-	const triggerHint = (action: string, _context?: any) => {
+	const triggerHint = (action: string, _context?: unknown) => {
 		switch (action) {
 			case "app-loaded":
-				// Show welcome hint after a short delay
+				// Show welcome hint after a short delay, only if contextual and not already shown
 				setTimeout(() => {
-					showHint(HINTS.FIRST_SEARCH);
-				}, 2000);
+					try {
+						const already = localStorage.getItem("first-search-shown") === "1";
+						const hasSearch = document.querySelector(
+							'[data-tour="search-bar"]',
+						);
+						const hasDialog = document.querySelector('[role="dialog"]');
+						if (!already && hasSearch && !hasDialog) {
+							showHint(HINTS.FIRST_SEARCH);
+							localStorage.setItem("first-search-shown", "1");
+						}
+					} catch {
+						// best-effort only
+					}
+				}, 1200);
 				break;
 
 			case "library-empty":

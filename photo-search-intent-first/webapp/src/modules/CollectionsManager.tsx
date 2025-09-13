@@ -85,6 +85,8 @@ export function CollectionsManager() {
 		<div
 			className="collection-card"
 			onClick={() => setSelectedCollection(collection.name)}
+			role="button"
+			tabIndex={0}
 		>
 			<div className="collection-preview">
 				{collection.preview && (
@@ -120,6 +122,8 @@ export function CollectionsManager() {
 		<div
 			className="collection-list-item"
 			onClick={() => setSelectedCollection(collection.name)}
+			role="button"
+			tabIndex={0}
 		>
 			<ChevronRight className="w-4 h-4 text-gray-400" />
 			<FolderPlus className="w-5 h-5 text-blue-500" />

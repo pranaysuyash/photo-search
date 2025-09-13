@@ -5,21 +5,21 @@ import { SettingsProvider, useSettingsContext } from "./SettingsContext";
 
 // Mock the usePhotoActions hook
 vi.mock("../stores/useStores", () => ({
-    usePhotoActions: () => ({
-        setResults: vi.fn(),
-        setQuery: vi.fn(),
-    }),
-    // Selectors used widely in providers/components
-    useDir: () => "/test/dir",
-    useEngine: () => "local",
-    useHfToken: () => "",
-    useOpenaiKey: () => "",
-    useNeedsHf: () => false,
-    useNeedsOAI: () => false,
-    // Library provider dependencies
-    useLibrary: () => [],
-    useLibHasMore: () => false,
-    useSettingsActions: () => ({ state: { dir: "/test/dir", engine: "local" } }),
+	usePhotoActions: () => ({
+		setResults: vi.fn(),
+		setQuery: vi.fn(),
+	}),
+	// Selectors used widely in providers/components
+	useDir: () => "/test/dir",
+	useEngine: () => "local",
+	useHfToken: () => "",
+	useOpenaiKey: () => "",
+	useNeedsHf: () => false,
+	useNeedsOAI: () => false,
+	// Library provider dependencies
+	useLibrary: () => [],
+	useLibHasMore: () => false,
+	useSettingsActions: () => ({ state: { dir: "/test/dir", engine: "local" } }),
 }));
 
 function Probe() {

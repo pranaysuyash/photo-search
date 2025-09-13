@@ -1,70 +1,69 @@
+import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import TestApp from "./debug/TestApp";
+import VisualHarness from "./debug/VisualHarness";
 import { ModularApp } from "./ModularApp";
 import { RootProviders } from "./RootProviders";
+// Debug-only components removed after fixing rendering
 import "./styles.css";
 import "./styles-modern.css";
 import "./styles/responsive-fixes.css";
 import "./high-contrast.css";
+// import "./fix-visibility.css"; // disabled: was used for debugging visibility
 
-// Dev helper: surface a tip if no token is configured and API may enforce auth
+// Dev helper: surface a tip only if backend actually requires Authorization
 if (import.meta.env.DEV) {
 	try {
+		// Prefer persisted token; seed from env once if present
 		let token =
 			localStorage.getItem("api_token") ||
-			(import.meta as any).env?.VITE_API_TOKEN;
-		// If no runtime token, seed from env to simplify dev
+			(import.meta as unknown).env?.VITE_API_TOKEN;
 		if (
 			!localStorage.getItem("api_token") &&
-			(import.meta as any).env?.VITE_API_TOKEN
+			(import.meta as unknown).env?.VITE_API_TOKEN
 		) {
 			try {
 				localStorage.setItem(
 					"api_token",
-					(import.meta as any).env?.VITE_API_TOKEN,
+					(import.meta as unknown).env?.VITE_API_TOKEN,
 				);
 			} catch {}
-			token = (import.meta as any).env?.VITE_API_TOKEN;
+			token = (import.meta as unknown).env?.VITE_API_TOKEN;
 		}
-		if (!token) {
-			// eslint-disable-next-line no-console
-			console.info(
-				"Tip: If your API sets API_TOKEN, add VITE_API_TOKEN in webapp .env or localStorage.setItem('api_token', '<value>').",
-			);
-		}
-		// Probe backend auth status to provide precise guidance
 		const base =
-			(import.meta as any).env?.VITE_API_BASE || window.location.origin;
+			(import.meta as unknown).env?.VITE_API_BASE || window.location.origin;
 		fetch(`${base}/auth/status`)
 			.then(async (r) => {
 				try {
 					const js = await r.json();
-					if (js?.auth_required && !token) {
-						// eslint-disable-next-line no-console
-						console.warn(
-							"Backend requires Authorization but no token is configured. Set localStorage.setItem('api_token','<value>') or VITE_API_TOKEN in .env, matching API_TOKEN used by the server.",
-						);
-					} else if (js?.auth_required && token) {
-						// Verify acceptance with a POST
-						fetch(`${base}/auth/check`, {
-							method: "POST",
-							headers: {
-								"Content-Type": "application/json",
-								Authorization: `Bearer ${token}`,
-							},
-						})
-							.then((res) => {
-								if (!res.ok) {
-									// eslint-disable-next-line no-console
-									console.warn(
-										"Auth check failed (",
-										res.status,
-										") — token mismatch? Ensure frontend and backend tokens match exactly.",
-									);
-								}
+					if (js?.auth_required) {
+						if (!token) {
+							// eslint-disable-next-line no-console
+							console.info(
+								"Tip: Backend requires API_TOKEN. Set VITE_API_TOKEN in webapp .env or localStorage.setItem('api_token','<value>').",
+							);
+						} else {
+							// Verify token works
+							fetch(`${base}/auth/check`, {
+								method: "POST",
+								headers: {
+									"Content-Type": "application/json",
+									Authorization: `Bearer ${token}`,
+								},
 							})
-							.catch(() => {});
+								.then((res) => {
+									if (!res.ok) {
+										// eslint-disable-next-line no-console
+										console.warn(
+											"Auth check failed (",
+											res.status,
+											") — ensure frontend token matches API_TOKEN.",
+										);
+									}
+								})
+								.catch(() => {});
+						}
 					}
 				} catch {}
 			})
@@ -109,18 +108,23 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
 	});
 }
 
-// Handle app install prompt
-let _deferredPrompt: any;
-window.addEventListener("beforeinstallprompt", (e) => {
-	e.preventDefault();
-	_deferredPrompt = e;
-	// Could trigger UI element here to prompt install
-	console.log("App can be installed");
-});
+// Handle app install prompt (only in production)
+if (import.meta.env.PROD) {
+	let _deferredPrompt: unknown;
+	window.addEventListener("beforeinstallprompt", (e) => {
+		e.preventDefault();
+		_deferredPrompt = e;
+		// Could trigger UI element here to prompt install
+		console.log("App can be installed");
+	});
+}
 
 function selectApp() {
 	const params = new URLSearchParams(window.location.search);
-	const ui = params.get("ui") ?? (import.meta as any).env?.VITE_UI ?? "modern";
+	// Visual harness for Playwright snapshots (deterministic states)
+	if (params.has("visual")) return <VisualHarness />;
+	const ui =
+		params.get("ui") ?? (import.meta as unknown).env?.VITE_UI ?? "modern";
 	// Default to App (formerly ModernApp); allow forcing test via ?ui=test
 	if (ui === "test") return <TestApp />;
 	if (ui === "modular") return <ModularApp />;
@@ -128,6 +132,51 @@ function selectApp() {
 	return <App />;
 }
 
-createRoot(document.getElementById("root")!).render(
-	<RootProviders>{selectApp()}</RootProviders>,
-);
+// Add error boundary to catch rendering issues
+class ErrorBoundary extends React.Component<
+	{ children: React.ReactNode },
+	{ hasError: boolean; error: Error | null }
+> {
+	constructor(props: { children: React.ReactNode }) {
+		super(props);
+		this.state = { hasError: false, error: null };
+	}
+
+	static getDerivedStateFromError(error: Error) {
+		return { hasError: true, error };
+	}
+
+	componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+		console.error("React Error Boundary caught:", error, errorInfo);
+	}
+
+	render() {
+		if (this.state.hasError) {
+			return (
+				<div style={{ padding: "20px", color: "red" }}>
+					<h1>Something went wrong.</h1>
+					<details style={{ whiteSpace: "pre-wrap" }}>
+						{this.state.error && this.state.error.toString()}
+					</details>
+				</div>
+			);
+		}
+
+		return this.props.children;
+	}
+}
+
+// Debug wrapper + overlays removed; render clean app below
+
+// Clean render with all required context providers
+const rootEl = document.getElementById("root");
+if (rootEl) {
+	// Ensure visible background
+	document.body.style.backgroundColor = "#ffffff";
+
+    createRoot(rootEl).render(
+        <ErrorBoundary>
+            <RootProviders>{selectApp()}</RootProviders>
+        </ErrorBoundary>
+    );
+}

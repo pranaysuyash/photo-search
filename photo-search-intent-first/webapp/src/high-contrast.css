@@ -1,3 +1,5 @@
+/* Support both root and body application of high contrast */
+html.high-contrast,
 body.high-contrast {
 	--color-primary-50: #000000;
 	--color-primary-100: #000000;

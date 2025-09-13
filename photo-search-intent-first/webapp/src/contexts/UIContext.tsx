@@ -18,9 +18,13 @@ const Ctx = createContext<{ state: UIState; actions: UIActions } | null>(null);
 
 export function UIProvider({ children }: { children: React.ReactNode }) {
 	const [sidebarOpen, setSidebarOpen] = useState(true);
-	const [theme, setTheme] = useState<"light" | "dark">(
-		() => (localStorage.getItem("ps_theme") as any) || "light",
-	);
+	const [theme, setTheme] = useState<"light" | "dark">(() => {
+		const stored = localStorage.getItem("ps_theme") as
+			| "light"
+			| "dark"
+			| null;
+		return stored ?? "light";
+	});
 	const [modals, setModals] = useState({ help: false, onboarding: false });
 
 	useEffect(() => {

@@ -1,0 +1,3 @@
+Checked 209 files in 93ms. No fixes applied.
+Found 189 errors.
+Found 100 warnings.

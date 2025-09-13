@@ -11,12 +11,12 @@ export default function JobsDrawer({
 }) {
 	const dir = useDir();
 	const [events, setEvents] = useState<
-		{ type: string; time: string; [k: string]: any }[]
+		{ type: string; time: string; [k: string]: unknown }[]
 	>([]);
 	const [loading, setLoading] = useState(false);
 
 	useEffect(() => {
-		let t: any;
+		let t: ReturnType<typeof setTimeout> | null = null;
 		async function load() {
 			if (!dir) return;
 			setLoading(true);
@@ -41,12 +41,12 @@ export default function JobsDrawer({
 				tabIndex={0}
 				className="absolute inset-0 bg-black/30"
 				onClick={onClose}
-				onKeyDown={(e) => {
-					if (e.key === "Enter" || e.key === " ") {
-						e.preventDefault();
-						onClose;
-					}
-				}}
+					onKeyDown={(e) => {
+						if (e.key === "Enter" || e.key === " ") {
+							e.preventDefault();
+							onClose();
+						}
+					}}
 			/>
 			<div className="absolute right-0 top-0 bottom-0 w-full sm:w-[420px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 p-3 overflow-auto">
 				<div className="flex items-center justify-between mb-2">
@@ -61,7 +61,9 @@ export default function JobsDrawer({
 				</div>
 				{loading && <div className="text-sm text-gray-600">Loading…</div>}
 				<div className="space-y-2">
-					{events.map((e, i) => (
+					{events.map((e, i) => {
+						const ev = e as unknown;
+						return (
 						<div
 							key={`event-${e.type}-${e.time}-${i}`}
 							className="p-2 border rounded text-sm flex items-center justify-between"
@@ -72,43 +74,44 @@ export default function JobsDrawer({
 								</span>
 								{e.type === "export" && (
 									<span>
-										{e.copied} copied, {e.skipped} skipped
-										{e.errors ? `, ${e.errors} errors` : ""}
+										{ev.copied} copied, {ev.skipped} skipped
+										{ev.errors ? `, ${ev.errors} errors` : ""}
 									</span>
 								)}
 								{e.type === "backup_run" && (
 									<span>
-										{e.copied} backed up, {e.skipped} skipped
+										{ev.copied} backed up, {ev.skipped} skipped
 									</span>
 								)}
 								{e.type === "backup_restore" && (
-									<span>{e.restored} restored</span>
+									<span>{ev.restored} restored</span>
 								)}
 								{e.type === "captions_build" && (
-									<span>{e.updated} captions</span>
+									<span>{ev.updated} captions</span>
 								)}
-								{e.type === "ocr_build" && <span>{e.updated} OCR</span>}
+								{e.type === "ocr_build" && <span>{ev.updated} OCR</span>}
 								{e.type === "fast_build" && (
 									<span>
-										{e.kind} index {e.ok ? "ok" : "failed"}
+										{ev.kind} index {ev.ok ? "ok" : "failed"}
 									</span>
 								)}
-								{e.type === "trips_build" && <span>{e.trips} trips</span>}
-								{e.type === "thumbs_build" && <span>{e.made} thumbs</span>}
+								{e.type === "trips_build" && <span>{ev.trips} trips</span>}
+								{e.type === "thumbs_build" && <span>{ev.made} thumbs</span>}
 								{e.type === "metadata_build" && (
-									<span>{e.updated} metadata</span>
+									<span>{ev.updated} metadata</span>
 								)}
 								{e.type === "share_created" && (
-									<span>link • {e.count} items</span>
+									<span>link • {ev.count} items</span>
 								)}
 								{e.type === "share_open" && <span>link opened</span>}
-								{e.type === "search" && <span>“{e.query}”</span>}
+								{e.type === "search" && <span>“{ev.query}”</span>}
 							</div>
 							<div className="text-gray-500">
 								{new Date(e.time).toLocaleString()}
 							</div>
 						</div>
-					))}
+					);
+					})}
 					{events.length === 0 && !loading && (
 						<div className="text-sm text-gray-600">No recent jobs.</div>
 					)}

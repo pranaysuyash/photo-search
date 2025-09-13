@@ -227,6 +227,18 @@ export const useAnnouncer = () => {
 	return { announce };
 };
 
+// Simple helper to announce a message via the global announcer
+export function announce(
+	message: string,
+	priority: "polite" | "assertive" = "polite",
+) {
+	try {
+		window.dispatchEvent(
+			new CustomEvent("announce", { detail: { message, priority } }) as unknown,
+		);
+	} catch {}
+}
+
 /**
  * Checks if an element is visible in the viewport
  * @param element - Element to check
@@ -254,16 +266,6 @@ export const _isElementInViewport = (
 
 	return vertInView && horInView;
 };
-
-/**
- * Props for the KeyboardShortcut component
- */
-interface KeyboardShortcutProps {
-	keyCombo: string;
-	description: string;
-	onTrigger: () => void;
-	disabled?: boolean;
-}
 
 /**
  * Hook for managing keyboard shortcuts
@@ -294,7 +296,7 @@ export const useKeyboardShortcut = (
 
 			// Parse key combo (e.g., "ctrl+k", "shift+?", "alt+f")
 			const keys = keyCombo.toLowerCase().split("+");
-			const key = keys.pop()!;
+			const key = keys.pop() || "";
 			const modifiers = keys;
 
 			// Check modifiers

@@ -5,7 +5,7 @@ interface PerformanceMetrics {
 	lastRenderTime: number;
 	averageRenderTime: number;
 	maxRenderTime: number;
-	memoryUsage?: any;
+	memoryUsage?: unknown;
 }
 
 /**
@@ -46,7 +46,7 @@ export function usePerformanceMonitor(
 				averageRenderTime:
 					renderTimes.reduce((a, b) => a + b, 0) / renderTimes.length,
 				maxRenderTime: Math.max(...renderTimes),
-				memoryUsage: (performance as any).memory,
+				memoryUsage: (performance as unknown).memory,
 			};
 
 			setMetrics(newMetrics);

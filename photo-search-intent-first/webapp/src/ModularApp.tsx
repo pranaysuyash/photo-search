@@ -13,6 +13,7 @@ import {
 	Users,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { LazyImage } from "./components/LazyImage";
 import { CollectionsManager } from "./modules/CollectionsManager";
 import { FaceDetection } from "./modules/FaceDetection";
 import { ImageEditor } from "./modules/ImageEditor";
@@ -248,11 +249,12 @@ export function ModularApp() {
 					<div className="search-results">
 						<h2>Search Results for "{searchQuery}"</h2>
 						<div className="photo-grid">
-							{searchResults.map((result, i) => (
+							{searchResults.map((result, _i) => (
 								<button
 									type="button"
 									key={`search-${result.path}`}
 									className="photo-item"
+									aria-label={result.path.split("/").pop() || result.path}
 									onClick={() => {
 										setSelectedPath(result.path);
 										setCurrentView("editor");
@@ -265,7 +267,10 @@ export function ModularApp() {
 										}
 									}}
 								>
-									<img src={getAPI().getThumbnailUrl(result.path)} alt="" />
+									<LazyImage
+										src={getAPI().getThumbnailUrl(result.path)}
+										alt=""
+									/>
 									<div className="photo-score">{result.score.toFixed(2)}</div>
 								</button>
 							))}
@@ -283,11 +288,12 @@ export function ModularApp() {
 							</span>
 						</div>
 						<div className="photo-grid">
-							{libraryImages.map((path, i) => (
+							{libraryImages.map((path, _i) => (
 								<button
 									type="button"
 									key={`lib-${path}`}
 									className="photo-item"
+									aria-label={path.split("/").pop() || path}
 									onClick={() => {
 										setSelectedPath(path);
 										setCurrentView("editor");
@@ -300,7 +306,7 @@ export function ModularApp() {
 										}
 									}}
 								>
-									<img src={getAPI().getThumbnailUrl(path)} alt="" />
+									<LazyImage src={getAPI().getThumbnailUrl(path)} alt="" />
 									{favorites.includes(path) && (
 										<div className="favorite-badge">
 											<Star className="w-4 h-4" fill="currentColor" />

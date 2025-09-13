@@ -52,7 +52,7 @@ export function PreferencesPanel({ isOpen, onClose }: PreferencesPanelProps) {
 		keyboardShortcuts: true,
 	});
 
-	const updatePreference = (key: string, value: any) => {
+	const updatePreference = (key: string, value: unknown) => {
 		setPreferences((prev) => ({
 			...prev,
 			[key]: value,
@@ -141,9 +141,9 @@ export function PreferencesPanel({ isOpen, onClose }: PreferencesPanelProps) {
 
 									<div className="space-y-4">
 										<div>
-											<label className="block text-sm font-medium mb-2">
+											<span className="block text-sm font-medium mb-2">
 												Theme
-											</label>
+											</span>
 											<div className="flex gap-2">
 												{["light", "dark", "system"].map((theme) => (
 													<button
@@ -168,10 +168,14 @@ export function PreferencesPanel({ isOpen, onClose }: PreferencesPanelProps) {
 										</div>
 
 										<div>
-											<label className="block text-sm font-medium mb-2">
+											<label
+												htmlFor="language-select"
+												className="block text-sm font-medium mb-2"
+											>
 												Language
 											</label>
 											<select
+												id="language-select"
 												value={preferences.language}
 												onChange={(e) =>
 													updatePreference("language", e.target.value)
@@ -187,9 +191,9 @@ export function PreferencesPanel({ isOpen, onClose }: PreferencesPanelProps) {
 										</div>
 
 										<div>
-											<label className="block text-sm font-medium mb-2">
+											<span className="block text-sm font-medium mb-2">
 												Date Format
-											</label>
+											</span>
 											<select
 												value={preferences.dateFormat}
 												onChange={(e) =>
@@ -213,9 +217,9 @@ export function PreferencesPanel({ isOpen, onClose }: PreferencesPanelProps) {
 
 								<div className="space-y-4">
 									<div>
-										<label className="block text-sm font-medium mb-2">
+										<span className="block text-sm font-medium mb-2">
 											Grid Size
-										</label>
+										</span>
 										<div className="flex gap-2">
 											{["small", "medium", "large"].map((size) => (
 												<button
@@ -251,10 +255,14 @@ export function PreferencesPanel({ isOpen, onClose }: PreferencesPanelProps) {
 									</div>
 
 									<div>
-										<label className="block text-sm font-medium mb-2">
+										<label
+											htmlFor="slideshow-speed"
+											className="block text-sm font-medium mb-2"
+										>
 											Slideshow Speed: {preferences.autoplaySpeed}s
 										</label>
 										<input
+											id="slideshow-speed"
 											type="range"
 											min="1"
 											max="10"
@@ -270,10 +278,14 @@ export function PreferencesPanel({ isOpen, onClose }: PreferencesPanelProps) {
 									</div>
 
 									<div>
-										<label className="block text-sm font-medium mb-2">
+										<label
+											htmlFor="image-quality"
+											className="block text-sm font-medium mb-2"
+										>
 											Image Quality
 										</label>
 										<select
+											id="image-quality"
 											value={preferences.imageQuality}
 											onChange={(e) =>
 												updatePreference("imageQuality", e.target.value)

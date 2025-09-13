@@ -1,88 +1,57 @@
 import type React from "react";
-import { memo, useEffect, useRef, useState } from "react";
-import { imageLoadingService } from "../services/ImageLoadingService";
+import { useEffect, useRef, useState } from "react";
 
-interface LazyImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
+type LazyImageProps = React.ImgHTMLAttributes<HTMLImageElement> & {
 	src: string;
-	alt: string;
-	onLoad?: () => void;
-	onError?: () => void;
-	enableProgressiveLoading?: boolean;
-	quality?: "low" | "medium" | "high";
-}
+	placeholderColor?: string;
+};
 
-const LazyImage = memo<LazyImageProps>(
-	({
-		src,
-		alt,
-		onLoad,
-		onError,
-		className = "",
-		enableProgressiveLoading = true,
-		quality = "medium",
-		...props
-	}) => {
-		const imgRef = useRef<HTMLImageElement>(null);
-		const [isLoaded, setIsLoaded] = useState(false);
-		const [hasError, setHasError] = useState(false);
+export function LazyImage({
+	src,
+	alt = "",
+	placeholderColor = "#f3f4f6",
+	...rest
+}: LazyImageProps) {
+	const imgRef = useRef<HTMLImageElement | null>(null);
+	const [visible, setVisible] = useState(false);
+	const [loaded, setLoaded] = useState(false);
 
-		useEffect(() => {
-			const img = imgRef.current;
-			if (!img || !src) return;
+	useEffect(() => {
+		const el = imgRef.current;
+		if (!el) return;
+		const obs = new IntersectionObserver(
+			(entries) => {
+				const entry = entries[0];
+				if (entry.isIntersecting) {
+					setVisible(true);
+					obs.disconnect();
+				}
+			},
+			{ rootMargin: "200px" },
+		);
+		obs.observe(el);
+		return () => obs.disconnect();
+	}, []);
 
-			const handleLoad = () => {
-				setIsLoaded(true);
-				onLoad?.();
-			};
-
-			const handleError = () => {
-				setHasError(true);
-				onError?.();
-			};
-
-			img.addEventListener("load", handleLoad);
-			img.addEventListener("error", handleError);
-
-			// Start observing for lazy loading
-			imageLoadingService.observeImage(img, src);
-
-			return () => {
-				img.removeEventListener("load", handleLoad);
-				img.removeEventListener("error", handleError);
-			};
-		}, [src, onLoad, onError]);
-
-		const combinedClassName = `
-    ${className}
-    ${enableProgressiveLoading && !isLoaded ? "transition-opacity duration-300 opacity-0" : ""}
-    ${isLoaded ? "opacity-100" : ""}
-    ${hasError ? "bg-red-100" : ""}
-  `.trim();
-
-		return (
+	return (
+		<>
+			{!visible && (
+				<div
+					style={{ backgroundColor: placeholderColor }}
+					aria-hidden="true"
+					className="w-full h-full"
+				/>
+			)}
 			<img
 				ref={imgRef}
+				src={visible ? src : undefined}
 				alt={alt}
-				className={combinedClassName}
-				{...props}
-				// Don't set src - it will be set by the service
-				style={{
-					...props.style,
-					...(enableProgressiveLoading && !isLoaded
-						? {
-								backgroundColor: "#f3f4f6",
-								backgroundImage:
-									"linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.3) 50%, transparent 60%)",
-								backgroundSize: "200% 100%",
-								animation: "shimmer 2s infinite linear",
-							}
-						: {}),
-				}}
+				onLoad={() => setLoaded(true)}
+				style={{ opacity: loaded ? 1 : 0, transition: "opacity 200ms ease" }}
+				{...rest}
 			/>
-		);
-	},
-);
-
-LazyImage.displayName = "LazyImage";
+		</>
+	);
+}
 
 export default LazyImage;

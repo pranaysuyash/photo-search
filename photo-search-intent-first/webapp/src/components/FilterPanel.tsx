@@ -85,7 +85,7 @@ export function FilterPanel({
 	yearRange,
 	filterPresets,
 	onSavePreset,
-	onLoadPreset,
+	onLoadPreset: _onLoadPreset,
 	onDeletePreset,
 }: FilterPanelProps) {
 	const [showPresets, setShowPresets] = useState(false);

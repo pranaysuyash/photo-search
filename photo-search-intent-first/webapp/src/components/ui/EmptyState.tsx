@@ -51,6 +51,7 @@ export const NoResultsEmpty: React.FC<{ onSearch?: () => void }> = ({
 				stroke="currentColor"
 				viewBox="0 0 24 24"
 			>
+				<title>Empty state icon</title>
 				<path
 					strokeLinecap="round"
 					strokeLinejoin="round"
@@ -76,6 +77,7 @@ export const NoPhotosEmpty: React.FC<{ onIndex?: () => void }> = ({
 				stroke="currentColor"
 				viewBox="0 0 24 24"
 			>
+				<title>Empty state icon</title>
 				<path
 					strokeLinecap="round"
 					strokeLinejoin="round"
@@ -99,6 +101,7 @@ export const NoFavoritesEmpty: React.FC = () => (
 				stroke="currentColor"
 				viewBox="0 0 24 24"
 			>
+				<title>Empty state icon</title>
 				<path
 					strokeLinecap="round"
 					strokeLinejoin="round"
@@ -123,6 +126,7 @@ export const NoCollectionsEmpty: React.FC<{ onCreate?: () => void }> = ({
 				stroke="currentColor"
 				viewBox="0 0 24 24"
 			>
+				<title>Empty state icon</title>
 				<path
 					strokeLinecap="round"
 					strokeLinejoin="round"

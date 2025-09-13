@@ -166,7 +166,7 @@ export class TouchGestureService {
 
 		if (
 			this.gestureState.isSwiping &&
-			touchDuration < this.config.maxSwipeTime!
+			touchDuration < (this.config.maxSwipeTime ?? 500)
 		) {
 			this.handleSwipe(e.changedTouches[0]);
 		}
@@ -190,7 +190,7 @@ export class TouchGestureService {
 		// Pull-to-refresh handling
 		if (this.isPulling && this.config.enablePullToRefresh) {
 			const pullDistance = touch.y - this.pullStartY;
-			if (pullDistance > this.config.pullToRefreshThreshold!) {
+			if (pullDistance > (this.config.pullToRefreshThreshold ?? 100)) {
 				this.triggerPullToRefresh();
 				this.isPulling = false;
 				return;
@@ -211,7 +211,7 @@ export class TouchGestureService {
 
 		// Swipe detection
 		if (
-			distance > this.config.minSwipeDistance! &&
+			distance > (this.config.minSwipeDistance ?? 50) &&
 			!this.gestureState.isPanning
 		) {
 			this.gestureState.isSwiping = true;
@@ -230,15 +230,16 @@ export class TouchGestureService {
 		const currentDistance = this.getDistance(touches[0], touches[1]);
 
 		if (
-			Math.abs(currentDistance - startDistance) > this.config.minPinchDistance!
+			Math.abs(currentDistance - startDistance) >
+			(this.config.minPinchDistance ?? 30)
 		) {
 			this.gestureState.isPinching = true;
 
 			const scale =
 				(currentDistance / startDistance) * this.gestureState.lastScale;
 			const clampedScale = Math.max(
-				this.config.minScale!,
-				Math.min(this.config.maxScale!, scale),
+				this.config.minScale ?? 0.5,
+				Math.min(this.config.maxScale ?? 3, scale),
 			);
 
 			const centerX = (touches[0].x + touches[1].x) / 2;
@@ -262,7 +263,10 @@ export class TouchGestureService {
 		const absDeltaY = Math.abs(deltaY);
 
 		// Only trigger swipe if horizontal movement is dominant
-		if (absDeltaX > absDeltaY && absDeltaX > this.config.minSwipeDistance!) {
+		if (
+			absDeltaX > absDeltaY &&
+			absDeltaX > (this.config.minSwipeDistance ?? 50)
+		) {
 			const direction: SwipeDirection = {
 				left: deltaX < 0,
 				right: deltaX > 0,

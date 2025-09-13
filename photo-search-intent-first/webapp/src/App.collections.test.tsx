@@ -12,7 +12,10 @@ vi.mock("./stores/useStores", () => {
 	const mockTags: string[] = [];
 	const mockTagsMap: Record<string, string[]> = {};
 	const mockCollections: Record<string, string[]> = {};
-	const mockSmartCollections: Record<string, { query: string; count?: number }> = {};
+	const mockSmartCollections: Record<
+		string,
+		{ query: string; count?: number }
+	> = {};
 	const mockLibrary: string[] = [];
 	const mockDiag = {
 		engines: [] as Array<{ key: string; index_dir: string; count: number }>,

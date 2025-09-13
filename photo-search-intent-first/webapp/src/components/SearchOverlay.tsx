@@ -50,10 +50,25 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
 		return () => window.removeEventListener("keydown", onKey);
 	}, [open, onClose]);
 
-	if (!open) return null;
+	// Announce quick keyboard hints the first time overlay opens in a session
+	const [hintShown, setHintShown] = useState(false);
+	useEffect(() => {
+		if (!open) return;
+		try {
+			const k = "ps_search_overlay_hint";
+			if (!localStorage.getItem(k)) {
+				setHintShown(true);
+				localStorage.setItem(k, "1");
+			}
+		} catch {
+			// ignore
+		}
+	}, [open]);
 
 	const [showFilters, setShowFilters] = useState(false);
 	const [showAdvanced, setShowAdvanced] = useState(false);
+
+	if (!open) return null;
 
 	return (
 		<div
@@ -63,6 +78,13 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
 			aria-label="Search Photos"
 		>
 			<FocusTrap onEscape={onClose}>
+				{/* Live region for first-time keyboard hint */}
+				{hintShown && (
+					<div className="sr-only" aria-live="polite">
+						Type to search. Use Arrow keys to navigate suggestions and Enter to
+						apply.
+					</div>
+				)}
 				<div className="w-full max-w-3xl rounded-xl shadow-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
 					<div className="flex items-center justify-between px-4 py-3 md:px-6 md:py-4 border-b border-gray-200 dark:border-gray-800">
 						<div className="text-base md:text-lg font-semibold text-gray-800 dark:text-gray-100">

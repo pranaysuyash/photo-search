@@ -1,6 +1,7 @@
 import clsx from "clsx";
-import { motion } from "framer-motion";
-import React, {
+import { motion, useReducedMotion } from "framer-motion";
+import type React from "react";
+import {
 	lazy,
 	Suspense,
 	useCallback,
@@ -10,9 +11,6 @@ import React, {
 	useState,
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import type { AccessibilitySettings } from "./components/AccessibilityPanel";
-import type { ModalKey } from "./contexts/ModalContext";
-import type { SettingsActions } from "./stores/types";
 import {
 	API_BASE,
 	apiAuthCheck,
@@ -39,10 +37,13 @@ import {
 	type SearchResult,
 	thumbUrl,
 } from "./api";
+import type { AccessibilitySettings } from "./components/AccessibilityPanel";
 // Modern UX Components Integration
 import { AccessibilityPanel } from "./components/AccessibilityPanel";
 import { BottomNavigation } from "./components/BottomNavigation";
 import Collections from "./components/Collections";
+import type { ModalKey } from "./contexts/ModalContext";
+import type { SettingsActions } from "./stores/types";
 
 const DiagnosticsDrawer = lazy(() => import("./components/DiagnosticsDrawer"));
 
@@ -137,6 +138,7 @@ import { useLibraryContext } from "./contexts/LibraryContext";
 import { useDebouncedCallback } from "./hooks/useDebounce";
 import { ShareManager } from "./modules/ShareManager";
 import { VideoService } from "./services/VideoService";
+import { useAltSearch } from "./stores";
 import {
 	useHighContrast,
 	useSearchCommandCenter,
@@ -212,94 +214,9 @@ export type View =
 type _IconType = React.ComponentType<React.SVGProps<SVGSVGElement>>;
 type ViewType = "results" | "library" | "map" | "people" | "tasks" | "trips";
 
-// Minimal focus trap for modals
-function FocusTrap({
-	children,
-	onEscape,
-}: {
-	children: React.ReactNode;
-	onEscape?: () => void;
-}) {
-	const rootRef = React.useRef<HTMLDivElement>(null);
-	React.useEffect(() => {
-		const root = rootRef.current;
-		if (!root) return;
-		const q = root.querySelectorAll<HTMLElement>(
-			'a[href], button, textarea, input, select, [tabindex]:not([tabindex="-1"])',
-		);
-		const focusables = Array.from(q).filter(
-			(el) => !el.hasAttribute("disabled"),
-		);
-		if (focusables.length > 0) {
-			const el =
-				focusables.find((el) => el.getAttribute("tabindex") !== "-1") ||
-				focusables[0];
-			el.focus();
-		} else {
-			root.setAttribute("tabindex", "-1");
-			root.focus();
-		}
-		const onKey = (e: KeyboardEvent) => {
-			if (e.key === "Escape") {
-				e.stopPropagation();
-				e.preventDefault();
-				onEscape?.();
-			}
-			if (e.key === "Tab") {
-				if (focusables.length === 0) return;
-				const idx = focusables.indexOf(document.activeElement as HTMLElement);
-				const dir = e.shiftKey ? -1 : 1;
-				let next = idx + dir;
-				if (next < 0) next = focusables.length - 1;
-				if (next >= focusables.length) next = 0;
-				e.preventDefault();
-				focusables[next].focus();
-			}
-		};
-		document.addEventListener("keydown", onKey);
-		return () => document.removeEventListener("keydown", onKey);
-	}, [onEscape]);
-	return <div ref={rootRef}>{children}</div>;
-}
+import { FocusTrap } from "./utils/accessibility";
 
-// Simple scroll-based loading component
-function _ScrollLoader({
-	onLoadMore,
-	isLoading,
-	hasMore,
-}: {
-	onLoadMore: () => void;
-	isLoading: boolean;
-	hasMore: boolean;
-}) {
-	const ref = useRef<HTMLDivElement>(null);
-
-	useEffect(() => {
-		if (!ref.current || isLoading || !hasMore) return;
-
-		const el = ref.current;
-		const observer = new IntersectionObserver(
-			(entries) => {
-				if (entries[0].isIntersecting) {
-					onLoadMore();
-				}
-			},
-			{ threshold: 0.1 },
-		);
-
-		observer.observe(el);
-		return () => observer.disconnect();
-	}, [isLoading, hasMore, onLoadMore]);
-
-	return (
-		<div
-			ref={ref}
-			className="h-8 w-full flex items-center justify-center text-xs text-gray-500"
-		>
-			{isLoading ? "Loading…" : ""}
-		</div>
-	);
-}
+// (Removed) Local ScrollLoader in favor of shared utils/loading ScrollLoader
 
 export default function App() {
 	// Skip to content link for keyboard users
@@ -314,7 +231,11 @@ export default function App() {
 	}, []);
 
 	// Modern UX Integration - Mobile detection and haptic feedback
-	const { isMobile, isTablet: _isTablet, screenSize: _screenSize } = useMobileDetection();
+	const {
+		isMobile,
+		isTablet: _isTablet,
+		screenSize: _screenSize,
+	} = useMobileDetection();
 	const { trigger: hapticTrigger } = useHapticFeedback();
 
 	// Modern UX Integration - Onboarding and hints
@@ -328,7 +249,8 @@ export default function App() {
 	);
 	const [showModernSidebar, setShowModernSidebar] = useState(false);
 	const [_useAnimatedGrid, _setUseAnimatedGrid] = useState(true);
-	const [accessibilitySettings, setAccessibilitySettings] = useState<AccessibilitySettings | null>(null);
+	const [accessibilitySettings, setAccessibilitySettings] =
+		useState<AccessibilitySettings | null>(null);
 
 	// Individual hooks for settings
 	const dir = useDir();
@@ -363,7 +285,13 @@ export default function App() {
 	const _savedSearches = saved; // alias for compatibility
 	const collections = useCollections();
 	const smart = useSmartCollections();
-	const _trips: Array<{ id: string; name: string; startDate: string; endDate: string; photos: string[] }> = []; // TODO: implement trips
+	const _trips: Array<{
+		id: string;
+		name: string;
+		startDate: string;
+		endDate: string;
+		photos: string[];
+	}> = []; // TODO: implement trips
 	const library = useLibrary();
 	const _libHasMore = useLibHasMore();
 	const tagsMap = useTagsMap();
@@ -426,11 +354,14 @@ export default function App() {
 	}, [layoutRows]);
 
 	// Modern UX Integration - Enhanced handlers
-	const handleAccessibilitySettingsChange = useCallback((settings: AccessibilitySettings) => {
-		setAccessibilitySettings(settings);
-		// Apply accessibility settings to the app
-		console.log("Accessibility settings changed:", settings);
-	}, []);
+	const handleAccessibilitySettingsChange = useCallback(
+		(settings: AccessibilitySettings) => {
+			setAccessibilitySettings(settings);
+			// Apply accessibility settings to the app
+			console.log("Accessibility settings changed:", settings);
+		},
+		[],
+	);
 
 	const handleOnboardingComplete = useCallback(() => {
 		setShowOnboardingTour(false);
@@ -467,6 +398,7 @@ export default function App() {
 		}
 	});
 	const [presets, setPresets] = useState<{ name: string; query: string }[]>([]);
+	const altSearch = useAltSearch();
 
 	// Search Command Center
 	const searchCommandCenter = useSearchCommandCenter();
@@ -603,6 +535,12 @@ export default function App() {
 					ae.isContentEditable)
 			)
 				return;
+
+			// If unknown modal/overlay is open, don't open more via shortcuts
+			try {
+				const anyModalOpen = Object.values(modalState || {}).some(Boolean);
+				if (anyModalOpen) return;
+			} catch {}
 			// Open Search Overlay (/)
 			if (searchCommandCenter && e.key === "/") {
 				e.preventDefault();
@@ -665,18 +603,12 @@ export default function App() {
 		searchCommandCenter,
 		modal.open,
 		modal.toggle,
+		modalState,
 	]);
 
-	useEffect(() => {
-		const body = document.body;
-		if (highContrast) {
-			body.classList.add("high-contrast");
-		} else {
-			body.classList.remove("high-contrast");
-		}
-	}, [highContrast]);
+	const prefersReducedMotion = useReducedMotion();
 
-	// Determine if any filters are active (for no-results empty state)
+	// Determine if unknown filters are active (for no-results empty state)
 	const hasAnyFilters = useMemo(() => {
 		const anyExif = Boolean(
 			camera || isoMin || isoMax || fMin || fMax || place,
@@ -1197,6 +1129,7 @@ export default function App() {
 			loadLibrary,
 			settingsActions.setDir,
 			tagFilter,
+			lib.index,
 		],
 	);
 
@@ -1434,7 +1367,7 @@ export default function App() {
 
 	// Modern UX Integration - Enhanced photo action handler with haptic feedback
 	const _handlePhotoAction = useCallback(
-		(action: string, photo: { path: string }) => {
+		(action: string, photo: { path: string } & Partial<import("./models/PhotoMeta").PhotoMeta>) => {
 			switch (action) {
 				case "favorite":
 					// Toggle favorite with haptic feedback
@@ -1798,6 +1731,24 @@ export default function App() {
 			);
 		}
 
+		// Show indexing state if starting from empty library and indexing is active
+		if (library && library.length === 0 && libState.isIndexing) {
+			return (
+				<div className="p-4">
+					<EnhancedEmptyState
+						type="indexing"
+						indexingProgress={Math.round((libState.progressPct || 0) * 100)}
+						estimatedTime={
+							typeof libState.etaSeconds === "number" &&
+							Number.isFinite(libState.etaSeconds)
+								? `~${Math.max(1, Math.ceil((libState.etaSeconds || 0) / 60))}m`
+								: undefined
+						}
+					/>
+				</div>
+			);
+		}
+
 		// Show empty state if directory has no photos
 		if (library && library.length === 0) {
 			return (
@@ -1846,7 +1797,9 @@ export default function App() {
 		selected: Set<string>;
 		showAccessibilityPanel: boolean;
 		setShowAccessibilityPanel: (v: boolean) => void;
-		handleAccessibilitySettingsChange: (settings: AccessibilitySettings) => void;
+		handleAccessibilitySettingsChange: (
+			settings: AccessibilitySettings,
+		) => void;
 		showOnboardingTour: boolean;
 		handleOnboardingComplete: () => void;
 		setShowOnboardingTour: (v: boolean) => void;
@@ -1902,763 +1855,905 @@ export default function App() {
 			<ThemeProvider>
 				{/* Modern UX Integration - Wrap with modern providers */}
 				<HintProvider>
-					<HintManager>
-						<MobileOptimizations
-							onSwipeLeft={handleSwipeLeft}
-							onSwipeRight={handleSwipeRight}
-							onSwipeUp={() => setShowModernSidebar(!showModernSidebar)}
-							enableSwipeGestures={isMobile}
-							enablePullToRefresh={true}
-							onPullToRefresh={handlePullToRefresh}
-						>
-							{/* Dedicated share viewer route (full screen, minimal chrome) */}
-							{(location.pathname || "").startsWith("/share/") && (
-								<ShareViewer />
-							)}
-							{(location.pathname || "").startsWith("/mobile-test") && (
-								<MobilePWATest />
-							)}
-							<div
-								className={clsx(
-									"flex h-screen bg-white dark:bg-gray-950 dark:text-gray-100",
-									{
-										"high-contrast": accessibilitySettings?.highContrast,
-										"large-text": accessibilitySettings?.largeText,
-										hidden:
-											(location.pathname || "").startsWith("/share/") ||
-											(location.pathname || "").startsWith("/mobile-test"),
-									},
-								)}
+						{!Object.values(modalState || {}).some(Boolean) ? (
+						<HintManager>
+							<MobileOptimizations
+								onSwipeLeft={handleSwipeLeft}
+								onSwipeRight={handleSwipeRight}
+								onSwipeUp={() => setShowModernSidebar(!showModernSidebar)}
+								enableSwipeGestures={isMobile}
+								enablePullToRefresh={true}
+								onPullToRefresh={handlePullToRefresh}
 							>
-								<a
-									href="#main-content"
-									className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 bg-blue-600 text-white px-4 py-2 rounded-md"
-								>
-									Skip to main content
-								</a>
-								<OfflineIndicator />
-								{showWelcome && (
-									<Welcome
-										onStartDemo={async () => {
-											// Set demo photos directory and close welcome
-											const demoPath = await apiDemoDir();
-											if (!demoPath) {
-												uiActions.setNote(
-													"Demo data is not available on this system.",
-												);
-												return;
-											}
-											settingsActions.setDir(demoPath);
-											uiActions.setShowWelcome(false);
-
-											// Add demo path to workspace and index it
-											try {
-												await apiWorkspaceAdd(demoPath);
-												await lib.index();
-											} catch (error) {
-												console.error(
-													"Failed to add demo path or index:",
-													error,
-												);
-												uiActions.setNote(
-													error instanceof Error
-														? error.message
-														: "Failed to setup demo",
-												);
-											}
-										}}
-										onSelectFolder={() => {
-											modal.open("folder");
-											uiActions.setShowWelcome(false);
-										}}
-										onClose={() => uiActions.setShowWelcome(false)}
-									/>
+								{/* Dedicated share viewer route (full screen, minimal chrome) */}
+								{(location.pathname || "").startsWith("/share/") && (
+									<ShareViewer />
 								)}
+								{(location.pathname || "").startsWith("/mobile-test") && (
+									<MobilePWATest />
+								)}
+								<div
+									className={clsx(
+										"flex h-screen bg-white dark:bg-gray-950 dark:text-gray-100",
+										{
+											"high-contrast": accessibilitySettings?.highContrast,
+											"large-text": accessibilitySettings?.largeText,
+											hidden:
+												(location.pathname || "").startsWith("/share/") ||
+												(location.pathname || "").startsWith("/mobile-test"),
+										},
+									)}
+								>
+									<a
+										href="#main-content"
+										className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 bg-blue-600 text-white px-4 py-2 rounded-md"
+									>
+										Skip to main content
+									</a>
+									<OfflineIndicator />
+									{showWelcome && (
+										<Welcome
+											onStartDemo={async () => {
+												// Set demo photos directory and close welcome
+												const demoPath = await apiDemoDir();
+												if (!demoPath) {
+													uiActions.setNote(
+														"Demo data is not available on this system.",
+													);
+													return;
+												}
+												settingsActions.setDir(demoPath);
+												uiActions.setShowWelcome(false);
 
-								{/* First-run setup */}
-								<FirstRunSetup
-									open={!dir && showOnboarding}
-									onClose={() => {
-										setShowOnboarding(false);
-										localStorage.setItem("hasSeenOnboarding", "true");
-									}}
-									onQuickStart={async (paths) => {
-										try {
-											// Add each path to workspace; set first as current dir; index each
-											const existing: string[] = [];
-											for (const p of paths) {
+												// Add demo path to workspace and index it
 												try {
-													const st = await fetch(`${API_BASE}/scan_count`, {
-														method: "POST",
-														headers: { "Content-Type": "application/json" },
-														body: JSON.stringify([p]),
-													});
-													if (st.ok) {
-														const js = await st.json();
-														if (js.items?.[0]?.exists) existing.push(p);
-													}
-												} catch {}
-											}
-											if (existing.length === 0) {
+													await apiWorkspaceAdd(demoPath);
+													await lib.index();
+												} catch (error) {
+													console.error(
+														"Failed to add demo path or index:",
+														error,
+													);
+													uiActions.setNote(
+														error instanceof Error
+															? error.message
+															: "Failed to setup demo",
+													);
+												}
+											}}
+											onSelectFolder={() => {
+												modal.open("folder");
+												uiActions.setShowWelcome(false);
+											}}
+											onClose={() => uiActions.setShowWelcome(false)}
+										/>
+									)}
+
+									{/* First-run setup */}
+									<FirstRunSetup
+										open={!dir && showOnboarding}
+										onClose={() => {
+											setShowOnboarding(false);
+											localStorage.setItem("hasSeenOnboarding", "true");
+										}}
+										onQuickStart={async (paths) => {
+											try {
+												// Add each path to workspace; set first as current dir; index each
+												const existing: string[] = [];
+												for (const p of paths) {
+													try {
+														const st = await fetch(`${API_BASE}/scan_count`, {
+															method: "POST",
+															headers: { "Content-Type": "application/json" },
+															body: JSON.stringify([p]),
+														});
+														if (st.ok) {
+															const js = await st.json();
+															if (js.items?.[0]?.exists) existing.push(p);
+														}
+													} catch {}
+												}
+												if (existing.length === 0) {
+													setShowOnboarding(false);
+													localStorage.setItem("hasSeenOnboarding", "true");
+													return;
+												}
+												settingsActions.setDir(existing[0]);
+												// Kick off background indexing without blocking
+												for (const p of existing) {
+													try {
+														await apiWorkspaceAdd(p);
+													} catch {}
+													(async () => {
+														try {
+															await apiIndex(
+																p,
+																engine,
+																24,
+																needsHf ? hfToken : undefined,
+																needsOAI ? openaiKey : undefined,
+															);
+														} catch {}
+													})();
+												}
 												setShowOnboarding(false);
 												localStorage.setItem("hasSeenOnboarding", "true");
-												return;
+											} catch (e) {
+												uiActions.setNote(
+													e instanceof Error ? e.message : "Quick start failed",
+												);
 											}
-											settingsActions.setDir(existing[0]);
-											// Kick off background indexing without blocking
-											for (const p of existing) {
-												try {
-													await apiWorkspaceAdd(p);
-												} catch {}
-												(async () => {
-													try {
-														await apiIndex(
-															p,
-															engine,
-															24,
-															needsHf ? hfToken : undefined,
-															needsOAI ? openaiKey : undefined,
-														);
-													} catch {}
-												})();
+										}}
+										onCustom={() => {
+											modal.open("folder");
+											setShowOnboarding(false);
+											localStorage.setItem("hasSeenOnboarding", "true");
+										}}
+										onDemo={async () => {
+											try {
+												const demoPath = await apiDemoDir();
+												if (!demoPath) {
+													uiActions.setNote(
+														"Demo data is not available on this system.",
+													);
+													setShowOnboarding(false);
+													localStorage.setItem("hasSeenOnboarding", "true");
+													return;
+												}
+												settingsActions.setDir(demoPath);
+												await apiWorkspaceAdd(demoPath);
+												await lib.index();
+											} catch (e) {
+												uiActions.setNote(
+													e instanceof Error ? e.message : "Demo setup failed",
+												);
 											}
 											setShowOnboarding(false);
 											localStorage.setItem("hasSeenOnboarding", "true");
-										} catch (e) {
-											uiActions.setNote(
-												e instanceof Error ? e.message : "Quick start failed",
-											);
-										}
-									}}
-									onCustom={() => {
-										modal.open("folder");
-										setShowOnboarding(false);
-										localStorage.setItem("hasSeenOnboarding", "true");
-									}}
-									onDemo={async () => {
-										try {
-											const demoPath = await apiDemoDir();
-											if (!demoPath) {
-												uiActions.setNote(
-													"Demo data is not available on this system.",
-												);
-												setShowOnboarding(false);
-												localStorage.setItem("hasSeenOnboarding", "true");
-												return;
-											}
-											settingsActions.setDir(demoPath);
-											await apiWorkspaceAdd(demoPath);
-											await lib.index();
-										} catch (e) {
-											uiActions.setNote(
-												e instanceof Error ? e.message : "Demo setup failed",
-											);
-										}
-										setShowOnboarding(false);
-										localStorage.setItem("hasSeenOnboarding", "true");
-									}}
-									onTour={() => {
-										modal.open("help");
-									}}
-								/>
-
-								{/* Modern UX Integration - Enhanced Sidebar */}
-								{isMobile ? (
-									<ModernSidebar
-										selectedView={selectedView}
-										onViewChange={(view: string) =>
-											setSelectedView(view as View)
-										}
-										stats={{
-											totalPhotos: library?.length || 0,
-											collections: Object.keys(collections || {}).length,
-											people: (clusters || []).length,
-											favorites: fav.length,
 										}}
-										aiStatus={{
-											indexReady: true,
-											fastIndexType: "FAISS",
-											freeSpace: 0,
+										onTour={() => {
+											modal.open("help");
 										}}
-										darkMode={themeMode === "dark"}
-										onDarkModeToggle={() =>
-											setThemeMode(themeMode === "dark" ? "light" : "dark")
-										}
-										onSettingsClick={() => setShowAccessibilityPanel(true)}
-										onSelectLibrary={() => modal.open("folder")}
 									/>
-								) : (
-									<ModernSidebar
-										selectedView={selectedView}
-										onViewChange={(view: string) =>
-											setSelectedView(view as View)
-										}
-										stats={{
-											totalPhotos: library?.length || 0,
-											collections: Object.keys(collections || {}).length,
-											people: (clusters || []).length,
-											favorites: fav.length,
-										}}
-										aiStatus={{
-											indexReady: true,
-											fastIndexType: "FAISS",
-											freeSpace: 0,
-										}}
-										darkMode={themeMode === "dark"}
-										onDarkModeToggle={() =>
-											setThemeMode(themeMode === "dark" ? "light" : "dark")
-										}
-										onSettingsClick={() => setShowAccessibilityPanel(true)}
-										onSelectLibrary={() => modal.open("folder")}
-									/>
-								)}
 
-								<div className="flex-1 flex flex-col overflow-hidden">
-									{/* Modern Header Wrapper */}
-									<header className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-700/50 px-4 md:px-8 py-4 md:py-6">
-										<TopBar
-											searchText={searchText}
-											setSearchText={setSearchText}
-											onSearch={doSearchImmediate}
-											clusters={clusters}
-											allTags={allTags}
-											meta={meta}
-											diag={diag}
-											busy={!!busy}
-											gridSize={gridSize}
-											setGridSize={setGridSize}
-											selectedView={selectedView as ViewType}
-											setSelectedView={(view: string) =>
+									{/* Modern UX Integration - Enhanced Sidebar */}
+									{isMobile ? (
+										<ModernSidebar
+											selectedView={selectedView}
+											onViewChange={(view: string) =>
 												setSelectedView(view as View)
 											}
-											currentFilter={currentFilter}
-											setCurrentFilter={setCurrentFilter}
-											ratingMin={ratingMin}
-											setRatingMin={setRatingMin}
-											setModal={(m: { kind: string } | null) =>
-												m ? modal.open(m.kind as ModalKey) : undefined
-											}
-											setIsMobileMenuOpen={setIsMobileMenuOpen}
-											setShowFilters={setShowFilters}
-											selected={selected}
-											setSelected={setSelected}
-											dir={dir}
-											engine={engine}
-											topK={topK}
-											useOsTrash={useOsTrash}
-											showInfoOverlay={showInfoOverlay}
-											onToggleInfoOverlay={() =>
-												settingsActions.setShowInfoOverlay
-													? settingsActions.setShowInfoOverlay(!showInfoOverlay)
-													: undefined
-											}
-											resultView={resultView as "grid" | "timeline"}
-											onChangeResultView={(view) =>
-												settingsActions.setResultView?.(view)
-											}
-											timelineBucket={timelineBucket}
-											onChangeTimelineBucket={(b) =>
-												settingsActions.setTimelineBucket?.(b)
-											}
-											photoActions={photoActions}
-											uiActions={uiActions}
-											toastTimerRef={toastTimerRef}
-											setToast={setToast}
-											isIndexing={libState.isIndexing}
-											onIndex={() => lib.index()}
-											activeJobs={
-												jobs.filter((j) => j.status === "running").length
-											}
-											onOpenJobs={() => modal.open("jobs")}
-											progressPct={libState.progressPct}
-											etaSeconds={libState.etaSeconds}
-											paused={libState.paused}
-											tooltip={libState.tip}
-											ocrReady={ocrReady}
-											onOpenSearchOverlay={() => modal.open("search")}
-											onPause={async () => {
-												try {
-													await lib.pause?.(dir);
-												} catch {}
+											stats={{
+												totalPhotos: library?.length || 0,
+												collections: Object.keys(collections || {}).length,
+												people: (clusters || []).length,
+												favorites: fav.length,
 											}}
-											onResume={async () => {
-												try {
-													await lib.resume?.(dir);
-												} catch {}
+											aiStatus={{
+												indexReady: true,
+												fastIndexType: "FAISS",
+												freeSpace: 0,
 											}}
-											onOpenThemeModal={() => modal.open("theme")}
-											onOpenDiagnostics={() => modal.open("diagnostics")}
+											darkMode={themeMode === "dark"}
+											onDarkModeToggle={() =>
+												setThemeMode(themeMode === "dark" ? "light" : "dark")
+											}
+											onSettingsClick={() => setShowAccessibilityPanel(true)}
+											onSelectLibrary={() => modal.open("folder")}
 										/>
-									</header>
+									) : (
+										<ModernSidebar
+											selectedView={selectedView}
+											onViewChange={(view: string) =>
+												setSelectedView(view as View)
+											}
+											stats={{
+												totalPhotos: library?.length || 0,
+												collections: Object.keys(collections || {}).length,
+												people: (clusters || []).length,
+												favorites: fav.length,
+											}}
+											aiStatus={{
+												indexReady: true,
+												fastIndexType: "FAISS",
+												freeSpace: 0,
+											}}
+											darkMode={themeMode === "dark"}
+											onDarkModeToggle={() =>
+												setThemeMode(themeMode === "dark" ? "light" : "dark")
+											}
+											onSettingsClick={() => setShowAccessibilityPanel(true)}
+											onSelectLibrary={() => modal.open("folder")}
+										/>
+									)}
 
-									{/* Modern UX Integration - Accessibility Button */}
-									<div className="px-4 pt-2 flex items-center gap-2">
-										<motion.button
-											whileHover={{ scale: 1.05 }}
-											whileTap={{ scale: 0.95 }}
-											onClick={() => setShowAccessibilityPanel(true)}
-											className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-											aria-label="Accessibility settings"
-										>
-											<span className="text-sm">♿</span>
-										</motion.button>
+									<div className="flex-1 flex flex-col overflow-hidden">
+										{/* Modern Header Wrapper */}
+										<header className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-700/50 px-4 md:px-8 py-4 md:py-6">
+											<TopBar
+												searchText={searchText}
+												setSearchText={setSearchText}
+												onSearch={doSearchImmediate}
+												clusters={clusters}
+												allTags={allTags}
+												meta={meta}
+												diag={diag}
+												busy={!!busy}
+												gridSize={gridSize}
+												setGridSize={setGridSize}
+												selectedView={selectedView as ViewType}
+												setSelectedView={(view: string) =>
+													setSelectedView(view as View)
+												}
+												currentFilter={currentFilter}
+												setCurrentFilter={setCurrentFilter}
+												ratingMin={ratingMin}
+												setRatingMin={setRatingMin}
+												setModal={(m: { kind: string } | null) =>
+													m ? modal.open(m.kind as ModalKey) : undefined
+												}
+												setIsMobileMenuOpen={setIsMobileMenuOpen}
+												setShowFilters={setShowFilters}
+												selected={selected}
+												setSelected={setSelected}
+												dir={dir}
+												engine={engine}
+												topK={topK}
+												useOsTrash={useOsTrash}
+												showInfoOverlay={showInfoOverlay}
+												onToggleInfoOverlay={() =>
+													settingsActions.setShowInfoOverlay
+														? settingsActions.setShowInfoOverlay(
+																!showInfoOverlay,
+															)
+														: undefined
+												}
+												resultView={resultView as "grid" | "timeline"}
+												onChangeResultView={(view) =>
+													settingsActions.setResultView?.(view)
+												}
+												timelineBucket={timelineBucket}
+												onChangeTimelineBucket={(b) =>
+													settingsActions.setTimelineBucket?.(b)
+												}
+												photoActions={photoActions}
+												uiActions={uiActions}
+												toastTimerRef={toastTimerRef}
+												setToast={setToast}
+												isIndexing={libState.isIndexing}
+												onIndex={() => lib.index()}
+												activeJobs={
+													jobs.filter((j) => j.status === "running").length
+												}
+												onOpenJobs={() => modal.open("jobs")}
+												progressPct={libState.progressPct}
+												etaSeconds={libState.etaSeconds}
+												paused={libState.paused}
+												tooltip={libState.tip}
+												ocrReady={ocrReady}
+												onOpenSearchOverlay={() => modal.open("search")}
+												onPause={async () => {
+													try {
+														await lib.pause?.(dir);
+													} catch {}
+												}}
+												onResume={async () => {
+													try {
+														await lib.resume?.(dir);
+													} catch {}
+												}}
+												onOpenThemeModal={() => modal.open("theme")}
+												onOpenDiagnostics={() => modal.open("diagnostics")}
+											/>
+										</header>
 
-										<motion.button
-											whileHover={{ scale: 1.05 }}
-											whileTap={{ scale: 0.95 }}
-											onClick={() => setShowOnboardingTour(true)}
-											className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-											aria-label="Help and onboarding"
-										>
-											<span className="text-sm">?</span>
-										</motion.button>
+										{/* Modern UX Integration - Accessibility Button */}
+										<div className="px-4 pt-2 flex items-center gap-2">
+											<motion.button
+												{...(prefersReducedMotion
+													? {}
+													: {
+															whileHover: { scale: 1.05 },
+															whileTap: { scale: 0.95 },
+														})}
+												onClick={() => setShowAccessibilityPanel(true)}
+												className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+												aria-label="Accessibility settings"
+											>
+												<span className="text-sm">♿</span>
+											</motion.button>
 
-										{showHelpHint && (
-											<div className="flex-1 bg-yellow-50 text-yellow-800 border border-yellow-200 rounded px-3 py-1 text-xs flex items-center justify-between">
-												<span>
-													Press <span className="font-mono">?</span> for help
-													and shortcuts
-												</span>
-												<button
-													type="button"
-													className="text-yellow-800 hover:text-yellow-900"
-													aria-label="Dismiss help hint"
-													onClick={() => {
-														setShowHelpHint(false);
-														try {
-															localStorage.setItem("ps_hint_help_seen", "1");
-														} catch {}
-													}}
-												>
-													×
-												</button>
-											</div>
-										)}
-									</div>
-									<main
-										id="main-content"
-										className="flex-1 overflow-auto"
-										ref={scrollContainerRef}
-										aria-label="Main content"
-									>
-										{selectedView === "results" && (
-											<SectionErrorBoundary sectionName="Search Results">
-												<div className="p-4">
-													{/* Results context toolbar */}
-													{results &&
-														results.length > 0 &&
-														(searchText || "").trim() && (
-															<div className="mb-2 flex items-center justify-between">
-																<div className="text-sm text-gray-600">
-																	{results.length} results
-																</div>
-																<button
-																	type="button"
-																	className="chip"
-																	title="Save this search as a Smart Collection"
-																	onClick={async () => {
-																		const name = (
-																			prompt(
-																				"Save current search as Smart (name):",
-																			) || ""
-																		).trim();
-																		if (!name) return;
-																		try {
-																			const tags = (tagFilter || "")
-																				.split(",")
-																				.map((s) => s.trim())
-																				.filter(Boolean);
-																			const rules: { query: string; count?: number } = {
-																				query: (searchText || "").trim(),
-																				favoritesOnly: favOnly,
-																				tags,
-																				useCaptions: useCaps,
-																				useOcr,
-																				hasText,
-																				camera: camera || undefined,
-																				isoMin: isoMin || undefined,
-																				isoMax: isoMax || undefined,
-																				fMin: fMin || undefined,
-																				fMax: fMax || undefined,
-																				place: place || undefined,
-																			};
-																			const ppl = (persons || []).filter(
-																				Boolean,
-																			);
-																			if (ppl.length === 1)
-																				rules.person = ppl[0];
-																			else if (ppl.length > 1)
-																				rules.persons = ppl;
-																			const { apiSetSmart, apiGetSmart } =
-																				await import("./api");
-																			await apiSetSmart(dir, name, rules);
-																			try {
-																				const r = await apiGetSmart(dir);
-																				photoActions.setSmart(r.smart || {});
-																			} catch {}
-																			uiActions.setNote(
-																				`Saved smart collection: ${name}`,
-																			);
-																		} catch (e: unknown) {
-																			uiActions.setNote(
-																				(e instanceof Error ? e.message : null) ||
-																					"Failed to save smart collection",
-																			);
-																		}
-																	}}
-																>
-																	Save as Smart Collection
-																</button>
-															</div>
-														)}
-													{results && results.length === 0 && searchText ? (
-														<div className="flex flex-col items-center justify-center min-h-[400px]">
-															<EnhancedEmptyState
-																type="no-results"
-																searchQuery={searchText}
-																onAction={() => {
-																	setSearchText("");
-																	photoActions.setQuery("");
-																}}
-																onOpenFilters={() => setShowFilters(true)}
-																onOpenAdvanced={() => modal.open("advanced")}
-																onClearSearch={() => {
-																	// Clear common filters
-																	if (favOnly) photoActions.setFavOnly(false);
-																	if (tagFilter) photoActions.setTagFilter("");
-																	setDateFrom("");
-																	setDateTo("");
-																	settingsActions.setPlace("");
-																	settingsActions.setCamera("");
-																	settingsActions.setIsoMin(0);
-																	settingsActions.setIsoMax(0);
-																	settingsActions.setFMin(0);
-																	settingsActions.setFMax(0);
-																	settingsActions.setHasText(false);
-																	workspaceActions.setPersons([]);
-																}}
-																hasActiveFilters={hasAnyFilters}
-																sampleQueries={[
-																	"golden hour",
-																	"city skyline",
-																	"family dinner",
-																	"blue car",
-																]}
-																onRunSample={(q) => doSearchImmediate(q)}
-																onOpenHelp={() => modal.open("help")}
-															/>
-															<SampleSearchSuggestions
-																onSearch={doSearchImmediate}
-															/>
-														</div>
-													) : resultView === "grid" ? (
-														<JustifiedResults
-															dir={dir}
-															engine={engine}
-															items={(results || []).map((r) => ({
-																path: r.path,
-																score: r.score,
-															}))}
-															selected={selected}
-															onToggleSelect={toggleSelect}
-															onOpen={(p) => openDetailByPath(p)}
-															scrollContainerRef={scrollContainerRef}
-															focusIndex={focusIdx ?? undefined}
-															onLayout={(rows) =>
-																setLayoutRows((prev) =>
-																	rowsEqual(prev, rows) ? prev : rows,
-																)
-															}
-															ratingMap={ratingMap}
-															showInfoOverlay={showInfoOverlay}
-														/>
-													) : (
-														<TimelineResults
-															dir={dir}
-															engine={engine}
-															items={(results || []).map((r) => ({
-																path: r.path,
-																score: r.score,
-															}))}
-															selected={selected}
-															onToggleSelect={toggleSelect}
-															onOpen={(p) => openDetailByPath(p)}
-															showInfoOverlay={showInfoOverlay}
-															bucket={timelineBucket}
-														/>
-													)}
+											<motion.button
+												{...(prefersReducedMotion
+													? {}
+													: {
+															whileHover: { scale: 1.05 },
+															whileTap: { scale: 0.95 },
+														})}
+												onClick={() => setShowOnboardingTour(true)}
+												className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+												aria-label="Help and onboarding"
+											>
+												<span className="text-sm">?</span>
+											</motion.button>
+
+											{showHelpHint && (
+												<div className="flex-1 bg-yellow-50 text-yellow-800 border border-yellow-200 rounded px-3 py-1 text-xs flex items-center justify-between">
+													<span>
+														Press <span className="font-mono">?</span> for help
+														and shortcuts
+													</span>
+													<button
+														type="button"
+														className="text-yellow-800 hover:text-yellow-900"
+														aria-label="Dismiss help hint"
+														onClick={() => {
+															setShowHelpHint(false);
+															try {
+																localStorage.setItem("ps_hint_help_seen", "1");
+															} catch {}
+														}}
+													>
+														×
+													</button>
 												</div>
-											</SectionErrorBoundary>
-										)}
-										{selectedView === "library" && (
-											<SectionErrorBoundary sectionName="Library">
-												<LibraryView />
-											</SectionErrorBoundary>
-										)}
-										{selectedView === "people" && (
-											<div className="p-4">
-												<PeopleView
-													dir={dir}
-													engine={engine}
-													clusters={clusters || []}
-													persons={persons}
-													setPersons={workspaceActions.setPersons}
-													busy={busy}
-													setBusy={uiActions.setBusy}
-													setNote={uiActions.setNote}
-													onLoadFaces={loadFaces}
-													onOpenPhotos={(photos) => {
-														// Convert paths to search results and switch to results view
-														photoActions.setResults(
-															photos.map((path) => ({ path, score: 0 })),
-														);
-														setSelectedView("results");
-														uiActions.setNote(
-															`Viewing ${photos.length} photos from face cluster`,
-														);
-													}}
-												/>
-											</div>
-										)}
-										{selectedView === "map" && (
-											<div className="p-4">
-												<MapView points={points || []} onLoadMap={loadMap} />
-											</div>
-										)}
-										{selectedView === "collections" && (
-											<div className="p-4">
-												<Collections
-													dir={dir}
-													engine={engine}
-													collections={collections}
-													onLoadCollections={async () => {
-														const { apiGetCollections } = await import("./api");
-														const r = await apiGetCollections(dir);
-														photoActions.setCollections(r.collections || {});
-													}}
-													onOpen={(name: string) => {
-														const paths = collections?.[name] || [];
-														photoActions.setResults(
-															paths.map((p) => ({ path: p, score: 0 })),
-														);
-														setSelectedView("results");
-														uiActions.setNote(`${paths.length} in ${name}`);
-													}}
-													onDelete={async (name: string) => {
-														try {
-															const { apiDeleteCollection, apiGetCollections } =
-																await import("./api");
-															await apiDeleteCollection(dir, name);
-															const r = await apiGetCollections(dir);
-															photoActions.setCollections(r.collections || {});
-															setToast({
-																message: `Deleted collection ${name}`,
-															});
-														} catch (e) {
-															uiActions.setNote(
-																e instanceof Error
-																	? e.message
-																	: "Delete failed",
-															);
-														}
-													}}
-												/>
-											</div>
-										)}
-										{selectedView === "saved" && (
-											<div className="p-4">
-												<SavedSearches
-													saved={saved}
-													onRun={(_name: string, q: string, k?: number) => {
-														setSearchText(q);
-														if (k) photoActions.setTopK(k);
-														doSearchImmediate(q);
-													}}
-													onDelete={async (name: string) => {
-														try {
-															const { apiDeleteSaved, apiGetSaved } =
-																await import("./api");
-															await apiDeleteSaved(dir, name);
-															const r = await apiGetSaved(dir);
-															photoActions.setSaved(r.saved || []);
-														} catch (e) {
-															uiActions.setNote(
-																e instanceof Error
-																	? e.message
-																	: "Delete failed",
-															);
-														}
-													}}
-												/>
-												<div className="mt-4 bg-white border rounded p-3">
-													<div className="flex items-center justify-between">
-														<h2 className="font-semibold">Presets</h2>
-														<div className="flex items-center gap-2">
-															<button
-																type="button"
-																className="px-2 py-1 rounded border"
-																onClick={loadPresets}
-															>
-																Refresh
-															</button>
-															<button
-																type="button"
-																className="px-2 py-1 rounded border"
-																onClick={() => {
-																	try {
-																		const data = JSON.stringify(
-																			presets || [],
-																			null,
-																			2,
-																		);
-																		const blob = new Blob([data], {
-																			type: "application/json",
-																		});
-																		const url = URL.createObjectURL(blob);
-																		const a = document.createElement("a");
-																		a.href = url;
-																		a.download = "photo-search-presets.json";
-																		document.body.appendChild(a);
-																		a.click();
-																		document.body.removeChild(a);
-																		URL.revokeObjectURL(url);
-																	} catch {}
-																}}
-															>
-																Export
-															</button>
-															<label className="px-2 py-1 rounded border cursor-pointer">
-																Import
-																<input
-																	type="file"
-																	accept="application/json"
-																	className="hidden"
-																	onChange={async (e) => {
-																		const file = e.target.files?.[0];
-																		if (!file) return;
-																		try {
-																			const txt = await file.text();
-																			const arr = JSON.parse(txt);
-																			if (Array.isArray(arr)) {
-																				const { apiAddPreset } = await import(
-																					"./api"
+											)}
+										</div>
+										<main
+											id="main-content"
+											className="flex-1 overflow-auto"
+											ref={scrollContainerRef}
+											aria-label="Main content"
+										>
+											{selectedView === "results" && (
+												<SectionErrorBoundary sectionName="Search Results">
+													<div className="p-4">
+														{/* Results context toolbar */}
+														{results &&
+															results.length > 0 &&
+															(searchText || "").trim() && (
+																<div className="mb-2 flex items-center justify-between">
+																	<div className="text-sm text-gray-600">
+																		{results.length} results
+																	</div>
+																	{altSearch?.active && (
+																		<div
+																			className="text-xs px-2 py-1 rounded bg-yellow-50 text-yellow-800 border border-yellow-200"
+																			aria-live="polite"
+																		>
+																			Showing results for "{altSearch.applied}"
+																			(from "{altSearch.original}")
+																			<button
+																				type="button"
+																				className="ml-2 underline"
+																				onClick={() => {
+																					setSearchText(altSearch.original);
+																					doSearchImmediate(altSearch.original);
+																				}}
+																			>
+																				Search original
+																			</button>
+																		</div>
+																	)}
+																	<button
+																		type="button"
+																		className="chip"
+																		title="Save this search as a Smart Collection"
+																		onClick={async () => {
+																			const name = (
+																				prompt(
+																					"Save current search as Smart (name):",
+																				) || ""
+																			).trim();
+																			if (!name) return;
+																			try {
+																				const tags = (tagFilter || "")
+																					.split(",")
+																					.map((s) => s.trim())
+																					.filter(Boolean);
+												const rules: {
+													query: string;
+													count?: number;
+												} & Record<string, unknown> = {
+																					query: (searchText || "").trim(),
+																					favoritesOnly: favOnly,
+																					tags,
+																					useCaptions: useCaps,
+																					useOcr,
+																					hasText,
+																					camera: camera || undefined,
+																					isoMin: isoMin || undefined,
+																					isoMax: isoMax || undefined,
+																					fMin: fMin || undefined,
+																					fMax: fMax || undefined,
+																					place: place || undefined,
+																				};
+																				const ppl = (persons || []).filter(
+																					Boolean,
 																				);
-																				for (const it of arr) {
-																					if (
-																						it &&
-																						typeof it.name === "string" &&
-																						typeof it.query === "string"
-																					) {
-																						await apiAddPreset(
-																							dir,
-																							it.name,
-																							it.query,
-																						);
-																					}
-																				}
-																				await loadPresets();
-																				setToast({
-																					message: `Imported ${arr.length} preset(s)`,
-																				});
-																			} else {
+																				if (ppl.length === 1)
+																					rules.person = ppl[0];
+																				else if (ppl.length > 1)
+																					rules.persons = ppl;
+																				const { apiSetSmart, apiGetSmart } =
+																					await import("./api");
+																				await apiSetSmart(dir, name, rules);
+																				try {
+																					const r = await apiGetSmart(dir);
+																					photoActions.setSmart(r.smart || {});
+																				} catch {}
 																				uiActions.setNote(
-																					"Invalid JSON format",
+																					`Saved smart collection: ${name}`,
+																				);
+																			} catch (e: unknown) {
+																				uiActions.setNote(
+																					(e instanceof Error
+																						? e.message
+																						: null) ||
+																						"Failed to save smart collection",
 																				);
 																			}
-																		} catch {
-																			uiActions.setNote("Import failed");
-																		} finally {
-																			e.currentTarget.value = "";
-																		}
-																	}}
-																/>
-															</label>
-														</div>
-													</div>
-													{presets.length === 0 ? (
-														<div className="text-sm text-gray-600 mt-2">
-															No presets yet. Use Advanced Search to create one.
-														</div>
-													) : (
-														<div className="mt-2 divide-y">
-															{presets.map((p) => (
-																<div
-																	key={p.name}
-																	className="py-2 flex items-center justify-between gap-3"
-																>
-																	<div className="min-w-0">
-																		<div
-																			className="font-medium truncate"
-																			title={p.name}
-																		>
-																			{p.name}
-																		</div>
-																		<div
-																			className="text-xs text-gray-600 truncate"
-																			title={p.query}
-																		>
-																			{p.query}
-																		</div>
-																	</div>
-																	<div className="flex gap-2 shrink-0">
-																		<button
-																			type="button"
-																			onClick={() => {
-																				setSearchText(p.query);
-																				doSearch(p.query);
-																			}}
-																			className="px-2 py-1 rounded bg-blue-600 text-white text-sm"
-																		>
-																			Run
-																		</button>
-																		<button
-																			type="button"
-																			onClick={async () => {
-																				try {
-																					const { apiDeletePreset } =
-																						await import("./api");
-																					await apiDeletePreset(dir, p.name);
-																					await loadPresets();
-																				} catch {}
-																			}}
-																			className="px-2 py-1 rounded bg-red-600 text-white text-sm"
-																		>
-																			Delete
-																		</button>
-																	</div>
+																		}}
+																	>
+																		Save as Smart Collection
+																	</button>
 																</div>
-															))}
-														</div>
-													)}
-												</div>
-											</div>
-										)}
-										{selectedView === "memories" && (
-											<div className="p-4 space-y-4">
-												<div className="bg-white border rounded p-3">
-													<div className="flex items-center justify-between">
-														<div className="font-semibold">
-															Recent Favorites
-														</div>
-													</div>
-													{fav.length === 0 ? (
-														<div className="text-sm text-gray-600 mt-2">
-															No favorites yet.
-														</div>
-													) : (
-														<div className="mt-2 grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-2">
-															{fav.slice(0, 24).map((p) => (
-																<img
-																	key={p}
-																	src={thumbUrl(dir, engine, p, 196)}
-																	alt={basename(p)}
-																	className="w-full h-24 object-cover rounded"
+															)}
+														{results && results.length === 0 && searchText ? (
+															<div className="flex flex-col items-center justify-center min-h-[400px]">
+																<EnhancedEmptyState
+																	type="no-results"
+																	searchQuery={searchText}
+																	onAction={() => {
+																		setSearchText("");
+																		photoActions.setQuery("");
+																	}}
+																	onOpenFilters={() => setShowFilters(true)}
+																	onOpenAdvanced={() => modal.open("advanced")}
+																	didYouMean={(() => {
+																		try {
+											const people = (clusters || [])
+												.map((c) => (c as unknown)?.name)
+																				.filter(Boolean)
+																				.map(String);
+																			const cameras = (meta?.cameras || []).map(
+																				String,
+																			);
+																			const tags = (allTags || []).map(String);
+																			const candidates = Array.from(
+																				new Set([
+																					...people,
+																					...cameras,
+																					...tags,
+																				]),
+																			);
+																			const {
+																				didYouMean,
+																			} = require("./utils/searchSynonyms");
+																			return didYouMean(
+																				searchText || "",
+																				candidates,
+																			).slice(0, 3);
+																		} catch {
+																			return [] as string[];
+																		}
+																	})()}
+																	onClearSearch={() => {
+																		// Clear common filters
+																		if (favOnly) photoActions.setFavOnly(false);
+																		if (tagFilter)
+																			photoActions.setTagFilter("");
+																		setDateFrom("");
+																		setDateTo("");
+																		settingsActions.setPlace("");
+																		settingsActions.setCamera("");
+																		settingsActions.setIsoMin(0);
+																		settingsActions.setIsoMax(0);
+																		settingsActions.setFMin(0);
+																		settingsActions.setFMax(0);
+																		settingsActions.setHasText(false);
+																		workspaceActions.setPersons([]);
+																	}}
+																	hasActiveFilters={hasAnyFilters}
+																	sampleQueries={Array.from(
+																		new Set([
+																			...(/\bkids?\b/.test(
+																				(searchText || "").toLowerCase(),
+																			)
+																				? ["children"]
+																				: []),
+																			...(/\bchildren\b/.test(
+																				(searchText || "").toLowerCase(),
+																			)
+																				? ["kid", "kids"]
+																				: []),
+																			...(/\bdog\b/.test(
+																				(searchText || "").toLowerCase(),
+																			)
+																				? ["puppy", "pet dog"]
+																				: []),
+																			...(/\bcat\b/.test(
+																				(searchText || "").toLowerCase(),
+																			)
+																				? ["kitten", "pet cat"]
+																				: []),
+																			...(/\bbeach\b/.test(
+																				(searchText || "").toLowerCase(),
+																			)
+																				? ["ocean", "coast", "sunset beach"]
+																				: []),
+																			...(/\bcity\b/.test(
+																				(searchText || "").toLowerCase(),
+																			)
+																				? ["city skyline", "street at night"]
+																				: []),
+																			"golden hour",
+																			"family dinner",
+																			"mountain hike",
+																		]),
+																	).slice(0, 6)}
+																	onRunSample={(q) => doSearchImmediate(q)}
+																	onOpenHelp={() => modal.open("help")}
 																/>
-															))}
-														</div>
-													)}
+																<SampleSearchSuggestions
+																	onSearch={doSearchImmediate}
+																/>
+															</div>
+														) : resultView === "grid" ? (
+															<JustifiedResults
+																dir={dir}
+																engine={engine}
+																items={(results || []).map((r) => ({
+																	path: r.path,
+																	score: r.score,
+																}))}
+																selected={selected}
+																onToggleSelect={toggleSelect}
+																onOpen={(p) => openDetailByPath(p)}
+																scrollContainerRef={scrollContainerRef}
+																focusIndex={focusIdx ?? undefined}
+																onLayout={(rows) =>
+																	setLayoutRows((prev) =>
+																		rowsEqual(prev, rows) ? prev : rows,
+																	)
+																}
+																ratingMap={ratingMap}
+																showInfoOverlay={showInfoOverlay}
+															/>
+														) : (
+															<TimelineResults
+																dir={dir}
+																engine={engine}
+																items={(results || []).map((r) => ({
+																	path: r.path,
+																	score: r.score,
+																}))}
+																selected={selected}
+																onToggleSelect={toggleSelect}
+																onOpen={(p) => openDetailByPath(p)}
+																showInfoOverlay={showInfoOverlay}
+																bucket={timelineBucket}
+															/>
+														)}
+													</div>
+												</SectionErrorBoundary>
+											)}
+											{selectedView === "library" && (
+												<SectionErrorBoundary sectionName="Library">
+													<LibraryView />
+												</SectionErrorBoundary>
+											)}
+											{selectedView === "people" && (
+												<div className="p-4">
+													<PeopleView
+														dir={dir}
+														engine={engine}
+														clusters={clusters || []}
+														persons={persons}
+														setPersons={workspaceActions.setPersons}
+														busy={busy}
+														setBusy={uiActions.setBusy}
+														setNote={uiActions.setNote}
+														onLoadFaces={loadFaces}
+														onOpenPhotos={(photos) => {
+															// Convert paths to search results and switch to results view
+															photoActions.setResults(
+																photos.map((path) => ({ path, score: 0 })),
+															);
+															setSelectedView("results");
+															uiActions.setNote(
+																`Viewing ${photos.length} photos from face cluster`,
+															);
+														}}
+													/>
 												</div>
-												<div>
+											)}
+											{selectedView === "map" && (
+												<div className="p-4">
+													<MapView points={points || []} onLoadMap={loadMap} />
+												</div>
+											)}
+											{selectedView === "collections" && (
+												<div className="p-4">
+													<Collections
+														dir={dir}
+														engine={engine}
+														collections={collections}
+														onLoadCollections={async () => {
+															const { apiGetCollections } = await import(
+																"./api"
+															);
+															const r = await apiGetCollections(dir);
+															photoActions.setCollections(r.collections || {});
+														}}
+														onOpen={(name: string) => {
+															const paths = collections?.[name] || [];
+															photoActions.setResults(
+																paths.map((p) => ({ path: p, score: 0 })),
+															);
+															setSelectedView("results");
+															uiActions.setNote(`${paths.length} in ${name}`);
+														}}
+														onDelete={async (name: string) => {
+															try {
+																const {
+																	apiDeleteCollection,
+																	apiGetCollections,
+																} = await import("./api");
+																await apiDeleteCollection(dir, name);
+																const r = await apiGetCollections(dir);
+																photoActions.setCollections(
+																	r.collections || {},
+																);
+																setToast({
+																	message: `Deleted collection ${name}`,
+																});
+															} catch (e) {
+																uiActions.setNote(
+																	e instanceof Error
+																		? e.message
+																		: "Delete failed",
+																);
+															}
+														}}
+													/>
+												</div>
+											)}
+											{selectedView === "saved" && (
+												<div className="p-4">
+													<SavedSearches
+														saved={saved}
+														onRun={(_name: string, q: string, k?: number) => {
+															setSearchText(q);
+															if (k) photoActions.setTopK(k);
+															doSearchImmediate(q);
+														}}
+														onDelete={async (name: string) => {
+															try {
+																const { apiDeleteSaved, apiGetSaved } =
+																	await import("./api");
+																await apiDeleteSaved(dir, name);
+																const r = await apiGetSaved(dir);
+																photoActions.setSaved(r.saved || []);
+															} catch (e) {
+																uiActions.setNote(
+																	e instanceof Error
+																		? e.message
+																		: "Delete failed",
+																);
+															}
+														}}
+													/>
+													<div className="mt-4 bg-white border rounded p-3">
+														<div className="flex items-center justify-between">
+															<h2 className="font-semibold">Presets</h2>
+															<div className="flex items-center gap-2">
+																<button
+																	type="button"
+																	className="px-2 py-1 rounded border"
+																	onClick={loadPresets}
+																>
+																	Refresh
+																</button>
+																<button
+																	type="button"
+																	className="px-2 py-1 rounded border"
+																	onClick={() => {
+																		try {
+																			const data = JSON.stringify(
+																				presets || [],
+																				null,
+																				2,
+																			);
+																			const blob = new Blob([data], {
+																				type: "application/json",
+																			});
+																			const url = URL.createObjectURL(blob);
+																			const a = document.createElement("a");
+																			a.href = url;
+																			a.download = "photo-search-presets.json";
+																			document.body.appendChild(a);
+																			a.click();
+																			document.body.removeChild(a);
+																			URL.revokeObjectURL(url);
+																		} catch {}
+																	}}
+																>
+																	Export
+																</button>
+																<label className="px-2 py-1 rounded border cursor-pointer">
+																	Import
+																	<input
+																		type="file"
+																		accept="application/json"
+																		className="hidden"
+																		onChange={async (e) => {
+																			const file = e.target.files?.[0];
+																			if (!file) return;
+																			try {
+																				const txt = await file.text();
+																				const arr = JSON.parse(txt);
+																				if (Array.isArray(arr)) {
+																					const { apiAddPreset } = await import(
+																						"./api"
+																					);
+																					for (const it of arr) {
+																						if (
+																							it &&
+																							typeof it.name === "string" &&
+																							typeof it.query === "string"
+																						) {
+																							await apiAddPreset(
+																								dir,
+																								it.name,
+																								it.query,
+																							);
+																						}
+																					}
+																					await loadPresets();
+																					setToast({
+																						message: `Imported ${arr.length} preset(s)`,
+																					});
+																				} else {
+																					uiActions.setNote(
+																						"Invalid JSON format",
+																					);
+																				}
+																			} catch {
+																				uiActions.setNote("Import failed");
+																			} finally {
+																				e.currentTarget.value = "";
+																			}
+																		}}
+																	/>
+																</label>
+															</div>
+														</div>
+														{presets.length === 0 ? (
+															<div className="text-sm text-gray-600 mt-2">
+																No presets yet. Use Advanced Search to create
+																one.
+															</div>
+														) : (
+															<div className="mt-2 divide-y">
+																{presets.map((p) => (
+																	<div
+																		key={p.name}
+																		className="py-2 flex items-center justify-between gap-3"
+																	>
+																		<div className="min-w-0">
+																			<div
+																				className="font-medium truncate"
+																				title={p.name}
+																			>
+																				{p.name}
+																			</div>
+																			<div
+																				className="text-xs text-gray-600 truncate"
+																				title={p.query}
+																			>
+																				{p.query}
+																			</div>
+																		</div>
+																		<div className="flex gap-2 shrink-0">
+																			<button
+																				type="button"
+																				onClick={() => {
+																					setSearchText(p.query);
+																					doSearch(p.query);
+																				}}
+																				className="px-2 py-1 rounded bg-blue-600 text-white text-sm"
+																			>
+																				Run
+																			</button>
+																			<button
+																				type="button"
+																				onClick={async () => {
+																					try {
+																						const { apiDeletePreset } =
+																							await import("./api");
+																						await apiDeletePreset(dir, p.name);
+																						await loadPresets();
+																					} catch {}
+																				}}
+																				className="px-2 py-1 rounded bg-red-600 text-white text-sm"
+																			>
+																				Delete
+																			</button>
+																		</div>
+																	</div>
+																))}
+															</div>
+														)}
+													</div>
+												</div>
+											)}
+											{selectedView === "memories" && (
+												<div className="p-4 space-y-4">
+													<div className="bg-white border rounded p-3">
+														<div className="flex items-center justify-between">
+															<div className="font-semibold">
+																Recent Favorites
+															</div>
+														</div>
+														{fav.length === 0 ? (
+															<div className="text-sm text-gray-600 mt-2">
+																No favorites yet.
+															</div>
+														) : (
+															<div className="mt-2 grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-2">
+																{fav.slice(0, 24).map((p) => (
+																	<img
+																		key={p}
+																		src={thumbUrl(dir, engine, p, 196)}
+																		alt={basename(p)}
+																		className="w-full h-24 object-cover rounded"
+																	/>
+																))}
+															</div>
+														)}
+													</div>
+													<div>
+														<TripsView
+															dir={dir}
+															engine={engine}
+															setBusy={uiActions.setBusy}
+															setNote={uiActions.setNote}
+															setResults={photoActions.setResults}
+														/>
+													</div>
+												</div>
+											)}
+											{/* tasks view removed */}
+											{selectedView === "smart" && (
+												<div className="p-4">
+													<SmartCollections
+														dir={dir}
+														engine={engine}
+														topK={topK}
+														smart={smart}
+														setSmart={photoActions.setSmart}
+														setResults={photoActions.setResults}
+														setSearchId={photoActions.setSearchId}
+														setNote={uiActions.setNote}
+														query={query}
+														favOnly={favOnly}
+														tagFilter={tagFilter}
+														useCaps={useCaps}
+														useOcr={useOcr}
+														hasText={hasText}
+														camera={camera}
+														isoMin={String(isoMin || "")}
+														isoMax={String(isoMax || "")}
+														fMin={String(fMin || "")}
+														fMax={String(fMax || "")}
+														place={place}
+														persons={persons}
+													/>
+												</div>
+											)}
+											{selectedView === "trips" && (
+												<div className="p-4">
 													<TripsView
 														dir={dir}
 														engine={engine}
@@ -2667,800 +2762,802 @@ export default function App() {
 														setResults={photoActions.setResults}
 													/>
 												</div>
-											</div>
-										)}
-										{/* tasks view removed */}
-										{selectedView === "smart" && (
-											<div className="p-4">
-												<SmartCollections
+											)}
+											{selectedView === "videos" && (
+												<div className="p-4">
+													<VideoManager currentDir={dir} provider={engine} />
+												</div>
+											)}
+											<StatsBar
+												items={items}
+												note={note}
+												diag={diag}
+												engine={engine}
+											/>
+
+											{/* Filters panel */}
+											<FilterPanel
+												show={showFilters}
+												onClose={() => setShowFilters(false)}
+												onApply={() => {
+													setShowFilters(false);
+													doSearchImmediate(searchText);
+												}}
+												favOnly={favOnly}
+												setFavOnly={photoActions.setFavOnly}
+												tagFilter={tagFilter}
+												setTagFilter={photoActions.setTagFilter}
+												camera={camera}
+												setCamera={settingsActions.setCamera}
+												isoMin={String(isoMin || "")}
+												setIsoMin={(value: string) =>
+													settingsActions.setIsoMin(parseFloat(value) || 0)
+												}
+												isoMax={String(isoMax || "")}
+												setIsoMax={(value: string) =>
+													settingsActions.setIsoMax(parseFloat(value) || 0)
+												}
+												dateFrom={dateFrom}
+												setDateFrom={setDateFrom}
+												dateTo={dateTo}
+												setDateTo={setDateTo}
+												fMin={String(fMin || "")}
+												setFMin={(value: string) =>
+													settingsActions.setFMin(parseFloat(value) || 0)
+												}
+												fMax={String(fMax || "")}
+												setFMax={(value: string) =>
+													settingsActions.setFMax(parseFloat(value) || 0)
+												}
+												place={place}
+												setPlace={settingsActions.setPlace}
+												useCaps={useCaps}
+												setUseCaps={settingsActions.setUseCaps}
+												useOcr={useOcr}
+												setUseOcr={settingsActions.setUseOcr}
+												hasText={hasText}
+												setHasText={settingsActions.setHasText}
+												ratingMin={ratingMin}
+												setRatingMin={setRatingMin}
+												availableCameras={meta?.cameras || []}
+												yearRange={[2020, new Date().getFullYear()]}
+												filterPresets={[]}
+												onSavePreset={(preset) => {
+													// TODO: Implement preset saving
+													console.log("Save preset:", preset);
+												}}
+												onLoadPreset={(preset) => {
+													// TODO: Implement preset loading
+													console.log("Load preset:", preset);
+												}}
+												onDeletePreset={(presetId) => {
+													// TODO: Implement preset deletion
+													console.log("Delete preset:", presetId);
+												}}
+											/>
+											{modalState.shareManage && (
+												<div
+													role="button"
+													tabIndex={0}
+													className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
+													onKeyDown={(e) => {
+														if (e.key === "Escape") modal.close("shareManage");
+													}}
+												>
+													<FocusTrap
+														onEscape={() => modal.close("shareManage")}
+													>
+														<div
+															className="bg-white rounded-lg p-4 w-full max-w-2xl"
+															role="dialog"
+															aria-modal="true"
+														>
+															<div className="flex items-center justify-between mb-3">
+																<div className="font-semibold">
+																	Manage Shares
+																</div>
+																<button
+																	type="button"
+																	className="px-2 py-1 border rounded"
+																	onClick={() => modal.close("shareManage")}
+																>
+																	Close
+																</button>
+															</div>
+															<ShareManager dir={dir} />
+														</div>
+													</FocusTrap>
+												</div>
+											)}
+
+											{/* Modals */}
+											{modalState.export && (
+												<ExportModal
+													selected={selected}
 													dir={dir}
-													engine={engine}
-													topK={topK}
-													smart={smart}
-													setSmart={photoActions.setSmart}
-													setResults={photoActions.setResults}
-													setSearchId={photoActions.setSearchId}
-													setNote={uiActions.setNote}
-													query={query}
-													favOnly={favOnly}
-													tagFilter={tagFilter}
+													onClose={() => modal.close("export")}
+													uiActions={uiActions}
+												/>
+											)}
+											{modalState["enhanced-share"] && (
+												<Suspense fallback={null}>
+													<EnhancedSharingModal
+														selected={selected}
+														dir={dir}
+														onClose={() => modal.close("enhanced-share")}
+														uiActions={uiActions}
+													/>
+												</Suspense>
+											)}
+											{modalState.share && (
+												<div
+													role="button"
+													tabIndex={0}
+													className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
+													onKeyDown={(e) => {
+														if (e.key === "Escape") modal.close("share");
+													}}
+												>
+													<FocusTrap onEscape={() => modal.close("share")}>
+														<div
+															className="bg-white rounded-lg p-4 w-full max-w-md"
+															role="dialog"
+															aria-modal="true"
+														>
+															<div className="font-semibold mb-2">
+																Share (v1)
+															</div>
+															<form
+																onSubmit={async (e) => {
+																	e.preventDefault();
+																	if (!dir) return;
+																	const sel = Array.from(selected);
+																	if (sel.length === 0) {
+																		alert("Select photos to share");
+																		return;
+																	}
+																	const f = e.target as HTMLFormElement;
+																	const expiry = parseInt(
+																		(
+																			f.elements.namedItem(
+																				"expiry",
+																			) as HTMLInputElement
+																		).value || "24",
+																		10,
+																	);
+																	const pw = (
+																		f.elements.namedItem(
+																			"pw",
+																		) as HTMLInputElement
+																	).value.trim();
+																	const viewOnly = (
+																		f.elements.namedItem(
+																			"viewonly",
+																		) as HTMLInputElement
+																	).checked;
+																	try {
+																		const { apiCreateShare } = await import(
+																			"./api"
+																		);
+																		const r = await apiCreateShare(
+																			dir,
+																			engine,
+																			sel,
+																			{
+																				expiryHours: Number.isNaN(expiry)
+																					? 24
+																					: expiry,
+																				password: pw || undefined,
+																				viewOnly,
+																			},
+																		);
+																		await navigator.clipboard.writeText(
+																			window.location.origin + r.url,
+																		);
+																		uiActions.setNote(
+																			"Share link copied to clipboard",
+																		);
+																	} catch (err) {
+																		uiActions.setNote(
+																			err instanceof Error
+																				? err.message
+																				: "Share failed",
+																		);
+																	}
+																	modal.close("share");
+																}}
+															>
+																<div className="grid gap-3">
+																	<div>
+																		<label
+																			className="block text-sm text-gray-600 mb-1"
+																			htmlFor="expiry-input"
+																		>
+																			Expiry (hours)
+																		</label>
+																		<input
+																			id="expiry-input"
+																			name="expiry"
+																			type="number"
+																			min={1}
+																			defaultValue={24}
+																			className="w-full border rounded px-2 py-1"
+																		/>
+																	</div>
+																	<div>
+																		<label
+																			className="block text-sm text-gray-600 mb-1"
+																			htmlFor="pw-input"
+																		>
+																			Password (optional)
+																		</label>
+																		<input
+																			id="pw-input"
+																			name="pw"
+																			type="password"
+																			className="w-full border rounded px-2 py-1"
+																			placeholder="••••••"
+																		/>
+																	</div>
+																	<label className="flex items-center gap-2 text-sm">
+																		<input
+																			type="checkbox"
+																			name="viewonly"
+																			defaultChecked
+																		/>{" "}
+																		View-only (disable downloads)
+																	</label>
+																</div>
+																<div className="mt-4 flex justify-end gap-2">
+																	<button
+																		type="button"
+																		className="px-3 py-1 rounded border"
+																		onClick={() => modal.close("share")}
+																		aria-label="Cancel sharing"
+																	>
+																		Cancel
+																	</button>
+																	<button
+																		type="submit"
+																		className="px-3 py-1 rounded bg-blue-600 text-white"
+																		aria-label="Create shareable link"
+																	>
+																		Create Link
+																	</button>
+																</div>
+															</form>
+														</div>
+													</FocusTrap>
+												</div>
+											)}
+											{modalState.tag && (
+												<TagModal
+													onClose={() => modal.close("tag")}
+													onTagSelected={tagSelected}
+												/>
+											)}
+											{modalState.folder && (
+												<FolderModal
+													dir={dir}
+													useOsTrash={useOsTrash}
+													useFast={useFast}
+													fastKind={fastKind}
 													useCaps={useCaps}
 													useOcr={useOcr}
 													hasText={hasText}
-													camera={camera}
-													isoMin={String(isoMin || "")}
-													isoMax={String(isoMax || "")}
-													fMin={String(fMin || "")}
-													fMax={String(fMax || "")}
-													place={place}
-													persons={persons}
+													highContrast={highContrast}
+													onClose={() => modal.close("folder")}
+													settingsActions={
+														{
+															...settingsActions,
+															setHighContrast: () => {}, // Dummy implementation
+														} as SettingsActions
+													}
+													uiActions={uiActions}
+													doIndex={() => lib.index()}
+													prepareFast={(kind: string) =>
+														prepareFast(kind as "annoy" | "faiss" | "hnsw")
+													}
+													buildOCR={buildOCR}
+													buildMetadata={buildMetadata}
 												/>
-											</div>
-										)}
-										{selectedView === "trips" && (
-											<div className="p-4">
-												<TripsView
-													dir={dir}
-													engine={engine}
-													setBusy={uiActions.setBusy}
-													setNote={uiActions.setNote}
-													setResults={photoActions.setResults}
-												/>
-											</div>
-										)}
-										{selectedView === "videos" && (
-											<div className="p-4">
-												<VideoManager currentDir={dir} provider={engine} />
-											</div>
-										)}
-										<StatsBar
-											items={items}
-											note={note}
-											diag={diag}
-											engine={engine}
-										/>
-
-										{/* Filters panel */}
-										<FilterPanel
-											show={showFilters}
-											onClose={() => setShowFilters(false)}
-											onApply={() => {
-												setShowFilters(false);
-												doSearchImmediate(searchText);
-											}}
-											favOnly={favOnly}
-											setFavOnly={photoActions.setFavOnly}
-											tagFilter={tagFilter}
-											setTagFilter={photoActions.setTagFilter}
-											camera={camera}
-											setCamera={settingsActions.setCamera}
-											isoMin={String(isoMin || "")}
-											setIsoMin={(value: string) =>
-												settingsActions.setIsoMin(parseFloat(value) || 0)
-											}
-											isoMax={String(isoMax || "")}
-											setIsoMax={(value: string) =>
-												settingsActions.setIsoMax(parseFloat(value) || 0)
-											}
-											dateFrom={dateFrom}
-											setDateFrom={setDateFrom}
-											dateTo={dateTo}
-											setDateTo={setDateTo}
-											fMin={String(fMin || "")}
-											setFMin={(value: string) =>
-												settingsActions.setFMin(parseFloat(value) || 0)
-											}
-											fMax={String(fMax || "")}
-											setFMax={(value: string) =>
-												settingsActions.setFMax(parseFloat(value) || 0)
-											}
-											place={place}
-											setPlace={settingsActions.setPlace}
-											useCaps={useCaps}
-											setUseCaps={settingsActions.setUseCaps}
-											useOcr={useOcr}
-											setUseOcr={settingsActions.setUseOcr}
-											hasText={hasText}
-											setHasText={settingsActions.setHasText}
-											ratingMin={ratingMin}
-											setRatingMin={setRatingMin}
-											availableCameras={meta?.cameras || []}
-											yearRange={[2020, new Date().getFullYear()]}
-											filterPresets={[]}
-											onSavePreset={(preset) => {
-												// TODO: Implement preset saving
-												console.log("Save preset:", preset);
-											}}
-											onLoadPreset={(preset) => {
-												// TODO: Implement preset loading
-												console.log("Load preset:", preset);
-											}}
-											onDeletePreset={(presetId) => {
-												// TODO: Implement preset deletion
-												console.log("Delete preset:", presetId);
-											}}
-										/>
-										{modalState.shareManage && (
-											<div
-												className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
-												onKeyDown={(e) => {
-													if (e.key === "Escape") modal.close("shareManage");
-												}}
-											>
-												<FocusTrap onEscape={() => modal.close("shareManage")}>
-													<div
-														className="bg-white rounded-lg p-4 w-full max-w-2xl"
-														role="dialog"
-														aria-modal="true"
-													>
-														<div className="flex items-center justify-between mb-3">
-															<div className="font-semibold">Manage Shares</div>
-															<button
-																type="button"
-																className="px-2 py-1 border rounded"
-																onClick={() => modal.close("shareManage")}
-															>
-																Close
-															</button>
-														</div>
-														<ShareManager dir={dir} />
-													</div>
-												</FocusTrap>
-											</div>
-										)}
-
-										{/* Modals */}
-										{modalState.export && (
-											<ExportModal
-												selected={selected}
-												dir={dir}
-												onClose={() => modal.close("export")}
-												uiActions={uiActions}
-											/>
-										)}
-										{modalState["enhanced-share"] && (
-											<Suspense fallback={null}>
-												<EnhancedSharingModal
+											)}
+											{modalState.likeplus && (
+												<LikePlusModal
 													selected={selected}
 													dir={dir}
-													onClose={() => modal.close("enhanced-share")}
+													engine={engine}
+													topK={topK}
+													onClose={() => modal.close("likeplus")}
+													setSelectedView={(view: string) =>
+														setSelectedView(view as View)
+													}
+													photoActions={photoActions}
 													uiActions={uiActions}
 												/>
-											</Suspense>
-										)}
-										{modalState.share && (
-											<div
-												className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
-												onKeyDown={(e) => {
-													if (e.key === "Escape") modal.close("share");
-												}}
-											>
-												<FocusTrap onEscape={() => modal.close("share")}>
-													<div
-														className="bg-white rounded-lg p-4 w-full max-w-md"
-														role="dialog"
-														aria-modal="true"
-													>
-														<div className="font-semibold mb-2">Share (v1)</div>
-														<form
-															onSubmit={async (e) => {
-																e.preventDefault();
-																if (!dir) return;
-																const sel = Array.from(selected);
-																if (sel.length === 0) {
-																	alert("Select photos to share");
-																	return;
-																}
-																const f = e.target as HTMLFormElement;
-																const expiry = parseInt(
-																	(
-																		f.elements.namedItem(
-																			"expiry",
-																		) as HTMLInputElement
-																	).value || "24",
-																	10,
-																);
-																const pw = (
-																	f.elements.namedItem("pw") as HTMLInputElement
-																).value.trim();
-																const viewOnly = (
-																	f.elements.namedItem(
-																		"viewonly",
-																	) as HTMLInputElement
-																).checked;
-																try {
-																	const { apiCreateShare } = await import(
-																		"./api"
-																	);
-																	const r = await apiCreateShare(
-																		dir,
-																		engine,
-																		sel,
-																		{
-																			expiryHours: Number.isNaN(expiry)
-																				? 24
-																				: expiry,
-																			password: pw || undefined,
-																			viewOnly,
-																		},
-																	);
-																	await navigator.clipboard.writeText(
-																		window.location.origin + r.url,
-																	);
-																	uiActions.setNote(
-																		"Share link copied to clipboard",
-																	);
-																} catch (err) {
-																	uiActions.setNote(
-																		err instanceof Error
-																			? err.message
-																			: "Share failed",
-																	);
-																}
-																modal.close("share");
-															}}
-														>
-															<div className="grid gap-3">
-																<div>
-																	<label
-																		className="block text-sm text-gray-600 mb-1"
-																		htmlFor="expiry-input"
-																	>
-																		Expiry (hours)
-																	</label>
-																	<input
-																		id="expiry-input"
-																		name="expiry"
-																		type="number"
-																		min={1}
-																		defaultValue={24}
-																		className="w-full border rounded px-2 py-1"
-																	/>
-																</div>
-																<div>
-																	<label
-																		className="block text-sm text-gray-600 mb-1"
-																		htmlFor="pw-input"
-																	>
-																		Password (optional)
-																	</label>
-																	<input
-																		id="pw-input"
-																		name="pw"
-																		type="password"
-																		className="w-full border rounded px-2 py-1"
-																		placeholder="••••••"
-																	/>
-																</div>
-																<label className="flex items-center gap-2 text-sm">
-																	<input
-																		type="checkbox"
-																		name="viewonly"
-																		defaultChecked
-																	/>{" "}
-																	View-only (disable downloads)
-																</label>
-															</div>
-															<div className="mt-4 flex justify-end gap-2">
-																<button
-																	type="button"
-																	className="px-3 py-1 rounded border"
-																	onClick={() => modal.close("share")}
-																	aria-label="Cancel sharing"
-																>
-																	Cancel
-																</button>
-																<button
-																	type="submit"
-																	className="px-3 py-1 rounded bg-blue-600 text-white"
-																	aria-label="Create shareable link"
-																>
-																	Create Link
-																</button>
-															</div>
-														</form>
-													</div>
-												</FocusTrap>
-											</div>
-										)}
-										{modalState.tag && (
-											<TagModal
-												onClose={() => modal.close("tag")}
-												onTagSelected={tagSelected}
-											/>
-										)}
-										{modalState.folder && (
-											<FolderModal
-												dir={dir}
-												useOsTrash={useOsTrash}
-												useFast={useFast}
-												fastKind={fastKind}
-												useCaps={useCaps}
-												useOcr={useOcr}
-												hasText={hasText}
-												highContrast={highContrast}
-												onClose={() => modal.close("folder")}
-												settingsActions={
-													{
-														...settingsActions,
-														setHighContrast: () => {}, // Dummy implementation
-													} as SettingsActions
-												}
-												uiActions={uiActions}
-												doIndex={() => lib.index()}
-												prepareFast={(kind: string) =>
-													prepareFast(kind as "annoy" | "faiss" | "hnsw")
-												}
-												buildOCR={buildOCR}
-												buildMetadata={buildMetadata}
-											/>
-										)}
-										{modalState.likeplus && (
-											<LikePlusModal
-												selected={selected}
-												dir={dir}
-												engine={engine}
-												topK={topK}
-												onClose={() => modal.close("likeplus")}
-												setSelectedView={(view: string) =>
-													setSelectedView(view as View)
-												}
-												photoActions={photoActions}
-												uiActions={uiActions}
-											/>
-										)}
-										{modalState.save && (
-											<SaveModal
-												dir={dir}
-												searchText={searchText}
-												query={query}
-												topK={topK}
-												onClose={() => modal.close("save")}
-												setSelectedView={(view: string) =>
-													setSelectedView(view as View)
-												}
-												photoActions={photoActions}
-												uiActions={uiActions}
-											/>
-										)}
-										{modalState.collect && (
-											<CollectionModal
-												selected={selected}
-												dir={dir}
-												collections={collections}
-												onClose={() => modal.close("collect")}
-												setToast={setToast}
-												photoActions={photoActions}
-												uiActions={uiActions}
-											/>
-										)}
-										{modalState.removeCollect && (
-											<RemoveCollectionModal
-												selected={selected}
-												dir={dir}
-												collections={collections}
-												onClose={() => modal.close("removeCollect")}
-												setToast={setToast}
-												photoActions={photoActions}
-												uiActions={uiActions}
-											/>
-										)}
-
-										{/* Lightbox */}
-										{detailIdx !== null &&
-											results &&
-											results[detailIdx] &&
-											(VideoService.isVideoFile(results[detailIdx].path) ? (
-												<VideoLightbox
-													videoPath={results[detailIdx].path}
-													videoUrl={`/api/media/${encodeURIComponent(
-														results[detailIdx].path,
-													)}`}
-													onPrevious={() => navDetail(-1)}
-													onNext={() => navDetail(1)}
-													onClose={() => setDetailIdx(null)}
-												/>
-											) : (
-												<Lightbox
+											)}
+											{modalState.save && (
+												<SaveModal
 													dir={dir}
-													engine={engine}
-													path={results[detailIdx].path}
-													onPrev={() => navDetail(-1)}
-													onNext={() => navDetail(1)}
-													onClose={() => setDetailIdx(null)}
-													onReveal={async () => {
-														try {
-															const { apiOpen } = await import("./api");
-															const p =
-																results && detailIdx !== null
-																	? results[detailIdx]?.path
-																	: undefined;
-															if (p) await apiOpen(dir, p);
-														} catch {}
-													}}
-													onFavorite={async () => {
-														try {
-															const p =
-																results && detailIdx !== null
-																	? results[detailIdx]?.path
-																	: undefined;
-															if (p) {
-																await apiSetFavorite(dir, p, !fav.includes(p));
-																await loadFav();
+													searchText={searchText}
+													query={query}
+													topK={topK}
+													onClose={() => modal.close("save")}
+													setSelectedView={(view: string) =>
+														setSelectedView(view as View)
+													}
+													photoActions={photoActions}
+													uiActions={uiActions}
+												/>
+											)}
+											{modalState.collect && (
+												<CollectionModal
+													selected={selected}
+													dir={dir}
+													collections={collections}
+													onClose={() => modal.close("collect")}
+													setToast={setToast}
+													photoActions={photoActions}
+													uiActions={uiActions}
+												/>
+											)}
+											{modalState.removeCollect && (
+												<RemoveCollectionModal
+													selected={selected}
+													dir={dir}
+													collections={collections}
+													onClose={() => modal.close("removeCollect")}
+													setToast={setToast}
+													photoActions={photoActions}
+													uiActions={uiActions}
+												/>
+											)}
+
+											{/* Lightbox */}
+											{detailIdx !== null &&
+												results &&
+												results[detailIdx] &&
+												(VideoService.isVideoFile(results[detailIdx].path) ? (
+													<VideoLightbox
+														videoPath={results[detailIdx].path}
+														videoUrl={`/api/media/${encodeURIComponent(
+															results[detailIdx].path,
+														)}`}
+														onPrevious={() => navDetail(-1)}
+														onNext={() => navDetail(1)}
+														onClose={() => setDetailIdx(null)}
+													/>
+												) : (
+													<Lightbox
+														dir={dir}
+														engine={engine}
+														path={results[detailIdx].path}
+														onPrev={() => navDetail(-1)}
+														onNext={() => navDetail(1)}
+														onClose={() => setDetailIdx(null)}
+														onReveal={async () => {
+															try {
+																const { apiOpen } = await import("./api");
+																const p =
+																	results && detailIdx !== null
+																		? results[detailIdx]?.path
+																		: undefined;
+																if (p) await apiOpen(dir, p);
+															} catch {}
+														}}
+														onFavorite={async () => {
+															try {
+																const p =
+																	results && detailIdx !== null
+																		? results[detailIdx]?.path
+																		: undefined;
+																if (p) {
+																	await apiSetFavorite(
+																		dir,
+																		p,
+																		!fav.includes(p),
+																	);
+																	await loadFav();
+																}
+															} catch {}
+														}}
+														onMoreLikeThis={async () => {
+															try {
+																const { apiSearchLike } = await import("./api");
+																const p =
+																	results && detailIdx !== null
+																		? results[detailIdx]?.path
+																		: undefined;
+																if (!p) return;
+																uiActions.setBusy("Searching similar…");
+																const r = await apiSearchLike(
+																	dir,
+																	p,
+																	engine,
+																	topK,
+																);
+																photoActions.setResults(r.results || []);
+																setSelectedView("results");
+															} catch (e) {
+																uiActions.setNote(
+																	e instanceof Error
+																		? e.message
+																		: "Search failed",
+																);
+															} finally {
+																uiActions.setBusy("");
 															}
-														} catch {}
+														}}
+													/>
+												))}
+
+											{/* Floating Jobs button + drawer */}
+											<button
+												type="button"
+												onClick={() => modal.open("jobs")}
+												className="fixed bottom-4 right-4 bg-blue-600 text-white rounded-full shadow px-4 py-2"
+												title="Open Jobs"
+												aria-label="Open the jobs panel"
+											>
+												Jobs
+											</button>
+
+											{modalState.jobs && (
+												<Suspense fallback={null}>
+													<JobsDrawer
+														open={true}
+														onClose={() => modal.close("jobs")}
+													/>
+												</Suspense>
+											)}
+											{modalState.diagnostics && (
+												<Suspense fallback={null}>
+													<DiagnosticsDrawer
+														open={true}
+														onClose={() => modal.close("diagnostics")}
+													/>
+												</Suspense>
+											)}
+											{modalState.advanced && (
+												<AdvancedSearchModal
+													open={true}
+													onClose={() => modal.close("advanced")}
+													onApply={(q) => {
+														setSearchText(q);
+														doSearch(q);
+														modal.close("advanced");
 													}}
-													onMoreLikeThis={async () => {
+													onSave={async (n, q) => {
 														try {
-															const { apiSearchLike } = await import("./api");
-															const p =
-																results && detailIdx !== null
-																	? results[detailIdx]?.path
-																	: undefined;
-															if (!p) return;
-															uiActions.setBusy("Searching similar…");
-															const r = await apiSearchLike(
-																dir,
-																p,
-																engine,
-																topK,
-															);
-															photoActions.setResults(r.results || []);
-															setSelectedView("results");
+															const { apiAddPreset } = await import("./api");
+															await apiAddPreset(dir, n, q);
+															setToast({ message: `Saved preset ${n}` });
+															await loadPresets();
 														} catch (e) {
 															uiActions.setNote(
-																e instanceof Error
-																	? e.message
-																	: "Search failed",
+																e instanceof Error ? e.message : "Save failed",
 															);
-														} finally {
-															uiActions.setBusy("");
 														}
 													}}
+													allTags={allTags || []}
+													cameras={meta?.cameras || []}
+													people={(clusters || [])
+														.filter((c) => c.name)
+														.map((c) => String(c.name))}
 												/>
-											))}
+											)}
 
-										{/* Floating Jobs button + drawer */}
-										<button
-											type="button"
-											onClick={() => modal.open("jobs")}
-											className="fixed bottom-4 right-4 bg-blue-600 text-white rounded-full shadow px-4 py-2"
-											title="Open Jobs"
-											aria-label="Open the jobs panel"
-										>
-											Jobs
-										</button>
-
-										{modalState.jobs && (
-											<Suspense fallback={null}>
-												<JobsDrawer
-													open={true}
-													onClose={() => modal.close("jobs")}
-												/>
-											</Suspense>
-										)}
-										{modalState.diagnostics && (
-											<Suspense fallback={null}>
-												<DiagnosticsDrawer
-													open={true}
-													onClose={() => modal.close("diagnostics")}
-												/>
-											</Suspense>
-										)}
-										{modalState.advanced && (
-											<AdvancedSearchModal
-												open={true}
-												onClose={() => modal.close("advanced")}
-												onApply={(q) => {
-													setSearchText(q);
-													doSearch(q);
-													modal.close("advanced");
-												}}
-												onSave={async (n, q) => {
-													try {
-														const { apiAddPreset } = await import("./api");
-														await apiAddPreset(dir, n, q);
-														setToast({ message: `Saved preset ${n}` });
-														await loadPresets();
-													} catch (e) {
-														uiActions.setNote(
-															e instanceof Error ? e.message : "Save failed",
-														);
-													}
-												}}
-												allTags={allTags || []}
-												cameras={meta?.cameras || []}
-												people={(clusters || [])
-													.filter((c) => c.name)
-													.map((c) => String(c.name))}
+											{/* Help Modal */}
+											<HelpModal
+												isOpen={modalState.help}
+												onClose={() => modal.close("help")}
+												initialSection="getting-started"
 											/>
-										)}
 
-										{/* Help Modal */}
-										<HelpModal
-											isOpen={modalState.help}
-											onClose={() => modal.close("help")}
-											initialSection="getting-started"
-										/>
-
-										{/* Theme Settings Modal */}
-										<Suspense fallback={null}>
-											<ThemeSettingsModal
-												isOpen={modalState.theme}
-												onClose={() => modal.close("theme")}
-											/>
-										</Suspense>
-
-										{/* Search Command Center overlay */}
-										{searchCommandCenter && (
+											{/* Theme Settings Modal */}
 											<Suspense fallback={null}>
-												<SearchOverlay
-													open={modalState.search}
-													onClose={() => modal.close("search")}
-													clusters={clusters}
-													allTags={allTags}
-													meta={meta}
+												<ThemeSettingsModal
+													isOpen={modalState.theme}
+													onClose={() => modal.close("theme")}
 												/>
 											</Suspense>
-										)}
 
-										{/* Global progress overlay */}
-										{!!busy && (
-											<div
-												className="fixed inset-0 z-[1050] bg-black/40 flex items-center justify-center"
-												role="status"
-												aria-live="polite"
-											>
-												<div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-6 w-full max-w-sm">
-													<LoadingSpinner
-														size="lg"
-														message={busy}
-														className="text-center"
+											{/* Search Command Center overlay */}
+											{searchCommandCenter && (
+												<Suspense fallback={null}>
+													<SearchOverlay
+														open={modalState.search}
+														onClose={() => modal.close("search")}
+														clusters={clusters}
+														allTags={allTags}
+														meta={meta}
 													/>
-													{note && (
-														<p className="mt-3 text-sm text-gray-600 dark:text-gray-300 text-center">
-															{note}
-														</p>
-													)}
-												</div>
-											</div>
-										)}
-										{toast && (
-											<ToastPortal>
+												</Suspense>
+											)}
+
+											{/* Global progress overlay */}
+											{!!busy && (
 												<div
-													className="pv-toast"
+													className="fixed inset-0 z-[1050] bg-black/40 flex items-center justify-center"
 													role="status"
 													aria-live="polite"
 												>
-													<div className="flex items-center gap-3 bg-gray-900 text-white px-4 py-2 rounded shadow">
-														<span className="text-sm">{toast.message}</span>
-														{toast.actionLabel && toast.onAction && (
-															<button
-																type="button"
-																className="text-sm underline"
-																onClick={toast.onAction}
-															>
-																{toast.actionLabel}
-															</button>
+													<div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-6 w-full max-w-sm">
+														<LoadingSpinner
+															size="lg"
+															message={busy}
+															className="text-center"
+														/>
+														{note && (
+															<p className="mt-3 text-sm text-gray-600 dark:text-gray-300 text-center">
+																{note}
+															</p>
 														)}
-														<button
-															type="button"
-															aria-label="Close notification"
-															className="ml-1"
-															onClick={() => {
-																setToast(null);
-																if (toastTimerRef.current) {
-																	window.clearTimeout(toastTimerRef.current);
-																	toastTimerRef.current = null;
-																}
-															}}
-														>
-															×
-														</button>
 													</div>
 												</div>
-											</ToastPortal>
-										)}
+											)}
+											{toast && (
+												<ToastPortal>
+													<div
+														className="pv-toast"
+														role="status"
+														aria-live="polite"
+													>
+														<div className="flex items-center gap-3 bg-gray-900 text-white px-4 py-2 rounded shadow">
+															<span className="text-sm">{toast.message}</span>
+															{toast.actionLabel && toast.onAction && (
+																<button
+																	type="button"
+																	className="text-sm underline"
+																	onClick={toast.onAction}
+																>
+																	{toast.actionLabel}
+																</button>
+															)}
+															<button
+																type="button"
+																aria-label="Close notification"
+																className="ml-1"
+																onClick={() => {
+																	setToast(null);
+																	if (toastTimerRef.current) {
+																		window.clearTimeout(toastTimerRef.current);
+																		toastTimerRef.current = null;
+																	}
+																}}
+															>
+																×
+															</button>
+														</div>
+													</div>
+												</ToastPortal>
+											)}
 
-										{/* Status Bar */}
-										{/* Auth required banner */}
-										{authRequired && (
-											<div className="bg-amber-50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 px-4 py-2 flex items-center gap-2 border-b border-amber-200 dark:border-amber-800">
-												<span className="text-sm">API requires token</span>
-												<input
-													type="password"
-													className="px-2 py-1 text-sm rounded border border-amber-300 dark:border-amber-700 bg-white dark:bg-gray-900"
-													placeholder="Enter token"
-													value={authTokenInput}
-													onChange={(e) => setAuthTokenInput(e.target.value)}
-												/>
-												<button
-													type="button"
-													className="text-sm px-2 py-1 bg-amber-600 text-white rounded"
-													onClick={async () => {
-														const tok = authTokenInput.trim();
-														if (!tok) return;
-														try {
-															localStorage.setItem("api_token", tok);
-														} catch {}
-														const ok = await apiAuthCheck(tok);
-														if (ok) {
-															setAuthRequired(false);
-															setAuthTokenInput("");
-															uiActions.setNote("Token accepted.");
-														} else {
-															uiActions.setNote(
-																"Token rejected — check API_TOKEN.",
-															);
-														}
-													}}
-												>
-													Save
-												</button>
-											</div>
-										)}
+											{/* Status Bar */}
+											{/* Auth required banner */}
+											{authRequired && (
+												<div className="bg-amber-50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 px-4 py-2 flex items-center gap-2 border-b border-amber-200 dark:border-amber-800">
+													<span className="text-sm">API requires token</span>
+													<input
+														type="password"
+														className="px-2 py-1 text-sm rounded border border-amber-300 dark:border-amber-700 bg-white dark:bg-gray-900"
+														placeholder="Enter token"
+														value={authTokenInput}
+														onChange={(e) => setAuthTokenInput(e.target.value)}
+													/>
+													<button
+														type="button"
+														className="text-sm px-2 py-1 bg-amber-600 text-white rounded"
+														onClick={async () => {
+															const tok = authTokenInput.trim();
+															if (!tok) return;
+															try {
+																localStorage.setItem("api_token", tok);
+															} catch {}
+															const ok = await apiAuthCheck(tok);
+															if (ok) {
+																setAuthRequired(false);
+																setAuthTokenInput("");
+																uiActions.setNote("Token accepted.");
+															} else {
+																uiActions.setNote(
+																	"Token rejected — check API_TOKEN.",
+																);
+															}
+														}}
+													>
+														Save
+													</button>
+												</div>
+											)}
 
-										<StatusBar
-											photoCount={library?.length || 0}
-											indexedCount={library?.length || 0}
-											searchProvider={engine}
-											isIndexing={libState.isIndexing}
-											isConnected={isConnected}
-											currentDirectory={dir}
-											activeJobs={
-												jobs.filter((j) => j.status === "running").length
-											}
-										/>
-
-										{/* Jobs Center */}
-										<JobsCenter
-											jobs={jobs}
-											onPause={(jobId) =>
-												jobsActions.setStatus(jobId, "paused")
-											}
-											onResume={(jobId) =>
-												jobsActions.setStatus(jobId, "running")
-											}
-											onCancel={(jobId) =>
-												jobsActions.setStatus(jobId, "cancelled")
-											}
-											onRetry={(jobId) =>
-												jobsActions.setStatus(jobId, "queued")
-											}
-											onClear={(jobId) => jobsActions.remove(jobId)}
-											onClearAll={() => jobsActions.clearStopped()}
-										/>
-
-										{/* Bottom Navigation */}
-										<BottomNavigation
-											activeTab={bottomNavTab}
-											onTabChange={(tab) => {
-												setBottomNavTab(tab);
-												// Map bottom nav tabs to main views
-												switch (tab) {
-													case "home":
-														setSelectedView("library");
-														break;
-													case "search":
-														setSelectedView("results");
-														break;
-													case "favorites":
-														setSelectedView("results");
-														photoActions.setFavOnly(true);
-														break;
-													case "settings":
-														setSelectedView("tasks");
-														break;
+											<StatusBar
+												photoCount={library?.length || 0}
+												indexedCount={library?.length || 0}
+												searchProvider={engine}
+												isIndexing={libState.isIndexing}
+												isConnected={isConnected}
+												currentDirectory={dir}
+												activeJobs={
+													jobs.filter((j) => j.status === "running").length
 												}
-											}}
-											onShowFilters={() => setShowFilters(true)}
-											onShowUpload={() => modal.open("folder")}
-											onShowLibrary={() => modal.open("folder")}
-											showSecondaryActions={true}
-										/>
+											/>
 
-										{/* Progressive Onboarding Components */}
-										<ContextualHelp
-											isVisible={showContextualHelp}
-											onDismiss={() => setShowContextualHelp(false)}
-											context={
-												selectedView as
-													| "search"
-													| "library"
-													| "results"
-													| "settings"
-													| "collections"
-											}
-											userActions={userActions}
-										/>
+											{/* Jobs Center */}
+											<JobsCenter
+												jobs={jobs}
+												onPause={(jobId) =>
+													jobsActions.setStatus(jobId, "paused")
+												}
+												onResume={(jobId) =>
+													jobsActions.setStatus(jobId, "running")
+												}
+												onCancel={(jobId) =>
+													jobsActions.setStatus(jobId, "cancelled")
+												}
+												onRetry={(jobId) =>
+													jobsActions.setStatus(jobId, "queued")
+												}
+												onClear={(jobId) => jobsActions.remove(jobId)}
+												onClearAll={() => jobsActions.clearStopped()}
+											/>
 
-										<OnboardingChecklist
-											isVisible={showOnboardingChecklist}
-											onComplete={() => {
-												setShowOnboardingChecklist(false);
-												// Mark onboarding as complete
-												try {
-													localStorage.setItem("onboardingComplete", "true");
-												} catch {}
-											}}
-											completedSteps={onboardingSteps}
-											inProgressStepId={
-												libState.isIndexing ? "index_photos" : undefined
-											}
-											onStepComplete={() => {
-												/* no-op: completion is event-based */
-											}}
-											onStepAction={(step) => {
-												// Navigate to the appropriate task/page and keep current completion behavior
-												switch (step) {
-													case "select_directory": {
-														// Open the folder picker and ensure we're on Library
-														setSelectedView("library");
-														modal.open("folder");
-														break;
+											{/* Bottom Navigation */}
+											<BottomNavigation
+												activeTab={bottomNavTab}
+												onTabChange={(tab) => {
+													setBottomNavTab(tab);
+													// Map bottom nav tabs to main views
+													switch (tab) {
+														case "home":
+															setSelectedView("library");
+															break;
+														case "search":
+															setSelectedView("results");
+															break;
+														case "favorites":
+															setSelectedView("results");
+															photoActions.setFavOnly(true);
+															break;
+														case "settings":
+															setSelectedView("tasks");
+															break;
 													}
-													case "index_photos": {
-														// Kick off indexing and surface progress UI
-														setSelectedView("library");
-														if (!dir) {
-															// If no directory yet, prompt to select one first
+												}}
+												onShowFilters={() => setShowFilters(true)}
+												onShowUpload={() => modal.open("folder")}
+												onShowLibrary={() => modal.open("folder")}
+												showSecondaryActions={true}
+											/>
+
+											{/* Progressive Onboarding Components */}
+											<ContextualHelp
+												isVisible={showContextualHelp}
+												onDismiss={() => setShowContextualHelp(false)}
+												context={
+													selectedView as
+														| "search"
+														| "library"
+														| "results"
+														| "settings"
+														| "collections"
+												}
+												userActions={userActions}
+											/>
+
+											<OnboardingChecklist
+												isVisible={
+													showOnboardingChecklist && !showOnboardingTour
+												}
+												onComplete={() => {
+													setShowOnboardingChecklist(false);
+													// Mark onboarding as complete
+													try {
+														localStorage.setItem("onboardingComplete", "true");
+													} catch {}
+												}}
+												completedSteps={onboardingSteps}
+												inProgressStepId={
+													libState.isIndexing ? "index_photos" : undefined
+												}
+												onStepComplete={() => {
+													/* no-op: completion is event-based */
+												}}
+												onStepAction={(step) => {
+													// Navigate to the appropriate task/page and keep current completion behavior
+													switch (step) {
+														case "select_directory": {
+															// Open the folder picker and ensure we're on Library
+															setSelectedView("library");
 															modal.open("folder");
-														} else {
-															lib.index();
+															break;
 														}
-														break;
+														case "index_photos": {
+															// Kick off indexing and surface progress UI
+															setSelectedView("library");
+															if (!dir) {
+																// If no directory yet, prompt to select one first
+																modal.open("folder");
+															} else {
+																lib.index();
+															}
+															break;
+														}
+														case "first_search": {
+															// Jump to search view; hint with a helpful toast
+															setSelectedView("results");
+															setToast({
+																message:
+																	"Try searching: beach sunset, birthday cake, mountain hike",
+															});
+															break;
+														}
+														case "explore_features": {
+															// Take users to Collections to explore features
+															setSelectedView("collections");
+															setToast({
+																message:
+																	"Explore collections, favorites, and sharing",
+															});
+															break;
+														}
 													}
-													case "first_search": {
-														// Jump to search view; hint with a helpful toast
-														setSelectedView("results");
-														setToast({
-															message:
-																"Try searching: beach sunset, birthday cake, mountain hike",
-														});
-														break;
-													}
-													case "explore_features": {
-														// Take users to Collections to explore features
-														setSelectedView("collections");
-														setToast({
-															message:
-																"Explore collections, favorites, and sharing",
-														});
-														break;
-													}
-												}
-											}}
-										/>
+												}}
+											/>
 
-										{/* Removed blocking GuidedIndexingFlow - indexing now runs in background */}
+											{/* Removed blocking GuidedIndexingFlow - indexing now runs in background */}
 
-										{/* Performance Monitor for development */}
-										<PerformanceMonitor />
-									</main>
+											{/* Performance Monitor for development */}
+											<PerformanceMonitor />
+										</main>
 
-									{/* Close main containers returned by the content layout */}
+										{/* Close main containers returned by the content layout */}
+									</div>
 								</div>
-							</div>
 
-							{/* Modern UX Integration - Accessibility Panel */}
-							{showAccessibilityPanel && (
-								<AccessibilityPanel
-									isOpen={showAccessibilityPanel}
-									onClose={() => setShowAccessibilityPanel(false)}
-									onSettingsChange={handleAccessibilitySettingsChange}
+								{/* Modern UX Integration - Accessibility Panel */}
+								{showAccessibilityPanel && (
+									<AccessibilityPanel
+										isOpen={showAccessibilityPanel}
+										onClose={() => setShowAccessibilityPanel(false)}
+										onSettingsChange={handleAccessibilitySettingsChange}
+									/>
+								)}
+
+								{/* Modern UX Integration - Onboarding Tour */}
+								{showOnboardingTour && (
+									<OnboardingTour
+										isActive={showOnboardingTour}
+										onComplete={handleOnboardingComplete}
+										onSkip={() => setShowOnboardingTour(false)}
+									/>
+								)}
+
+								{/* Modern UX Integration - Hint System is already provided by HintProvider above */}
+								<AppWithHints
+									searchText={searchText}
+									selected={selected}
+									showAccessibilityPanel={showAccessibilityPanel}
+									setShowAccessibilityPanel={setShowAccessibilityPanel}
+									handleAccessibilitySettingsChange={
+										handleAccessibilitySettingsChange
+									}
+									showOnboardingTour={showOnboardingTour}
+									handleOnboardingComplete={handleOnboardingComplete}
+									setShowOnboardingTour={setShowOnboardingTour}
 								/>
-							)}
-
-							{/* Modern UX Integration - Onboarding Tour */}
-							{showOnboardingTour && (
-								<OnboardingTour
-									isActive={showOnboardingTour}
-									onComplete={handleOnboardingComplete}
-									onSkip={() => setShowOnboardingTour(false)}
-								/>
-							)}
-
-							{/* Modern UX Integration - Hint System is already provided by HintProvider above */}
+							</MobileOptimizations>
+						</HintManager>
+					) : (
+						<MobileOptimizations
+							onSwipeLeft={handleSwipeLeft}
+							onSwipeRight={handleSwipeRight}
+							onSwipeUp={() => setShowModernSidebar(!showModernSidebar)}
+							enableSwipeGestures={isMobile}
+							enablePullToRefresh={true}
+							onPullToRefresh={handlePullToRefresh}
+						>
+							{/* Render the same main content without HintManager wrapper */}
 							<AppWithHints
 								searchText={searchText}
 								selected={selected}
@@ -3474,7 +3571,7 @@ export default function App() {
 								setShowOnboardingTour={setShowOnboardingTour}
 							/>
 						</MobileOptimizations>
-					</HintManager>
+					)}
 				</HintProvider>
 			</ThemeProvider>
 		</ErrorBoundary>

@@ -1,3 +1,4 @@
+// biome-ignore lint/complexity/noStaticOnlyClass: Service pattern
 /**
  * Duplicate Detection Service
  * Visual similarity clustering and near-duplicate identification

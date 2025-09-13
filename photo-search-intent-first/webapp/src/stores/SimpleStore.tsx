@@ -1,4 +1,6 @@
 import React, { createContext, useCallback, useContext, useState } from "react";
+import type { SearchResult } from "../api";
+import type { WorkspaceState } from "./types";
 
 // Simple state management to replace Zustand and eliminate infinite loops
 interface SimpleSettings {
@@ -13,6 +15,7 @@ interface SimpleSettings {
 	useOcr: boolean;
 	hasText: boolean;
 	useOsTrash: boolean;
+	highContrast: boolean;
 	camera: string;
 	isoMin: number;
 	isoMax: number;
@@ -20,13 +23,13 @@ interface SimpleSettings {
 	fMax: number;
 	place: string;
 	showInfoOverlay: boolean;
-	resultView: "grid" | "film" | "timeline";
-	timelineBucket: "day" | "week" | "month";
+	resultView: "grid" | "film" | "timeline" | "map";
+	timelineBucket: "day" | "week" | "month" | "year";
 	includeVideos: boolean;
 }
 
 interface SimplePhoto {
-	results: any[];
+	results: SearchResult[];
 	searchId: string;
 	query: string;
 	topK: number;
@@ -37,9 +40,9 @@ interface SimplePhoto {
 		tagsMap: Record<string, string[]>;
 		tagFilter: string;
 	};
-	saved: any[];
+	saved: Array<{ name: string; query: string; top_k?: number }>;
 	collections: Record<string, string[]>;
-	smart: Record<string, any>;
+	smart: Record<string, unknown>;
 	library: string[];
 	libHasMore: boolean;
 }
@@ -55,11 +58,11 @@ interface SimpleUI {
 interface SimpleWorkspace {
 	workspace: string;
 	wsToggle: boolean;
-	persons: any[];
-	clusters: any[];
-	groups: any[];
-	points: any[];
-	diag: any;
+	persons: string[];
+	clusters: WorkspaceState["clusters"];
+	groups: WorkspaceState["groups"];
+	points: WorkspaceState["points"];
+	diag: WorkspaceState["diag"];
 }
 
 interface SimpleStore {
@@ -82,6 +85,7 @@ const initialState: SimpleStore = {
 		useOcr: false,
 		hasText: false,
 		useOsTrash: false,
+		highContrast: false,
 		camera: "",
 		isoMin: 0,
 		isoMax: 25600,
@@ -262,24 +266,31 @@ export const useSettingsActions = () => {
 			setHfToken: (hfToken: string) => setSettings({ hfToken }),
 			setOpenaiKey: (openaiKey: string) => setSettings({ openaiKey }),
 			setUseFast: (useFast: boolean) => setSettings({ useFast }),
-			setFastKind: (fastKind: string) => setSettings({ fastKind }),
+			setFastKind: (fastKind: "" | "annoy" | "faiss" | "hnsw") =>
+				setSettings({ fastKind }),
 			setUseCaps: (useCaps: boolean) => setSettings({ useCaps }),
 			setVlmModel: (vlmModel: string) => setSettings({ vlmModel }),
 			setUseOcr: (useOcr: boolean) => setSettings({ useOcr }),
 			setHasText: (hasText: boolean) => setSettings({ hasText }),
 			setUseOsTrash: (useOsTrash: boolean) => setSettings({ useOsTrash }),
+			setHighContrast: (highContrast: boolean) => setSettings({ highContrast }),
 			setCamera: (camera: string) => setSettings({ camera }),
-			setIsoMin: (isoMin: number) => setSettings({ isoMin }),
-			setIsoMax: (isoMax: number) => setSettings({ isoMax }),
-			setFMin: (fMin: number) => setSettings({ fMin }),
-			setFMax: (fMax: number) => setSettings({ fMax }),
+			setIsoMin: (isoMin: number | string) =>
+				setSettings({ isoMin: Number(isoMin) || 0 }),
+			setIsoMax: (isoMax: number | string) =>
+				setSettings({ isoMax: Number(isoMax) || 0 }),
+			setFMin: (fMin: number | string) =>
+				setSettings({ fMin: Number(fMin) || 0 }),
+			setFMax: (fMax: number | string) =>
+				setSettings({ fMax: Number(fMax) || 0 }),
 			setPlace: (place: string) => setSettings({ place }),
 			setShowInfoOverlay: (showInfoOverlay: boolean) =>
 				setSettings({ showInfoOverlay }),
-			setResultView: (resultView: "grid" | "film" | "timeline") =>
+			setResultView: (resultView: "grid" | "film" | "timeline" | "map") =>
 				setSettings({ resultView }),
-			setTimelineBucket: (timelineBucket: "day" | "week" | "month") =>
-				setSettings({ timelineBucket }),
+			setTimelineBucket: (
+				timelineBucket: "day" | "week" | "month" | "year",
+			) => setSettings({ timelineBucket }),
 			setIncludeVideos: (includeVideos: boolean) =>
 				setSettings({ includeVideos }),
 		}),
@@ -291,7 +302,7 @@ export const usePhotoActions = () => {
 	const { setPhoto } = useSimpleStore();
 	return React.useMemo(
 		() => ({
-			setResults: (results: any[]) => setPhoto({ results }),
+			setResults: (results: SearchResult[]) => setPhoto({ results }),
 			setSearchId: (searchId: string) => setPhoto({ searchId }),
 			setQuery: (query: string) => setPhoto({ query }),
 			setTopK: (topK: number) => setPhoto({ topK }),
@@ -309,10 +320,11 @@ export const usePhotoActions = () => {
 				setPhoto((prev: SimpleStore) => ({
 					tags: { ...prev.photo.tags, tagFilter },
 				})),
-			setSaved: (saved: any[]) => setPhoto({ saved }),
+			setSaved: (saved: Array<{ name: string; query: string; top_k?: number }>) =>
+				setPhoto({ saved }),
 			setCollections: (collections: Record<string, string[]>) =>
 				setPhoto({ collections }),
-			setSmart: (smart: Record<string, any>) => setPhoto({ smart }),
+			setSmart: (smart: Record<string, unknown>) => setPhoto({ smart }),
 			setLibrary: (library: string[]) => setPhoto({ library }),
 			setLibHasMore: (libHasMore: boolean) => setPhoto({ libHasMore }),
 			appendLibrary: (paths: string[]) =>
@@ -334,6 +346,7 @@ export const useUIActions = () => {
 			setViewMode: (viewMode: "grid" | "film") => setUI({ viewMode }),
 			setShowWelcome: (showWelcome: boolean) => setUI({ showWelcome }),
 			setShowHelp: (showHelp: boolean) => setUI({ showHelp }),
+			clearBusy: () => setUI({ busy: "" }),
 		}),
 		[setUI],
 	);
@@ -345,11 +358,14 @@ export const useWorkspaceActions = () => {
 		() => ({
 			setWorkspace: (workspace: string) => setWorkspace({ workspace }),
 			setWsToggle: (wsToggle: boolean) => setWorkspace({ wsToggle }),
-			setPersons: (persons: any[]) => setWorkspace({ persons }),
-			setClusters: (clusters: any[]) => setWorkspace({ clusters }),
-			setGroups: (groups: any[]) => setWorkspace({ groups }),
-			setPoints: (points: any[]) => setWorkspace({ points }),
-			setDiag: (diag: any) => setWorkspace({ diag }),
+			setPersons: (persons: string[]) => setWorkspace({ persons }),
+			setClusters: (clusters: SimpleWorkspace["clusters"]) =>
+				setWorkspace({ clusters }),
+			setGroups: (groups: SimpleWorkspace["groups"]) =>
+				setWorkspace({ groups }),
+			setPoints: (points: SimpleWorkspace["points"]) =>
+				setWorkspace({ points }),
+			setDiag: (diag: SimpleWorkspace["diag"]) => setWorkspace({ diag }),
 		}),
 		[setWorkspace],
 	);

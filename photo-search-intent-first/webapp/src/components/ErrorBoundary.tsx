@@ -59,6 +59,11 @@ export class ErrorBoundary extends Component<Props, State> {
 				timestamp: new Date().toISOString(),
 			});
 		}
+
+		// Announce a global-error so other systems (e.g., modal manager) can recover/close overlays
+		try {
+			window.dispatchEvent(new CustomEvent("global-error"));
+		} catch {}
 	}
 
 	handleReset = () => {
@@ -74,7 +79,11 @@ export class ErrorBoundary extends Component<Props, State> {
 	};
 
 	handleGoHome = () => {
-		window.location.href = "/";
+		try {
+			window.location.hash = "#/";
+		} catch {
+			window.location.href = "/";
+		}
 	};
 
 	render() {

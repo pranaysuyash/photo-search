@@ -14,6 +14,13 @@ export function Welcome({
 			<div
 				className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden"
 				onClick={(e) => e.stopPropagation()}
+				onKeyDown={(e) => {
+					if (e.key === "Enter" || e.key === " ") {
+						e.preventDefault();
+						e.stopPropagation();
+					}
+				}}
+				role="dialog"
 			>
 				<div className="p-8">
 					<div className="text-center">
@@ -24,7 +31,9 @@ export function Welcome({
 								fill="none"
 								viewBox="0 0 24 24"
 								stroke="currentColor"
+								aria-label="PhotoVault logo"
 							>
+								<title>PhotoVault logo</title>
 								<path
 									strokeLinecap="round"
 									strokeLinejoin="round"
@@ -53,6 +62,7 @@ export function Welcome({
 										viewBox="0 0 24 24"
 										stroke="currentColor"
 									>
+										<title>Folder icon</title>
 										<path
 											strokeLinecap="round"
 											strokeLinejoin="round"
@@ -79,6 +89,7 @@ export function Welcome({
 										viewBox="0 0 24 24"
 										stroke="currentColor"
 									>
+										<title>Demo icon</title>
 										<path
 											strokeLinecap="round"
 											strokeLinejoin="round"

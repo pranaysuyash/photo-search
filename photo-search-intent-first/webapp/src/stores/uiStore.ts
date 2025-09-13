@@ -32,7 +32,7 @@ export const useShowWelcome = () => useUIStore((state) => state.showWelcome);
 export const useShowHelp = () => useUIStore((state) => state.showHelp);
 
 // Stable actions selector
-const uiActionsSelector = (state: any) => ({
+const uiActionsSelector = (state: unknown) => ({
 	setBusy: state.setBusy,
 	setNote: state.setNote,
 	setViewMode: state.setViewMode,

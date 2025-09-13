@@ -44,7 +44,7 @@ export function MobileSidebar({
 	const x = useMotionValue(0);
 	const _opacity = useTransform(x, [-100, 0, 100], [0, 1, 0]);
 
-	const handleDragEnd = (_event: any, info: PanInfo) => {
+	const handleDragEnd = (_event: unknown, info: PanInfo) => {
 		const threshold = 50;
 		if (position === "left" && info.offset.x < -threshold) {
 			onClose();
@@ -119,18 +119,18 @@ export function MobileSearchBar({
 	enableVoiceSearch?: boolean;
 }) {
 	const [isListening, setIsListening] = useState(false);
-	const [recognition, setRecognition] = useState<any>(null);
+	const [recognition, setRecognition] = useState<unknown>(null);
 
 	useEffect(() => {
 		if (enableVoiceSearch && "webkitSpeechRecognition" in window) {
-			const recognition = new (window as any).webkitSpeechRecognition();
+			const recognition = new (window as unknown).webkitSpeechRecognition();
 			recognition.continuous = false;
 			recognition.interimResults = false;
 			recognition.lang = "en-US";
 
 			recognition.onstart = () => setIsListening(true);
 			recognition.onend = () => setIsListening(false);
-			recognition.onresult = (event: any) => {
+			recognition.onresult = (event: unknown) => {
 				const transcript = event.results[0][0].transcript;
 				onChange(transcript);
 				onSubmit(transcript);
@@ -207,8 +207,8 @@ export function MobilePhotoGrid({
 	onSelectionChange,
 }: {
 	photos: Array<{ id: string; src: string; alt: string }>;
-	onPhotoClick: (photo: any) => void;
-	onPhotoLongPress?: (photo: any) => void;
+	onPhotoClick: (photo: unknown) => void;
+	onPhotoLongPress?: (photo: unknown) => void;
 	selectedPhotos?: string[];
 	onSelectionChange?: (selected: string[]) => void;
 }) {
@@ -217,7 +217,7 @@ export function MobilePhotoGrid({
 	);
 	const [isSelectionMode, setIsSelectionMode] = useState(false);
 
-	const handleTouchStart = (photo: any) => {
+	const handleTouchStart = (photo: unknown) => {
 		if (onPhotoLongPress) {
 			const timer = setTimeout(() => {
 				setIsSelectionMode(true);
@@ -227,14 +227,14 @@ export function MobilePhotoGrid({
 		}
 	};
 
-	const handleTouchEnd = (_photo: any) => {
+	const handleTouchEnd = (_photo: unknown) => {
 		if (longPressTimer) {
 			clearTimeout(longPressTimer);
 			setLongPressTimer(null);
 		}
 	};
 
-	const handlePhotoClick = (photo: any) => {
+	const handlePhotoClick = (photo: unknown) => {
 		if (isSelectionMode && onSelectionChange) {
 			const isSelected = selectedPhotos.includes(photo.id);
 			const newSelected = isSelected
@@ -489,7 +489,7 @@ export function MobileImageViewer({
 	const [rotation, setRotation] = useState(0);
 	const imageRef = useRef<HTMLImageElement>(null);
 
-	const _handlePinch = (e: any) => {
+	const _handlePinch = (e: unknown) => {
 		setScale(e.scale);
 	};
 

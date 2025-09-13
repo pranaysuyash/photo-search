@@ -18,11 +18,16 @@ describe("JustifiedResults", () => {
 			configurable: true,
 			get: () => 600,
 		});
-		const scrollRef = { current: document.createElement("div") } as any;
+		const scrollRef = {
+			current: document.createElement("div"),
+		} as React.MutableRefObject<HTMLDivElement>;
 		const onToggle = vi.fn();
 		const onOpen = vi.fn();
 		render(
-			<div ref={scrollRef as any} style={{ width: 800, height: 600 }}>
+			<div
+				ref={scrollRef as React.RefObject<HTMLDivElement>}
+				style={{ width: 800, height: 600 }}
+			>
 				<JustifiedResults
 					dir="/d"
 					engine="local"

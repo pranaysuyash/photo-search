@@ -1,4 +1,5 @@
 import { apiResolveLookalike, apiSetFavorite, thumbUrl } from "../api";
+import LazyImage from "./LazyImage";
 
 const basename = (p: string) => p.split("/").pop() || p;
 
@@ -59,8 +60,9 @@ export default function LookAlikesView({
 										<div className="truncate" title={p}>
 											{basename(p)}
 										</div>
-										<img
+										<LazyImage
 											src={thumbUrl(dir, engine, p, 196)}
+											alt={basename(p)}
 											className="w-full h-24 object-cover rounded mt-1"
 										/>
 									</div>

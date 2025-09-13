@@ -102,9 +102,9 @@ export function SearchExplainability({
 	if (compact) {
 		return (
 			<div className="flex flex-wrap gap-1 mt-1">
-				{topReasons.map((reason, idx) => (
+				{topReasons.map((reason, _idx) => (
 					<div
-						key={`reason-${idx}`}
+						key={`item-${String(reason)}`}
 						className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border ${getConfidenceColor(reason.confidence)}`}
 						title={reason.detail}
 					>
@@ -132,8 +132,11 @@ export function SearchExplainability({
 				</span>
 			</div>
 			<div className="space-y-1">
-				{topReasons.map((reason, idx) => (
-					<div key={`reason-${idx}`} className="flex items-start gap-2 text-sm">
+				{topReasons.map((reason, _idx) => (
+					<div
+						key={`item-${String(reason)}`}
+						className="flex items-start gap-2 text-sm"
+					>
 						<div
 							className={`mt-0.5 p-1 rounded ${getConfidenceColor(reason.confidence)}`}
 						>
@@ -178,16 +181,16 @@ function HighlightedText({
 
 	return (
 		<>
-			{parts.map((part, idx) =>
+			{parts.map((part, _idx) =>
 				part.toLowerCase() === highlight.toLowerCase() ? (
 					<mark
-						key={`part-${idx}`}
+						key={`item-${String(part)}`}
 						className="bg-yellow-200 dark:bg-yellow-800 px-0.5 rounded"
 					>
 						{part}
 					</mark>
 				) : (
-					<span key={`part-${idx}`}>{part}</span>
+					<span key={`item-${String(part)}`}>{part}</span>
 				),
 			)}
 		</>
@@ -196,7 +199,7 @@ function HighlightedText({
 
 // Match analyzer to generate reasons from search results
 export class MatchAnalyzer {
-	analyzeMatch(photo: any, query: string): MatchReason[] {
+	analyzeMatch(photo: unknown, query: string): MatchReason[] {
 		const reasons: MatchReason[] = [];
 		const queryLower = query.toLowerCase();
 		const queryWords = queryLower.split(/\s+/);
@@ -297,14 +300,14 @@ export class MatchAnalyzer {
 
 		// Check for objects
 		if (photo.objects && photo.objects.length > 0) {
-			const matchedObjects = photo.objects.filter((obj: any) =>
+			const matchedObjects = photo.objects.filter((obj: unknown) =>
 				queryWords.some((word) => obj.label.toLowerCase().includes(word)),
 			);
 			if (matchedObjects.length > 0) {
 				reasons.push({
 					type: "object",
 					confidence: matchedObjects[0].confidence || 0.75,
-					detail: matchedObjects.map((o: any) => o.label).join(", "),
+					detail: matchedObjects.map((o: unknown) => o.label).join(", "),
 				});
 			}
 		}

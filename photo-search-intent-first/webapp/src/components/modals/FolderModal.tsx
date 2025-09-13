@@ -49,11 +49,11 @@ interface FolderModalProps {
 		setDir: (path: string) => void;
 		setUseOsTrash: (value: boolean) => void;
 		setUseFast: (value: boolean) => void;
-		setFastKind: (value: any) => void;
+		setFastKind: (value: "" | "annoy" | "faiss" | "hnsw") => void;
 		setUseCaps: (value: boolean) => void;
 		setUseOcr: (value: boolean) => void;
 		setHasText: (value: boolean) => void;
-		setHighContrast: (value: boolean) => void;
+		setHighContrast?: (value: boolean) => void;
 	};
 	uiActions: {
 		setNote: (message: string) => void;
@@ -87,9 +87,25 @@ export const FolderModal: React.FC<FolderModalProps> = ({
 		setSelectedPath(path);
 	};
 
+	const handleChooseWithOS = async () => {
+		try {
+			const p = await (window as unknown).electronAPI?.selectFolder?.();
+			if (typeof p === "string" && p.trim()) {
+				setSelectedPath(p);
+				try {
+					(window as unknown).electronAPI?.setAllowedRoot?.(p);
+				} catch {}
+			}
+		} catch {}
+	};
+
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		if (selectedPath) {
+			try {
+				// Inform Electron (if present) about the chosen library root for protocol restriction
+				(window as unknown).electronAPI?.setAllowedRoot?.(selectedPath);
+			} catch {}
 			settingsActions.setDir(selectedPath);
 			onClose();
 			// Add path to workspace and index it
@@ -124,6 +140,21 @@ export const FolderModal: React.FC<FolderModalProps> = ({
 						onFolderSelect={handleFolderSelect}
 						currentPath={selectedPath}
 					/>
+
+					{/* OS picker (Electron) */}
+			{typeof (window as unknown).electronAPI?.selectFolder ===
+						"function" && (
+						<div className="mt-3">
+							<button
+								type="button"
+								onClick={handleChooseWithOS}
+								className="px-3 py-1 rounded border"
+								aria-label="Choose folder with system dialog"
+							>
+								Choose with OS…
+							</button>
+						</div>
+					)}
 
 					<form onSubmit={handleSubmit}>
 						<div className="mt-3 flex items-center justify-between">
@@ -161,7 +192,10 @@ export const FolderModal: React.FC<FolderModalProps> = ({
 										className="border rounded px-2 py-1"
 										value={fastKind}
 										onChange={(e) =>
-											settingsActions.setFastKind(e.target.value as any)
+											settingsActions.setFastKind(
+												(e.target as HTMLSelectElement)
+													.value as "" | "annoy" | "faiss" | "hnsw",
+											)
 										}
 									>
 										<option value="">Auto</option>

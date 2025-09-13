@@ -8,6 +8,7 @@ import {
 	MapPin,
 	Settings,
 } from "lucide-react";
+import type { LucideProps } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import {
@@ -25,11 +26,11 @@ interface MetadataPanelProps {
 
 interface MetadataSection {
 	title: string;
-	icon: React.ComponentType<any>;
+	icon: React.ComponentType<LucideProps>;
 	fields: Array<{
 		key: keyof ExifData | "fileSize" | "megapixels" | "aspectRatio";
 		label: string;
-		formatter?: (value: any) => string | undefined;
+		formatter?: (value: number | string) => string | undefined;
 	}>;
 }
 
@@ -83,7 +84,7 @@ const METADATA_SECTIONS: MetadataSection[] = [
 			{
 				key: "fileSize",
 				label: "File Size",
-				formatter: (v) => metadataService.formatExifValue("file_size", v),
+            formatter: (v) => metadataService.formatExifValue("file_size", v as number | string),
 			},
 		],
 	},
@@ -110,12 +111,14 @@ const METADATA_SECTIONS: MetadataSection[] = [
 			{
 				key: "latitude",
 				label: "Latitude",
-				formatter: (v) => (v ? `${v.toFixed(6)}°` : undefined),
+				formatter: (v) =>
+					typeof v === "number" ? `${v.toFixed(6)}°` : undefined,
 			},
 			{
 				key: "longitude",
 				label: "Longitude",
-				formatter: (v) => (v ? `${v.toFixed(6)}°` : undefined),
+				formatter: (v) =>
+					typeof v === "number" ? `${v.toFixed(6)}°` : undefined,
 			},
 			{
 				key: "altitude",
@@ -272,9 +275,9 @@ export function MetadataPanel({
 							if (value === null || value === undefined || value === "")
 								return null;
 
-							const displayValue = field.formatter
-								? field.formatter(value)
-								: String(value);
+            const displayValue = field.formatter
+                ? field.formatter(value as string | number)
+                : String(value);
 							if (!displayValue) return null;
 
 							return (

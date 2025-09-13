@@ -104,8 +104,10 @@ export function AccessibilityPanel({
 		// High contrast
 		if (settings.highContrast) {
 			root.setAttribute("data-high-contrast", "true");
+			root.classList.add("high-contrast");
 		} else {
 			root.removeAttribute("data-high-contrast");
+			root.classList.remove("high-contrast");
 		}
 
 		// Large text
@@ -180,7 +182,12 @@ export function AccessibilityPanel({
 						</span>
 						<select
 							value={settings.theme}
-							onChange={(e) => updateSetting("theme", e.target.value as "light" | "dark" | "auto")}
+							onChange={(e) =>
+								updateSetting(
+									"theme",
+									e.target.value as "light" | "dark" | "auto",
+								)
+							}
 							className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
 						>
 							<option value="auto">Auto</option>
@@ -198,7 +205,12 @@ export function AccessibilityPanel({
 						</span>
 						<select
 							value={settings.fontSize}
-							onChange={(e) => updateSetting("fontSize", e.target.value as "small" | "medium" | "large" | "xlarge")}
+							onChange={(e) =>
+								updateSetting(
+									"fontSize",
+									e.target.value as "small" | "medium" | "large" | "xlarge",
+								)
+							}
 							className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
 						>
 							<option value="small">Small</option>
@@ -598,7 +610,11 @@ export function AccessibilityPanel({
 									<button
 										type="button"
 										key={tab.id}
-										onClick={() => setActiveTab(tab.id as "vision" | "motor" | "cognitive" | "general")}
+										onClick={() =>
+											setActiveTab(
+												tab.id as "vision" | "motor" | "cognitive" | "general",
+											)
+										}
 										className={clsx(
 											"flex-1 px-4 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2",
 											activeTab === tab.id

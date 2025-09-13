@@ -4,6 +4,7 @@ import {
 	motion,
 	type PanInfo,
 	useMotionValue,
+	useReducedMotion,
 	useTransform,
 } from "framer-motion";
 import {
@@ -228,26 +229,28 @@ const ModernLightbox: React.FC<ModernLightboxProps> = ({
 
 	if (!isOpen) return null;
 
+	const prefersReducedMotion = useReducedMotion();
 	return (
 		<AnimatePresence>
 			<motion.div
-				initial={{ opacity: 0 }}
+				initial={prefersReducedMotion ? false : { opacity: 0 }}
 				animate={{ opacity: 1 }}
-				exit={{ opacity: 0 }}
+				exit={prefersReducedMotion ? false : { opacity: 0 }}
 				className={clsx("fixed inset-0 z-50 bg-black flex flex-col", className)}
 			>
 				{/* Header */}
 				<motion.div
-					initial={{ opacity: 0, y: -20 }}
+					initial={prefersReducedMotion ? false : { opacity: 0, y: -20 }}
 					animate={{ opacity: 1, y: 0 }}
-					transition={{ delay: 0.1 }}
+					transition={prefersReducedMotion ? undefined : { delay: 0.1 }}
 					className="absolute top-0 left-0 right-0 z-20 p-4 bg-gradient-to-b from-black/80 to-transparent"
 				>
 					<div className="flex items-center justify-between">
 						<div className="flex items-center gap-4">
 							<motion.button
-								whileHover={{ scale: 1.1 }}
-								whileTap={{ scale: 0.9 }}
+								{...(prefersReducedMotion
+									? {}
+									: { whileHover: { scale: 1.1 }, whileTap: { scale: 0.9 } })}
 								onClick={onClose}
 								className="p-3 bg-white/10 backdrop-blur-sm rounded-xl text-white hover:bg-white/20 transition-colors"
 							>
@@ -269,16 +272,24 @@ const ModernLightbox: React.FC<ModernLightboxProps> = ({
 							{enableZoom && (
 								<>
 									<motion.button
-										whileHover={{ scale: 1.1 }}
-										whileTap={{ scale: 0.9 }}
+										{...(prefersReducedMotion
+											? {}
+											: {
+													whileHover: { scale: 1.1 },
+													whileTap: { scale: 0.9 },
+												})}
 										onClick={handleZoomIn}
 										className="p-2 bg-white/10 backdrop-blur-sm rounded-lg text-white hover:bg-white/20 transition-colors"
 									>
 										<ZoomIn className="w-5 h-5" />
 									</motion.button>
 									<motion.button
-										whileHover={{ scale: 1.1 }}
-										whileTap={{ scale: 0.9 }}
+										{...(prefersReducedMotion
+											? {}
+											: {
+													whileHover: { scale: 1.1 },
+													whileTap: { scale: 0.9 },
+												})}
 										onClick={handleZoomOut}
 										className="p-2 bg-white/10 backdrop-blur-sm rounded-lg text-white hover:bg-white/20 transition-colors"
 									>
@@ -289,8 +300,9 @@ const ModernLightbox: React.FC<ModernLightboxProps> = ({
 
 							{enableRotation && (
 								<motion.button
-									whileHover={{ scale: 1.1 }}
-									whileTap={{ scale: 0.9 }}
+									{...(prefersReducedMotion
+										? {}
+										: { whileHover: { scale: 1.1 }, whileTap: { scale: 0.9 } })}
 									onClick={handleRotate}
 									className="p-2 bg-white/10 backdrop-blur-sm rounded-lg text-white hover:bg-white/20 transition-colors"
 								>
@@ -299,8 +311,9 @@ const ModernLightbox: React.FC<ModernLightboxProps> = ({
 							)}
 
 							<motion.button
-								whileHover={{ scale: 1.1 }}
-								whileTap={{ scale: 0.9 }}
+								{...(prefersReducedMotion
+									? {}
+									: { whileHover: { scale: 1.1 }, whileTap: { scale: 0.9 } })}
 								onClick={() => onPhotoAction?.("download", currentPhoto)}
 								className="p-2 bg-white/10 backdrop-blur-sm rounded-lg text-white hover:bg-white/20 transition-colors"
 							>
@@ -308,8 +321,9 @@ const ModernLightbox: React.FC<ModernLightboxProps> = ({
 							</motion.button>
 
 							<motion.button
-								whileHover={{ scale: 1.1 }}
-								whileTap={{ scale: 0.9 }}
+								{...(prefersReducedMotion
+									? {}
+									: { whileHover: { scale: 1.1 }, whileTap: { scale: 0.9 } })}
 								onClick={() => onPhotoAction?.("share", currentPhoto)}
 								className="p-2 bg-white/10 backdrop-blur-sm rounded-lg text-white hover:bg-white/20 transition-colors"
 							>
@@ -513,9 +527,9 @@ const ModernLightbox: React.FC<ModernLightboxProps> = ({
 											{currentPhoto.aiAnalysis.description}
 										</p>
 										<div className="flex flex-wrap gap-2">
-											{currentPhoto.aiAnalysis.tags.map((tag, index) => (
+											{currentPhoto.aiAnalysis.tags.map((tag, _index) => (
 												<span
-													key={`tag-${index}`}
+													key={`item-${String(tag)}`}
 													className="px-2 py-1 bg-white/10 text-white/80 text-xs rounded-lg"
 												>
 													{tag}
@@ -615,9 +629,9 @@ const ModernLightbox: React.FC<ModernLightboxProps> = ({
 									<div className="space-y-3">
 										<h3 className="text-white font-semibold">Tags</h3>
 										<div className="flex flex-wrap gap-2">
-											{currentPhoto.tags.map((tag, index) => (
+											{currentPhoto.tags.map((tag, _index) => (
 												<span
-													key={`tag-${index}`}
+													key={`item-${String(tag)}`}
 													className="px-3 py-1 bg-white/10 text-white/80 text-sm rounded-lg hover:bg-white/20 transition-colors cursor-pointer"
 												>
 													#{tag}
@@ -635,9 +649,9 @@ const ModernLightbox: React.FC<ModernLightboxProps> = ({
 											Comments
 										</h3>
 										<div className="space-y-2">
-											{currentPhoto.comments.map((comment, index) => (
+											{currentPhoto.comments.map((comment, _index) => (
 												<div
-													key={`comment-${index}`}
+													key={`item-${String(comment)}`}
 													className="p-3 bg-white/5 rounded-lg"
 												>
 													<div className="flex items-center justify-between mb-1">

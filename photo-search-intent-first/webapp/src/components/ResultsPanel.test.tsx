@@ -11,7 +11,7 @@ vi.mock("../stores/uiStore", () => ({
 
 // Provide a lightweight settings store stub to avoid persist/hydration churn
 vi.mock("../stores/settingsStore", () => {
-	const state: any = {
+	const state: unknown = {
 		dir: "",
 		engine: "local",
 		useCaps: false,
@@ -21,11 +21,11 @@ vi.mock("../stores/settingsStore", () => {
 		showExplain: false,
 	};
 	const useSettingsStore = {
-		setState: (partial: any) => {
+		setState: (partial: unknown) => {
 			const next = typeof partial === "function" ? partial(state) : partial;
 			Object.assign(state, next);
 		},
-	} as any;
+	} as unknown;
 	return {
 		useSettingsStore,
 		useDir: () => state.dir,
@@ -48,18 +48,18 @@ vi.mock("../api", () => ({
 
 describe("ResultsPanel", () => {
 	it("shows empty states and renders grid when results exist", () => {
-		useSettingsStore.setState({ dir: "/d", engine: "local" } as any);
-		usePhotoStore.setState({ results: [], query: "" } as any);
+		useSettingsStore.setState({ dir: "/d", engine: "local" } as unknown);
+		usePhotoStore.setState({ results: [], query: "" } as unknown);
 		const { rerender } = render(<ResultsPanel />);
 		expect(screen.getByText(/Run a search/)).toBeInTheDocument();
 		// With a query but no results
-		usePhotoStore.setState({ query: "foo" } as any);
+		usePhotoStore.setState({ query: "foo" } as unknown);
 		rerender(<ResultsPanel />);
 		expect(screen.getByText(/No results/)).toBeInTheDocument();
 		// With results
 		usePhotoStore.setState({
 			results: [{ path: "/a.jpg", score: 0.9 }],
-		} as any);
+		} as unknown);
 		rerender(<ResultsPanel />);
 		expect(screen.getByText("Results")).toBeInTheDocument();
 		expect(screen.getByText("1 found")).toBeInTheDocument();
@@ -67,21 +67,21 @@ describe("ResultsPanel", () => {
 
 	it("selects all and favorites selected", async () => {
 		const { apiSetFavorite } = await import("../api");
-		useSettingsStore.setState({ dir: "/d", engine: "local" } as any);
+		useSettingsStore.setState({ dir: "/d", engine: "local" } as unknown);
 		usePhotoStore.setState({
 			results: [
 				{ path: "/a.jpg", score: 0.9 },
 				{ path: "/b.jpg", score: 0.8 },
 			],
 			query: "q",
-		} as any);
+		} as unknown);
 		render(<ResultsPanel />);
 		fireEvent.click(screen.getByText("Select all"));
 		fireEvent.click(screen.getByText("♥ Favorite selected"));
 		await waitFor(() => {
-			expect((apiSetFavorite as any).mock.calls.length).toBeGreaterThanOrEqual(
-				1,
-			);
+			expect(
+				(apiSetFavorite as unknown).mock.calls.length,
+			).toBeGreaterThanOrEqual(1);
 		});
 	});
 });

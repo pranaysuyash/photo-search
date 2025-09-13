@@ -1,13 +1,5 @@
 import type React from "react";
-
-interface FocusTrapProps {
-	onEscape: () => void;
-	children: React.ReactNode;
-}
-
-const FocusTrap: React.FC<FocusTrapProps> = ({ onEscape, children }) => {
-	return <div>{children}</div>;
-};
+import { FocusTrap } from "../../utils/accessibility";
 
 interface TagModalProps {
 	onClose: () => void;

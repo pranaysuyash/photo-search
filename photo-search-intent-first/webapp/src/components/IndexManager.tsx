@@ -29,7 +29,7 @@ interface IndexManagerProps {
 
 export default function IndexManager({
 	dir,
-	engine,
+	engine: _engine,
 	busy,
 	note,
 	diag,

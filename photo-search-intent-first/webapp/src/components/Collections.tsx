@@ -9,6 +9,7 @@ import {
 import type React from "react";
 import { useCallback, useRef, useState } from "react";
 import { apiCreateShare, apiExport, apiSetCollection, thumbUrl } from "../api";
+import { announce } from "../utils/accessibility";
 
 interface CollectionsProps {
 	dir: string;
@@ -198,6 +199,7 @@ export default function Collections({
 						window.location.origin + result.url,
 					);
 					alert("Share link copied to clipboard!");
+					announce("Share link copied to clipboard", "polite");
 				} catch (error) {
 					console.error("Failed to share collection:", error);
 					alert(
@@ -233,6 +235,7 @@ export default function Collections({
 
 					await apiExport(dir, paths, folderName, "copy", false, false);
 					alert(`Exported ${paths.length} photos to ${folderName}`);
+					announce(`Exported ${paths.length} photos`, "polite");
 				} catch (error) {
 					console.error("Failed to export collection:", error);
 					alert(
@@ -354,6 +357,14 @@ export default function Collections({
 								onDragEnter={(e) => handleDragEnter(e, name)}
 								onDragLeave={handleDragLeave}
 								onDrop={(e) => handleDrop(e, name)}
+								onKeyDown={(e) => {
+									if (e.key === "Enter" || e.key === " ") {
+										e.preventDefault();
+										setExpandedActions(expandedActions === name ? null : name);
+									}
+								}}
+								role="listitem"
+								aria-label={`Collection ${name} with ${items.length} photos`}
 								className={`border rounded-lg p-3 transition-all cursor-move ${
 									isDropTarget
 										? "border-blue-500 bg-blue-50 shadow-md"

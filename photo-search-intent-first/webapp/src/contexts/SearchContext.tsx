@@ -17,6 +17,7 @@ import {
 	useOpenaiKey,
 } from "../stores/settingsStore";
 import { usePhotoActions } from "../stores/useStores";
+import { expandSynonyms } from "../utils/searchSynonyms";
 
 export type SearchFilters = {
 	tags?: string[];
@@ -72,7 +73,7 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
 		(r: SearchResult[]) => {
 			setResults(r);
 			try {
-				(photo as any)?.setResults?.(r);
+				(photo as unknown)?.setResults?.(r);
 			} catch {}
 		},
 		[photo],
@@ -82,7 +83,7 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
 		(q: string) => {
 			setQuery(q);
 			try {
-				(photo as any)?.setQuery?.(q);
+				(photo as unknown)?.setQuery?.(q);
 			} catch {}
 		},
 		[photo],
@@ -114,7 +115,16 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
 			if (!qq) return;
 			if (!dir || !engine) return;
 			try {
-				const r = await apiSearch(dir, qq, engine, topK || 24, {
+				// Clear unknown prior alt search banner on new attempts
+				try {
+					(photo as unknown)?.setAltSearch?.({
+						active: false,
+						original: "",
+						applied: "",
+					});
+				} catch {}
+
+				const base = await apiSearch(dir, qq, engine, topK || 24, {
 					hfToken: needsHf ? hfToken : undefined,
 					openaiKey: needsOAI ? openaiKey : undefined,
 					favoritesOnly: filters.favOnly,
@@ -124,7 +134,45 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
 					place: filters.place ?? undefined,
 					useOcr: filters.hasText,
 				});
-				setResultsSafe(r.results || []);
+				const baseResults = base.results || [];
+				if (baseResults.length > 0) {
+					setResultsSafe(baseResults);
+					if (typeof q === "string") setQuerySafe(q);
+					return;
+				}
+
+				// Soft fallback: try a synonym-expanded query when none found
+				const altQuery = expandSynonyms(qq);
+
+				if (altQuery && altQuery !== qq) {
+					const alt = await apiSearch(dir, altQuery, engine, topK || 24, {
+						hfToken: needsHf ? hfToken : undefined,
+						openaiKey: needsOAI ? openaiKey : undefined,
+						favoritesOnly: filters.favOnly,
+						tags: filters.tags,
+						dateFrom: filters.dateFrom ?? undefined,
+						dateTo: filters.dateTo ?? undefined,
+						place: filters.place ?? undefined,
+						useOcr: filters.hasText,
+					});
+					const altResults = alt.results || [];
+					if (altResults.length > 0) {
+						setResultsSafe(altResults);
+						// keep the original query in state for clarity
+						if (typeof q === "string") setQuerySafe(q);
+						try {
+							(photo as unknown)?.setAltSearch?.({
+								active: true,
+								original: qq,
+								applied: altQuery,
+							});
+						} catch {}
+						return;
+					}
+				}
+
+				// Nothing matched, keep empty results and original state
+				setResultsSafe([]);
 				if (typeof q === "string") setQuerySafe(q);
 			} catch {
 				// swallow, caller can surface via UI if desired
@@ -141,6 +189,7 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
 			filters,
 			setResultsSafe,
 			setQuerySafe,
+			photo,
 		],
 	);
 

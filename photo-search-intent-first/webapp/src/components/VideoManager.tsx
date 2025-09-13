@@ -5,6 +5,7 @@ import {
 	apiListVideos,
 	videoThumbnailUrl,
 } from "../api";
+import LazyImage from "./LazyImage";
 import { LoadingSpinner } from "./LoadingSpinner";
 
 interface VideoFile {
@@ -23,7 +24,7 @@ export function VideoManager({ currentDir, provider }: VideoManagerProps) {
 	const [loading, setLoading] = useState(false);
 	const [indexing, setIndexing] = useState(false);
 	const [selectedVideo, setSelectedVideo] = useState<VideoFile | null>(null);
-	const [videoMetadata, setVideoMetadata] = useState<any>(null);
+	const [videoMetadata, setVideoMetadata] = useState<unknown>(null);
 	const [error, setError] = useState<string | null>(null);
 
 	const loadVideos = useCallback(async () => {
@@ -136,6 +137,14 @@ export function VideoManager({ currentDir, provider }: VideoManagerProps) {
 								<div
 									key={`video-${video.path}-${index}`}
 									onClick={() => selectVideo(video)}
+									onKeyDown={(e) => {
+										if (e.key === "Enter" || e.key === " ") {
+											e.preventDefault();
+											selectVideo(video);
+										}
+									}}
+									role="button"
+									tabIndex={0}
 									className={`p-3 border rounded cursor-pointer transition-colors ${
 										selectedVideo?.path === video.path
 											? "border-blue-500 bg-blue-50"
@@ -163,9 +172,9 @@ export function VideoManager({ currentDir, provider }: VideoManagerProps) {
 						<div className="space-y-4">
 							{/* Video Thumbnail */}
 							<div className="aspect-video bg-gray-100 rounded overflow-hidden">
-								<img
+								<LazyImage
 									src={videoThumbnailUrl(currentDir, selectedVideo.path)}
-									alt="Video thumbnail"
+									alt={selectedVideo.path.split("/").pop() || "Video thumbnail"}
 									className="w-full h-full object-cover"
 									onError={(e) => {
 										(e.target as HTMLImageElement).src =

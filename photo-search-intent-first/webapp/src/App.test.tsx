@@ -21,19 +21,19 @@ vi.mock("./api", () => ({
 }));
 
 import {
+	apiAuthStatus,
 	apiDelete,
 	apiExport,
 	apiGetFavorites,
 	apiGetSaved,
 	apiGetTags,
 	apiLibrary,
+	apiPing,
 	apiSearch,
 	apiSetFavorite,
 	apiSetTags,
 	apiUndoDelete,
 	thumbUrl,
-  apiAuthStatus,
-  apiPing,
 } from "./api";
 
 // Mock data

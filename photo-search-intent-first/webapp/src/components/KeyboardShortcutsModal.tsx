@@ -24,7 +24,7 @@ export function KeyboardShortcutsModal({
 
 	const getCategoryShortcuts = (keys: string[]) => {
 		return shortcuts.filter((s) => {
-			const lk = s.keys.toLowerCase();
+			const lk = String(s.keys || "").toLowerCase();
 			return keys.some((k) => lk.includes(k.toLowerCase()));
 		});
 	};
@@ -36,10 +36,15 @@ export function KeyboardShortcutsModal({
 			onKeyDown={(e) => {
 				if (e.key === "Escape") onClose();
 			}}
+			role="dialog"
+			tabIndex={-1}
 		>
 			<div
 				className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden"
 				onClick={(e) => e.stopPropagation()}
+				onKeyDown={(e) => e.stopPropagation()}
+				role="dialog"
+				aria-label="Keyboard shortcuts"
 			>
 				{/* Header */}
 				<div className="flex items-center justify-between p-6 border-b dark:border-gray-700">
@@ -65,9 +70,9 @@ export function KeyboardShortcutsModal({
 									{category}
 								</h3>
 								<div className="space-y-2">
-									{getCategoryShortcuts(keys).map((shortcut, idx) => (
+									{getCategoryShortcuts(keys).map((shortcut, _idx) => (
 										<div
-											key={`item-${idx}`}
+											key={`item-${String(category)}-${shortcut.keys}`}
 											className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
 										>
 											<span className="text-sm text-gray-700 dark:text-gray-300">

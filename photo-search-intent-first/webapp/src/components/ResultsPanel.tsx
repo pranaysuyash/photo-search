@@ -77,7 +77,7 @@ export default function ResultsPanel() {
 				t &&
 				(t.tagName === "INPUT" ||
 					t.tagName === "TEXTAREA" ||
-					(t as any).isContentEditable)
+					(t as unknown).isContentEditable)
 			)
 				return;
 			if (!hasResults) return;

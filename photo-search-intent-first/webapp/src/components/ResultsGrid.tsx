@@ -45,7 +45,7 @@ export function ResultsGrid({
 						key={p}
 						className={`relative cursor-pointer border rounded ${isSel ? "ring-2 ring-blue-600" : ""}`}
 						onClick={() => onToggleSelect(p)}
-						onDoubleClick={() => onOpen(p)}
+							onDoubleClick={() => onOpen(p)}
 						role="gridcell"
 						aria-selected={isSel}
 						tabIndex={0}

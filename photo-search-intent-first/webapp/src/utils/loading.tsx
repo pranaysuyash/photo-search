@@ -2,7 +2,7 @@
  * Loading and performance utilities for the photo search application
  */
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
@@ -61,11 +61,13 @@ export const ScrollLoader: React.FC<ScrollLoaderProps> = ({
 		<div
 			ref={ref}
 			className={`h-8 w-full flex items-center justify-center text-xs text-gray-500 ${className}`}
+			role="status"
+			aria-live="polite"
 		>
 			{isLoading ? (
 				<div className="flex items-center gap-2">
 					<Loader2 className="w-4 h-4 animate-spin" />
-					<span>{loadingText}</span>
+					<span>{loadingText || "Loading more photos..."}</span>
 				</div>
 			) : (
 				!hasMore && <span className="text-gray-400">No more items</span>
@@ -149,15 +151,16 @@ export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
 	className = "",
 	children,
 }) => {
+	const prefersReducedMotion = useReducedMotion();
 	return (
 		<div className={`relative ${className}`}>
 			{children}
 			<AnimatePresence>
 				{isLoading && (
 					<motion.div
-						initial={{ opacity: 0 }}
+						initial={prefersReducedMotion ? false : { opacity: 0 }}
 						animate={{ opacity: 1 }}
-						exit={{ opacity: 0 }}
+						exit={prefersReducedMotion ? false : { opacity: 0 }}
 						className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
 					>
 						<div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-xl">

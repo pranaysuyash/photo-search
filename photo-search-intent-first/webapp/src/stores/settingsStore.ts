@@ -115,10 +115,10 @@ export const useSettingsStore = create<SettingsStore>()(
 
 			// EXIF filters
 			camera: "",
-			isoMin: "",
-			isoMax: "",
-			fMin: "",
-			fMax: "",
+			isoMin: 0,
+			isoMax: 0,
+			fMin: 0,
+			fMax: 0,
 			place: "",
 
 			// Actions
@@ -140,10 +140,10 @@ export const useSettingsStore = create<SettingsStore>()(
 			setShowInfoOverlay: (showInfoOverlay) => set({ showInfoOverlay }),
 			setHighContrast: (highContrast) => set({ highContrast }),
 			setCamera: (camera) => set({ camera }),
-			setIsoMin: (isoMin) => set({ isoMin }),
-			setIsoMax: (isoMax) => set({ isoMax }),
-			setFMin: (fMin) => set({ fMin }),
-			setFMax: (fMax) => set({ fMax }),
+			setIsoMin: (isoMin: number | string) => set({ isoMin: Number(isoMin) || 0 }),
+			setIsoMax: (isoMax: number | string) => set({ isoMax: Number(isoMax) || 0 }),
+			setFMin: (fMin: number | string) => set({ fMin: Number(fMin) || 0 }),
+			setFMax: (fMax: number | string) => set({ fMax: Number(fMax) || 0 }),
 			setPlace: (place) => set({ place }),
 		})),
 		{

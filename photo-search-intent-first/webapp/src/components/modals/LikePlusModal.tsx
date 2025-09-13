@@ -1,13 +1,5 @@
 import type React from "react";
-
-interface FocusTrapProps {
-	onEscape: () => void;
-	children: React.ReactNode;
-}
-
-const FocusTrap: React.FC<FocusTrapProps> = ({ onEscape, children }) => {
-	return <div>{children}</div>;
-};
+import { FocusTrap } from "../../utils/accessibility";
 
 interface LikePlusModalProps {
 	selected: Set<string>;
@@ -17,7 +9,7 @@ interface LikePlusModalProps {
 	onClose: () => void;
 	setSelectedView: (view: string) => void;
 	photoActions: {
-		setResults: (results: any[]) => void;
+		setResults: (results: import("../../api").SearchResult[]) => void;
 	};
 	uiActions: {
 		setBusy: (message: string) => void;

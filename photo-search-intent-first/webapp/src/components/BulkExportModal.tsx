@@ -1,6 +1,7 @@
 import { Download, FolderOpen, Settings2, X } from "lucide-react";
 import { useState } from "react";
 import { apiExport } from "../api";
+import { announce } from "../utils/accessibility";
 
 interface BulkExportModalProps {
 	isOpen: boolean;
@@ -66,6 +67,9 @@ export function BulkExportModal({
 			}
 
 			let completed = 0;
+			let copied = 0;
+			let skipped = 0;
+			let errors = 0;
 
 			for (const batch of batches) {
 				const _result = await apiExport(
@@ -82,11 +86,19 @@ export function BulkExportModal({
 					},
 				);
 
+				copied += _result.copied || 0;
+				skipped += _result.skipped || 0;
+				errors += _result.errors || 0;
+
 				completed += batch.length;
 				setProgress(Math.round((completed / selectedPaths.length) * 100));
 			}
 
 			// Success
+			announce(
+				`Exported ${copied} photos${skipped ? `, skipped ${skipped}` : ""}${errors ? `, ${errors} errors` : ""}`,
+				"polite",
+			);
 			onClose();
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Export failed");
@@ -157,7 +169,10 @@ export function BulkExportModal({
 
 					{/* Destination */}
 					<div className="mb-6">
-						<label htmlFor="export-destination" className="block text-sm font-medium mb-2">
+						<label
+							htmlFor="export-destination"
+							className="block text-sm font-medium mb-2"
+						>
 							Destination Folder
 						</label>
 						<div className="flex gap-2">
@@ -223,7 +238,12 @@ export function BulkExportModal({
 						<div className="space-y-4 pl-6">
 							{/* Format */}
 							<div>
-								<label htmlFor="export-format" className="block text-sm font-medium mb-2">Format</label>
+								<label
+									htmlFor="export-format"
+									className="block text-sm font-medium mb-2"
+								>
+									Format
+								</label>
 								<select
 									id="export-format"
 									value={exportConfig.format}
@@ -246,7 +266,10 @@ export function BulkExportModal({
 							{/* Quality */}
 							{exportConfig.format !== "original" && (
 								<div>
-									<label htmlFor="export-quality" className="block text-sm font-medium mb-2">
+									<label
+										htmlFor="export-quality"
+										className="block text-sm font-medium mb-2"
+									>
 										Quality: {exportConfig.quality}%
 									</label>
 									<input
@@ -271,7 +294,10 @@ export function BulkExportModal({
 							{/* Custom Size */}
 							<div className="grid grid-cols-2 gap-4">
 								<div>
-									<label htmlFor="export-max-width" className="block text-sm font-medium mb-2">
+									<label
+										htmlFor="export-max-width"
+										className="block text-sm font-medium mb-2"
+									>
 										Max Width (px)
 									</label>
 									<input
@@ -290,7 +316,10 @@ export function BulkExportModal({
 									/>
 								</div>
 								<div>
-									<label htmlFor="export-max-height" className="block text-sm font-medium mb-2">
+									<label
+										htmlFor="export-max-height"
+										className="block text-sm font-medium mb-2"
+									>
 										Max Height (px)
 									</label>
 									<input
@@ -312,7 +341,10 @@ export function BulkExportModal({
 
 							{/* Folder Structure */}
 							<div>
-								<label htmlFor="export-structure" className="block text-sm font-medium mb-2">
+								<label
+									htmlFor="export-structure"
+									className="block text-sm font-medium mb-2"
+								>
 									Folder Structure
 								</label>
 								<select
@@ -336,7 +368,10 @@ export function BulkExportModal({
 
 							{/* Naming */}
 							<div>
-								<label htmlFor="export-naming" className="block text-sm font-medium mb-2">
+								<label
+									htmlFor="export-naming"
+									className="block text-sm font-medium mb-2"
+								>
 									File Naming
 								</label>
 								<select

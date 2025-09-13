@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import React, { useCallback, useRef, useState } from "react";
 import { apiCreateShare, apiExport } from "../../api";
+import { announce } from "../../utils/accessibility";
 
 interface EnhancedSharingModalProps {
 	selected: Set<string>;
@@ -147,6 +148,7 @@ export const EnhancedSharingModal: React.FC<EnhancedSharingModalProps> = ({
 			await navigator.clipboard.writeText(shareUrl);
 			setCopiedToClipboard(true);
 			uiActions.setNote("Share link created and copied to clipboard!");
+			announce("Share link ready: copied to clipboard", "polite");
 		} catch (e) {
 			uiActions.setNote(e instanceof Error ? e.message : "Share failed");
 		} finally {
@@ -182,6 +184,7 @@ export const EnhancedSharingModal: React.FC<EnhancedSharingModalProps> = ({
 			);
 
 			uiActions.setNote(`Exported ${r.copied} photos to ${exportDestination}`);
+			announce(`Exported ${r.copied} photos`, "polite");
 			onClose();
 		} catch (e) {
 			uiActions.setNote(e instanceof Error ? e.message : "Export failed");

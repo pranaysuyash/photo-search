@@ -1,3 +1,4 @@
+// biome-ignore lint/complexity/noStaticOnlyClass: Service pattern
 /**
  * Comments & Annotations Service
  * Handles photo comments, annotations, mentions, and discussions

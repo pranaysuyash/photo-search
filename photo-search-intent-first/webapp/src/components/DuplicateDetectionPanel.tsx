@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
 	type DuplicateDetectionResult,
 	DuplicateDetectionService,
 } from "../services/DuplicateDetectionService";
+import { getAPI } from "../services/PhotoVaultAPI";
+import LazyImage from "./LazyImage";
 
 interface DuplicateDetectionPanelProps {
 	photos: Array<{ path: string; embedding?: number[] }>;
@@ -26,7 +28,9 @@ export function DuplicateDetectionPanel({
 	const [safeMode, setSafeMode] = useState(true);
 	const [deleting, setDeleting] = useState(false);
 
-	const startScan = async () => {
+	const api = getAPI();
+
+	const startScan = useCallback(async () => {
 		setScanning(true);
 		setProgress(0);
 
@@ -49,7 +53,7 @@ export function DuplicateDetectionPanel({
 		} finally {
 			setScanning(false);
 		}
-	};
+	}, [photos, safeMode]);
 
 	const handleDelete = async () => {
 		if (!result || selectedGroups.size === 0) return;
@@ -192,7 +196,11 @@ export function DuplicateDetectionPanel({
 							<div className="flex items-center gap-4">
 								<select
 									value={deleteStrategy}
-									onChange={(e) => setDeleteStrategy(e.target.value as "best" | "newest" | "largest")}
+									onChange={(e) =>
+										setDeleteStrategy(
+											e.target.value as "best" | "newest" | "largest",
+										)
+									}
 									className="px-3 py-1.5 border rounded text-sm"
 								>
 									<option value="best">Keep Best Quality</option>
@@ -250,8 +258,11 @@ export function DuplicateDetectionPanel({
 				{result && result.recommendations.length > 0 && (
 					<div className="px-6 py-3 bg-blue-50 border-b">
 						<div className="space-y-1">
-							{result.recommendations.map((rec, idx) => (
-								<p key={`rec-${idx}`} className="text-sm text-blue-800">
+							{result.recommendations.map((rec) => (
+								<p
+									key={`rec-${rec.slice(0, 50)}`}
+									className="text-sm text-blue-800"
+								>
 									• {rec}
 								</p>
 							))}
@@ -279,9 +290,12 @@ export function DuplicateDetectionPanel({
 											: "border-gray-200"
 									}`}
 								>
-									<div
-										className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50"
+									<button
+										type="button"
+										className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 w-full text-left"
 										onClick={() => toggleExpanded(group.id)}
+										aria-expanded={expandedGroups.has(group.id)}
+										aria-label={`Toggle ${group.type} duplicate group with ${group.photos.length} photos`}
 									>
 										<div className="flex items-center gap-4">
 											<input
@@ -308,10 +322,10 @@ export function DuplicateDetectionPanel({
 												</p>
 											</div>
 										</div>
-										<button type="button" className="text-gray-400">
+										<span className="text-gray-400">
 											{expandedGroups.has(group.id) ? "▼" : "▶"}
-										</button>
-									</div>
+										</span>
+									</button>
 
 									{expandedGroups.has(group.id) && (
 										<div className="border-t bg-gray-50 p-4">
@@ -325,8 +339,15 @@ export function DuplicateDetectionPanel({
 																: "border-gray-200"
 														}`}
 													>
-														<div className="aspect-square bg-gray-200 rounded mb-2">
-															{/* Thumbnail would go here */}
+														<div className="aspect-square bg-gray-200 rounded mb-2 overflow-hidden">
+															<LazyImage
+																src={api.getThumbnailUrl(photo.path)}
+																alt={
+																	photo.path.split("/").pop() ||
+																	"Duplicate candidate"
+																}
+																className="w-full h-full object-cover"
+															/>
 														</div>
 														<p className="text-xs truncate" title={photo.path}>
 															{photo.path.split("/").pop()}

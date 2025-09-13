@@ -73,10 +73,12 @@ export function SettingsModal({
 	if (!isOpen) return null;
 	return (
 		<div
+			role="dialog"
 			className="fixed inset-0 z-[1200] bg-black/40 flex items-center justify-center"
 			onKeyDown={(e) => {
 				if (e.key === "Escape") onClose();
 			}}
+			tabIndex={-1}
 		>
 			<FocusTrap onEscape={onClose}>
 				<div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-3xl p-4">

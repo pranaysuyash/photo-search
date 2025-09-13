@@ -11,7 +11,7 @@ vi.mock("../stores/uiStore", () => ({
 
 // Provide a lightweight settings store stub to avoid persist/hydration churn
 vi.mock("../stores/settingsStore", () => {
-	const state: any = {
+	const state: unknown = {
 		dir: "",
 		engine: "local",
 		useCaps: false,
@@ -21,11 +21,11 @@ vi.mock("../stores/settingsStore", () => {
 		showExplain: false,
 	};
 	const useSettingsStore = {
-		setState: (partial: any) => {
+		setState: (partial: unknown) => {
 			const next = typeof partial === "function" ? partial(state) : partial;
 			Object.assign(state, next);
 		},
-	} as any;
+	} as unknown;
 	return {
 		useSettingsStore,
 		useDir: () => state.dir,
@@ -53,7 +53,7 @@ function press(key: string) {
 describe("ResultsPanel keyboard + lightbox", () => {
 	it("opens lightbox on Enter and favorites with f", async () => {
 		const { apiSetFavorite, apiOpen } = await import("../api");
-		useSettingsStore.setState({ dir: "/d", engine: "local" as any });
+		useSettingsStore.setState({ dir: "/d", engine: "local" as unknown });
 		usePhotoStore.setState({
 			results: [
 				{ path: "/a.jpg", score: 0.9 },
@@ -61,7 +61,7 @@ describe("ResultsPanel keyboard + lightbox", () => {
 			],
 			query: "q",
 			fav: [],
-		} as any);
+		} as unknown);
 		render(<ResultsPanel />);
 		// Open first detail with Enter
 		press("Enter");
@@ -69,12 +69,12 @@ describe("ResultsPanel keyboard + lightbox", () => {
 		// Favorite current photo with 'f'
 		press("f");
 		await waitFor(() =>
-			expect((apiSetFavorite as any).mock.calls.length).toBeGreaterThan(0),
+			expect((apiSetFavorite as unknown).mock.calls.length).toBeGreaterThan(0),
 		);
 		// Reveal click
 		fireEvent.click(screen.getByText("Reveal in Finder/Explorer"));
 		await waitFor(() =>
-			expect((apiOpen as any).mock.calls.length).toBeGreaterThan(0),
+			expect((apiOpen as unknown).mock.calls.length).toBeGreaterThan(0),
 		);
 		// Close lightbox with Escape before using grid shortcuts
 		press("Escape");

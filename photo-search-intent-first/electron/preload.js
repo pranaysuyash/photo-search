@@ -4,5 +4,6 @@ const { contextBridge, ipcRenderer } = require('electron')
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
   selectFolder: () => ipcRenderer.invoke('select-folder'),
-  getApiToken: () => ipcRenderer.invoke('get-api-token')
+  getApiToken: () => ipcRenderer.invoke('get-api-token'),
+  setAllowedRoot: (p) => ipcRenderer.invoke('set-allowed-root', p)
 })

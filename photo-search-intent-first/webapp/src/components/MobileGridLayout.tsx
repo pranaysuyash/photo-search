@@ -144,11 +144,19 @@ const GridItem: React.FC<GridItemProps> = ({
 
 	return (
 		<div
+			role="button"
 			ref={itemRef}
 			className={`relative aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer select-none transition-all duration-200 ${
 				isSelected ? "ring-2 ring-blue-500" : ""
 			}`}
 			onClick={handleClick}
+			onKeyDown={(e) => {
+				if (e.key === "Enter" || e.key === " ") {
+					e.preventDefault();
+					handleClick(e);
+				}
+			}}
+			tabIndex={0}
 		>
 			{/* Image */}
 			<div className="w-full h-full relative">

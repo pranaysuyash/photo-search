@@ -229,30 +229,42 @@ export function FaceClusterManager({
 											selectCluster(cluster);
 										}
 									}}
+									onKeyDown={(e) => {
+										if (e.key === "Enter" || e.key === " ") {
+											e.preventDefault();
+											if (mergeMode) {
+												toggleMergeSelection(cluster.id);
+											} else {
+												selectCluster(cluster);
+											}
+										}
+									}}
+									role="option"
+									tabIndex={0}
+									aria-selected={selectedCluster?.id === cluster.id}
+									aria-label={`Face cluster ${cluster.name || "Unnamed"} with ${cluster.photos.length} photos`}
 								>
 									<div className="flex items-center gap-3">
 										{/* Example faces */}
 										<div className="flex -space-x-2">
-											{cluster.examples
-												.slice(0, 3)
-												.map(([path, embIndex], idx) => (
-													<img
-														key={`item-${idx}`}
-														src={thumbFaceUrl(
-															currentDir,
-															provider,
-															path,
-															embIndex,
-															48,
-														)}
-														alt="Face example"
-														className="w-12 h-12 rounded-full border-2 border-white object-cover"
-														onError={(e) => {
-															(e.target as HTMLImageElement).style.display =
-																"none";
-														}}
-													/>
-												))}
+											{cluster.examples.slice(0, 3).map(([path, embIndex]) => (
+												<img
+													key={`face-${path}-${embIndex}`}
+													src={thumbFaceUrl(
+														currentDir,
+														provider,
+														path,
+														embIndex,
+														48,
+													)}
+													alt="Face example"
+													className="w-12 h-12 rounded-full border-2 border-white object-cover"
+													onError={(e) => {
+														(e.target as HTMLImageElement).style.display =
+															"none";
+													}}
+												/>
+											))}
 										</div>
 
 										<div className="flex-1">
@@ -311,10 +323,13 @@ export function FaceClusterManager({
 
 							{clusterPhotos.length > 0 ? (
 								<div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto">
-									{clusterPhotos.map((photoPath, index) => (
-										<div
-											key={`photo-${photoPath}-${index}`}
+									{clusterPhotos.map((photoPath) => (
+										<button
+											type="button"
+											key={`photo-${photoPath}`}
 											onClick={() => togglePhotoSelection(photoPath)}
+											aria-pressed={selectedPhotos.has(photoPath)}
+											aria-label={`Select photo ${photoPath.split("/").pop()}`}
 											className={`relative aspect-square cursor-pointer rounded overflow-hidden ${
 												selectedPhotos.has(photoPath)
 													? "ring-2 ring-blue-500"
@@ -323,7 +338,7 @@ export function FaceClusterManager({
 										>
 											<img
 												src={`/api/thumb?dir=${encodeURIComponent(currentDir)}&provider=${provider}&path=${encodeURIComponent(photoPath)}&size=128`}
-												alt="Cluster photo"
+												alt={`Face from ${photoPath.split("/").pop()}`}
 												className="w-full h-full object-cover"
 												onError={(e) => {
 													(e.target as HTMLImageElement).src =
@@ -335,7 +350,7 @@ export function FaceClusterManager({
 													<span className="text-white text-xs">✓</span>
 												</div>
 											)}
-										</div>
+										</button>
 									))}
 								</div>
 							) : (

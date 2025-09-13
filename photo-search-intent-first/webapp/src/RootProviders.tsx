@@ -1,5 +1,6 @@
 import type React from "react";
 import { HashRouter } from "react-router-dom";
+import GlobalAnnouncer from "./components/GlobalAnnouncer";
 import { JobsProvider } from "./contexts/JobsContext";
 import { LibraryProvider } from "./contexts/LibraryContext";
 import { ModalProvider } from "./contexts/ModalContext";
@@ -21,7 +22,10 @@ export function RootProviders({ children }: { children: React.ReactNode }) {
 							<JobsProvider>
 								<LibraryProvider>
 									<SearchProvider>
-										<ModalProvider>{children}</ModalProvider>
+										<ModalProvider>
+											{children}
+											<GlobalAnnouncer />
+										</ModalProvider>
 									</SearchProvider>
 								</LibraryProvider>
 							</JobsProvider>

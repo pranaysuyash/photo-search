@@ -6,8 +6,8 @@ interface PaginatedSearchProps {
 	currentDir: string;
 	provider: string;
 	query: string;
-	searchOptions: any;
-	onResultsChange: (results: SearchResult[], pagination: any) => void;
+	searchOptions: unknown;
+	onResultsChange: (results: SearchResult[], pagination: unknown) => void;
 }
 
 export function PaginatedSearch({

@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
 	CheckCircle,
 	ChevronLeft,
@@ -283,7 +283,7 @@ export function OnboardingTour({
 	onComplete,
 	onSkip,
 	currentStep = 0,
-	userActions = [],
+	userActions: _userActions = [],
 }: OnboardingTourProps) {
 	const [step, setStep] = useState(currentStep);
 	const [isPaused, setIsPaused] = useState(false);
@@ -339,6 +339,29 @@ export function OnboardingTour({
 		}
 	};
 
+	// Auto-advance the "search-bar" step when user types in the search input
+	useEffect(() => {
+		if (!isActive) return;
+		const st = tourSteps[step];
+		if (!st || st.id !== "search-bar") return;
+		const el = document.querySelector(
+			'[data-tour="search-bar"]',
+		) as HTMLElement | null;
+		if (!el) return;
+		let advanced = false;
+		const onInput = () => {
+			if (advanced) return;
+			advanced = true;
+			if (step < tourSteps.length - 1) setStep(step + 1);
+		};
+		el.addEventListener("input", onInput, true);
+		el.addEventListener("keydown", onInput, true);
+		return () => {
+			el.removeEventListener("input", onInput, true);
+			el.removeEventListener("keydown", onInput, true);
+		};
+	}, [isActive, step]);
+
 	const handleComplete = () => {
 		setCompletedSteps((prev) => new Set([...prev, step]));
 		onComplete();
@@ -367,12 +390,13 @@ export function OnboardingTour({
 
 	if (!isActive) return null;
 
+	const prefersReducedMotion = useReducedMotion();
 	return (
 		<AnimatePresence>
 			<motion.div
-				initial={{ opacity: 0 }}
+				initial={prefersReducedMotion ? false : { opacity: 0 }}
 				animate={{ opacity: 1 }}
-				exit={{ opacity: 0 }}
+				exit={prefersReducedMotion ? false : { opacity: 0 }}
 				className="fixed inset-0 z-50 pointer-events-none"
 			>
 				{/* Backdrop */}
@@ -395,9 +419,13 @@ export function OnboardingTour({
 				{/* Tour Card */}
 				<motion.div
 					key={step}
-					initial={{ opacity: 0, scale: 0.9, y: 20 }}
+					initial={
+						prefersReducedMotion ? false : { opacity: 0, scale: 0.9, y: 20 }
+					}
 					animate={{ opacity: 1, scale: 1, y: 0 }}
-					exit={{ opacity: 0, scale: 0.9, y: 20 }}
+					exit={
+						prefersReducedMotion ? false : { opacity: 0, scale: 0.9, y: 20 }
+					}
 					className={clsx(
 						"absolute pointer-events-auto max-w-md",
 						getPositionClasses(
@@ -613,13 +641,33 @@ export function ContextualHint({
 		}
 	}, [autoHide, onDismiss]);
 
+	// Auto-dismiss when user interacts with the target (focus/type/click)
+	useEffect(() => {
+		if (!target) return;
+		const el = document.querySelector(target) as HTMLElement | null;
+		if (!el) return;
+		const dismiss = () => {
+			setIsVisible(false);
+			onDismiss?.();
+		};
+		el.addEventListener("focus", dismiss, true);
+		el.addEventListener("input", dismiss, true);
+		el.addEventListener("click", dismiss, true);
+		return () => {
+			el.removeEventListener("focus", dismiss, true);
+			el.removeEventListener("input", dismiss, true);
+			el.removeEventListener("click", dismiss, true);
+		};
+	}, [target, onDismiss]);
+
 	if (!isVisible) return null;
 
+	const prefersReducedMotion = useReducedMotion();
 	return (
 		<motion.div
-			initial={{ opacity: 0, scale: 0.9 }}
+			initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.9 }}
 			animate={{ opacity: 1, scale: 1 }}
-			exit={{ opacity: 0, scale: 0.9 }}
+			exit={prefersReducedMotion ? false : { opacity: 0, scale: 0.9 }}
 			className={clsx(
 				"absolute z-40 pointer-events-auto",
 				getPositionClasses(position, target),

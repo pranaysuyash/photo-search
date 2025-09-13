@@ -26,6 +26,8 @@ interface EnhancedEmptyStateProps {
 	onOpenJobs?: () => void;
 	sampleQueries?: string[];
 	onRunSample?: (q: string) => void;
+	// Optional "Did you mean" alternatives (typo corrections)
+	didYouMean?: string[];
 	hasActiveFilters?: boolean;
 	indexingProgress?: number;
 	estimatedTime?: string;
@@ -44,6 +46,7 @@ export function EnhancedEmptyState({
 	onOpenJobs,
 	sampleQueries,
 	onRunSample,
+	didYouMean,
 	hasActiveFilters,
 	indexingProgress = 0,
 	estimatedTime,
@@ -102,13 +105,23 @@ export function EnhancedEmptyState({
 					title: `No results for "${searchQuery}"`,
 					description:
 						"Try adjusting your search terms or filters. Here are some suggestions:",
-					suggestions: [
-						"Use simpler words or phrases",
-						"Try searching for colors, objects, or locations",
-						"Check your spelling",
-						"Remove filters if any are applied",
-						"Try searching for people or events",
-					],
+					suggestions: (() => {
+						const base = [
+							"Use simpler words or phrases",
+							"Try searching for colors, objects, or locations",
+							"Check your spelling",
+							"Remove filters if any are applied",
+							"Try searching for people or events",
+						];
+						const q = (searchQuery || "").toLowerCase();
+						// Contextual nudge for common synonyms
+						if (/\bkids?\b/.test(q)) {
+							base.unshift("Try 'children'");
+						} else if (/\bchildren\b/.test(q)) {
+							base.unshift("Try 'kid' or 'kids'");
+						}
+						return base;
+					})(),
 					actionLabel: "Clear Search",
 					action: onAction,
 				};
@@ -229,6 +242,22 @@ export function EnhancedEmptyState({
 							</button>
 						))}
 					</div>
+
+					{Array.isArray(didYouMean) && didYouMean.length > 0 && (
+						<div className="mt-3 text-sm">
+							<span className="text-gray-600 mr-2">Did you mean:</span>
+							{didYouMean.slice(0, 3).map((alt) => (
+								<button
+									key={`dym-${alt}`}
+									type="button"
+									className="px-2 py-1.5 rounded bg-gray-100 dark:bg-gray-800 text-xs mr-2"
+									onClick={() => onRunSample?.(alt)}
+								>
+									{alt}
+								</button>
+							))}
+						</div>
+					)}
 				</div>
 			)}
 
@@ -280,6 +309,23 @@ export function EnhancedEmptyState({
 					</button>
 				)}
 			</div>
+
+			{/* Skeleton grid preview for indexing state */}
+			{type === "indexing" && (
+				<div className="mt-4 w-full max-w-4xl">
+					<div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-2">
+						{Array.from({ length: 16 }).map((_, _i) => (
+							<div
+								key={`item-${String(_)}`}
+								className="skeleton-box h-24 rounded"
+							/>
+						))}
+					</div>
+					<p className="text-xs text-gray-500 mt-2 text-center">
+						Preparing thumbnails and metadata…
+					</p>
+				</div>
+			)}
 
 			{/* Expandable tips section */}
 			{content.tips && (

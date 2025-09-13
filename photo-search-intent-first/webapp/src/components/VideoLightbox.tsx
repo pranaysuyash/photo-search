@@ -252,6 +252,7 @@ export function VideoLightbox({
 			onTouchStart={handleTouchStart}
 			onTouchMove={handleTouchMove}
 			onTouchEnd={handleTouchEnd}
+			role="dialog"
 		>
 			<div className="video-container">
 				{loading ? (
@@ -281,6 +282,8 @@ export function VideoLightbox({
 									ref={progressRef}
 									className="progress-bar"
 									onClick={handleSeek}
+									role="button"
+									tabIndex={0}
 								>
 									<div
 										className="buffered-bar"
@@ -300,7 +303,7 @@ export function VideoLightbox({
 										<div className="keyframes">
 											{keyframes.map((frame, i) => (
 												<img
-													key={`frame-${i}`}
+													key={`item-${String(frame)}`}
 													src={frame}
 													className="keyframe"
 													style={{

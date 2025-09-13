@@ -19,7 +19,7 @@ import "@testing-library/jest-dom/vitest";
 // Helpful: surface a console hint if the API enforces auth but frontend lacks token
 if (typeof window !== "undefined") {
 	const token =
-		(import.meta as any).env?.VITE_API_TOKEN ||
+		(import.meta as unknown).env?.VITE_API_TOKEN ||
 		localStorage.getItem("api_token");
 	if (!token) {
 		// eslint-disable-next-line no-console
@@ -116,17 +116,17 @@ vi.mock("../stores/settingsStore", () => {
 			setCustomColors: mockState.setCustomColors,
 			resetTheme: mockState.resetTheme,
 		}),
-    useThemeStore,
-    useSettingsStore,
-    // Common selector hooks used throughout the app
-    useDir: () => "/test/dir",
-    useEngine: () => "local" as const,
-    useNeedsHf: () => false,
-    useHfToken: () => "",
-    useNeedsOAI: () => false,
-    useOpenaiKey: () => "",
-    useOsTrash: () => false,
-  };
+		useThemeStore,
+		useSettingsStore,
+		// Common selector hooks used throughout the app
+		useDir: () => "/test/dir",
+		useEngine: () => "local" as const,
+		useNeedsHf: () => false,
+		useHfToken: () => "",
+		useNeedsOAI: () => false,
+		useOpenaiKey: () => "",
+		useOsTrash: () => false,
+	};
 });
 
 // Mock mobile detection
@@ -163,8 +163,8 @@ const AllTheProviders: React.FC<{ children: React.ReactNode }> = ({
 	// Minimal browser polyfills for JSDOM
 	if (typeof window !== "undefined" && !window.matchMedia) {
 		// Basic matchMedia stub used by ThemeProvider
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		(window as any).matchMedia = (query: string) => ({
+		// eslint-disable-next-line @typescript-eslint/no-explicit-unknown
+		(window as unknown).matchMedia = (query: string) => ({
 			matches: false,
 			media: query,
 			onchange: null,

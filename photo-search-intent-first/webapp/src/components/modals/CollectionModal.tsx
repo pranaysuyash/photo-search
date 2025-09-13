@@ -1,22 +1,14 @@
 import type React from "react";
-
-interface FocusTrapProps {
-	onEscape: () => void;
-	children: React.ReactNode;
-}
-
-const FocusTrap: React.FC<FocusTrapProps> = ({ onEscape, children }) => {
-	return <div>{children}</div>;
-};
+import { announce, FocusTrap } from "../../utils/accessibility";
 
 interface CollectionModalProps {
 	selected: Set<string>;
 	dir: string;
-	collections: Record<string, any> | null;
+	collections: Record<string, string[]> | null;
 	onClose: () => void;
 	setToast: (toast: { message: string } | null) => void;
 	photoActions: {
-		setCollections: (collections: any) => void;
+		setCollections: (collections: Record<string, string[]>) => void;
 	};
 	uiActions: {
 		setNote: (message: string) => void;
@@ -62,6 +54,7 @@ export const CollectionModal: React.FC<CollectionModalProps> = ({
 								const r = await apiGetCollections(dir);
 								photoActions.setCollections(r.collections || {});
 								setToast({ message: `Added ${selected.size} to ${name}` });
+								announce(`Added ${selected.size} to ${name}`, "polite");
 							} catch (e) {
 								uiActions.setNote(
 									e instanceof Error ? e.message : "Collection update failed",

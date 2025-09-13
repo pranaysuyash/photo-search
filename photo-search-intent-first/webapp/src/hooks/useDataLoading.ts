@@ -31,7 +31,7 @@ export interface DataLoadingOptions {
 		setTagsMap: (tags: Record<string, string[]>) => void;
 		setAllTags: (tags: string[]) => void;
 		setCollections: (collections: Record<string, string[]>) => void;
-		setSmart: (smart: Record<string, any>) => void;
+		setSmart: (smart: Record<string, unknown>) => void;
 		setLibrary: (library: string[]) => void;
 		appendLibrary: (library: string[]) => void;
 		setLibHasMore: (hasMore: boolean) => void;

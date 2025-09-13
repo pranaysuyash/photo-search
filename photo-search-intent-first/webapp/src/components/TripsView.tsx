@@ -1,4 +1,5 @@
 import { type SearchResult, thumbUrl } from "../api";
+import LazyImage from "./LazyImage";
 
 interface TripsViewProps {
 	dir: string;
@@ -21,9 +22,9 @@ export default function TripsView({
 			setBusy("Grouping trips…");
 			const r = await apiTripsBuild(dir, engine);
 			setBusy("");
-			(window as any)._trips = r.trips || [];
+			(window as unknown)._trips = r.trips || [];
 			setNote(`Trips: ${r.trips?.length || 0}`);
-		} catch (e: any) {
+		} catch (e: unknown) {
 			setBusy("");
 			setNote(e.message);
 		}
@@ -33,14 +34,14 @@ export default function TripsView({
 		try {
 			const { apiTripsList } = await import("../api");
 			const r = await apiTripsList(dir);
-			(window as any)._trips = r.trips || [];
+			(window as unknown)._trips = r.trips || [];
 			setNote(`Loaded ${r.trips.length} trips`);
-		} catch (e: any) {
+		} catch (e: unknown) {
 			setNote(e.message);
 		}
 	};
 
-	const handleOpenTrip = (trip: any) => {
+	const handleOpenTrip = (trip: unknown) => {
 		setResults(
 			(trip.paths || []).map((p: string) => ({ path: p, score: 1.0 })),
 		);
@@ -69,34 +70,37 @@ export default function TripsView({
 				</div>
 			</div>
 			<div className="mt-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
-				{(window as any)._trips?.slice(0, 6)?.map((t: any, ti: number) => (
-					<div key={t.id || ti} className="border rounded p-2">
-						<div className="flex items-center justify-between">
-							<div className="font-semibold truncate" title={t.place || ""}>
-								{t.place || "Trip"}
+				{(window as unknown)._trips
+					?.slice(0, 6)
+					?.map((t: unknown, ti: number) => (
+						<div key={t.id || ti} className="border rounded p-2">
+							<div className="flex items-center justify-between">
+								<div className="font-semibold truncate" title={t.place || ""}>
+									{t.place || "Trip"}
+								</div>
+								<div>{t.count}</div>
 							</div>
-							<div>{t.count}</div>
+							<div className="mt-2 grid grid-cols-3 gap-1">
+								{(t.paths || []).slice(0, 3).map((p: string, _i: number) => (
+									<LazyImage
+										key={`item-${String(p)}`}
+										src={thumbUrl(dir, engine, p, 196)}
+										alt={(p || "").split("/").pop() || "Thumbnail"}
+										className="w-full h-16 object-cover rounded"
+									/>
+								))}
+							</div>
+							<div className="mt-2 flex gap-2">
+								<button
+									type="button"
+									onClick={() => handleOpenTrip(t)}
+									className="bg-blue-600 text-white rounded px-3 py-1"
+								>
+									Open
+								</button>
+							</div>
 						</div>
-						<div className="mt-2 grid grid-cols-3 gap-1">
-							{(t.paths || []).slice(0, 3).map((p: string, i: number) => (
-								<img
-									key={`item-${i}`}
-									src={thumbUrl(dir, engine, p, 196)}
-									className="w-full h-16 object-cover rounded"
-								/>
-							))}
-						</div>
-						<div className="mt-2 flex gap-2">
-							<button
-								type="button"
-								onClick={() => handleOpenTrip(t)}
-								className="bg-blue-600 text-white rounded px-3 py-1"
-							>
-								Open
-							</button>
-						</div>
-					</div>
-				))}
+					))}
 			</div>
 		</div>
 	);

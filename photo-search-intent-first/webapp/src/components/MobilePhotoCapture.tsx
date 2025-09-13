@@ -195,7 +195,7 @@ export function MobilePhotoCapture({
 	};
 
 	// Get error message
-	const getErrorMessage = (err: any): string => {
+	const getErrorMessage = (err: unknown): string => {
 		if (err.name === "NotAllowedError") {
 			return "Camera access denied. Please allow camera permissions.";
 		} else if (err.name === "NotFoundError") {
@@ -401,7 +401,7 @@ export function useCameraSupport() {
 					const result = await navigator.permissions.query({
 						name: "camera" as PermissionName,
 					});
-					setPermission(result.state as any);
+					setPermission(result.state as unknown);
 				} catch {
 					setPermission("unknown");
 				}
@@ -416,7 +416,7 @@ export function useCameraSupport() {
 
 // PWA Install Prompt Component
 export function PWAInstallPrompt() {
-	const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+	const [deferredPrompt, setDeferredPrompt] = useState<unknown>(null);
 	const [showInstall, setShowInstall] = useState(false);
 
 	useEffect(() => {

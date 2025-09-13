@@ -22,7 +22,9 @@ export default function AdvancedSearchModal({
 	const [place, setPlace] = useState("");
 	const [tag, setTag] = useState("");
 	const [person, setPerson] = useState("");
-	const [hasText, setHasText] = useState<"any" | "true" | "false">("any");
+	const [hasText, setHasText] = useState<"unknown" | "true" | "false">(
+		"unknown",
+	);
 	const [isoMin, setIsoMin] = useState("");
 	const [fMax, setFMax] = useState("");
 	const [wMin, setWMin] = useState("");
@@ -119,6 +121,8 @@ export default function AdvancedSearchModal({
 			onKeyDown={(e) => {
 				if (e.key === "Escape") onClose();
 			}}
+			role="dialog"
+			tabIndex={-1}
 		>
 			<button
 				type="button"
@@ -200,9 +204,9 @@ export default function AdvancedSearchModal({
 						<select
 							className="input"
 							value={hasText}
-							onChange={(e) => setHasText(e.target.value as any)}
+							onChange={(e) => setHasText(e.target.value as unknown)}
 						>
-							<option value="any">Any</option>
+							<option value="unknown">Any</option>
 							<option value="true">True</option>
 							<option value="false">False</option>
 						</select>
@@ -272,8 +276,8 @@ export default function AdvancedSearchModal({
 					</div>
 					{warnings.length > 0 && (
 						<ul className="mt-2 text-xs text-red-600 list-disc pl-5">
-							{warnings.map((w, i) => (
-								<li key={`warning-${i}`}>{w}</li>
+							{warnings.map((w, _i) => (
+								<li key={`item-${String(w)}`}>{w}</li>
 							))}
 						</ul>
 					)}
