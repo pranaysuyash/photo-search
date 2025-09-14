@@ -7,6 +7,7 @@ import {
 	useOpenaiKey,
 } from "../stores/useStores";
 import { getAPI, initializeAPI, type PhotoVaultAPI } from "./PhotoVaultAPI";
+import { handleError } from "../utils/errors";
 
 const Ctx = createContext<PhotoVaultAPI | null>(null);
 
@@ -48,11 +49,12 @@ export function usePhotoVaultAPI(): PhotoVaultAPI {
 	const v = useContext(Ctx);
 	if (!v) {
 		// Fallback to singleton if provider not ready (e.g., early splash)
-		try {
-			return getAPI();
-		} catch {
-			throw new Error("PhotoVaultAPI not available yet: missing dir/provider");
-		}
+    try {
+        return getAPI();
+    } catch (e) {
+        handleError(e, { logToServer: true, context: { action: "api_unavailable", component: "PhotoVaultAPIProvider.usePhotoVaultAPI" } });
+        throw new Error("PhotoVaultAPI not available yet: missing dir/provider");
+    }
 	}
 	return v;
 }

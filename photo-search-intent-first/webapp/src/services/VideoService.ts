@@ -25,6 +25,8 @@ export interface VideoFile {
 	streamUrl?: string;
 }
 
+import { handleError } from "../utils/errors";
+
 export class VideoService {
 	private static supportedFormats = [
 		".mp4",
@@ -232,11 +234,12 @@ export class VideoService {
 			}
 
 			return videoFile;
-		} catch (error) {
-			console.error("Failed to get video info:", error);
-			throw error;
-		}
-	}
+        } catch (error) {
+            console.error("Failed to get video info:", error);
+            handleError(error, { logToServer: true, context: { action: "video_info", component: "VideoService.getVideoInfo", metadata: { path, videoUrl } } });
+            throw error;
+        }
+    }
 
 	/**
 	 * Clear video cache

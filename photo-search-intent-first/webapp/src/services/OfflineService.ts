@@ -7,6 +7,8 @@ export interface OfflineAction {
 	retries: number;
 }
 
+import { handleError } from "../utils/errors";
+
 class OfflineService {
 	private readonly QUEUE_KEY = "offline_action_queue";
 	private readonly MAX_RETRIES = 3;
@@ -129,22 +131,34 @@ class OfflineService {
 			try {
 				await this.processAction(action);
 				console.log(`[Offline Service] Synced action: ${action.id}`);
-			} catch (error) {
-				console.error(
-					`[Offline Service] Failed to sync action: ${action.id}`,
-					error,
-				);
-				action.retries++;
+            } catch (error) {
+                console.error(
+                    `[Offline Service] Failed to sync action: ${action.id}`,
+                    error,
+                );
+                action.retries++;
 
-				if (action.retries < this.MAX_RETRIES) {
-					remaining.push(action);
-				} else {
-					console.error(
-						`[Offline Service] Max retries reached for action: ${action.id}`,
-					);
-				}
-			}
-		}
+                if (action.retries < this.MAX_RETRIES) {
+                    remaining.push(action);
+                } else {
+                    console.error(
+                        `[Offline Service] Max retries reached for action: ${action.id}`,
+                    );
+                    // Log only when we have exhausted retries to avoid noise
+                    const payload = (action?.payload as any) || {};
+                    const dir = payload?.dir || payload?.path || "";
+                    handleError(error, {
+                        logToServer: true,
+                        context: {
+                            action: `offline_sync_${String(action?.type)}`,
+                            component: "OfflineService.syncQueue",
+                            dir,
+                            metadata: { id: action.id },
+                        },
+                    });
+                }
+            }
+        }
 
 		this.saveQueue(remaining);
 		this.syncInProgress = false;

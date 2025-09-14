@@ -801,3 +801,85 @@ function LazyImage({ src, placeholder }) {
 ## Conclusion
 
 This guide covers the essential patterns and practices for developing the Photo Search application. For specific implementation details, refer to the source code and inline documentation. Always prioritize code quality, user experience, and maintainability when implementing new features.
+## Lazy Loading, Suspense, and Manual Chunking
+
+This codebase uses route-driven lazy-loading and code-splitting to keep initial loads fast and improve long‑term caching.
+
+Why
+- Heavy or rarely used views and modals do not need to ship in the first paint.
+- Chunking stable dependencies (vendor/UI libs) improves browser caching across releases.
+
+Patterns
+- Routes: Use `React.lazy` for infrequently used views like Map, Smart, Trips, and Videos.
+- Modals/Drawers: Lazy‑load AdvancedSearch, EnhancedSharing, ThemeSettings, Jobs, Diagnostics, and SearchOverlay.
+- Suspense: Wrap the lazy region with a unified fallback for consistent UX.
+
+Example: Route lazy‑loading with fallback
+```tsx
+// App.tsx
+import { lazy, Suspense } from 'react';
+import { SuspenseFallback } from './components/SuspenseFallback';
+
+const MapView = lazy(() => import('./components/MapView'));
+// ... other lazy routes
+
+<Suspense fallback={<SuspenseFallback label="Loading…" /> }>
+  <Routes>
+    <Route path="/map" element={<MapView />} />
+    {/* ... */}
+  </Routes>
+  </Suspense>
+```
+
+Example: Modal lazy‑loading with fallback
+```tsx
+// ModalManager.tsx
+const AdvancedSearchModal = lazy(() => import('./modals/AdvancedSearchModal'));
+
+{modalState.advanced && (
+  <Suspense fallback={<SuspenseFallback label="Loading advanced search…" /> }>
+    <AdvancedSearchModal /* ...props */ />
+  </Suspense>
+)}
+```
+
+Unified Suspense Fallback
+- Reusable spinner + label for all lazy regions.
+- File: `src/components/SuspenseFallback.tsx` (`data-testid="suspense-fallback"`).
+
+Manual Chunking (Vite)
+- Configured in `vite.config.ts`:
+```ts
+build: {
+  rollupOptions: {
+    output: {
+      manualChunks: {
+        vendor: ['react', 'react-dom'],
+        ui: ['lucide-react', 'framer-motion'],
+        utils: ['zustand'],
+      },
+    },
+  },
+}
+```
+- This creates stable vendor/UI chunks for better browser caching.
+
+Testing Lazy Components
+- Use an async `vi.mock` to intentionally delay a lazy import, assert the fallback appears, then assert the loaded component.
+```tsx
+// Example
+vi.mock('./components/MapView', async () => {
+  await new Promise(r => setTimeout(r, 50));
+  return { default: () => <div data-testid="route-map">Map</div> };
+});
+
+window.history.pushState({}, '', '/map');
+render(<App />);
+expect(screen.getByTestId('suspense-fallback')).toBeInTheDocument();
+expect(await screen.findByTestId('route-map')).toBeInTheDocument();
+expect(screen.queryByTestId('suspense-fallback')).toBeNull();
+```
+
+Bundle Analysis
+- Run `npm run analyze` to build and print a summary of chunk sizes.
+- Optional: install `rollup-plugin-visualizer` for a treemap report and add it to Vite if deeper insights are needed.

@@ -18,9 +18,15 @@ Error Logging
 When to log to server
 - Indexing build failures (index, pause/resume flows)
 - OCR build, metadata build
-- Tag/favorite/collection mutations
-- Export/delete/undo delete flows
+- Tag/favorite/collection mutations; batch operations
+- Export/delete/undo delete flows; share creation
 - Search failures and demo‑setup failures
+- Diagnostics load failures
+- Niche services on user‑impactful failure (kept low‑noise):
+  - Offline queue max‑retry reached (action type + dir)
+  - Image loading (sampled)
+  - Video info extraction
+  - Offline photo caching and retrieval
 
 Deep‑Link Parameters
 The app encodes/decodes these into `location.search`:
@@ -52,4 +58,3 @@ Examples
 Testing Notes
 - Most unit tests do not depend on analytics logging. `handleError` is fail‑safe and won’t throw if logging fails.
 - For UI tests that use lazy image loading, consider polyfilling `IntersectionObserver` in the test setup if a component requires it.
-

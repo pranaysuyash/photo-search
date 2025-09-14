@@ -3,6 +3,7 @@
 // Following Intent-First principles: user-friendly, transparent, and automatic
 
 import { EventEmitter } from "node:events";
+import { handleError } from "../utils/errors";
 
 export type BackupProvider =
 	| "local"
@@ -206,10 +207,11 @@ class BackupService extends EventEmitter {
 			await this.initializeProvider(provider);
 			this.emit("provider-added", provider);
 			return true;
-		} catch (error) {
-			this.emit("provider-error", { provider, error });
-			return false;
-		}
+        } catch (error) {
+            this.emit("provider-error", { provider, error });
+            handleError(error, { logToServer: true, context: { action: "backup_add_provider", component: "BackupService.addProvider", metadata: { provider } } });
+            return false;
+        }
 	}
 
 	// Validate provider credentials
@@ -499,13 +501,14 @@ class BackupService extends EventEmitter {
 			job.status = "completed";
 			job.endTime = new Date();
 			this.emit("restore-completed", job);
-		} catch (error) {
-			job.status = "error";
-			job.errors.push(String(error));
-			this.emit("restore-failed", job);
-		} finally {
-			this.activeJobs.delete(job.id);
-		}
+        } catch (error) {
+            job.status = "error";
+            job.errors.push(String(error));
+            this.emit("restore-failed", job);
+            handleError(error, { logToServer: true, context: { action: "backup_restore", component: "BackupService.restore", metadata: { versionId, targetPath } } });
+        } finally {
+            this.activeJobs.delete(job.id);
+        }
 	}
 
 	// Perform restore operation

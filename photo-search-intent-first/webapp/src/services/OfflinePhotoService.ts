@@ -4,6 +4,7 @@
  */
 
 import React from "react";
+import { handleError } from "../utils/errors";
 import { API_BASE } from "../api";
 
 export interface PhotoCacheEntry {
@@ -129,12 +130,13 @@ export class OfflinePhotoService {
 			await this.storeCacheEntry(entry);
 
 			console.log(`[OfflinePhotoService] Cached photo: ${path}`);
-		} catch (error) {
-			console.error(
-				`[OfflinePhotoService] Failed to cache photo: ${path}`,
-				error,
-			);
-		}
+        } catch (error) {
+            console.error(
+                `[OfflinePhotoService] Failed to cache photo: ${path}`,
+                error,
+            );
+            handleError(error, { logToServer: true, context: { action: "offline_cache_photo", component: "OfflinePhotoService.cachePhoto", metadata: { path } } });
+        }
 	}
 
 	// Cache multiple photos efficiently
@@ -173,12 +175,13 @@ export class OfflinePhotoService {
 				const blob = await response.blob();
 				return URL.createObjectURL(blob);
 			}
-		} catch (error) {
-			console.error(
-				`[OfflinePhotoService] Failed to get cached photo: ${path}`,
-				error,
-			);
-		}
+        } catch (error) {
+            console.error(
+                `[OfflinePhotoService] Failed to get cached photo: ${path}`,
+                error,
+            );
+            handleError(error, { logToServer: true, context: { action: "offline_get_cached_photo", component: "OfflinePhotoService.getCachedPhotoUrl", metadata: { path, size } } });
+        }
 		return null;
 	}
 
@@ -275,9 +278,10 @@ export class OfflinePhotoService {
 				};
 				request.onerror = () => resolve();
 			});
-		} catch (error) {
-			console.error("[OfflinePhotoService] Cache cleanup failed:", error);
-		}
+        } catch (error) {
+            console.error("[OfflinePhotoService] Cache cleanup failed:", error);
+            handleError(error, { logToServer: true, context: { action: "offline_cache_cleanup", component: "OfflinePhotoService.cleanupCache" } });
+        }
 	}
 
 	// Get offline photo metadata
@@ -348,12 +352,13 @@ export class OfflinePhotoService {
 							const deleteStore =
 								deleteTransaction.objectStore("offlineActions");
 							deleteStore.delete(action.id);
-						} catch (error) {
-							console.error(
-								"[OfflinePhotoService] Failed to sync action:",
-								error,
-							);
-						}
+                        } catch (error) {
+                            console.error(
+                                "[OfflinePhotoService] Failed to sync action:",
+                                error,
+                            );
+                            handleError(error, { logToServer: true, context: { action: "offline_sync_action", component: "OfflinePhotoService.syncOfflineActions" } });
+                        }
 					}
 
 					resolve(syncedCount);

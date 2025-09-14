@@ -16,6 +16,8 @@ interface CacheEntry {
 	size: number;
 }
 
+import { handleError } from "../utils/errors";
+
 class ImageLoadingService {
 	private intersectionObserver: IntersectionObserver | null = null;
 	private imageCache = new Map<string, CacheEntry>();
@@ -127,11 +129,18 @@ class ImageLoadingService {
 
 			this.addToCache(src, entry);
 			this.applyImageToElement(objectUrl, img);
-		} catch (error) {
-			console.warn("Failed to load image:", src, error);
-			img.style.backgroundColor = "#fee2e2";
-			img.alt = "Failed to load";
-		} finally {
+        } catch (error) {
+            console.warn("Failed to load image:", src, error);
+            // Sample to avoid noisy logs on intermittent failures
+            if (Math.random() < 0.02) {
+                handleError(error, {
+                    logToServer: true,
+                    context: { action: "image_load", component: "ImageLoadingService.loadImage", metadata: { src } },
+                });
+            }
+            img.style.backgroundColor = "#fee2e2";
+            img.alt = "Failed to load";
+        } finally {
 			this.loadingQueue.delete(src);
 		}
 	}
