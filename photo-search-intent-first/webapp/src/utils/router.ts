@@ -71,3 +71,8 @@ export function shareTokenFromPath(pathname: string): string | null {
   const segs = (pathname || "").split("/").filter(Boolean);
   return segs[0] === "share" && segs[1] ? segs[1] : null;
 }
+
+export function isMobileTestPath(pathname: string): boolean {
+  const segs = (pathname || "").split("/").filter(Boolean);
+  return segs[0] === "mobile-test";
+}

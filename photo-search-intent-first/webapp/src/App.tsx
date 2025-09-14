@@ -83,7 +83,7 @@ import { PeopleViewContainer } from "./views/PeopleViewContainer";
 import { CollectionsViewContainer } from "./views/CollectionsViewContainer";
 import { ResultsUIProvider } from "./contexts/ResultsUIContext";
 import { ResultsConfigProvider } from "./contexts/ResultsConfigContext";
-import { viewToPath, pathToView, isSharePath } from "./utils/router";
+import { viewToPath, pathToView, isSharePath, isMobileTestPath } from "./utils/router";
 import { SavedViewContainer } from "./views/SavedViewContainer";
 import { useOnboardingActions } from "./hooks/useOnboardingActions";
 // Modals: still referenced below; keep named imports to satisfy JSX usage
@@ -1615,9 +1615,9 @@ export default function App() {
                                 {isSharePath(location.pathname) && (
                                     <ShareViewer />
                                 )}
-								{(location.pathname || "").startsWith("/mobile-test") && (
-									<MobilePWATest />
-								)}
+                                {isMobileTestPath(location.pathname) && (
+                                    <MobilePWATest />
+                                )}
 								<div
 									className={clsx(
 										"flex h-screen bg-white dark:bg-gray-950 dark:text-gray-100",
@@ -1626,7 +1626,7 @@ export default function App() {
 											"large-text": accessibilitySettings?.largeText,
                                     hidden:
                                         isSharePath(location.pathname) ||
-                                        (location.pathname || "").startsWith("/mobile-test"),
+                                        isMobileTestPath(location.pathname),
 										},
 									)}
 								>
