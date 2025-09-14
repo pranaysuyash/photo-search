@@ -8,7 +8,6 @@ import {
   X, 
   Zap,
   Aperture,
-  DollarSign,
   Clock,
   Tag,
   Heart,
@@ -17,6 +16,9 @@ import {
   Palette
 } from "lucide-react";
 import { useState } from "react";
+import { Button } from "@/components/ui/shadcn/Button";
+import { Input } from "@/components/ui/shadcn/Input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/shadcn/Select";
 
 interface AdvancedFilterPanelProps {
   // Current filter values
@@ -200,14 +202,14 @@ export function AdvancedFilterPanel({
           <span>Advanced Filters</span>
         </div>
         <div className="advanced-filter-actions">
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={onClose}
-            className="close-btn"
             title="Close"
           >
             <X className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -249,9 +251,9 @@ export function AdvancedFilterPanel({
                   <Filter className="w-4 h-4" />
                   Basic Filters
                 </h3>
-                <button className="text-gray-500">
+                <Button variant="ghost" size="sm">
                   {expandedSections.basic ? "−" : "+"}
-                </button>
+                </Button>
               </div>
               
               {expandedSections.basic && (
@@ -275,9 +277,8 @@ export function AdvancedFilterPanel({
                       <Tag className="w-4 h-4" />
                       Tags (comma-separated)
                     </label>
-                    <input
+                    <Input
                       id="flt-tags"
-                      className="w-full border rounded px-3 py-2"
                       value={tagFilter}
                       onChange={(e) => setTagFilter(e.target.value)}
                       placeholder="portrait, landscape, vacation"
@@ -289,9 +290,8 @@ export function AdvancedFilterPanel({
                       <MapPin className="w-4 h-4" />
                       Location/Place
                     </label>
-                    <input
+                    <Input
                       id="flt-place"
-                      className="w-full border rounded px-3 py-2"
                       value={place}
                       onChange={(e) => setPlace(e.target.value)}
                       placeholder="New York, Beach, Mountains"
@@ -327,17 +327,17 @@ export function AdvancedFilterPanel({
                       <Camera className="w-4 h-4" />
                       Camera
                     </label>
-                    <select
-                      id="flt-camera"
-                      className="w-full border rounded px-3 py-2"
-                      value={camera}
-                      onChange={(e) => setCamera(e.target.value)}
-                    >
-                      <option value="">Any Camera</option>
-                      {availableCameras.map((cam) => (
-                        <option key={cam} value={cam}>{cam}</option>
-                      ))}
-                    </select>
+                    <Select value={camera} onValueChange={setCamera}>
+                      <SelectTrigger id="flt-camera">
+                        <SelectValue placeholder="Any Camera" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Any Camera</SelectItem>
+                        {availableCameras.map((cam) => (
+                          <SelectItem key={cam} value={cam}>{cam}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   
                   <div>
@@ -859,28 +859,25 @@ export function AdvancedFilterPanel({
 
       {/* Footer Actions */}
       <div className="filter-footer flex justify-between items-center p-4 border-t bg-gray-50">
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={clearAllFilters}
-          className="text-sm text-gray-600 hover:text-gray-800"
         >
           Clear All Filters
-        </button>
+        </Button>
         <div className="flex gap-2">
-          <button
-            type="button"
-            className="px-4 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50"
+          <Button
+            variant="outline"
             onClick={onClose}
           >
             Cancel
-          </button>
-          <button
-            type="button"
-            className="px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700"
+          </Button>
+          <Button
             onClick={onApply}
           >
             Apply Filters
-          </button>
+          </Button>
         </div>
       </div>
 
