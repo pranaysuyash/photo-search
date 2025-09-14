@@ -131,19 +131,24 @@ class ImageLoadingService {
 			this.applyImageToElement(objectUrl, img);
         } catch (error) {
             console.warn("Failed to load image:", src, error);
-            // Sample to avoid noisy logs on intermittent failures
-            if (Math.random() < 0.02) {
+            // Sample to avoid noisy logs on intermittent failures (env-tunable)
+            const env: any = (import.meta as unknown as { env?: Record<string, any> })?.env || {};
+            const imageSample = Number(env.VITE_IMAGE_ERROR_SAMPLE ?? "0.02"); // default ~2%
+            const p = Math.min(1, Math.max(0, isNaN(imageSample) ? 0.02 : imageSample));
+            if (Math.random() < p) {
                 handleError(error, {
                     logToServer: true,
+                    // keep console noise low; warn above already emitted
+                    logToConsole: false,
                     context: { action: "image_load", component: "ImageLoadingService.loadImage", metadata: { src } },
                 });
             }
             img.style.backgroundColor = "#fee2e2";
             img.alt = "Failed to load";
         } finally {
-			this.loadingQueue.delete(src);
-		}
-	}
+            this.loadingQueue.delete(src);
+        }
+    }
 
 	private applyImageToElement(url: string, img: HTMLImageElement) {
 		img.onload = () => {

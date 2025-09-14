@@ -58,3 +58,8 @@ Examples
 Testing Notes
 - Most unit tests do not depend on analytics logging. `handleError` is fail‑safe and won’t throw if logging fails.
 - For UI tests that use lazy image loading, consider polyfilling `IntersectionObserver` in the test setup if a component requires it.
+- Logging feature flags (Vite env)
+  - `VITE_LOG_ERRORS_TO_SERVER`: `1` to enable (default), `0` to disable.
+  - `VITE_LOG_ERRORS_ENV`: `prod` (default, only log in production) or `all` (log in all modes).
+  - `VITE_ERROR_LOG_SAMPLE`: sampling rate between `0` and `1` (default `1`). Example: `0.1` logs ~10% of events.
+  - `VITE_IMAGE_ERROR_SAMPLE`: image-load failure sampling between `0` and `1` (default `0.02`). Example: `0.2` logs ~20% of image load failures.

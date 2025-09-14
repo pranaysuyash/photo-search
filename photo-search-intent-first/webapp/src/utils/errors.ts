@@ -210,8 +210,8 @@ export const getUserErrorMessage = (
  * Comprehensive error handler with logging and user feedback
  */
 export const handleError = (
-	error: Error | unknown,
-	options: ErrorHandlerOptions = {},
+    error: Error | unknown,
+    options: ErrorHandlerOptions = {},
 ): void => {
 	const {
 		showToast: shouldShowToast = true,
@@ -259,15 +259,24 @@ export const handleError = (
 		});
 	}
 
-	// Log to server (if enabled)
-	if (logToServer) {
-		void (async () => {
-			try {
-				const { apiAnalyticsLog } = await import("../api");
-				// Best-effort dir resolution: prefer explicit context.dir
-				let dir = context?.dir || "";
-				if (!dir) {
-					try {
+    // Log to server (if enabled)
+    if (logToServer) {
+        void (async () => {
+            try {
+                // Feature flags / gating
+                const env: any = (import.meta as unknown as { env?: Record<string, any> })?.env || {};
+                const enabled = String(env.VITE_LOG_ERRORS_TO_SERVER ?? "1") !== "0";
+                const envGate = String(env.VITE_LOG_ERRORS_ENV || "prod"); // 'prod' | 'all'
+                const mode = env.MODE || env.NODE_ENV || "development";
+                const sampleRate = Number(env.VITE_ERROR_LOG_SAMPLE ?? "1"); // 0..1
+                if (!enabled) return;
+                if (envGate === "prod" && mode !== "production") return;
+                if (!(sampleRate > 0) || Math.random() >= Math.min(1, Math.max(0, sampleRate))) return;
+                const { apiAnalyticsLog } = await import("../api");
+                // Best-effort dir resolution: prefer explicit context.dir
+                let dir = context?.dir || "";
+                if (!dir) {
+                    try {
 						const raw = localStorage.getItem("photo-search-settings");
 						if (raw) {
 							const js = JSON.parse(raw);
@@ -276,27 +285,27 @@ export const handleError = (
 						}
 					} catch {}
 				}
-				if (dir) {
-					const payload = {
-						component: context?.component,
-						action: context?.action,
-						userId: context?.userId,
-						sessionId: context?.sessionId,
-						metadata: context?.metadata || {},
-						type: classifyError(appError),
-						message: (appError as Error)?.message,
-						name: (appError as Error)?.name,
-						stack: (appError as Error)?.stack,
-						timestamp: new Date().toISOString(),
-					};
-					await apiAnalyticsLog(dir, "error", payload as Record<string, unknown>);
-				}
-			} catch (e) {
-				// Fail quiet; never crash calling sites on logging
-				console.debug("Server error logging failed", e);
-			}
-		})();
-	}
+                if (dir) {
+                    const payload = {
+                        component: context?.component,
+                        action: context?.action,
+                        userId: context?.userId,
+                        sessionId: context?.sessionId,
+                        metadata: context?.metadata || {},
+                        type: classifyError(appError),
+                        message: (appError as Error)?.message,
+                        name: (appError as Error)?.name,
+                        stack: (appError as Error)?.stack,
+                        timestamp: new Date().toISOString(),
+                    };
+                    await apiAnalyticsLog(dir, "error", payload as Record<string, unknown>);
+                }
+            } catch (e) {
+                // Fail quiet; never crash calling sites on logging
+                console.debug("Server error logging failed", e);
+            }
+        })();
+    }
 };
 
 /**
