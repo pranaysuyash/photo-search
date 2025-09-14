@@ -18,9 +18,14 @@ Error Logging & Deep‑Links
   - When to log to server (indexing, builds, mutations, exports, search, etc.).
   - Full list of deep-link parameters and encode/decode examples.
 
+PR Checklist
+- [ ] Error logging: New or changed async flows call `handleError` in their `catch` blocks with a helpful `context` (include `action`, `component`, and `dir` when available).
+- [ ] Tests: Add or update unit/integration tests for new code paths; update `src/test/setup.ts` for new browser APIs where needed.
+- [ ] Docs: Update or cross-link relevant docs (README, error logging + deep-links doc) for new features or patterns.
+- [ ] Scope: Keep PRs focused; avoid unrelated formatting or refactors.
+
 Security
 - Do not log secrets or PII. `handleError` is best‑effort; prefer context like `{ action, component, dir }` and avoid sensitive payloads.
 
 Questions
 - Open a discussion or tag your PR with questions. We’re happy to help.
-

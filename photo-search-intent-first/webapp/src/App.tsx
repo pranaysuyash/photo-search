@@ -68,7 +68,8 @@ import JustifiedResults from "./components/JustifiedResults";
 import LibraryBrowser from "./components/LibraryBrowser";
 import { Lightbox } from "./components/Lightbox";
 import { LoadingSpinner } from "./components/LoadingSpinner";
-import MapView from "./components/MapView";
+import { lazy, Suspense } from "react";
+const MapView = lazy(() => import("./components/MapView"));
 import {
 	MobileOptimizations,
 	useHapticFeedback,
@@ -110,8 +111,9 @@ import {
 } from "./components/ProgressiveOnboarding";
 import SavedSearches from "./components/SavedSearches";
 import ShareViewer from "./components/ShareViewer";
-import SmartCollections from "./components/SmartCollections";
+const SmartCollections = lazy(() => import("./components/SmartCollections"));
 import { StatsBar } from "./components/StatsBar";
+import { SuspenseFallback } from "./components/SuspenseFallback";
 import { StatusBar } from "./components/StatusBar";
 // TasksView removed (developer-only)
 import { ThemeProvider } from "./components/ThemeProvider";
@@ -126,9 +128,9 @@ import { TopBar } from "./components/TopBar";
 import ToastPortal from "./components/ToastPortal";
 import { ModalManager } from "./components/ModalManager";
 import { OverlayLayer } from "./components/OverlayLayer";
-import TripsView from "./components/TripsView";
+const TripsView = lazy(() => import("./components/TripsView"));
 import { VideoLightbox } from "./components/VideoLightbox";
-import { VideoManager } from "./components/VideoManager";
+const VideoManager = lazy(() => import("./components/VideoManager").then(m => ({ default: m.VideoManager })));
 import { Welcome } from "./components/Welcome";
 import { useLibraryContext } from "./contexts/LibraryContext";
 import { useDebouncedCallback } from "./hooks/useDebounce";
@@ -1947,8 +1949,9 @@ export default function App() {
 													setLayoutRows,
 												}}
 											>
-											{/* Route-mounted feature containers */}
-											<Routes>
+                                        {/* Route-mounted feature containers */}
+                                        <Suspense fallback={<SuspenseFallback label="Loading…" /> }>
+                                        <Routes>
 												<Route path="/people" element={<PeopleViewContainer />} />
 												<Route path="/collections" element={<CollectionsViewContainer />} />
 												<Route
@@ -2075,7 +2078,8 @@ export default function App() {
 													}
 												/>
 												<Route path="/" element={<Navigate to="/library" replace />} />
-											</Routes>
+                                        </Routes>
+                                        </Suspense>
 											<StatsBar
 												items={items}
 												note={note}

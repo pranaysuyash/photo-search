@@ -22,10 +22,9 @@ describe("App route rendering", () => {
     ["/smart", "route-smart"],
     ["/trips", "route-trips"],
     ["/videos", "route-videos"],
-  ])("renders %s container", (path, testId) => {
+  ])("renders %s container", async (path, testId) => {
     window.history.pushState({}, "", String(path));
     render(<App />);
-    expect(screen.getByTestId(String(testId))).toBeInTheDocument();
+    expect(await screen.findByTestId(String(testId))).toBeInTheDocument();
   });
 });
-

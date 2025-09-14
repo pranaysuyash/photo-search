@@ -3,6 +3,7 @@ import { useModalContext } from "../contexts/ModalContext";
 import type { PhotoActions, UIActions } from "../stores/types";
 import type { SettingsActions } from "../stores/types";
 import { FocusTrap } from "../utils/accessibility";
+import { SuspenseFallback } from "./SuspenseFallback";
 
 // Modals
 import {
@@ -142,19 +143,19 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
     <>
       {/* Jobs & Diagnostics drawers */}
       {modalState.jobs && (
-        <Suspense fallback={null}>
+        <Suspense fallback={<SuspenseFallback label="Loading jobs…" /> }>
           <JobsDrawer open={true} onClose={() => modal.close("jobs")} />
         </Suspense>
       )}
       {modalState.diagnostics && (
-        <Suspense fallback={null}>
+        <Suspense fallback={<SuspenseFallback label="Loading diagnostics…" /> }>
           <DiagnosticsDrawer open={true} onClose={() => modal.close("diagnostics")} />
         </Suspense>
       )}
 
       {/* Advanced Search */}
       {modalState.advanced && (
-        <Suspense fallback={null}>
+        <Suspense fallback={<SuspenseFallback label="Loading advanced search…" /> }>
           <AdvancedSearchModal
             open={true}
             onClose={() => modal.close("advanced")}
@@ -187,14 +188,14 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
       {/* Help / Theme */}
       <HelpModal isOpen={modalState.help} onClose={() => modal.close("help")} initialSection="getting-started" />
       {modalState.theme && (
-        <Suspense fallback={null}>
+        <Suspense fallback={<SuspenseFallback label="Loading theme settings…" /> }>
           <ThemeSettingsModal isOpen={true} onClose={() => modal.close("theme")} />
         </Suspense>
       )}
 
       {/* Search Command Center overlay */}
       {modalState.search && (
-        <Suspense fallback={null}>
+        <Suspense fallback={<SuspenseFallback label="Opening search…" /> }>
           <SearchOverlay
             open={modalState.search}
             onClose={() => modal.close("search")}
@@ -234,7 +235,7 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
         <ExportModal selected={selected} dir={dir} onClose={() => modal.close("export")} uiActions={uiActions} />
       )}
       {modalState["enhanced-share"] && (
-        <Suspense fallback={null}>
+        <Suspense fallback={<SuspenseFallback label="Loading sharing…" /> }>
           <EnhancedSharingModal selected={selected} dir={dir} onClose={() => modal.close("enhanced-share")} uiActions={uiActions} />
         </Suspense>
       )}

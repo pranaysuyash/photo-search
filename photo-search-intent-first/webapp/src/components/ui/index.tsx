@@ -15,3 +15,6 @@ export {
 	SkeletonText,
 	SkeletonTitle,
 } from "./Skeleton";
+
+// shadcn UI Components
+export * from "./shadcn";
