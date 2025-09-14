@@ -13,6 +13,7 @@ import {
 	Users,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { handleError } from "./utils/errors";
 import { LazyImage } from "./components/LazyImage";
 import { CollectionsManager } from "./modules/CollectionsManager";
 import { FaceDetection } from "./modules/FaceDetection";
@@ -72,11 +73,12 @@ export function ModularApp() {
 			const api = getAPI();
 			const lib = await api.getLibrary(120, 0);
 			setLibraryImages(lib.paths);
-		} catch (error) {
-			console.error("Failed to load library:", error);
-		} finally {
-			setLoading(false);
-		}
+    } catch (error) {
+        console.error("Failed to load library:", error);
+        handleError(error, { logToServer: true, context: { action: "load_library", component: "ModularApp.loadLibrary" } });
+    } finally {
+        setLoading(false);
+    }
 	}, []);
 
 	const loadInitialData = useCallback(async () => {
@@ -92,9 +94,10 @@ export function ModularApp() {
 			// Load favorites
 			const favs = await api.getFavorites();
 			setFavorites(favs.favorites);
-		} catch (error) {
-			console.error("Failed to load initial data:", error);
-		}
+    } catch (error) {
+        console.error("Failed to load initial data:", error);
+        handleError(error, { logToServer: true, context: { action: "load_initial", component: "ModularApp.loadInitialData" } });
+    }
 	}, [loadLibrary]);
 
 	useEffect(() => {
@@ -208,9 +211,10 @@ export function ModularApp() {
 			const api = getAPI();
 			const result = await api.addToWorkspace(folder);
 			setWorkspaceFolders(result.folders);
-		} catch (error) {
-			console.error("Failed to add workspace folder:", error);
-		}
+    } catch (error) {
+        console.error("Failed to add workspace folder:", error);
+        handleError(error, { logToServer: true, context: { action: "workspace_add", component: "ModularApp.addWorkspaceFolder" } });
+    }
 	};
 
 	const runDiagnostics = async () => {
@@ -220,11 +224,12 @@ export function ModularApp() {
 			const diag = await api.runDiagnostics();
 			setIndexStats(diag);
 			setCurrentView("diagnostics");
-		} catch (error) {
-			console.error("Failed to run diagnostics:", error);
-		} finally {
-			setLoading(false);
-		}
+    } catch (error) {
+        console.error("Failed to run diagnostics:", error);
+        handleError(error, { logToServer: true, context: { action: "diagnostics", component: "ModularApp.runDiagnostics" } });
+    } finally {
+        setLoading(false);
+    }
 	};
 
 	const renderMainContent = () => {

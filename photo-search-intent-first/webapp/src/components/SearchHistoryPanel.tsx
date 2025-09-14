@@ -1,6 +1,6 @@
-import { Clock, Search, Trash2, X } from "lucide-react";
+import { Clock, Search, Trash2, X, Filter, SortDesc } from "lucide-react";
 import type React from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
 	type SearchHistoryEntry,
 	searchHistoryService,
@@ -17,6 +17,9 @@ export const SearchHistoryPanel: React.FC<SearchHistoryPanelProps> = ({
 }) => {
 	const [history, setHistory] = useState<SearchHistoryEntry[]>([]);
 	const [showClearConfirm, setShowClearConfirm] = useState(false);
+	const [sortBy, setSortBy] = useState<"recent" | "popular">("recent");
+	const [filterBy, setFilterBy] = useState<"all" | "today" | "week" | "month">("all");
+	const [searchQuery, setSearchQuery] = useState("");
 
 	const loadHistory = useCallback(() => {
 		const historyEntries = searchHistoryService.getHistory();
@@ -26,6 +29,59 @@ export const SearchHistoryPanel: React.FC<SearchHistoryPanelProps> = ({
 	useEffect(() => {
 		loadHistory();
 	}, [loadHistory]);
+
+	const filteredAndSortedHistory = useMemo(() => {
+		let filtered = [...history];
+		
+		// Apply search filter
+		if (searchQuery) {
+			const query = searchQuery.toLowerCase();
+			filtered = filtered.filter(entry => 
+				entry.query.toLowerCase().includes(query)
+			);
+		}
+		
+		// Apply time filter
+		const now = Date.now();
+		switch (filterBy) {
+			case "today":
+				filtered = filtered.filter(entry => 
+					now - entry.timestamp < 24 * 60 * 60 * 1000
+				);
+				break;
+			case "week":
+				filtered = filtered.filter(entry => 
+					now - entry.timestamp < 7 * 24 * 60 * 60 * 1000
+				);
+				break;
+			case "month":
+				filtered = filtered.filter(entry => 
+					now - entry.timestamp < 30 * 24 * 60 * 60 * 1000
+				);
+				break;
+		}
+		
+		// Apply sorting
+		if (sortBy === "popular") {
+			// Sort by frequency of use
+			const queryCount = new Map<string, number>();
+			history.forEach(entry => {
+				const count = queryCount.get(entry.query) || 0;
+				queryCount.set(entry.query, count + 1);
+			});
+			
+			filtered.sort((a, b) => {
+				const countA = queryCount.get(a.query) || 0;
+				const countB = queryCount.get(b.query) || 0;
+				return countB - countA;
+			});
+		} else {
+			// Sort by recency (default)
+			filtered.sort((a, b) => b.timestamp - a.timestamp);
+		}
+		
+		return filtered;
+	}, [history, sortBy, filterBy, searchQuery]);
 
 	const handleSearch = (query: string) => {
 		onSearch(query);
@@ -87,6 +143,48 @@ export const SearchHistoryPanel: React.FC<SearchHistoryPanelProps> = ({
 				</div>
 			</div>
 
+			{/* Search and Filters */}
+			<div className="search-history-filters p-3 border-b">
+				<div className="relative mb-2">
+					<input
+						type="text"
+						placeholder="Search in history..."
+						value={searchQuery}
+						onChange={(e) => setSearchQuery(e.target.value)}
+						className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+					/>
+					<Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+				</div>
+				
+				<div className="flex gap-2">
+					<div className="relative flex-1">
+						<select
+							value={filterBy}
+							onChange={(e) => setFilterBy(e.target.value as any)}
+							className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none"
+						>
+							<option value="all">All time</option>
+							<option value="today">Today</option>
+							<option value="week">This week</option>
+							<option value="month">This month</option>
+						</select>
+						<Filter className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+					</div>
+					
+					<div className="relative flex-1">
+						<select
+							value={sortBy}
+							onChange={(e) => setSortBy(e.target.value as any)}
+							className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none"
+						>
+							<option value="recent">Most recent</option>
+							<option value="popular">Most popular</option>
+						</select>
+						<SortDesc className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+					</div>
+				</div>
+			</div>
+
 			{showClearConfirm && (
 				<div className="clear-confirm-overlay">
 					<div className="clear-confirm-dialog">
@@ -112,17 +210,28 @@ export const SearchHistoryPanel: React.FC<SearchHistoryPanelProps> = ({
 			)}
 
 			<div className="search-history-content">
-				{history.length === 0 ? (
+				{filteredAndSortedHistory.length === 0 ? (
 					<div className="empty-state">
 						<Clock className="w-12 h-12 text-gray-300" />
-						<p>No search history yet</p>
-						<p className="text-sm text-gray-500">
-							Your recent searches will appear here
-						</p>
+						{searchQuery ? (
+							<>
+								<p>No matching search history</p>
+								<p className="text-sm text-gray-500">
+									No searches match "{searchQuery}"
+								</p>
+							</>
+						) : (
+							<>
+								<p>No search history yet</p>
+								<p className="text-sm text-gray-500">
+									Your recent searches will appear here
+								</p>
+							</>
+						)}
 					</div>
 				) : (
 					<div className="search-history-list">
-						{history.map((entry, index) => (
+						{filteredAndSortedHistory.map((entry, index) => (
 							<div
 								key={`entry-${entry.query}-${index}`}
 								className="search-history-item"
@@ -132,7 +241,7 @@ export const SearchHistoryPanel: React.FC<SearchHistoryPanelProps> = ({
 									onClick={() => handleSearch(entry.query)}
 									className="search-history-button"
 								>
-									<Search className="w-4 h-4 text-gray-400" />
+									<Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
 									<div className="search-query-container">
 										<span className="search-query">{entry.query}</span>
 										<div className="search-meta">

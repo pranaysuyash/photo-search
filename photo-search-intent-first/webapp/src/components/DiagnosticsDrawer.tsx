@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { handleError } from "../utils/errors";
 import { usePhotoVaultAPI } from "../services/PhotoVaultAPIProvider";
 
 type Diagnostics = {
@@ -33,14 +34,14 @@ export default function DiagnosticsDrawer({
 				setError("");
 				const d = await api.runDiagnostics();
 				if (!cancelled) setDiag(d as Diagnostics);
-			} catch (e) {
-				if (!cancelled)
-					setError(
-						e instanceof Error ? e.message : "Failed to load diagnostics",
-					);
-			} finally {
-				if (!cancelled) setLoading(false);
-			}
+            } catch (e) {
+                if (!cancelled) {
+                    setError(e instanceof Error ? e.message : "Failed to load diagnostics");
+                    handleError(e, { logToServer: true, context: { action: "diagnostics", component: "DiagnosticsDrawer.load" } });
+                }
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
 		}
 		if (open) load();
 		return () => {
