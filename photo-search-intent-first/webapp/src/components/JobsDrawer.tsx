@@ -61,8 +61,8 @@ export default function JobsDrawer({
 				</div>
 				{loading && <div className="text-sm text-gray-600">Loading…</div>}
 				<div className="space-y-2">
-					{events.map((e, i) => {
-						const ev = e as unknown;
+                    {events.map((e, i) => {
+                        const ev = e as Record<string, any>;
 						return (
 						<div
 							key={`event-${e.type}-${e.time}-${i}`}

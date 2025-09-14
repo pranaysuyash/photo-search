@@ -18,12 +18,14 @@ import {
 import type React from "react";
 import type { SearchResult } from "../api";
 import { useState } from "react";
+import { humanizeSeconds } from "../utils/time";
 import { apiDelete, apiUndoDelete } from "../api";
 import { useSearchContext } from "../contexts/SearchContext";
 import { useUIContext } from "../contexts/UIContext";
 import { useSearchCommandCenter } from "../stores/settingsStore";
 import { SearchBar } from "./SearchBar";
 import type { PhotoActions, UIActions } from "../stores/types";
+import { useResultsConfig } from "../contexts/ResultsConfigContext";
 
 export type GridSize = "small" | "medium" | "large";
 export type ViewType =
@@ -73,11 +75,7 @@ export interface TopBarProps {
 	useOsTrash: boolean;
 	showInfoOverlay: boolean;
 	onToggleInfoOverlay: () => void;
-	// Results view mode
-	resultView: "grid" | "timeline";
-	onChangeResultView: (view: "grid" | "timeline") => void;
-	timelineBucket?: "day" | "week" | "month";
-	onChangeTimelineBucket?: (b: "day" | "week" | "month") => void;
+    // Results view mode provided via ResultsConfig context
 	// Index progress
 	diag?: {
 		engines?: Array<{ key: string; index_dir: string; count: number }>;
@@ -144,13 +142,9 @@ export function TopBar({
 	useOsTrash,
 	showInfoOverlay,
 	onToggleInfoOverlay,
-	resultView,
-	onChangeResultView,
-	timelineBucket,
-	onChangeTimelineBucket,
-	diag,
-	isIndexing,
-	onIndex,
+    diag,
+    isIndexing,
+    onIndex,
 	activeJobs,
 	onOpenJobs,
 	progressPct,
@@ -167,6 +161,7 @@ export function TopBar({
 	onOpenThemeModal,
 	onOpenSearchOverlay,
 }: TopBarProps) {
+    const { resultView, setResultView, timelineBucket, setTimelineBucket } = useResultsConfig();
 	const { state: uiState } = useUIContext();
 	const searchCommandCenter = useSearchCommandCenter();
 	const searchCtx = useSearchContext();
@@ -455,7 +450,7 @@ export function TopBar({
 										className="ml-2 text-[11px] text-gray-600"
 										title="Estimated time remaining"
 									>
-										~{Math.max(1, Math.ceil(etaSeconds / 60))}m
+										~{humanizeSeconds(etaSeconds)}
 									</span>
 								)}
 							{isIndexing && (
@@ -655,23 +650,23 @@ export function TopBar({
 			{/* View mode toggle remains visible */}
 			<div className="view-toggle">
 				<span>View:</span>
-				<button
-					type="button"
-					className={`view-button ${resultView === "grid" ? "active" : ""}`}
-					onClick={() => onChangeResultView("grid")}
-					aria-pressed={resultView === "grid"}
-				>
-					Grid
-				</button>
-				<button
-					type="button"
-					className={`view-button ${resultView === "timeline" ? "active" : ""}`}
-					onClick={() => onChangeResultView("timeline")}
-					aria-pressed={resultView === "timeline"}
-				>
-					Timeline
-				</button>
-			</div>
+                <button
+                    type="button"
+                    className={`view-button ${resultView === "grid" ? "active" : ""}`}
+                    onClick={() => setResultView("grid")}
+                    aria-pressed={resultView === "grid"}
+                >
+                    Grid
+                </button>
+                <button
+                    type="button"
+                    className={`view-button ${resultView === "timeline" ? "active" : ""}`}
+                    onClick={() => setResultView("timeline")}
+                    aria-pressed={resultView === "timeline"}
+                >
+                    Timeline
+                </button>
+            </div>
 			{/* Boolean query hints */}
 			{/* Boolean query hints (hidden when Search Command Center is enabled) */}
 			{!searchCommandCenter && (
@@ -736,22 +731,22 @@ export function TopBar({
 					))}
 				</div>
 			)}
-			{resultView === "timeline" && (
-				<div className="view-toggle">
-					<span>Bucket:</span>
-					{(["day", "week", "month"] as const).map((b) => (
-						<button
-							key={b}
-							type="button"
-							className={`view-button ${timelineBucket === b ? "active" : ""}`}
-							onClick={() => onChangeTimelineBucket?.(b)}
-							aria-pressed={timelineBucket === b}
-						>
-							{b[0].toUpperCase() + b.slice(1)}
-						</button>
-					))}
-				</div>
-			)}
+            {resultView === "timeline" && (
+                <div className="view-toggle">
+                    <span>Bucket:</span>
+                    {(["day", "week", "month"] as const).map((b) => (
+                        <button
+                            key={b}
+                            type="button"
+                            className={`view-button ${timelineBucket === b ? "active" : ""}`}
+                            onClick={() => setTimelineBucket(b)}
+                            aria-pressed={timelineBucket === b}
+                        >
+                            {b[0].toUpperCase() + b.slice(1)}
+                        </button>
+                    ))}
+                </div>
+            )}
 
 			{selected.size > 0 && (
 				<div className="selected-actions">

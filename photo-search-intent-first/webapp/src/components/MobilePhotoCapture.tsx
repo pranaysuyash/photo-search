@@ -195,18 +195,19 @@ export function MobilePhotoCapture({
 	};
 
 	// Get error message
-	const getErrorMessage = (err: unknown): string => {
-		if (err.name === "NotAllowedError") {
-			return "Camera access denied. Please allow camera permissions.";
-		} else if (err.name === "NotFoundError") {
-			return "No camera found on this device.";
-		} else if (err.name === "NotReadableError") {
-			return "Camera is already in use by another application.";
-		} else if (err.message) {
-			return err.message;
-		}
-		return "An unknown error occurred";
-	};
+    const getErrorMessage = (err: unknown): string => {
+        const e = err as any;
+        if (e?.name === "NotAllowedError") {
+            return "Camera access denied. Please allow camera permissions.";
+        } else if (e?.name === "NotFoundError") {
+            return "No camera found on this device.";
+        } else if (e?.name === "NotReadableError") {
+            return "Camera is already in use by another application.";
+        } else if (typeof e?.message === 'string') {
+            return e.message;
+        }
+        return "An unknown error occurred";
+    };
 
 	// Update camera when settings change
 	useEffect(() => {
@@ -396,16 +397,16 @@ export function useCameraSupport() {
 			setIsSupported(hasCamera);
 
 			// Check permission status
-			if (navigator.permissions) {
-				try {
-					const result = await navigator.permissions.query({
-						name: "camera" as PermissionName,
-					});
-					setPermission(result.state as unknown);
-				} catch {
-					setPermission("unknown");
-				}
-			}
+            if ((navigator as any).permissions) {
+                try {
+                    const result = await (navigator as any).permissions.query({
+                        name: "camera" as PermissionName,
+                    });
+                    setPermission(result.state as "granted" | "denied" | "prompt");
+                } catch {
+                    setPermission("unknown");
+                }
+            }
 		};
 
 		checkSupport();

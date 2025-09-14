@@ -157,12 +157,12 @@ export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
 			{children}
 			<AnimatePresence>
 				{isLoading && (
-					<motion.div
-						initial={prefersReducedMotion ? false : { opacity: 0 }}
-						animate={{ opacity: 1 }}
-						exit={prefersReducedMotion ? false : { opacity: 0 }}
-						className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-					>
+                    <motion.div
+                        initial={prefersReducedMotion ? undefined : { opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={prefersReducedMotion ? undefined : { opacity: 0 }}
+                        className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+                    >
 						<div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-xl">
 							<LoadingSpinner size="lg" message={message || "Loading..."} />
 						</div>

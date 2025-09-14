@@ -86,7 +86,7 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 			icon: Grid,
 			count: stats.totalPhotos,
 		},
-		{ id: "search", label: "Search Results", icon: Search },
+    { id: "results", label: "Search Results", icon: Search },
 		{ id: "map", label: "Map View", icon: Map },
 		{ id: "people", label: "People", icon: Users, count: stats.people },
 	];
@@ -104,7 +104,6 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 
 	const smartFeatures: SidebarItem[] = [
 		{ id: "saved", label: "Saved Searches", icon: Bookmark },
-		{ id: "memories", label: "Memories", icon: Heart, count: stats.favorites },
 		// Tasks removed from user app
 	];
 
@@ -216,9 +215,9 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 						</motion.div>
 						{!isCollapsed && (
 							<motion.div
-								initial={prefersReducedMotion ? false : { opacity: 0 }}
+                    initial={prefersReducedMotion ? undefined : { opacity: 0 }}
 								animate={{ opacity: 1 }}
-								exit={prefersReducedMotion ? false : { opacity: 0 }}
+                    exit={prefersReducedMotion ? undefined : { opacity: 0 }}
 							>
 								<h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
 									PhotoVault
@@ -307,7 +306,7 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 				{/* AI Status Panel */}
 				{!isCollapsed && (
 					<motion.div
-						initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
+                    initial={prefersReducedMotion ? undefined : { opacity: 0, y: 20 }}
 						animate={{ opacity: 1, y: 0 }}
 						className="p-6 border-t border-gray-200/50 dark:border-gray-700/50"
 					>
@@ -438,10 +437,10 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 
 			{/* Mobile Overlay */}
 			{isCompact && !isCollapsed && (
-				<motion.div
-					initial={prefersReducedMotion ? false : { opacity: 0 }}
+                <motion.div
+                    initial={prefersReducedMotion ? undefined : { opacity: 0 }}
 					animate={{ opacity: 1 }}
-					exit={prefersReducedMotion ? false : { opacity: 0 }}
+                    exit={prefersReducedMotion ? undefined : { opacity: 0 }}
 					onClick={() => setIsCollapsed(true)}
 					className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
 				/>

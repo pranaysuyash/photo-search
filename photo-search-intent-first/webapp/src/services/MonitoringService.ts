@@ -92,12 +92,12 @@ class MonitoringService {
 				} else if (entry.entryType === "first-input") {
 					const fid = entry as PerformanceEventTiming;
 					this.trackMetric("fid", fid.processingStart - fid.startTime);
-				} else if (entry.entryType === "layout-shift") {
-					const cls = entry as unknown;
-					if (!cls.hadRecentInput) {
-						this.trackMetric("cls", cls.value, "count");
-					}
-				}
+                } else if (entry.entryType === "layout-shift") {
+                    const cls = entry as any;
+                    if (!cls?.hadRecentInput) {
+                        this.trackMetric("cls", Number(cls?.value) || 0, "count");
+                    }
+                }
 			}
 		});
 
@@ -317,18 +317,15 @@ class MonitoringService {
 	// Web Vitals tracking
 	public trackWebVitals() {
 		// Track Core Web Vitals
-		if ("web-vital" in window) {
-			const webVital = window["web-vital"] as unknown;
-			const { onCLS, onFID, onLCP, onFCP, onTTFB } = webVital;
-
-			onCLS((metric: unknown) =>
-				this.trackMetric("cls", metric.value, "count"),
-			);
-			onFID((metric: unknown) => this.trackMetric("fid", metric.value));
-			onLCP((metric: unknown) => this.trackMetric("lcp", metric.value));
-			onFCP((metric: unknown) => this.trackMetric("fcp", metric.value));
-			onTTFB((metric: unknown) => this.trackMetric("ttfb", metric.value));
-		}
+        const webVital = (window as any)["web-vital"];
+        if (webVital?.onCLS) {
+            const { onCLS, onFID, onLCP, onFCP, onTTFB } = webVital;
+            onCLS((metric: any) => this.trackMetric("cls", Number(metric?.value) || 0, "count"));
+            onFID((metric: any) => this.trackMetric("fid", Number(metric?.value) || 0));
+            onLCP((metric: any) => this.trackMetric("lcp", Number(metric?.value) || 0));
+            onFCP((metric: any) => this.trackMetric("fcp", Number(metric?.value) || 0));
+            onTTFB((metric: any) => this.trackMetric("ttfb", Number(metric?.value) || 0));
+        }
 	}
 
 	// Custom business metrics
@@ -374,10 +371,10 @@ export const monitoringService = new MonitoringService();
 
 // React Error Boundary integration
 export function logErrorToService(error: Error, errorInfo: unknown) {
-	monitoringService.logError({
-		message: error.message,
-		stack: error.stack,
-		context: errorInfo,
-		severity: "high",
-	});
+    monitoringService.logError({
+        message: error.message,
+        stack: error.stack,
+        context: (errorInfo as unknown) as Record<string, unknown>,
+        severity: "high",
+    });
 }

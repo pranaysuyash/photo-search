@@ -53,38 +53,38 @@ export default function SmartCollections({
 		const name = (prompt("Save current search as Smart (name):") || "").trim();
 		if (!name) return;
 
-		try {
-			const tags = tagFilter
-				.split(",")
-				.map((s) => s.trim())
-				.filter(Boolean);
-			const rules: unknown = {
-				query,
-				favoritesOnly: favOnly,
-				tags,
-				useCaptions: useCaps,
-				useOcr,
-				hasText,
-				camera: camera || undefined,
-				isoMin: isoMin ? parseInt(isoMin, 10) : undefined,
-				isoMax: isoMax ? parseInt(isoMax, 10) : undefined,
-				fMin: fMin ? parseFloat(fMin) : undefined,
-				fMax: fMax ? parseFloat(fMax) : undefined,
-				place: place || undefined,
-			};
+        try {
+            const tags = tagFilter
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean);
+            const rules: { query: string; count?: number } & Record<string, unknown> = {
+                query,
+                favoritesOnly: favOnly,
+                tags,
+                useCaptions: useCaps,
+                useOcr,
+                hasText,
+                camera: camera || undefined,
+                isoMin: isoMin ? parseInt(isoMin, 10) : undefined,
+                isoMax: isoMax ? parseInt(isoMax, 10) : undefined,
+                fMin: fMin ? parseFloat(fMin) : undefined,
+                fMax: fMax ? parseFloat(fMax) : undefined,
+                place: place || undefined,
+            };
 
-			const ppl = persons.filter(Boolean);
-			if (ppl.length === 1) rules.person = ppl[0];
-			else if (ppl.length > 1) rules.persons = ppl;
+            const ppl = persons.filter(Boolean);
+            if (ppl.length === 1) (rules as any).person = ppl[0];
+            else if (ppl.length > 1) (rules as any).persons = ppl;
 
 			const { apiSetSmart, apiGetSmart } = await import("../api");
 			await apiSetSmart(dir, name, rules);
 			const r = await apiGetSmart(dir);
 			setSmart(r.smart || {});
 			setNote("Saved smart collection");
-		} catch (e: unknown) {
-			setNote(e.message || "Failed to save smart");
-		}
+        } catch (e: unknown) {
+            setNote(e instanceof Error ? e.message : "Failed to save smart");
+        }
 	};
 
 	const handleRefreshSmart = async () => {
@@ -92,9 +92,9 @@ export default function SmartCollections({
 			const { apiGetSmart } = await import("../api");
 			const r = await apiGetSmart(dir);
 			setSmart(r.smart || {});
-		} catch (e: unknown) {
-			setNote(e.message || "Failed to load smart");
-		}
+        } catch (e: unknown) {
+            setNote(e instanceof Error ? e.message : "Failed to load smart");
+        }
 	};
 
 	const handleOpenSmart = async (name: string) => {
@@ -104,9 +104,9 @@ export default function SmartCollections({
 			setResults(r.results || []);
 			setSearchId(r.search_id || "");
 			setNote(`Opened smart: ${name}`);
-		} catch (e: unknown) {
-			setNote(e.message);
-		}
+        } catch (e: unknown) {
+            setNote(e instanceof Error ? e.message : "Failed to open smart");
+        }
 	};
 
 	const handleDeleteSmart = async (name: string) => {
@@ -116,9 +116,9 @@ export default function SmartCollections({
 			await apiDeleteSmart(dir, name);
 			const r = await apiGetSmart(dir);
 			setSmart(r.smart || {});
-		} catch (e: unknown) {
-			setNote(e.message);
-		}
+        } catch (e: unknown) {
+            setNote(e instanceof Error ? e.message : "Failed to delete smart");
+        }
 	};
 
 	return (

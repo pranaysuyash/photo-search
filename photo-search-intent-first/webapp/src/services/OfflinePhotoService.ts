@@ -303,17 +303,14 @@ export class OfflinePhotoService {
 	}
 
 	// Store offline action for sync when online
-	async queueOfflineAction(action: unknown) {
+    async queueOfflineAction(action: Record<string, unknown>) {
 		try {
 			const db = this.db;
 			if (!db) return;
 
 			const transaction = db.transaction(["offlineActions"], "readwrite");
 			const store = transaction.objectStore("offlineActions");
-			store.put({
-				...action,
-				timestamp: Date.now(),
-			});
+            store.put(Object.assign({}, action, { timestamp: Date.now() }));
 		} catch (error) {
 			console.error(
 				"[OfflinePhotoService] Failed to queue offline action:",
@@ -368,7 +365,7 @@ export class OfflinePhotoService {
 		}
 	}
 
-	private async processOfflineAction(action: unknown) {
+    private async processOfflineAction(action: any) {
 		// Process different types of offline actions
 		switch (action.type) {
 			case "favorite":
@@ -380,11 +377,11 @@ export class OfflinePhotoService {
 			case "rating":
 				// Handle offline rating action
 				break;
-			default:
-				console.warn(
-					"[OfflinePhotoService] Unknown offline action type:",
-					action.type,
-				);
+            default:
+                console.warn(
+                    "[OfflinePhotoService] Unknown offline action type:",
+                    action?.type,
+                );
 		}
 	}
 

@@ -35,14 +35,14 @@ export function PaginatedSearch({
 				setLoading(true);
 				setError(null);
 
-				const result = await apiSearchPaginated(
-					currentDir,
-					query,
-					provider,
-					limit,
-					offset,
-					searchOptions,
-				);
+                    const result = await apiSearchPaginated(
+                        currentDir,
+                        query,
+                        provider,
+                        limit,
+                        offset,
+                        searchOptions as any,
+                    );
 
 				const newResults =
 					offset === 0 ? result.results : [...results, ...result.results];

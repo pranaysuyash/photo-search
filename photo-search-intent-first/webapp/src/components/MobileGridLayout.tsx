@@ -116,8 +116,8 @@ const GridItem: React.FC<GridItemProps> = ({
 		};
 	}, [touchGestureService, photo.path, onSelect, onToggleFavorite]);
 
-	const handleClick = (e: React.MouseEvent) => {
-		e.preventDefault();
+    const handleClick = (e: React.SyntheticEvent) => {
+        e.preventDefault();
 		if (isSelected) {
 			onSelect(photo.path);
 		} else {
@@ -125,20 +125,20 @@ const GridItem: React.FC<GridItemProps> = ({
 		}
 	};
 
-	const handleFavoriteClick = (e: React.MouseEvent) => {
-		e.stopPropagation();
-		onToggleFavorite(photo.path);
-	};
+    const handleFavoriteClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onToggleFavorite(photo.path);
+    };
 
-	const handleShareClick = (e: React.MouseEvent) => {
-		e.stopPropagation();
-		onShare(photo.path);
-	};
+    const handleShareClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onShare(photo.path);
+    };
 
-	const handleDownloadClick = (e: React.MouseEvent) => {
-		e.stopPropagation();
-		onDownload(photo.path);
-	};
+    const handleDownloadClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onDownload(photo.path);
+    };
 
 	const imageUrl = thumbUrl(dir, engine, photo.path, 400);
 

@@ -86,6 +86,8 @@ export interface ErrorContext {
 	userId?: string;
 	sessionId?: string;
 	metadata?: Record<string, unknown>;
+	/** Optional current library directory to attach server logs */
+	dir?: string;
 }
 
 /**
@@ -257,12 +259,75 @@ export const handleError = (
 		});
 	}
 
-	// Log to server (if implemented)
+	// Log to server (if enabled)
 	if (logToServer) {
-		// TODO: Implement server-side error logging
-		console.warn("Server logging not implemented yet");
+		void (async () => {
+			try {
+				const { apiAnalyticsLog } = await import("../api");
+				// Best-effort dir resolution: prefer explicit context.dir
+				let dir = context?.dir || "";
+				if (!dir) {
+					try {
+						const raw = localStorage.getItem("photo-search-settings");
+						if (raw) {
+							const js = JSON.parse(raw);
+							// zustand persist format: { state: { dir, ... }, version }
+							dir = js?.state?.dir || "";
+						}
+					} catch {}
+				}
+				if (dir) {
+					const payload = {
+						component: context?.component,
+						action: context?.action,
+						userId: context?.userId,
+						sessionId: context?.sessionId,
+						metadata: context?.metadata || {},
+						type: classifyError(appError),
+						message: (appError as Error)?.message,
+						name: (appError as Error)?.name,
+						stack: (appError as Error)?.stack,
+						timestamp: new Date().toISOString(),
+					};
+					await apiAnalyticsLog(dir, "error", payload as Record<string, unknown>);
+				}
+			} catch (e) {
+				// Fail quiet; never crash calling sites on logging
+				console.debug("Server error logging failed", e);
+			}
+		})();
 	}
 };
+
+/**
+ * Explicit helper to log errors to server analytics from callers wanting control.
+ */
+export async function logServerError(
+	error: unknown,
+	context: ErrorContext & { dir?: string },
+): Promise<boolean> {
+	try {
+		const { apiAnalyticsLog } = await import("../api");
+		let dir = context?.dir || "";
+		if (!dir) return false;
+		const base: Record<string, unknown> = {
+			component: context?.component,
+			action: context?.action,
+			metadata: context?.metadata || {},
+			timestamp: new Date().toISOString(),
+		};
+		const e = error as Error;
+		if (e && typeof e === "object") {
+			base.message = (e as Error).message;
+			base.name = (e as Error).name;
+			base.stack = (e as Error).stack;
+		}
+		await apiAnalyticsLog(dir, "error", base);
+		return true;
+	} catch {
+		return false;
+	}
+}
 
 /**
  * Async operation wrapper with error handling

@@ -199,7 +199,7 @@ function HighlightedText({
 
 // Match analyzer to generate reasons from search results
 export class MatchAnalyzer {
-	analyzeMatch(photo: unknown, query: string): MatchReason[] {
+    analyzeMatch(photo: any, query: string): MatchReason[] {
 		const reasons: MatchReason[] = [];
 		const queryLower = query.toLowerCase();
 		const queryWords = queryLower.split(/\s+/);
@@ -299,18 +299,18 @@ export class MatchAnalyzer {
 		}
 
 		// Check for objects
-		if (photo.objects && photo.objects.length > 0) {
-			const matchedObjects = photo.objects.filter((obj: unknown) =>
-				queryWords.some((word) => obj.label.toLowerCase().includes(word)),
-			);
-			if (matchedObjects.length > 0) {
-				reasons.push({
-					type: "object",
-					confidence: matchedObjects[0].confidence || 0.75,
-					detail: matchedObjects.map((o: unknown) => o.label).join(", "),
-				});
-			}
-		}
+        if (photo.objects && photo.objects.length > 0) {
+            const matchedObjects = (photo.objects as Array<{ label: string; confidence?: number }>).filter((obj) =>
+                queryWords.some((word) => obj.label.toLowerCase().includes(word)),
+            );
+            if (matchedObjects.length > 0) {
+                reasons.push({
+                    type: "object",
+                    confidence: matchedObjects[0].confidence || 0.75,
+                    detail: matchedObjects.map((o) => o.label).join(", "),
+                });
+            }
+        }
 
 		// Check for scene understanding
 		if (

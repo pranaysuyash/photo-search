@@ -22,7 +22,7 @@ export function isElectron(): boolean {
 
 // Compute API base URL robustly across web, dev, and Electron (file://) contexts
 function computeApiBase(): string {
-  const envBase = (import.meta as unknown).env?.VITE_API_BASE;
+  const envBase = import.meta.env?.VITE_API_BASE;
   if (envBase) return envBase;
   try {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -42,7 +42,7 @@ function authHeaders() {
 		// Runtime token from localStorage should take precedence in dev
 		const ls =
 			typeof window !== "undefined" ? localStorage.getItem("api_token") : null;
-			const envTok = (import.meta as unknown).env?.VITE_API_TOKEN;
+			const envTok = import.meta.env?.VITE_API_TOKEN;
 		const token = ls || envTok;
 		if (token)
 			return { Authorization: `Bearer ${token}` } as Record<string, string>;
@@ -617,6 +617,15 @@ export async function apiWorkspaceAdd(path: string) {
 
 export async function apiWorkspaceRemove(path: string) {
 	return post<{ folders: string[] }>("/workspace/remove", { path });
+}
+
+// Analytics / Monitoring
+export async function apiAnalyticsLog(
+	dir: string,
+	type: string,
+	data?: Record<string, unknown>,
+) {
+	return post<{ ok: boolean }>("/analytics/log", { dir, type, data });
 }
 
 export async function apiMetadataDetail(dir: string, path: string) {

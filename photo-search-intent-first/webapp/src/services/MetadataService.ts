@@ -104,23 +104,24 @@ class MetadataService {
 		const rawMeta = response.meta || {};
 
 		// Parse and normalize EXIF data
-		const exif: ExifData = {
-			make: rawMeta.make || rawMeta.Make,
-			model: rawMeta.model || rawMeta.Model,
-			lens_make: rawMeta.lens_make || rawMeta.LensMake,
-			lens_model: rawMeta.lens_model || rawMeta.LensModel,
+        const exif: ExifData = {
+            make: this.asString(rawMeta.make || rawMeta.Make),
+            model: this.asString(rawMeta.model || rawMeta.Model),
+            lens_make: this.asString(rawMeta.lens_make || rawMeta.LensMake),
+            lens_model: this.asString(rawMeta.lens_model || rawMeta.LensModel),
 
 			iso: this.parseNumber(rawMeta.iso || rawMeta.ISO),
 			aperture: this.parseNumber(rawMeta.aperture || rawMeta.FNumber),
-			shutter_speed: rawMeta.shutter_speed || rawMeta.ExposureTime,
+            shutter_speed: this.asString(rawMeta.shutter_speed || rawMeta.ExposureTime),
 			exposure_time: this.parseNumber(rawMeta.exposure_time),
 			focal_length: this.parseNumber(
 				rawMeta.focal_length || rawMeta.FocalLength,
 			),
 
-			date_taken:
-				rawMeta.date_taken || rawMeta.DateTime || rawMeta.DateTimeOriginal,
-			date_modified: rawMeta.date_modified || rawMeta.ModifyDate,
+            date_taken: this.asString(
+                rawMeta.date_taken || rawMeta.DateTime || rawMeta.DateTimeOriginal,
+            ),
+            date_modified: this.asString(rawMeta.date_modified || rawMeta.ModifyDate),
 
 			latitude: this.parseNumber(rawMeta.latitude || rawMeta.GPSLatitude),
 			longitude: this.parseNumber(rawMeta.longitude || rawMeta.GPSLongitude),
@@ -131,22 +132,22 @@ class MetadataService {
 			width: this.parseNumber(rawMeta.width || rawMeta.ImageWidth),
 			height: this.parseNumber(rawMeta.height || rawMeta.ImageHeight),
 			orientation: this.parseNumber(rawMeta.orientation || rawMeta.Orientation),
-			color_space: rawMeta.color_space || rawMeta.ColorSpace,
+            color_space: this.asString(rawMeta.color_space || rawMeta.ColorSpace),
 
-			flash: rawMeta.flash || rawMeta.Flash,
-			flash_fired: rawMeta.flash_fired,
-			white_balance: rawMeta.white_balance || rawMeta.WhiteBalance,
-			metering_mode: rawMeta.metering_mode || rawMeta.MeteringMode,
+            flash: this.asString(rawMeta.flash || rawMeta.Flash),
+            flash_fired: rawMeta.flash_fired,
+            white_balance: this.asString(rawMeta.white_balance || rawMeta.WhiteBalance),
+            metering_mode: this.asString(rawMeta.metering_mode || rawMeta.MeteringMode),
 
-			quality: rawMeta.quality,
-			compression: rawMeta.compression,
-			software: rawMeta.software || rawMeta.Software,
+            quality: this.asString(rawMeta.quality),
+            compression: this.asString(rawMeta.compression),
+            software: this.asString(rawMeta.software || rawMeta.Software),
 
-			title: rawMeta.title || rawMeta.Title,
-			description: rawMeta.description || rawMeta.Description,
+            title: this.asString(rawMeta.title || rawMeta.Title),
+            description: this.asString(rawMeta.description || rawMeta.Description),
 			keywords: this.parseKeywords(rawMeta.keywords || rawMeta.Keywords),
-			copyright: rawMeta.copyright || rawMeta.Copyright,
-			artist: rawMeta.artist || rawMeta.Artist,
+            copyright: this.asString(rawMeta.copyright || rawMeta.Copyright),
+            artist: this.asString(rawMeta.artist || rawMeta.Artist),
 			rating: this.parseNumber(rawMeta.rating || rawMeta.Rating),
 		};
 
@@ -203,39 +204,42 @@ class MetadataService {
 		return `${ratioW}:${ratioH}`;
 	}
 
-	// Format EXIF values for display
-	formatExifValue(key: string, value: unknown): string {
-		if (value === null || value === undefined) return "N/A";
+    // Format EXIF values for display
+    formatExifValue(key: string, value: unknown): string {
+        if (value === null || value === undefined) return "N/A";
 
-		switch (key) {
-			case "aperture":
-				return `f/${value}`;
-			case "shutter_speed":
-			case "exposure_time":
-				if (typeof value === "number") {
-					return value >= 1 ? `${value}s` : `1/${Math.round(1 / value)}s`;
-				}
-				return String(value);
-			case "focal_length":
-				return `${value}mm`;
-			case "iso":
-				return `ISO ${value}`;
-			case "file_size":
-				return this.formatFileSize(value);
-			case "megapixels":
-				return `${value}MP`;
-			case "date_taken":
-			case "date_modified":
-				return this.formatDate(value);
-			case "latitude":
-			case "longitude":
-				return `${value.toFixed(6)}°`;
-			case "altitude":
-				return `${value}m`;
-			default:
-				return String(value);
-		}
-	}
+        switch (key) {
+            case "aperture":
+                return `f/${value}`;
+            case "shutter_speed":
+            case "exposure_time":
+                if (typeof value === "number") {
+                    return value >= 1 ? `${value}s` : `1/${Math.round(1 / value)}s`;
+                }
+                return String(value);
+            case "focal_length":
+                return `${value}mm`;
+            case "iso":
+                return `ISO ${value}`;
+            case "file_size":
+                {
+                    const n = this.parseNumber(value);
+                    return typeof n === "number" ? this.formatFileSize(n) : String(value);
+                }
+            case "megapixels":
+                return `${value}MP`;
+            case "date_taken":
+            case "date_modified":
+                return this.formatDate(String(value));
+            case "latitude":
+            case "longitude":
+                return typeof value === "number" ? `${value.toFixed(6)}°` : String(value);
+            case "altitude":
+                return `${value}m`;
+            default:
+                return String(value);
+        }
+    }
 
 	private formatFileSize(bytes: number): string {
 		if (bytes === 0) return "0 B";
@@ -245,21 +249,25 @@ class MetadataService {
 		return `${parseFloat((bytes / k ** i).toFixed(1))} ${sizes[i]}`;
 	}
 
-	private formatDate(dateStr: string): string {
-		try {
-			const date = new Date(dateStr);
-			return (
-				date.toLocaleDateString() +
-				" " +
-				date.toLocaleTimeString([], {
-					hour: "2-digit",
-					minute: "2-digit",
-				})
-			);
-		} catch {
-			return dateStr;
-		}
-	}
+    private formatDate(dateStr: string): string {
+        try {
+            const date = new Date(dateStr);
+            return (
+                date.toLocaleDateString() +
+                " " +
+                date.toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                })
+            );
+        } catch {
+            return dateStr;
+        }
+    }
+
+    private asString(value: unknown): string | undefined {
+        return typeof value === "string" ? value : undefined;
+    }
 
 	// Extract common filter values from metadata
 	getFilterValues(metadata: PhotoMetadata[]): {

@@ -9,10 +9,11 @@ import {
 import { LoadingSpinner } from "./LoadingSpinner";
 
 interface FaceCluster {
-	id: string;
-	name?: string;
-	size: number;
-	examples: [string, number][]; // [path, embedding_index]
+    id: string;
+    name?: string;
+    size: number;
+    examples: [string, number][]; // [path, embedding_index]
+    photos?: string[];
 }
 
 interface FaceClusterManagerProps {
@@ -211,7 +212,11 @@ export function FaceClusterManager({
 							No face clusters found. Run face detection first.
 						</div>
 					) : (
-						<div className="space-y-3 max-h-96 overflow-y-auto">
+						<div
+							className="space-y-3 max-h-96 overflow-y-auto"
+							role="listbox"
+							aria-label="Face clusters list"
+						>
 							{clusters.map((cluster) => (
 								<div
 									key={cluster.id}

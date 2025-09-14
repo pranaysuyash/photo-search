@@ -232,11 +232,11 @@ export function announce(
 	message: string,
 	priority: "polite" | "assertive" = "polite",
 ) {
-	try {
-		window.dispatchEvent(
-			new CustomEvent("announce", { detail: { message, priority } }) as unknown,
-		);
-	} catch {}
+    try {
+        window.dispatchEvent(
+            new CustomEvent("announce", { detail: { message, priority } }) as unknown as Event,
+        );
+    } catch {}
 }
 
 /**

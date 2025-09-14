@@ -204,7 +204,7 @@ export default function AdvancedSearchModal({
 						<select
 							className="input"
 							value={hasText}
-							onChange={(e) => setHasText(e.target.value as unknown)}
+                        onChange={(e) => setHasText(e.target.value as "true" | "false" | "unknown")}
 						>
 							<option value="unknown">Any</option>
 							<option value="true">True</option>

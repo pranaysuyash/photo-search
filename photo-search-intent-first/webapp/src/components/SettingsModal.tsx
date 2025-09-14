@@ -44,12 +44,12 @@ export function SettingsModal({
 		if (!isOpen) return;
 		let cancelled = false;
 		(async () => {
-			try {
-				const ws = await apiWatchStatus();
-				if (!cancelled) setWatchAvail(!!ws.available);
-			} catch {
-				if (!cancelled) setWatchAvail(false);
-			}
+            try {
+                await apiWatchStatus();
+                if (!cancelled) setWatchAvail(true);
+            } catch {
+                if (!cancelled) setWatchAvail(false);
+            }
 			try {
 				const caps = await apiModelsCapabilities();
 				if (!cancelled) setModelCaps(caps.capabilities);

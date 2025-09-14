@@ -24,7 +24,8 @@ export function VideoManager({ currentDir, provider }: VideoManagerProps) {
 	const [loading, setLoading] = useState(false);
 	const [indexing, setIndexing] = useState(false);
 	const [selectedVideo, setSelectedVideo] = useState<VideoFile | null>(null);
-	const [videoMetadata, setVideoMetadata] = useState<unknown>(null);
+    interface VideoMetadata { width?: number; height?: number; fps?: number; duration?: number; frame_count?: number }
+    const [videoMetadata, setVideoMetadata] = useState<VideoMetadata | null>(null);
 	const [error, setError] = useState<string | null>(null);
 
 	const loadVideos = useCallback(async () => {
@@ -204,24 +205,24 @@ export function VideoManager({ currentDir, provider }: VideoManagerProps) {
 								{videoMetadata && (
 									<>
 										<div className="font-medium mt-4">Video Metadata</div>
-										<div className="text-sm space-y-1">
-											<div>
-												<span className="font-medium">Dimensions:</span>{" "}
-												{videoMetadata.width} × {videoMetadata.height}
-											</div>
-											<div>
-												<span className="font-medium">Frame Rate:</span>{" "}
-												{videoMetadata.fps?.toFixed(2)} fps
-											</div>
-											<div>
-												<span className="font-medium">Duration:</span>{" "}
-												{formatDuration(videoMetadata.duration)}
-											</div>
-											<div>
-												<span className="font-medium">Frame Count:</span>{" "}
-												{videoMetadata.frame_count?.toLocaleString()}
-											</div>
-										</div>
+                            <div className="text-sm space-y-1">
+                                <div>
+                                    <span className="font-medium">Dimensions:</span>{" "}
+                                    {videoMetadata?.width ?? "?"} × {videoMetadata?.height ?? "?"}
+                                </div>
+                                <div>
+                                    <span className="font-medium">Frame Rate:</span>{" "}
+                                    {typeof videoMetadata?.fps === 'number' ? videoMetadata.fps.toFixed(2) : "?"} fps
+                                </div>
+                                <div>
+                                    <span className="font-medium">Duration:</span>{" "}
+                                    {typeof videoMetadata?.duration === 'number' ? formatDuration(videoMetadata.duration) : "?"}
+                                </div>
+                                <div>
+                                    <span className="font-medium">Frame Count:</span>{" "}
+                                    {typeof videoMetadata?.frame_count === 'number' ? videoMetadata.frame_count.toLocaleString() : "?"}
+                                </div>
+                            </div>
 									</>
 								)}
 							</div>

@@ -155,43 +155,43 @@ class OfflineService {
 		}
 	}
 
-	private async processAction(action: OfflineAction): Promise<void> {
-		const { apiSearch, apiSetCollection, apiBatchTag, apiBatchDelete } =
-			await import("../api");
+    private async processAction(action: OfflineAction): Promise<void> {
+        const { apiSearch, apiSetCollection, apiBatchTag, apiBatchDelete } =
+            await import("../api");
 
-		switch (action.type) {
-			case "search":
-				await apiSearch(
-					action.payload.dir,
-					action.payload.query,
-					action.payload.topK,
-				);
-				break;
+        switch (action.type) {
+            case "search":
+                {
+                    const p = action.payload as any;
+                    await apiSearch(
+                        p.dir,
+                        p.query,
+                        p.provider ?? "local",
+                        p.topK ?? 24,
+                    );
+                }
+                break;
 
-			case "collection":
-				await apiSetCollection(
-					action.payload.dir,
-					action.payload.name,
-					action.payload.paths,
-				);
-				break;
+            case "collection":
+                {
+                    const p = action.payload as any;
+                    await apiSetCollection(p.dir, p.name, p.paths);
+                }
+                break;
 
-			case "tag":
-				await apiBatchTag(
-					action.payload.dir,
-					action.payload.paths,
-					action.payload.tags,
-					action.payload.operation,
-				);
-				break;
+            case "tag":
+                {
+                    const p = action.payload as any;
+                    await apiBatchTag(p.dir, p.paths, p.tags, p.operation);
+                }
+                break;
 
-			case "delete":
-				await apiBatchDelete(
-					action.payload.dir,
-					action.payload.paths,
-					action.payload.useOsTrash,
-				);
-				break;
+            case "delete":
+                {
+                    const p = action.payload as any;
+                    await apiBatchDelete(p.dir, p.paths, p.useOsTrash);
+                }
+                break;
 
 			default:
 				throw new Error(`Unknown action type: ${action.type}`);

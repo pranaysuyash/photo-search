@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { API_BASE, thumbUrl } from "../api";
+import { shareTokenFromPath } from "../utils/router";
 
 type ShareDetail = {
 	ok: boolean;
@@ -18,10 +19,7 @@ type ShareDetail = {
 export default function ShareViewer() {
 	const location = useLocation();
 	const navigate = useNavigate();
-	const token = useMemo(
-		() => location.pathname.split("/").filter(Boolean)[1] || "",
-		[location.pathname],
-	);
+    const token = useMemo(() => shareTokenFromPath(location.pathname) || "", [location.pathname]);
 	const [detail, setDetail] = useState<ShareDetail | null>(null);
 	const [password, setPassword] = useState("");
 	const [error, setError] = useState("");

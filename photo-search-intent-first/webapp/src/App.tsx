@@ -10,7 +10,7 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import {
 	API_BASE,
 	apiAuthCheck,
@@ -45,7 +45,6 @@ import Collections from "./components/Collections";
 import type { ModalKey } from "./contexts/ModalContext";
 import type { SettingsActions } from "./stores/types";
 
-const DiagnosticsDrawer = lazy(() => import("./components/DiagnosticsDrawer"));
 
 import {
 	QuickActions,
@@ -57,17 +56,12 @@ import {
 	SectionErrorBoundary,
 } from "./components/ErrorBoundary";
 import { FilterPanel } from "./components/FilterPanel";
-import { HelpModal } from "./components/HelpModal";
-import {
-	HintManager,
-	HintProvider,
-	useHintTriggers,
-} from "./components/HintSystem";
+import { HintManager, HintProvider, useHintTriggers } from "./components/HintSystem";
 import { JobsCenter } from "./components/JobsCenter";
 import { useJobsContext } from "./contexts/JobsContext";
 import { useModalContext } from "./contexts/ModalContext";
 
-const JobsDrawer = lazy(() => import("./components/JobsDrawer"));
+// Drawers handled via ModalManager
 
 // Reuse existing feature components
 import JustifiedResults from "./components/JustifiedResults";
@@ -81,25 +75,29 @@ import {
 	useMobileDetection,
 } from "./components/MobileOptimizations";
 import MobilePWATest from "./components/MobilePWATest";
-import ModernSidebar from "./components/ModernSidebar";
+import ModernSidebar from "./components/ModernSidebar"; // kept for now, but replaced by AppShell usage
+import { AppShell } from "./components/AppShell";
+import { ResultsView } from "./views/ResultsView";
+import { LibraryView as LibraryContainer } from "./views/LibraryView";
+import { PeopleViewContainer } from "./views/PeopleViewContainer";
+import { CollectionsViewContainer } from "./views/CollectionsViewContainer";
+import { ResultsUIProvider } from "./contexts/ResultsUIContext";
+import { ResultsConfigProvider } from "./contexts/ResultsConfigContext";
+import { viewToPath, pathToView, isSharePath } from "./utils/router";
+import { SavedViewContainer } from "./views/SavedViewContainer";
+import { useOnboardingActions } from "./hooks/useOnboardingActions";
+// Modals: still referenced below; keep named imports to satisfy JSX usage
 import {
-	CollectionModal,
-	ExportModal,
-	FolderModal,
-	LikePlusModal,
-	RemoveCollectionModal,
-	SaveModal,
-	TagModal,
+    CollectionModal,
+    ExportModal,
+    FolderModal,
+    LikePlusModal,
+    RemoveCollectionModal,
+    SaveModal,
+    TagModal,
 } from "./components/modals";
 
-const AdvancedSearchModal = lazy(
-	() => import("./components/modals/AdvancedSearchModal"),
-);
-const EnhancedSharingModal = lazy(() =>
-	import("./components/modals/EnhancedSharingModal").then((m) => ({
-		default: m.EnhancedSharingModal,
-	})),
-);
+// AdvancedSearchModal and EnhancedSharingModal handled via ModalManager
 
 import FirstRunSetup from "./components/modals/FirstRunSetup";
 import { OfflineIndicator } from "./components/OfflineIndicator";
@@ -118,24 +116,25 @@ import { StatusBar } from "./components/StatusBar";
 // TasksView removed (developer-only)
 import { ThemeProvider } from "./components/ThemeProvider";
 
-const ThemeSettingsModal = lazy(() =>
-	import("./components/ThemeSettingsModal").then((m) => ({
-		default: m.ThemeSettingsModal,
-	})),
-);
+// ThemeSettingsModal handled via ModalManager
 
 import TimelineResults from "./components/TimelineResults";
 import { TopBar } from "./components/TopBar";
 
-const SearchOverlay = lazy(() => import("./components/SearchOverlay"));
+// SearchOverlay handled via ModalManager
 
 import ToastPortal from "./components/ToastPortal";
+import { ModalManager } from "./components/ModalManager";
+import { OverlayLayer } from "./components/OverlayLayer";
 import TripsView from "./components/TripsView";
 import { VideoLightbox } from "./components/VideoLightbox";
 import { VideoManager } from "./components/VideoManager";
 import { Welcome } from "./components/Welcome";
 import { useLibraryContext } from "./contexts/LibraryContext";
 import { useDebouncedCallback } from "./hooks/useDebounce";
+import { useConnectivityAndAuth } from "./hooks/useConnectivityAndAuth";
+import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
+import { useResultsShortcuts } from "./hooks/useResultsShortcuts";
 import { ShareManager } from "./modules/ShareManager";
 import { VideoService } from "./services/VideoService";
 import { useAltSearch } from "./stores";
@@ -215,6 +214,7 @@ type _IconType = React.ComponentType<React.SVGProps<SVGSVGElement>>;
 type ViewType = "results" | "library" | "map" | "people" | "tasks" | "trips";
 
 import { FocusTrap } from "./utils/accessibility";
+import { handleError } from "./utils/errors";
 
 // (Removed) Local ScrollLoader in favor of shared utils/loading ScrollLoader
 
@@ -323,9 +323,10 @@ export default function App() {
 	const setThemeMode = useThemeStore((s) => s.setThemeMode);
 
 	// Local UI state
-	const [selectedView, setSelectedView] = useState<View>("library");
+// Route-driven: derive current view from location
 	const location = useLocation();
 	const navigate = useNavigate();
+    const currentView = pathToView(location.pathname);
 	const [searchText, setSearchText] = useState("");
 
 	const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -476,135 +477,22 @@ export default function App() {
 	const showInfoOverlay = useShowInfoOverlay();
 
 	// Onboarding tour action listeners ("Do it for me")
-	useEffect(() => {
-		const openAdvanced = () => modal.open("advanced");
-		const openFilters = () => setShowFilters(true);
-		const openFolder = () => modal.open("folder");
+	useOnboardingActions({ openModal: modal.open, openFilters: () => setShowFilters(true) });
 
-		window.addEventListener("tour-action-open-advanced", openAdvanced);
-		window.addEventListener("tour-action-open-filters", openFilters);
-		window.addEventListener("tour-action-select-library", openFolder);
-
-		return () => {
-			window.removeEventListener("tour-action-open-advanced", openAdvanced);
-			window.removeEventListener("tour-action-open-filters", openFilters);
-			window.removeEventListener("tour-action-select-library", openFolder);
-		};
-	}, [modal.open]);
-
-	// Connectivity ping + auth status
-	useEffect(() => {
-		let t: number | undefined;
-		let stopped = false;
-		const tick = async () => {
-			try {
-				const ok = await apiPing();
-				if (!stopped) setIsConnected(ok);
-			} catch {
-				if (!stopped) setIsConnected(false);
-			}
-			t = window.setTimeout(tick, 2500);
-		};
-		tick();
-		// Probe auth requirement once on mount
-		apiAuthStatus()
-			.then((s) => {
-				try {
-					const ls = localStorage.getItem("api_token");
-					setAuthRequired(Boolean(s?.auth_required) && !ls);
-				} catch {
-					setAuthRequired(Boolean(s?.auth_required));
-				}
-			})
-			.catch(() => {});
-		return () => {
-			stopped = true;
-			if (t) window.clearTimeout(t);
-		};
-	}, []);
+	// Connectivity and auth requirement
+	useConnectivityAndAuth({ setIsConnected, setAuthRequired });
 
 	// Global keyboard shortcuts
-	useEffect(() => {
-		const onKey = (e: KeyboardEvent) => {
-			// Skip when typing in inputs or contenteditable
-			const ae = document.activeElement as HTMLElement | null;
-			if (
-				ae &&
-				(ae.tagName === "INPUT" ||
-					ae.tagName === "TEXTAREA" ||
-					ae.isContentEditable)
-			)
-				return;
-
-			// If unknown modal/overlay is open, don't open more via shortcuts
-			try {
-				const anyModalOpen = Object.values(modalState || {}).some(Boolean);
-				if (anyModalOpen) return;
-			} catch {}
-			// Open Search Overlay (/)
-			if (searchCommandCenter && e.key === "/") {
-				e.preventDefault();
-				modal.open("search");
-				return;
-			}
-			// Toggle info overlay (I)
-			if (e.key.toLowerCase() === "i") {
-				e.preventDefault();
-				settingsActions.setShowInfoOverlay?.(!showInfoOverlay);
-				return;
-			}
-			// Open Advanced (A)
-			if (e.key.toLowerCase() === "a") {
-				e.preventDefault();
-				modal.open("advanced");
-				return;
-			}
-			// Help (?): toggle Help modal
-			if (e.key === "?") {
-				e.preventDefault();
-				modal.toggle("help");
-				return;
-			}
-			// Timeline jumps only when viewing results timeline
-			if (selectedView === "results" && (resultView as string) === "timeline") {
-				const dispatch = (kind: string) =>
-					window.dispatchEvent(
-						new CustomEvent("timeline-jump", { detail: { kind } }),
-					);
-				if (e.key.toLowerCase() === "t") {
-					e.preventDefault();
-					dispatch("today");
-					return;
-				}
-				if (e.key.toLowerCase() === "m") {
-					e.preventDefault();
-					dispatch("this-month");
-					return;
-				}
-				if (e.key.toLowerCase() === "l") {
-					e.preventDefault();
-					dispatch("last-month");
-					return;
-				}
-				if (e.key.toLowerCase() === "o") {
-					e.preventDefault();
-					dispatch("oldest");
-					return;
-				}
-			}
-		};
-		window.addEventListener("keydown", onKey);
-		return () => window.removeEventListener("keydown", onKey);
-	}, [
+	useGlobalShortcuts({
+		anyModalOpen: Boolean(Object.values(modalState || {}).some(Boolean)),
+		openModal: modal.open,
+		toggleModal: modal.toggle,
+		searchCommandCenter: Boolean(searchCommandCenter),
 		showInfoOverlay,
-		settingsActions,
-		selectedView,
-		resultView,
-		searchCommandCenter,
-		modal.open,
-		modal.toggle,
-		modalState,
-	]);
+		setShowInfoOverlay: settingsActions.setShowInfoOverlay,
+    selectedView: currentView,
+		resultView: resultView as string,
+	});
 
 	const prefersReducedMotion = useReducedMotion();
 
@@ -636,42 +524,7 @@ export default function App() {
 		favOnly,
 	]);
 
-	// Route -> view sync (HashRouter deep links)
-	useEffect(() => {
-		const path = location.pathname || "/library";
-		const seg = path.split("/").filter(Boolean)[0] || "library";
-		const nextView: View =
-			seg === "search"
-				? "results"
-				: seg === "library"
-					? "library"
-					: seg === "people"
-						? "people"
-						: seg === "collections"
-							? "collections"
-							: seg === "settings"
-								? "tasks" // map settings to tasks/settings panel for now
-								: "library";
-		if (selectedView !== nextView) setSelectedView(nextView);
-	}, [location.pathname, selectedView]);
-
-	// view -> route sync (user clicks in sidebar)
-	useEffect(() => {
-		const curr = location.pathname || "";
-		const want =
-			selectedView === "results"
-				? "/search"
-				: selectedView === "library"
-					? "/library"
-					: selectedView === "people"
-						? "/people"
-						: selectedView === "collections"
-							? "/collections"
-							: "/settings";
-		if (curr !== want)
-			navigate({ pathname: want, search: location.search }, { replace: false });
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [selectedView, navigate, location.search, location.pathname]);
+	// Route-driven views: derive from location when needed; navigation uses navigate()
 
 	// Read search query + filters from URL for deep linking
 	useEffect(() => {
@@ -703,6 +556,9 @@ export default function App() {
 			if (fmin) settingsActions.setFMin(parseFloat(fmin));
 			const fmax = sp.get("f_max");
 			if (fmax) settingsActions.setFMax(parseFloat(fmax));
+			// Rating filter
+			const rmin = sp.get("rating_min");
+			if (rmin) setRatingMin(Math.max(0, Math.min(5, parseInt(rmin, 10) || 0)));
 			const person = sp.get("person");
 			const personsCSV = sp.get("persons");
 			if (personsCSV)
@@ -713,12 +569,25 @@ export default function App() {
 						.filter(Boolean),
 				);
 			else if (person) workspaceActions.setPersons([person]);
-			const rv = sp.get("rv") as "grid" | "timeline" | "map" | null;
-			if (rv && settingsActions.setResultView)
-				settingsActions.setResultView(rv);
-			const tb = sp.get("tb") as "day" | "week" | "month" | "year" | null;
-			if (tb && settingsActions.setTimelineBucket)
-				settingsActions.setTimelineBucket(tb);
+			// Engine/search behavior flags
+			const fast = sp.get("fast");
+			if (fast === "1") settingsActions.setUseFast(true);
+			const fastk = sp.get("fast_kind");
+			if (fastk) settingsActions.setFastKind(fastk);
+			const caps = sp.get("caps");
+			if (caps === "1") settingsActions.setUseCaps(true);
+			const ocrq = sp.get("ocr");
+			if (ocrq === "1") settingsActions.setUseOcr(true);
+            const rv = sp.get("rv") as "grid" | "timeline" | "map" | null;
+            if (rv && settingsActions.setResultView) {
+                settingsActions.setResultView(rv);
+                if (rv === "grid" || rv === "timeline") _setResultView(rv);
+            }
+            const tb = sp.get("tb") as "day" | "week" | "month" | "year" | null;
+            if (tb && settingsActions.setTimelineBucket) {
+                settingsActions.setTimelineBucket(tb);
+                if (tb === "day" || tb === "week" || tb === "month") _setTimelineBucket(tb);
+            }
 		} catch {}
 	}, [
 		location.search,
@@ -783,16 +652,15 @@ export default function App() {
 			"collections",
 			"saved",
 			"smart",
-			"memories",
 			"trips",
 			"videos",
 			"people",
 			"map",
 		];
-		if (exploringViews.includes(selectedView as View)) {
+		if (exploringViews.includes(currentView as View)) {
 			completeOnboardingStep("explore_features");
 		}
-	}, [selectedView, completeOnboardingStep]);
+	}, [currentView, completeOnboardingStep]);
 
 	// Show contextual help based on context and user actions
 	useEffect(() => {
@@ -801,12 +669,12 @@ export default function App() {
 			if (userActions.length === 0) return true;
 
 			// Show help when user hasn't searched yet but is on search view
-			if (selectedView === "results" && !userActions.includes("searched"))
+			if (currentView === "results" && !userActions.includes("searched"))
 				return true;
 
 			// Show help when user has photos but hasn't searched
 			if (
-				selectedView === "library" &&
+				currentView === "library" &&
 				dir &&
 				!userActions.includes("searched")
 			)
@@ -816,7 +684,7 @@ export default function App() {
 		};
 
 		setShowContextualHelp(shouldShowHelp());
-	}, [selectedView, userActions, dir]);
+	}, [currentView, userActions, dir]);
 
 	// Show onboarding checklist for new users
 	useEffect(() => {
@@ -1010,9 +878,20 @@ export default function App() {
 				if (isoMax) sp.set("iso_max", String(isoMax));
 				if (fMin) sp.set("f_min", String(fMin));
 				if (fMax) sp.set("f_max", String(fMax));
+				if (ratingMin > 0) sp.set("rating_min", String(ratingMin));
 				const ppl = persons.filter(Boolean);
 				if (ppl.length === 1) sp.set("person", ppl[0]);
 				if (ppl.length > 1) sp.set("persons", ppl.join(","));
+				// Engine/search behavior flags
+				if (useFast) sp.set("fast", "1");
+				if (fastKind) sp.set("fast_kind", fastKind);
+				if (useCaps) sp.set("caps", "1");
+                if (useOcr) sp.set("ocr", "1");
+                // UI state for result presentation
+                try {
+                    if (resultView) sp.set("rv", resultView);
+                    if (timelineBucket) sp.set("tb", timelineBucket);
+                } catch {}
 				navigate(
 					{ pathname: "/search", search: `?${sp.toString()}` },
 					{ replace: false },
@@ -1020,8 +899,8 @@ export default function App() {
 			} catch {}
 			uiActions.setBusy("Searching…");
 			uiActions.setNote("");
-			try {
-				const tagList = tagFilter
+            try {
+                const tagList = tagFilter
 					.split(",")
 					.map((s: string) => s.trim())
 					.filter(Boolean);
@@ -1082,14 +961,18 @@ export default function App() {
 				photoActions.setSearchId(r.search_id || "");
 				uiActions.setNote(`Found ${r.results?.length || 0} results.`);
 				await Promise.all([loadFav(), loadSaved(), loadTags(), loadDiag()]);
-				setSelectedView("results");
 				// Mark onboarding: first search completed
 				completeOnboardingStep("first_search");
-			} catch (e) {
-				uiActions.setNote(e instanceof Error ? e.message : "Search failed");
-			} finally {
-				uiActions.setBusy("");
-			}
+            } catch (e) {
+                uiActions.setNote(e instanceof Error ? e.message : "Search failed");
+                handleError(e, {
+                    logToConsole: true,
+                    logToServer: true,
+                    context: { action: "search", component: "App.doSearchImmediate", dir },
+                });
+            } finally {
+                uiActions.setBusy("");
+            }
 		},
 		[
 			searchText,
@@ -1136,6 +1019,20 @@ export default function App() {
 	// Debounced search for better performance
 	const doSearch = useDebouncedCallback(doSearchImmediate, 300);
 
+	// Hook up advanced search apply events from ModalManager
+	useEffect(() => {
+		const onApply = (e: Event) => {
+			// @ts-ignore
+			const q = e?.detail?.q as string | undefined;
+			if (typeof q === "string") {
+				setSearchText(q);
+				doSearchImmediate(q);
+			}
+		};
+		window.addEventListener("advanced-search-apply", onApply as EventListener);
+		return () => window.removeEventListener("advanced-search-apply", onApply as EventListener);
+	}, [doSearchImmediate]);
+
 	const prepareFast = useCallback(
 		async (kind: "annoy" | "faiss" | "hnsw") => {
 			uiActions.setBusy(`Preparing ${kind.toUpperCase()}…`);
@@ -1148,13 +1045,14 @@ export default function App() {
 					needsOAI ? openaiKey : undefined,
 				);
 				uiActions.setNote(`${kind.toUpperCase()} ready`);
-			} catch (e) {
-				uiActions.setNote(
-					e instanceof Error ? e.message : "Failed to build index",
-				);
-			} finally {
-				uiActions.setBusy("");
-			}
+    } catch (e) {
+        uiActions.setNote(
+            e instanceof Error ? e.message : "Failed to build index",
+        );
+        handleError(e, { logToServer: true, context: { action: "build_fast", component: "App.buildFast", dir } });
+    } finally {
+        uiActions.setBusy("");
+    }
 		},
 		[dir, engine, needsHf, hfToken, needsOAI, openaiKey, uiActions],
 	);
@@ -1171,11 +1069,12 @@ export default function App() {
 			);
 			uiActions.setNote(`OCR updated ${r.updated} images`);
 			await loadTags();
-		} catch (e) {
-			uiActions.setNote(e instanceof Error ? e.message : "OCR failed");
-		} finally {
-			uiActions.setBusy("");
-		}
+    } catch (e) {
+        uiActions.setNote(e instanceof Error ? e.message : "OCR failed");
+        handleError(e, { logToServer: true, context: { action: "build_ocr", component: "App.buildOCR", dir } });
+    } finally {
+        uiActions.setBusy("");
+    }
 	}, [dir, engine, needsHf, hfToken, needsOAI, openaiKey, loadTags, uiActions]);
 
 	const buildMetadata = useCallback(async () => {
@@ -1188,13 +1087,14 @@ export default function App() {
 				needsOAI ? openaiKey : undefined,
 			);
 			uiActions.setNote(`Metadata ready (${r.updated})`);
-		} catch (e) {
-			uiActions.setNote(
-				e instanceof Error ? e.message : "Metadata build failed",
-			);
-		} finally {
-			uiActions.setBusy("");
-		}
+    } catch (e) {
+        uiActions.setNote(
+            e instanceof Error ? e.message : "Metadata build failed",
+        );
+        handleError(e, { logToServer: true, context: { action: "build_metadata", component: "App.buildMetadata", dir } });
+    } finally {
+        uiActions.setBusy("");
+    }
 	}, [dir, engine, needsHf, hfToken, needsOAI, openaiKey, uiActions]);
 
 	// Poll analytics when busy to surface progress notes
@@ -1496,177 +1396,23 @@ export default function App() {
 		});
 	}, [results?.length, isMounted]);
 
-	// Keyboard shortcuts in modern results context
-	useEffect(() => {
-		function onKey(e: KeyboardEvent) {
-			const t = e.target as HTMLElement;
-			if (
-				t &&
-				(t.tagName === "INPUT" ||
-					t.tagName === "TEXTAREA" ||
-					t.isContentEditable)
-			)
-				return;
-			// Pause global shortcuts when overlays or modals are open
-			if (showShortcuts || modal || showFilters) return;
-			if (e.key === "/") {
-				e.preventDefault();
-				// Focus search bar if needed
-				return;
-			}
-			if (e.key === "?" || (e.shiftKey && e.key === "/")) {
-				e.preventDefault();
-				setShowShortcuts(true);
-				return;
-			}
-			if (selectedView !== "results") return;
-			const hasResults = (results?.length || 0) > 0;
-			if (!hasResults) return;
-
-			if (e.key === "Escape") {
-				setDetailIdx(null);
-				return;
-			}
-			if (detailIdx !== null) {
-				if (e.key === "ArrowLeft" || e.key === "k") {
-					e.preventDefault();
-					navDetail(-1);
-				}
-				if (e.key === "ArrowRight" || e.key === "j") {
-					e.preventDefault();
-					navDetail(1);
-				}
-				if (e.key.toLowerCase() === "f") {
-					e.preventDefault();
-					const p = results?.[detailIdx]?.path;
-					if (!p) return;
-					apiSetFavorite(dir, p, !fav.includes(p))
-						.then(loadFav)
-						.catch(() => {});
-				}
-				return;
-			}
-			// Grid context
-			if (e.key.toLowerCase() === "a") {
-				e.preventDefault();
-				setSelected(new Set((results ?? []).map((r) => r.path)));
-				return;
-			}
-			if (e.key.toLowerCase() === "c") {
-				e.preventDefault();
-				setSelected(new Set());
-				return;
-			}
-			if (e.key.toLowerCase() === "f" && focusIdx !== null) {
-				e.preventDefault();
-				const p = results?.[focusIdx]?.path;
-				if (!p) return;
-				apiSetFavorite(dir, p, !fav.includes(p))
-					.then(loadFav)
-					.catch(() => {});
-				return;
-			}
-			if (e.key === "Enter" && focusIdx !== null) {
-				e.preventDefault();
-				setDetailIdx(focusIdx);
-				return;
-			}
-			if (e.key === " " && focusIdx !== null) {
-				e.preventDefault();
-				const p = results?.[focusIdx]?.path;
-				if (!p) return;
-				toggleSelect(p);
-				return;
-			}
-
-			// Navigation across grid
-			if (e.key === "ArrowLeft") {
-				e.preventDefault();
-				if (focusIdx !== null) setFocusIdx(Math.max(0, focusIdx - 1));
-				return;
-			}
-			if (e.key === "ArrowRight") {
-				e.preventDefault();
-				if (focusIdx !== null)
-					setFocusIdx(Math.min((results?.length ?? 1) - 1, focusIdx + 1));
-				return;
-			}
-			if (e.key === "ArrowUp" && focusIdx !== null) {
-				e.preventDefault();
-				// find current row and col using ref to avoid dependency
-				const currentLayout = layoutRowsRef.current;
-				const rowIdx = currentLayout.findIndex((r) => r.includes(focusIdx));
-				if (rowIdx > 0) {
-					const col = currentLayout[rowIdx].indexOf(focusIdx);
-					const prevRow = currentLayout[rowIdx - 1];
-					const target = prevRow[Math.min(col, prevRow.length - 1)];
-					if (typeof target === "number") setFocusIdx(target);
-				}
-				return;
-			}
-			if (e.key === "ArrowDown" && focusIdx !== null) {
-				e.preventDefault();
-				const currentLayout = layoutRowsRef.current;
-				const rowIdx = currentLayout.findIndex((r) => r.includes(focusIdx));
-				if (rowIdx >= 0 && rowIdx < currentLayout.length - 1) {
-					const col = currentLayout[rowIdx].indexOf(focusIdx);
-					const nextRow = currentLayout[rowIdx + 1];
-					const target = nextRow[Math.min(col, nextRow.length - 1)];
-					if (typeof target === "number") setFocusIdx(target);
-				}
-				return;
-			}
-
-			// Home/End jump
-			if (e.key === "Home") {
-				e.preventDefault();
-				setFocusIdx(0);
-				return;
-			}
-			if (e.key === "End") {
-				e.preventDefault();
-				setFocusIdx(results.length - 1);
-				return;
-			}
-
-			// PageUp/PageDown jumps by ~3 rows preserving column when possible
-			if ((e.key === "PageUp" || e.key === "PageDown") && focusIdx !== null) {
-				e.preventDefault();
-				const jump = 3;
-				const currentLayout = layoutRowsRef.current;
-				const rowIdx = currentLayout.findIndex((r) => r.includes(focusIdx));
-				if (rowIdx >= 0) {
-					const col = currentLayout[rowIdx].indexOf(focusIdx);
-					const targetRow =
-						e.key === "PageUp"
-							? Math.max(0, rowIdx - jump)
-							: Math.min(currentLayout.length - 1, rowIdx + jump);
-					const row = currentLayout[targetRow];
-					const target = row[Math.min(col, row.length - 1)];
-					if (typeof target === "number") setFocusIdx(target);
-				}
-				return;
-			}
-		}
-		window.addEventListener("keydown", onKey);
-		return () => window.removeEventListener("keydown", onKey);
-	}, [
-		selectedView,
-		results?.length,
-		detailIdx,
+	// Results context keyboard shortcuts
+	useResultsShortcuts({
+    enabled: currentView === "results",
+		anyOverlayOpen:
+			Boolean(showShortcuts) || Boolean(showFilters) || Boolean(Object.values(modalState || {}).some(Boolean)),
+		results: (results || []).map((r) => ({ path: r.path })),
 		dir,
 		fav,
-		// layoutRows removed - causes re-render cascades
-		// focusIdx is intentionally omitted - it's managed internally
+		focusIdx,
+		setFocusIdx,
+		layoutRowsRef,
+		detailIdx,
+		setDetailIdx,
 		navDetail,
 		toggleSelect,
-		showShortcuts,
-		modal,
-		showFilters,
 		loadFav,
-		results,
-		focusIdx,
-	]);
+	});
 
 	// Ensure focused tile is visible
 	useEffect(() => {
@@ -1776,7 +1522,7 @@ export default function App() {
 						const results = [{ path, score: 0 }];
 						photoActions.setResults(results);
 						setDetailIdx(0);
-						setSelectedView("results");
+						navigate(viewToPath("results"));
 					}}
 					tagsMap={tagsMap}
 				/>
@@ -1865,10 +1611,10 @@ export default function App() {
 								enablePullToRefresh={true}
 								onPullToRefresh={handlePullToRefresh}
 							>
-								{/* Dedicated share viewer route (full screen, minimal chrome) */}
-								{(location.pathname || "").startsWith("/share/") && (
-									<ShareViewer />
-								)}
+                                {/* Dedicated share viewer route (full screen, minimal chrome) */}
+                                {isSharePath(location.pathname) && (
+                                    <ShareViewer />
+                                )}
 								{(location.pathname || "").startsWith("/mobile-test") && (
 									<MobilePWATest />
 								)}
@@ -1878,9 +1624,9 @@ export default function App() {
 										{
 											"high-contrast": accessibilitySettings?.highContrast,
 											"large-text": accessibilitySettings?.largeText,
-											hidden:
-												(location.pathname || "").startsWith("/share/") ||
-												(location.pathname || "").startsWith("/mobile-test"),
+                                    hidden:
+                                        isSharePath(location.pathname) ||
+                                        (location.pathname || "").startsWith("/mobile-test"),
 										},
 									)}
 								>
@@ -2016,137 +1762,106 @@ export default function App() {
 										}}
 									/>
 
-									{/* Modern UX Integration - Enhanced Sidebar */}
-									{isMobile ? (
-										<ModernSidebar
-											selectedView={selectedView}
-											onViewChange={(view: string) =>
-												setSelectedView(view as View)
-											}
-											stats={{
-												totalPhotos: library?.length || 0,
-												collections: Object.keys(collections || {}).length,
-												people: (clusters || []).length,
-												favorites: fav.length,
-											}}
-											aiStatus={{
-												indexReady: true,
-												fastIndexType: "FAISS",
-												freeSpace: 0,
-											}}
-											darkMode={themeMode === "dark"}
-											onDarkModeToggle={() =>
-												setThemeMode(themeMode === "dark" ? "light" : "dark")
-											}
-											onSettingsClick={() => setShowAccessibilityPanel(true)}
-											onSelectLibrary={() => modal.open("folder")}
-										/>
-									) : (
-										<ModernSidebar
-											selectedView={selectedView}
-											onViewChange={(view: string) =>
-												setSelectedView(view as View)
-											}
-											stats={{
-												totalPhotos: library?.length || 0,
-												collections: Object.keys(collections || {}).length,
-												people: (clusters || []).length,
-												favorites: fav.length,
-											}}
-											aiStatus={{
-												indexReady: true,
-												fastIndexType: "FAISS",
-												freeSpace: 0,
-											}}
-											darkMode={themeMode === "dark"}
-											onDarkModeToggle={() =>
-												setThemeMode(themeMode === "dark" ? "light" : "dark")
-											}
-											onSettingsClick={() => setShowAccessibilityPanel(true)}
-											onSelectLibrary={() => modal.open("folder")}
-										/>
-									)}
-
-									<div className="flex-1 flex flex-col overflow-hidden">
-										{/* Modern Header Wrapper */}
-										<header className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-700/50 px-4 md:px-8 py-4 md:py-6">
-											<TopBar
-												searchText={searchText}
-												setSearchText={setSearchText}
-												onSearch={doSearchImmediate}
-												clusters={clusters}
-												allTags={allTags}
-												meta={meta}
-												diag={diag}
-												busy={!!busy}
-												gridSize={gridSize}
-												setGridSize={setGridSize}
-												selectedView={selectedView as ViewType}
-												setSelectedView={(view: string) =>
-													setSelectedView(view as View)
-												}
-												currentFilter={currentFilter}
-												setCurrentFilter={setCurrentFilter}
-												ratingMin={ratingMin}
-												setRatingMin={setRatingMin}
-												setModal={(m: { kind: string } | null) =>
-													m ? modal.open(m.kind as ModalKey) : undefined
-												}
-												setIsMobileMenuOpen={setIsMobileMenuOpen}
-												setShowFilters={setShowFilters}
-												selected={selected}
-												setSelected={setSelected}
-												dir={dir}
-												engine={engine}
-												topK={topK}
-												useOsTrash={useOsTrash}
-												showInfoOverlay={showInfoOverlay}
-												onToggleInfoOverlay={() =>
-													settingsActions.setShowInfoOverlay
-														? settingsActions.setShowInfoOverlay(
-																!showInfoOverlay,
-															)
-														: undefined
-												}
-												resultView={resultView as "grid" | "timeline"}
-												onChangeResultView={(view) =>
-													settingsActions.setResultView?.(view)
-												}
-												timelineBucket={timelineBucket}
-												onChangeTimelineBucket={(b) =>
-													settingsActions.setTimelineBucket?.(b)
-												}
-												photoActions={photoActions}
-												uiActions={uiActions}
-												toastTimerRef={toastTimerRef}
-												setToast={setToast}
-												isIndexing={libState.isIndexing}
-												onIndex={() => lib.index()}
-												activeJobs={
-													jobs.filter((j) => j.status === "running").length
-												}
-												onOpenJobs={() => modal.open("jobs")}
-												progressPct={libState.progressPct}
-												etaSeconds={libState.etaSeconds}
-												paused={libState.paused}
-												tooltip={libState.tip}
-												ocrReady={ocrReady}
-												onOpenSearchOverlay={() => modal.open("search")}
-												onPause={async () => {
-													try {
-														await lib.pause?.(dir);
-													} catch {}
-												}}
-												onResume={async () => {
-													try {
-														await lib.resume?.(dir);
-													} catch {}
-												}}
-												onOpenThemeModal={() => modal.open("theme")}
-												onOpenDiagnostics={() => modal.open("diagnostics")}
-											/>
-										</header>
-
+									{/* App shell with sidebar + header */}
+    <AppShell
+										showModernSidebar={true}
+										isMobile={isMobile}
+										sidebarStats={{
+											totalPhotos: library?.length || 0,
+											collections: Object.keys(collections || {}).length,
+											people: (clusters || []).length,
+											favorites: fav.length,
+										}}
+										darkMode={themeMode === "dark"}
+										onDarkModeToggle={() => setThemeMode(themeMode === "dark" ? "light" : "dark")}
+            onSettingsClick={() => setShowAccessibilityPanel(true)}
+            selectedView={currentView}
+                                onViewChange={(view: string) => {
+                                    switch (view) {
+                                        case "results":
+                                            navigate(viewToPath("results"));
+                                            break;
+                                        case "library":
+                                            navigate(viewToPath("library"));
+                                            break;
+                                        case "people":
+                                            navigate(viewToPath("people"));
+                                            break;
+                                        case "collections":
+                                            navigate(viewToPath("collections"));
+                                            break;
+                                        case "saved":
+                                            navigate(viewToPath("saved"));
+                                            break;
+                                        case "map":
+                                            navigate(viewToPath("map"));
+                                            break;
+                                        case "smart":
+                                            navigate(viewToPath("smart"));
+                                            break;
+                                        case "trips":
+                                            navigate(viewToPath("trips"));
+                                            break;
+                                        case "videos":
+                                            navigate(viewToPath("videos"));
+                                            break;
+                                        default:
+                                            navigate(viewToPath("library"));
+                                    }
+                                }}
+										onSelectLibrary={() => modal.open("folder")}
+										topBarProps={{
+											searchText,
+											setSearchText,
+											onSearch: doSearchImmediate,
+											clusters: clusters || [],
+											allTags: allTags || [],
+											meta: meta || { cameras: [], places: [] },
+											busy: !!busy,
+											gridSize,
+											setGridSize,
+                                selectedView: (currentView as ViewType),
+                                setSelectedView: (v) => navigate(viewToPath(String(v))),
+											currentFilter,
+											setCurrentFilter,
+											ratingMin,
+											setRatingMin,
+											setModal: (m: { kind: string } | null) => (m ? modal.open(m.kind as ModalKey) : undefined),
+											setIsMobileMenuOpen,
+											setShowFilters,
+											selected,
+											setSelected,
+											dir,
+											engine,
+											topK,
+											useOsTrash,
+											showInfoOverlay,
+											onToggleInfoOverlay: () =>
+												settingsActions.setShowInfoOverlay ? settingsActions.setShowInfoOverlay(!showInfoOverlay) : undefined,
+											resultView: resultView as "grid" | "timeline",
+											onChangeResultView: (view) => settingsActions.setResultView?.(view),
+											timelineBucket,
+											onChangeTimelineBucket: (b) => settingsActions.setTimelineBucket?.(b),
+											photoActions,
+											uiActions,
+											toastTimerRef,
+											setToast,
+											isIndexing: libState.isIndexing,
+											onIndex: () => lib.index(),
+											activeJobs: jobs.filter((j) => j.status === "running").length,
+											onOpenJobs: () => modal.open("jobs"),
+											progressPct: libState.progressPct,
+											etaSeconds: libState.etaSeconds,
+											paused: libState.paused,
+											tooltip: libState.tip,
+											ocrReady,
+											onOpenSearchOverlay: () => modal.open("search"),
+											onPause: async () => { try { await lib.pause?.(dir); } catch {} },
+											onResume: async () => { try { await lib.resume?.(dir); } catch {} },
+											onOpenThemeModal: () => modal.open("theme"),
+											onOpenDiagnostics: () => modal.open("diagnostics"),
+										}}
+									>
 										{/* Modern UX Integration - Accessibility Button */}
 										<div className="px-4 pt-2 flex items-center gap-2">
 											<motion.button
@@ -2205,569 +1920,162 @@ export default function App() {
 											ref={scrollContainerRef}
 											aria-label="Main content"
 										>
-											{selectedView === "results" && (
-												<SectionErrorBoundary sectionName="Search Results">
-													<div className="p-4">
-														{/* Results context toolbar */}
-														{results &&
-															results.length > 0 &&
-															(searchText || "").trim() && (
-																<div className="mb-2 flex items-center justify-between">
-																	<div className="text-sm text-gray-600">
-																		{results.length} results
-																	</div>
-																	{altSearch?.active && (
-																		<div
-																			className="text-xs px-2 py-1 rounded bg-yellow-50 text-yellow-800 border border-yellow-200"
-																			aria-live="polite"
-																		>
-																			Showing results for "{altSearch.applied}"
-																			(from "{altSearch.original}")
-																			<button
-																				type="button"
-																				className="ml-2 underline"
-																				onClick={() => {
-																					setSearchText(altSearch.original);
-																					doSearchImmediate(altSearch.original);
-																				}}
-																			>
-																				Search original
-																			</button>
-																		</div>
-																	)}
-																	<button
-																		type="button"
-																		className="chip"
-																		title="Save this search as a Smart Collection"
-																		onClick={async () => {
-																			const name = (
-																				prompt(
-																					"Save current search as Smart (name):",
-																				) || ""
-																			).trim();
-																			if (!name) return;
-																			try {
-																				const tags = (tagFilter || "")
-																					.split(",")
-																					.map((s) => s.trim())
-																					.filter(Boolean);
-												const rules: {
-													query: string;
-													count?: number;
-												} & Record<string, unknown> = {
-																					query: (searchText || "").trim(),
-																					favoritesOnly: favOnly,
-																					tags,
-																					useCaptions: useCaps,
-																					useOcr,
-																					hasText,
-																					camera: camera || undefined,
-																					isoMin: isoMin || undefined,
-																					isoMax: isoMax || undefined,
-																					fMin: fMin || undefined,
-																					fMax: fMax || undefined,
-																					place: place || undefined,
-																				};
-																				const ppl = (persons || []).filter(
-																					Boolean,
-																				);
-																				if (ppl.length === 1)
-																					rules.person = ppl[0];
-																				else if (ppl.length > 1)
-																					rules.persons = ppl;
-																				const { apiSetSmart, apiGetSmart } =
-																					await import("./api");
-																				await apiSetSmart(dir, name, rules);
-																				try {
-																					const r = await apiGetSmart(dir);
-																					photoActions.setSmart(r.smart || {});
-																				} catch {}
-																				uiActions.setNote(
-																					`Saved smart collection: ${name}`,
-																				);
-																			} catch (e: unknown) {
-																				uiActions.setNote(
-																					(e instanceof Error
-																						? e.message
-																						: null) ||
-																						"Failed to save smart collection",
-																				);
-																			}
-																		}}
-																	>
-																		Save as Smart Collection
-																	</button>
-																</div>
-															)}
-														{results && results.length === 0 && searchText ? (
-															<div className="flex flex-col items-center justify-center min-h-[400px]">
-																<EnhancedEmptyState
-																	type="no-results"
-																	searchQuery={searchText}
-																	onAction={() => {
-																		setSearchText("");
-																		photoActions.setQuery("");
-																	}}
-																	onOpenFilters={() => setShowFilters(true)}
-																	onOpenAdvanced={() => modal.open("advanced")}
-																	didYouMean={(() => {
-																		try {
-											const people = (clusters || [])
-												.map((c) => (c as unknown)?.name)
-																				.filter(Boolean)
-																				.map(String);
-																			const cameras = (meta?.cameras || []).map(
-																				String,
-																			);
-																			const tags = (allTags || []).map(String);
-																			const candidates = Array.from(
-																				new Set([
-																					...people,
-																					...cameras,
-																					...tags,
-																				]),
-																			);
-																			const {
-																				didYouMean,
-																			} = require("./utils/searchSynonyms");
-																			return didYouMean(
-																				searchText || "",
-																				candidates,
-																			).slice(0, 3);
-																		} catch {
-																			return [] as string[];
-																		}
-																	})()}
-																	onClearSearch={() => {
-																		// Clear common filters
-																		if (favOnly) photoActions.setFavOnly(false);
-																		if (tagFilter)
-																			photoActions.setTagFilter("");
-																		setDateFrom("");
-																		setDateTo("");
-																		settingsActions.setPlace("");
-																		settingsActions.setCamera("");
-																		settingsActions.setIsoMin(0);
-																		settingsActions.setIsoMax(0);
-																		settingsActions.setFMin(0);
-																		settingsActions.setFMax(0);
-																		settingsActions.setHasText(false);
-																		workspaceActions.setPersons([]);
-																	}}
-																	hasActiveFilters={hasAnyFilters}
-																	sampleQueries={Array.from(
-																		new Set([
-																			...(/\bkids?\b/.test(
-																				(searchText || "").toLowerCase(),
-																			)
-																				? ["children"]
-																				: []),
-																			...(/\bchildren\b/.test(
-																				(searchText || "").toLowerCase(),
-																			)
-																				? ["kid", "kids"]
-																				: []),
-																			...(/\bdog\b/.test(
-																				(searchText || "").toLowerCase(),
-																			)
-																				? ["puppy", "pet dog"]
-																				: []),
-																			...(/\bcat\b/.test(
-																				(searchText || "").toLowerCase(),
-																			)
-																				? ["kitten", "pet cat"]
-																				: []),
-																			...(/\bbeach\b/.test(
-																				(searchText || "").toLowerCase(),
-																			)
-																				? ["ocean", "coast", "sunset beach"]
-																				: []),
-																			...(/\bcity\b/.test(
-																				(searchText || "").toLowerCase(),
-																			)
-																				? ["city skyline", "street at night"]
-																				: []),
-																			"golden hour",
-																			"family dinner",
-																			"mountain hike",
-																		]),
-																	).slice(0, 6)}
-																	onRunSample={(q) => doSearchImmediate(q)}
-																	onOpenHelp={() => modal.open("help")}
-																/>
-																<SampleSearchSuggestions
-																	onSearch={doSearchImmediate}
-																/>
-															</div>
-														) : resultView === "grid" ? (
-															<JustifiedResults
-																dir={dir}
-																engine={engine}
-																items={(results || []).map((r) => ({
-																	path: r.path,
-																	score: r.score,
-																}))}
-																selected={selected}
-																onToggleSelect={toggleSelect}
-																onOpen={(p) => openDetailByPath(p)}
-																scrollContainerRef={scrollContainerRef}
-																focusIndex={focusIdx ?? undefined}
-																onLayout={(rows) =>
-																	setLayoutRows((prev) =>
-																		rowsEqual(prev, rows) ? prev : rows,
-																	)
-																}
-																ratingMap={ratingMap}
-																showInfoOverlay={showInfoOverlay}
-															/>
-														) : (
-															<TimelineResults
-																dir={dir}
-																engine={engine}
-																items={(results || []).map((r) => ({
-																	path: r.path,
-																	score: r.score,
-																}))}
-																selected={selected}
-																onToggleSelect={toggleSelect}
-																onOpen={(p) => openDetailByPath(p)}
-																showInfoOverlay={showInfoOverlay}
-																bucket={timelineBucket}
-															/>
-														)}
-													</div>
-												</SectionErrorBoundary>
-											)}
-											{selectedView === "library" && (
-												<SectionErrorBoundary sectionName="Library">
-													<LibraryView />
-												</SectionErrorBoundary>
-											)}
-											{selectedView === "people" && (
-												<div className="p-4">
-													<PeopleView
-														dir={dir}
-														engine={engine}
-														clusters={clusters || []}
-														persons={persons}
-														setPersons={workspaceActions.setPersons}
-														busy={busy}
-														setBusy={uiActions.setBusy}
-														setNote={uiActions.setNote}
-														onLoadFaces={loadFaces}
-														onOpenPhotos={(photos) => {
-															// Convert paths to search results and switch to results view
-															photoActions.setResults(
-																photos.map((path) => ({ path, score: 0 })),
-															);
-															setSelectedView("results");
-															uiActions.setNote(
-																`Viewing ${photos.length} photos from face cluster`,
-															);
-														}}
-													/>
-												</div>
-											)}
-											{selectedView === "map" && (
-												<div className="p-4">
-													<MapView points={points || []} onLoadMap={loadMap} />
-												</div>
-											)}
-											{selectedView === "collections" && (
-												<div className="p-4">
-													<Collections
-														dir={dir}
-														engine={engine}
-														collections={collections}
-														onLoadCollections={async () => {
-															const { apiGetCollections } = await import(
-																"./api"
-															);
-															const r = await apiGetCollections(dir);
-															photoActions.setCollections(r.collections || {});
-														}}
-														onOpen={(name: string) => {
-															const paths = collections?.[name] || [];
-															photoActions.setResults(
-																paths.map((p) => ({ path: p, score: 0 })),
-															);
-															setSelectedView("results");
-															uiActions.setNote(`${paths.length} in ${name}`);
-														}}
-														onDelete={async (name: string) => {
+											<ResultsConfigProvider
+												value={{
+													resultView: resultView as "grid" | "timeline",
+													setResultView: (v) => {
+														_setResultView(v);
+														settingsActions.setResultView?.(v);
+													},
+													timelineBucket,
+													setTimelineBucket: (b) => {
+														_setTimelineBucket(b);
+														settingsActions.setTimelineBucket?.(b);
+													},
+												}}
+											>
+											<ResultsUIProvider
+												value={{
+													selected,
+													setSelected,
+													toggleSelect,
+													focusIdx,
+													setFocusIdx,
+													detailIdx,
+													setDetailIdx,
+													layoutRowsRef,
+													setLayoutRows,
+												}}
+											>
+											{/* Route-mounted feature containers */}
+											<Routes>
+												<Route path="/people" element={<PeopleViewContainer />} />
+												<Route path="/collections" element={<CollectionsViewContainer />} />
+												<Route
+													path="/library"
+													element={
+														<LibraryContainer
+															dir={dir}
+															library={library}
+															isIndexing={libState.isIndexing}
+															progressPct={libState.progressPct}
+															etaSeconds={libState.etaSeconds}
+															onSelectLibrary={() => modal.open("folder")}
+															onRunDemo={async () => {
 															try {
-																const {
-																	apiDeleteCollection,
-																	apiGetCollections,
-																} = await import("./api");
-																await apiDeleteCollection(dir, name);
-																const r = await apiGetCollections(dir);
-																photoActions.setCollections(
-																	r.collections || {},
-																);
-																setToast({
-																	message: `Deleted collection ${name}`,
-																});
-															} catch (e) {
-																uiActions.setNote(
-																	e instanceof Error
-																		? e.message
-																		: "Delete failed",
-																);
-															}
+																const demoPath = await apiDemoDir();
+																if (!demoPath) {
+																	uiActions.setNote("Demo library not available on this install.");
+																	return;
+																}
+																settingsActions.setDir(demoPath);
+																await lib.index();
+																uiActions.setNote("Demo library loaded! Try 'beach sunset' or 'family photos'");
+                                            } catch (error) {
+                                                console.error("Failed to setup demo:", error);
+                                                uiActions.setNote(error instanceof Error ? error.message : "Failed to setup demo");
+                                                handleError(error, { logToServer: true, context: { action: "demo_setup", component: "App.LibraryView.onRunDemo", dir } });
+                                            }
 														}}
-													/>
-												</div>
-											)}
-											{selectedView === "saved" && (
-												<div className="p-4">
-													<SavedSearches
-														saved={saved}
-														onRun={(_name: string, q: string, k?: number) => {
-															setSearchText(q);
+															onOpenHelp={() => modal.open("help")}
+														/>
+													}
+												/>
+												<Route
+													path="/search"
+													element={
+														<ResultsView
+															dir={dir}
+															engine={engine}
+															results={(results || []).map((r) => ({ path: r.path, score: r.score }))}
+															searchText={searchText}
+															altSearch={altSearch}
+															ratingMap={ratingMap}
+															showInfoOverlay={showInfoOverlay}
+															openDetailByPath={openDetailByPath}
+															scrollContainerRef={scrollContainerRef}
+															setSearchText={setSearchText}
+															onSearchNow={doSearchImmediate}
+															resultView={resultView as "grid" | "timeline"}
+															timelineBucket={timelineBucket}
+															onLayout={(rows) => setLayoutRows((prev) => (rowsEqual(prev, rows) ? prev : rows))}
+														/>
+													}
+												/>
+												<Route
+													path="/map"
+													element={
+														<div className="p-4">
+															<MapView points={points || []} onLoadMap={loadMap} />
+														</div>
+													}
+												/>
+												<Route
+													path="/smart"
+													element={
+														<div className="p-4">
+															<SmartCollections
+																dir={dir}
+																engine={engine}
+																topK={topK}
+																smart={smart}
+																setSmart={photoActions.setSmart}
+																setResults={photoActions.setResults}
+																setSearchId={photoActions.setSearchId}
+																setNote={uiActions.setNote}
+																query={query}
+																favOnly={favOnly}
+																tagFilter={tagFilter}
+																useCaps={useCaps}
+																useOcr={useOcr}
+																hasText={hasText}
+																camera={camera}
+																isoMin={String(isoMin || "")}
+																isoMax={String(isoMax || "")}
+																fMin={String(fMin || "")}
+																fMax={String(fMax || "")}
+																place={place}
+																persons={persons}
+															/>
+														</div>
+													}
+												/>
+												<Route
+													path="/trips"
+													element={
+														<div className="p-4">
+															<TripsView
+																dir={dir}
+																engine={engine}
+																setBusy={uiActions.setBusy}
+																setNote={uiActions.setNote}
+																setResults={photoActions.setResults}
+															/>
+														</div>
+													}
+												/>
+												<Route
+													path="/videos"
+													element={
+														<div className="p-4">
+															<VideoManager currentDir={dir} provider={engine} />
+														</div>
+													}
+												/>
+												<Route
+													path="/saved"
+													element={
+														<SavedViewContainer
+															onRun={(_name, q, k) => {
+															if (q) setSearchText(q);
 															if (k) photoActions.setTopK(k);
 															doSearchImmediate(q);
 														}}
-														onDelete={async (name: string) => {
-															try {
-																const { apiDeleteSaved, apiGetSaved } =
-																	await import("./api");
-																await apiDeleteSaved(dir, name);
-																const r = await apiGetSaved(dir);
-																photoActions.setSaved(r.saved || []);
-															} catch (e) {
-																uiActions.setNote(
-																	e instanceof Error
-																		? e.message
-																		: "Delete failed",
-																);
-															}
-														}}
-													/>
-													<div className="mt-4 bg-white border rounded p-3">
-														<div className="flex items-center justify-between">
-															<h2 className="font-semibold">Presets</h2>
-															<div className="flex items-center gap-2">
-																<button
-																	type="button"
-																	className="px-2 py-1 rounded border"
-																	onClick={loadPresets}
-																>
-																	Refresh
-																</button>
-																<button
-																	type="button"
-																	className="px-2 py-1 rounded border"
-																	onClick={() => {
-																		try {
-																			const data = JSON.stringify(
-																				presets || [],
-																				null,
-																				2,
-																			);
-																			const blob = new Blob([data], {
-																				type: "application/json",
-																			});
-																			const url = URL.createObjectURL(blob);
-																			const a = document.createElement("a");
-																			a.href = url;
-																			a.download = "photo-search-presets.json";
-																			document.body.appendChild(a);
-																			a.click();
-																			document.body.removeChild(a);
-																			URL.revokeObjectURL(url);
-																		} catch {}
-																	}}
-																>
-																	Export
-																</button>
-																<label className="px-2 py-1 rounded border cursor-pointer">
-																	Import
-																	<input
-																		type="file"
-																		accept="application/json"
-																		className="hidden"
-																		onChange={async (e) => {
-																			const file = e.target.files?.[0];
-																			if (!file) return;
-																			try {
-																				const txt = await file.text();
-																				const arr = JSON.parse(txt);
-																				if (Array.isArray(arr)) {
-																					const { apiAddPreset } = await import(
-																						"./api"
-																					);
-																					for (const it of arr) {
-																						if (
-																							it &&
-																							typeof it.name === "string" &&
-																							typeof it.query === "string"
-																						) {
-																							await apiAddPreset(
-																								dir,
-																								it.name,
-																								it.query,
-																							);
-																						}
-																					}
-																					await loadPresets();
-																					setToast({
-																						message: `Imported ${arr.length} preset(s)`,
-																					});
-																				} else {
-																					uiActions.setNote(
-																						"Invalid JSON format",
-																					);
-																				}
-																			} catch {
-																				uiActions.setNote("Import failed");
-																			} finally {
-																				e.currentTarget.value = "";
-																			}
-																		}}
-																	/>
-																</label>
-															</div>
-														</div>
-														{presets.length === 0 ? (
-															<div className="text-sm text-gray-600 mt-2">
-																No presets yet. Use Advanced Search to create
-																one.
-															</div>
-														) : (
-															<div className="mt-2 divide-y">
-																{presets.map((p) => (
-																	<div
-																		key={p.name}
-																		className="py-2 flex items-center justify-between gap-3"
-																	>
-																		<div className="min-w-0">
-																			<div
-																				className="font-medium truncate"
-																				title={p.name}
-																			>
-																				{p.name}
-																			</div>
-																			<div
-																				className="text-xs text-gray-600 truncate"
-																				title={p.query}
-																			>
-																				{p.query}
-																			</div>
-																		</div>
-																		<div className="flex gap-2 shrink-0">
-																			<button
-																				type="button"
-																				onClick={() => {
-																					setSearchText(p.query);
-																					doSearch(p.query);
-																				}}
-																				className="px-2 py-1 rounded bg-blue-600 text-white text-sm"
-																			>
-																				Run
-																			</button>
-																			<button
-																				type="button"
-																				onClick={async () => {
-																					try {
-																						const { apiDeletePreset } =
-																							await import("./api");
-																						await apiDeletePreset(dir, p.name);
-																						await loadPresets();
-																					} catch {}
-																				}}
-																				className="px-2 py-1 rounded bg-red-600 text-white text-sm"
-																			>
-																				Delete
-																			</button>
-																		</div>
-																	</div>
-																))}
-															</div>
-														)}
-													</div>
-												</div>
-											)}
-											{selectedView === "memories" && (
-												<div className="p-4 space-y-4">
-													<div className="bg-white border rounded p-3">
-														<div className="flex items-center justify-between">
-															<div className="font-semibold">
-																Recent Favorites
-															</div>
-														</div>
-														{fav.length === 0 ? (
-															<div className="text-sm text-gray-600 mt-2">
-																No favorites yet.
-															</div>
-														) : (
-															<div className="mt-2 grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-2">
-																{fav.slice(0, 24).map((p) => (
-																	<img
-																		key={p}
-																		src={thumbUrl(dir, engine, p, 196)}
-																		alt={basename(p)}
-																		className="w-full h-24 object-cover rounded"
-																	/>
-																))}
-															</div>
-														)}
-													</div>
-													<div>
-														<TripsView
-															dir={dir}
-															engine={engine}
-															setBusy={uiActions.setBusy}
-															setNote={uiActions.setNote}
-															setResults={photoActions.setResults}
 														/>
-													</div>
-												</div>
-											)}
-											{/* tasks view removed */}
-											{selectedView === "smart" && (
-												<div className="p-4">
-													<SmartCollections
-														dir={dir}
-														engine={engine}
-														topK={topK}
-														smart={smart}
-														setSmart={photoActions.setSmart}
-														setResults={photoActions.setResults}
-														setSearchId={photoActions.setSearchId}
-														setNote={uiActions.setNote}
-														query={query}
-														favOnly={favOnly}
-														tagFilter={tagFilter}
-														useCaps={useCaps}
-														useOcr={useOcr}
-														hasText={hasText}
-														camera={camera}
-														isoMin={String(isoMin || "")}
-														isoMax={String(isoMax || "")}
-														fMin={String(fMin || "")}
-														fMax={String(fMax || "")}
-														place={place}
-														persons={persons}
-													/>
-												</div>
-											)}
-											{selectedView === "trips" && (
-												<div className="p-4">
-													<TripsView
-														dir={dir}
-														engine={engine}
-														setBusy={uiActions.setBusy}
-														setNote={uiActions.setNote}
-														setResults={photoActions.setResults}
-													/>
-												</div>
-											)}
-											{selectedView === "videos" && (
-												<div className="p-4">
-													<VideoManager currentDir={dir} provider={engine} />
-												</div>
-											)}
+													}
+												/>
+												<Route path="/" element={<Navigate to="/library" replace />} />
+											</Routes>
 											<StatsBar
 												items={items}
 												note={note}
@@ -2870,248 +2178,36 @@ export default function App() {
 												</div>
 											)}
 
-											{/* Modals */}
-											{modalState.export && (
-												<ExportModal
-													selected={selected}
-													dir={dir}
-													onClose={() => modal.close("export")}
-													uiActions={uiActions}
-												/>
-											)}
-											{modalState["enhanced-share"] && (
-												<Suspense fallback={null}>
-													<EnhancedSharingModal
-														selected={selected}
-														dir={dir}
-														onClose={() => modal.close("enhanced-share")}
-														uiActions={uiActions}
-													/>
-												</Suspense>
-											)}
-											{modalState.share && (
-												<div
-													role="button"
-													tabIndex={0}
-													className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
-													onKeyDown={(e) => {
-														if (e.key === "Escape") modal.close("share");
-													}}
-												>
-													<FocusTrap onEscape={() => modal.close("share")}>
-														<div
-															className="bg-white rounded-lg p-4 w-full max-w-md"
-															role="dialog"
-															aria-modal="true"
-														>
-															<div className="font-semibold mb-2">
-																Share (v1)
-															</div>
-															<form
-																onSubmit={async (e) => {
-																	e.preventDefault();
-																	if (!dir) return;
-																	const sel = Array.from(selected);
-																	if (sel.length === 0) {
-																		alert("Select photos to share");
-																		return;
-																	}
-																	const f = e.target as HTMLFormElement;
-																	const expiry = parseInt(
-																		(
-																			f.elements.namedItem(
-																				"expiry",
-																			) as HTMLInputElement
-																		).value || "24",
-																		10,
-																	);
-																	const pw = (
-																		f.elements.namedItem(
-																			"pw",
-																		) as HTMLInputElement
-																	).value.trim();
-																	const viewOnly = (
-																		f.elements.namedItem(
-																			"viewonly",
-																		) as HTMLInputElement
-																	).checked;
-																	try {
-																		const { apiCreateShare } = await import(
-																			"./api"
-																		);
-																		const r = await apiCreateShare(
-																			dir,
-																			engine,
-																			sel,
-																			{
-																				expiryHours: Number.isNaN(expiry)
-																					? 24
-																					: expiry,
-																				password: pw || undefined,
-																				viewOnly,
-																			},
-																		);
-																		await navigator.clipboard.writeText(
-																			window.location.origin + r.url,
-																		);
-																		uiActions.setNote(
-																			"Share link copied to clipboard",
-																		);
-																	} catch (err) {
-																		uiActions.setNote(
-																			err instanceof Error
-																				? err.message
-																				: "Share failed",
-																		);
-																	}
-																	modal.close("share");
-																}}
-															>
-																<div className="grid gap-3">
-																	<div>
-																		<label
-																			className="block text-sm text-gray-600 mb-1"
-																			htmlFor="expiry-input"
-																		>
-																			Expiry (hours)
-																		</label>
-																		<input
-																			id="expiry-input"
-																			name="expiry"
-																			type="number"
-																			min={1}
-																			defaultValue={24}
-																			className="w-full border rounded px-2 py-1"
-																		/>
-																	</div>
-																	<div>
-																		<label
-																			className="block text-sm text-gray-600 mb-1"
-																			htmlFor="pw-input"
-																		>
-																			Password (optional)
-																		</label>
-																		<input
-																			id="pw-input"
-																			name="pw"
-																			type="password"
-																			className="w-full border rounded px-2 py-1"
-																			placeholder="••••••"
-																		/>
-																	</div>
-																	<label className="flex items-center gap-2 text-sm">
-																		<input
-																			type="checkbox"
-																			name="viewonly"
-																			defaultChecked
-																		/>{" "}
-																		View-only (disable downloads)
-																	</label>
-																</div>
-																<div className="mt-4 flex justify-end gap-2">
-																	<button
-																		type="button"
-																		className="px-3 py-1 rounded border"
-																		onClick={() => modal.close("share")}
-																		aria-label="Cancel sharing"
-																	>
-																		Cancel
-																	</button>
-																	<button
-																		type="submit"
-																		className="px-3 py-1 rounded bg-blue-600 text-white"
-																		aria-label="Create shareable link"
-																	>
-																		Create Link
-																	</button>
-																</div>
-															</form>
-														</div>
-													</FocusTrap>
-												</div>
-											)}
-											{modalState.tag && (
-												<TagModal
-													onClose={() => modal.close("tag")}
-													onTagSelected={tagSelected}
-												/>
-											)}
-											{modalState.folder && (
-												<FolderModal
-													dir={dir}
-													useOsTrash={useOsTrash}
-													useFast={useFast}
-													fastKind={fastKind}
-													useCaps={useCaps}
-													useOcr={useOcr}
-													hasText={hasText}
-													highContrast={highContrast}
-													onClose={() => modal.close("folder")}
-													settingsActions={
-														{
-															...settingsActions,
-															setHighContrast: () => {}, // Dummy implementation
-														} as SettingsActions
-													}
-													uiActions={uiActions}
-													doIndex={() => lib.index()}
-													prepareFast={(kind: string) =>
-														prepareFast(kind as "annoy" | "faiss" | "hnsw")
-													}
-													buildOCR={buildOCR}
-													buildMetadata={buildMetadata}
-												/>
-											)}
-											{modalState.likeplus && (
-												<LikePlusModal
-													selected={selected}
-													dir={dir}
-													engine={engine}
-													topK={topK}
-													onClose={() => modal.close("likeplus")}
-													setSelectedView={(view: string) =>
-														setSelectedView(view as View)
-													}
-													photoActions={photoActions}
-													uiActions={uiActions}
-												/>
-											)}
-											{modalState.save && (
-												<SaveModal
-													dir={dir}
-													searchText={searchText}
-													query={query}
-													topK={topK}
-													onClose={() => modal.close("save")}
-													setSelectedView={(view: string) =>
-														setSelectedView(view as View)
-													}
-													photoActions={photoActions}
-													uiActions={uiActions}
-												/>
-											)}
-											{modalState.collect && (
-												<CollectionModal
-													selected={selected}
-													dir={dir}
-													collections={collections}
-													onClose={() => modal.close("collect")}
-													setToast={setToast}
-													photoActions={photoActions}
-													uiActions={uiActions}
-												/>
-											)}
-											{modalState.removeCollect && (
-												<RemoveCollectionModal
-													selected={selected}
-													dir={dir}
-													collections={collections}
-													onClose={() => modal.close("removeCollect")}
-													setToast={setToast}
-													photoActions={photoActions}
-													uiActions={uiActions}
-												/>
-											)}
+											{/* Centralized modal rendering */}
+											<ModalManager
+												selected={selected}
+												dir={dir}
+												engine={engine}
+												topK={topK}
+												highContrast={highContrast}
+												useFast={useFast}
+												fastKind={fastKind}
+												useCaps={useCaps}
+												useOcr={useOcr}
+												hasText={hasText}
+												useOsTrash={useOsTrash}
+												settingsActions={settingsActions as unknown as SettingsActions}
+												uiActions={uiActions}
+												photoActions={photoActions}
+												libIndex={() => lib.index()}
+												prepareFast={prepareFast}
+												buildOCR={buildOCR}
+												buildMetadata={buildMetadata}
+												setSelectedView={(v: string) => navigate(viewToPath(v))}
+												searchText={searchText}
+												query={query}
+												collections={collections}
+												tagSelected={tagSelected}
+												setToast={setToast}
+												clusters={clusters}
+												allTags={allTags || []}
+												meta={meta}
+											/>
 
 											{/* Lightbox */}
 											{detailIdx !== null &&
@@ -3176,8 +2272,8 @@ export default function App() {
 																	engine,
 																	topK,
 																);
-																photoActions.setResults(r.results || []);
-																setSelectedView("results");
+												photoActions.setResults(r.results || []);
+												navigate("/search");
 															} catch (e) {
 																uiActions.setNote(
 																	e instanceof Error
@@ -3202,136 +2298,8 @@ export default function App() {
 												Jobs
 											</button>
 
-											{modalState.jobs && (
-												<Suspense fallback={null}>
-													<JobsDrawer
-														open={true}
-														onClose={() => modal.close("jobs")}
-													/>
-												</Suspense>
-											)}
-											{modalState.diagnostics && (
-												<Suspense fallback={null}>
-													<DiagnosticsDrawer
-														open={true}
-														onClose={() => modal.close("diagnostics")}
-													/>
-												</Suspense>
-											)}
-											{modalState.advanced && (
-												<AdvancedSearchModal
-													open={true}
-													onClose={() => modal.close("advanced")}
-													onApply={(q) => {
-														setSearchText(q);
-														doSearch(q);
-														modal.close("advanced");
-													}}
-													onSave={async (n, q) => {
-														try {
-															const { apiAddPreset } = await import("./api");
-															await apiAddPreset(dir, n, q);
-															setToast({ message: `Saved preset ${n}` });
-															await loadPresets();
-														} catch (e) {
-															uiActions.setNote(
-																e instanceof Error ? e.message : "Save failed",
-															);
-														}
-													}}
-													allTags={allTags || []}
-													cameras={meta?.cameras || []}
-													people={(clusters || [])
-														.filter((c) => c.name)
-														.map((c) => String(c.name))}
-												/>
-											)}
-
-											{/* Help Modal */}
-											<HelpModal
-												isOpen={modalState.help}
-												onClose={() => modal.close("help")}
-												initialSection="getting-started"
-											/>
-
-											{/* Theme Settings Modal */}
-											<Suspense fallback={null}>
-												<ThemeSettingsModal
-													isOpen={modalState.theme}
-													onClose={() => modal.close("theme")}
-												/>
-											</Suspense>
-
-											{/* Search Command Center overlay */}
-											{searchCommandCenter && (
-												<Suspense fallback={null}>
-													<SearchOverlay
-														open={modalState.search}
-														onClose={() => modal.close("search")}
-														clusters={clusters}
-														allTags={allTags}
-														meta={meta}
-													/>
-												</Suspense>
-											)}
-
-											{/* Global progress overlay */}
-											{!!busy && (
-												<div
-													className="fixed inset-0 z-[1050] bg-black/40 flex items-center justify-center"
-													role="status"
-													aria-live="polite"
-												>
-													<div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-6 w-full max-w-sm">
-														<LoadingSpinner
-															size="lg"
-															message={busy}
-															className="text-center"
-														/>
-														{note && (
-															<p className="mt-3 text-sm text-gray-600 dark:text-gray-300 text-center">
-																{note}
-															</p>
-														)}
-													</div>
-												</div>
-											)}
-											{toast && (
-												<ToastPortal>
-													<div
-														className="pv-toast"
-														role="status"
-														aria-live="polite"
-													>
-														<div className="flex items-center gap-3 bg-gray-900 text-white px-4 py-2 rounded shadow">
-															<span className="text-sm">{toast.message}</span>
-															{toast.actionLabel && toast.onAction && (
-																<button
-																	type="button"
-																	className="text-sm underline"
-																	onClick={toast.onAction}
-																>
-																	{toast.actionLabel}
-																</button>
-															)}
-															<button
-																type="button"
-																aria-label="Close notification"
-																className="ml-1"
-																onClick={() => {
-																	setToast(null);
-																	if (toastTimerRef.current) {
-																		window.clearTimeout(toastTimerRef.current);
-																		toastTimerRef.current = null;
-																	}
-																}}
-															>
-																×
-															</button>
-														</div>
-													</div>
-												</ToastPortal>
-											)}
+											{/* Centralized busy + toast overlays */}
+											<OverlayLayer busy={busy} note={note} toast={toast} setToast={setToast} toastTimerRef={toastTimerRef} />
 
 											{/* Status Bar */}
 											{/* Auth required banner */}
@@ -3410,17 +2378,17 @@ export default function App() {
 													// Map bottom nav tabs to main views
 													switch (tab) {
 														case "home":
-															setSelectedView("library");
+															navigate("/library");
 															break;
 														case "search":
-															setSelectedView("results");
+															navigate("/search");
 															break;
 														case "favorites":
-															setSelectedView("results");
+															navigate("/search");
 															photoActions.setFavOnly(true);
 															break;
 														case "settings":
-															setSelectedView("tasks");
+															navigate("/library");
 															break;
 													}
 												}}
@@ -3435,7 +2403,13 @@ export default function App() {
 												isVisible={showContextualHelp}
 												onDismiss={() => setShowContextualHelp(false)}
 												context={
-													selectedView as
+													(currentView === "results"
+														? "results"
+														: currentView === "library"
+														? "library"
+														: currentView === "collections"
+														? "collections"
+														: "search") as
 														| "search"
 														| "library"
 														| "results"
@@ -3468,13 +2442,13 @@ export default function App() {
 													switch (step) {
 														case "select_directory": {
 															// Open the folder picker and ensure we're on Library
-															setSelectedView("library");
+															navigate("/library");
 															modal.open("folder");
 															break;
 														}
 														case "index_photos": {
 															// Kick off indexing and surface progress UI
-															setSelectedView("library");
+															navigate("/library");
 															if (!dir) {
 																// If no directory yet, prompt to select one first
 																modal.open("folder");
@@ -3485,7 +2459,7 @@ export default function App() {
 														}
 														case "first_search": {
 															// Jump to search view; hint with a helpful toast
-															setSelectedView("results");
+															navigate("/search");
 															setToast({
 																message:
 																	"Try searching: beach sunset, birthday cake, mountain hike",
@@ -3494,7 +2468,7 @@ export default function App() {
 														}
 														case "explore_features": {
 															// Take users to Collections to explore features
-															setSelectedView("collections");
+															navigate("/collections");
 															setToast({
 																message:
 																	"Explore collections, favorites, and sharing",
@@ -3509,11 +2483,14 @@ export default function App() {
 
 											{/* Performance Monitor for development */}
 											<PerformanceMonitor />
+											</ResultsUIProvider>
+											</ResultsConfigProvider>
 										</main>
+
+										</AppShell>
 
 										{/* Close main containers returned by the content layout */}
 									</div>
-								</div>
 
 								{/* Modern UX Integration - Accessibility Panel */}
 								{showAccessibilityPanel && (

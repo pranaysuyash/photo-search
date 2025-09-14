@@ -8,6 +8,7 @@ import {
 	useState,
 } from "react";
 import { apiIndex, apiLibrary } from "../api";
+import { handleError } from "../utils/errors";
 import {
 	useDir,
 	useEngine,
@@ -92,16 +93,21 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
 					status: "completed",
 					endTime: new Date(),
 				} as unknown);
-			} catch (e) {
-				const err = e instanceof Error ? e.message : "Index failed";
-				jobs.update(jobId, {
-					status: "failed",
-					endTime: new Date(),
-					error: err,
-				} as unknown);
-			} finally {
-				setIsIndexing(false);
-			}
+            } catch (e) {
+                const err = e instanceof Error ? e.message : "Index failed";
+                jobs.update(jobId, {
+                    status: "failed",
+                    endTime: new Date(),
+                    error: err,
+                } as unknown);
+                handleError(e, {
+                    logToConsole: true,
+                    logToServer: true,
+                    context: { action: "index", component: "LibraryContext.index", dir: d },
+                });
+            } finally {
+                setIsIndexing(false);
+            }
 		},
 		[settings, jobs, lib],
 	);

@@ -394,9 +394,9 @@ export function OnboardingTour({
 	return (
 		<AnimatePresence>
 			<motion.div
-				initial={prefersReducedMotion ? false : { opacity: 0 }}
+            initial={prefersReducedMotion ? undefined : { opacity: 0 }}
 				animate={{ opacity: 1 }}
-				exit={prefersReducedMotion ? false : { opacity: 0 }}
+            exit={prefersReducedMotion ? undefined : { opacity: 0 }}
 				className="fixed inset-0 z-50 pointer-events-none"
 			>
 				{/* Backdrop */}
@@ -665,9 +665,9 @@ export function ContextualHint({
 	const prefersReducedMotion = useReducedMotion();
 	return (
 		<motion.div
-			initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.9 }}
+        initial={prefersReducedMotion ? undefined : { opacity: 0, scale: 0.9 }}
 			animate={{ opacity: 1, scale: 1 }}
-			exit={prefersReducedMotion ? false : { opacity: 0, scale: 0.9 }}
+        exit={prefersReducedMotion ? undefined : { opacity: 0, scale: 0.9 }}
 			className={clsx(
 				"absolute z-40 pointer-events-auto",
 				getPositionClasses(position, target),

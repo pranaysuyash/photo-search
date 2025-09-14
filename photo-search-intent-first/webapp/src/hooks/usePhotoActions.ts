@@ -8,7 +8,7 @@ import {
 } from "../api";
 import { useSettingsActions } from "../stores/settingsStore";
 import { useWorkspaceActions } from "../stores/workspaceStore";
-import { networkErrors } from "../utils/errors";
+import { handleError, networkErrors } from "../utils/errors";
 
 interface SearchFilters {
 	favOnly?: boolean;
@@ -79,9 +79,11 @@ export const usePhotoActions = (_options: PhotoActionsOptions) => {
 						? `Cleared rating for ${selectedPaths.length}`
 						: `Set rating ${rating} for ${selectedPaths.length}`,
 				);
-			} catch (error: unknown) {
-				uiActions.setNote(error?.message || "Rating update failed");
-			}
+            } catch (error: unknown) {
+                // @ts-ignore
+                uiActions.setNote(error?.message || "Rating update failed");
+                handleError(error, { logToServer: true, context: { action: "set_rating", component: "usePhotoActions", dir } });
+            }
 		},
 		[dir, uiActions, tagsMap, normalizePaths],
 	);
@@ -102,9 +104,11 @@ export const usePhotoActions = (_options: PhotoActionsOptions) => {
 					selectedPaths.map((p) => apiSetTags(dir, p, tagList)),
 				);
 				uiActions.setNote(`Updated tags for ${selectedPaths.length} photos`);
-			} catch (error: unknown) {
-				uiActions.setNote(error?.message || "Tag update failed");
-			}
+            } catch (error: unknown) {
+                // @ts-ignore
+                uiActions.setNote(error?.message || "Tag update failed");
+                handleError(error, { logToServer: true, context: { action: "set_tags", component: "usePhotoActions", dir } });
+            }
 		},
 		[dir, uiActions, normalizePaths],
 	);
@@ -146,9 +150,11 @@ export const usePhotoActions = (_options: PhotoActionsOptions) => {
 				uiActions.setNote(
 					`Exported ${r.copied}, skipped ${r.skipped}, errors ${r.errors} → ${r.dest}`,
 				);
-			} catch (error: unknown) {
-				uiActions.setNote(error?.message || "Export failed");
-			}
+            } catch (error: unknown) {
+                // @ts-ignore
+                uiActions.setNote(error?.message || "Export failed");
+                handleError(error, { logToServer: true, context: { action: "export", component: "usePhotoActions", dir } });
+            }
 		},
 		[dir, uiActions, normalizePaths],
 	);
@@ -170,9 +176,11 @@ export const usePhotoActions = (_options: PhotoActionsOptions) => {
 						? `Moved ${selectedPaths.length} to OS Trash`
 						: `Moved ${selectedPaths.length} to Trash`,
 				);
-			} catch (error: unknown) {
-				uiActions.setNote(error?.message || "Delete failed");
-			}
+            } catch (error: unknown) {
+                // @ts-ignore
+                uiActions.setNote(error?.message || "Delete failed");
+                handleError(error, { logToServer: true, context: { action: "delete", component: "usePhotoActions", dir } });
+            }
 		},
 		[dir, useOsTrash, uiActions, normalizePaths],
 	);
@@ -183,9 +191,11 @@ export const usePhotoActions = (_options: PhotoActionsOptions) => {
 			const r = await apiUndoDelete(dir as string);
 			const restored = (r as unknown)?.restored ?? 0;
 			uiActions.setNote(`Restored ${restored}`);
-		} catch (error: unknown) {
-			uiActions.setNote(error?.message || "Undo failed");
-		}
+        } catch (error: unknown) {
+            // @ts-ignore
+            uiActions.setNote(error?.message || "Undo failed");
+            handleError(error, { logToServer: true, context: { action: "undo_delete", component: "usePhotoActions", dir } });
+        }
 	}, [dir, uiActions]);
 
 	const toggleFavorite = useCallback(
@@ -194,9 +204,10 @@ export const usePhotoActions = (_options: PhotoActionsOptions) => {
 			try {
 				const isFav = (tagsMap?.[photoPath] || []).includes("favorite");
 				await apiSetFavorite(dir, photoPath, !isFav);
-			} catch {
-				// Swallow per tests; no note required
-			}
+        } catch (error) {
+            // Swallow per tests; log for diagnostics
+            handleError(error, { logToServer: true, context: { action: "toggle_favorite", component: "usePhotoActions", dir } });
+        }
 		},
 		[dir, tagsMap],
 	);

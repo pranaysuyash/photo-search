@@ -55,7 +55,7 @@ export class ErrorBoundary extends Component<Props, State> {
 		if (typeof window !== "undefined" && windowWithService.logErrorToService) {
 			windowWithService.logErrorToService({
 				error: error.toString(),
-				errorInfo: errorInfo.componentStack,
+				errorInfo: String(errorInfo?.componentStack ?? ""),
 				timestamp: new Date().toISOString(),
 			});
 		}

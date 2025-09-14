@@ -43,24 +43,24 @@ export default function TimelineResults({
 		need.forEach((p) => next.add(p));
 		setInflight(next);
 		let cancelled = false;
-		Promise.all(
-			need.map(async (p) => {
-				try {
-					const r = await apiMetadataDetail(dir, p);
-					if (!cancelled && r && r.meta) {
-						setMeta((m) => ({
-							...m,
-							[p]: {
-								mtime: r.meta.mtime,
-								camera: r.meta.camera,
-								fnumber: r.meta.fnumber,
-								iso: r.meta.iso,
-							},
-						}));
-					}
-				} catch {}
-			}),
-		).finally(() => {
+        Promise.all(
+            need.map(async (p) => {
+                try {
+                    const r = await apiMetadataDetail(dir, p);
+                    if (!cancelled && r && r.meta) {
+                        setMeta((m) => ({
+                            ...m,
+                            [p]: {
+                                mtime: typeof r.meta.mtime === 'number' ? r.meta.mtime : undefined,
+                                camera: typeof r.meta.camera === 'string' ? r.meta.camera : undefined,
+                                fnumber: typeof r.meta.fnumber === 'number' ? r.meta.fnumber : undefined,
+                                iso: typeof r.meta.iso === 'number' ? r.meta.iso : undefined,
+                            },
+                        }));
+                    }
+                } catch {}
+            }),
+        ).finally(() => {
 			if (!cancelled) {
 				setInflight((s) => {
 					const n = new Set(s);
@@ -230,11 +230,11 @@ export default function TimelineResults({
 	}, []);
 
 	// Listen for global jump events dispatched by the app for keyboard shortcuts
-	useEffect(() => {
-		const onJump = (e: unknown) => {
-			try {
-				const kind = e?.detail?.kind as string;
-				if (!kind) return;
+    useEffect(() => {
+        const onJump = (e: CustomEvent<{ kind?: string }>) => {
+            try {
+                const kind = e.detail?.kind as string;
+                if (!kind) return;
 				const now = Date.now() / 1000;
 				if (kind === "today") {
 					const key =
@@ -295,9 +295,9 @@ export default function TimelineResults({
 				}
 			} catch {}
 		};
-		window.addEventListener("timeline-jump", onJump as unknown);
-		return () => window.removeEventListener("timeline-jump", onJump as unknown);
-	}, [bucket]);
+        window.addEventListener("timeline-jump", onJump as unknown as EventListener);
+        return () => window.removeEventListener("timeline-jump", onJump as unknown as EventListener);
+    }, [bucket]);
 
 	return (
 		<div

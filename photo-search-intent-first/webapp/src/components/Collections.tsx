@@ -10,6 +10,7 @@ import type React from "react";
 import { useCallback, useRef, useState } from "react";
 import { apiCreateShare, apiExport, apiSetCollection, thumbUrl } from "../api";
 import { announce } from "../utils/accessibility";
+import { handleError } from "../utils/errors";
 
 interface CollectionsProps {
 	dir: string;
@@ -166,12 +167,13 @@ export default function Collections({
 						onCollectionUpdate(updated);
 					}
 				}
-			} catch (error) {
-				console.error("Failed to update collection:", error);
-				alert("Failed to update collection");
-			} finally {
-				setDraggedItem(null);
-			}
+            } catch (error) {
+                console.error("Failed to update collection:", error);
+                alert("Failed to update collection");
+                handleError(error, { logToServer: true, context: { action: "collection_update", component: "Collections.handleDrop", dir } });
+            } finally {
+                setDraggedItem(null);
+            }
 		},
 		[collections, dir, onLoadCollections, onCollectionUpdate, draggedItem],
 	);
@@ -200,14 +202,15 @@ export default function Collections({
 					);
 					alert("Share link copied to clipboard!");
 					announce("Share link copied to clipboard", "polite");
-				} catch (error) {
-					console.error("Failed to share collection:", error);
-					alert(
-						error instanceof Error
-							? error.message
-							: "Failed to share collection",
-					);
-				}
+            } catch (error) {
+                console.error("Failed to share collection:", error);
+                alert(
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to share collection",
+                );
+                handleError(error, { logToServer: true, context: { action: "share_collection", component: "Collections.handleShare", dir } });
+            }
 			}
 		},
 		[onShare, collections, dir, engine],
@@ -236,14 +239,15 @@ export default function Collections({
 					await apiExport(dir, paths, folderName, "copy", false, false);
 					alert(`Exported ${paths.length} photos to ${folderName}`);
 					announce(`Exported ${paths.length} photos`, "polite");
-				} catch (error) {
-					console.error("Failed to export collection:", error);
-					alert(
-						error instanceof Error
-							? error.message
-							: "Failed to export collection",
-					);
-				}
+            } catch (error) {
+                console.error("Failed to export collection:", error);
+                alert(
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to export collection",
+                );
+                handleError(error, { logToServer: true, context: { action: "export_collection", component: "Collections.handleExport", dir } });
+            }
 			}
 		},
 		[onExport, collections, dir],
@@ -360,11 +364,11 @@ export default function Collections({
 								onKeyDown={(e) => {
 									if (e.key === "Enter" || e.key === " ") {
 										e.preventDefault();
-										setExpandedActions(expandedActions === name ? null : name);
+                                _setExpandedActions(expandedActions === name ? null : name);
 									}
 								}}
 								role="listitem"
-								aria-label={`Collection ${name} with ${items.length} photos`}
+                                aria-label={`Collection ${name} with ${collectionPaths.length} photos`}
 								className={`border rounded-lg p-3 transition-all cursor-move ${
 									isDropTarget
 										? "border-blue-500 bg-blue-50 shadow-md"

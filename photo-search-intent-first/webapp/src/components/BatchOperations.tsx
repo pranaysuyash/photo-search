@@ -7,6 +7,7 @@ import {
 	apiGetCollections,
 } from "../api";
 import { LoadingSpinner } from "./LoadingSpinner";
+import { handleError } from "../utils/errors";
 
 interface BatchOperationsProps {
 	selectedPaths: string[];
@@ -90,11 +91,12 @@ export function BatchOperations({
 			);
 			onSelectionClear();
 			onOperationComplete();
-		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to delete items");
-		} finally {
-			setLoading(false);
-		}
+    } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to delete items");
+        handleError(err, { logToServer: true, context: { action: "batch_delete", component: "BatchOperations", dir: currentDir } });
+    } finally {
+        setLoading(false);
+    }
 	};
 
 	const handleBatchTag = async () => {
@@ -132,11 +134,12 @@ export function BatchOperations({
 			);
 			setNewTags("");
 			onOperationComplete();
-		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to update tags");
-		} finally {
-			setLoading(false);
-		}
+    } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to update tags");
+        handleError(err, { logToServer: true, context: { action: "batch_tag", component: "BatchOperations", dir: currentDir } });
+    } finally {
+        setLoading(false);
+    }
 	};
 
 	const handleAddToCollection = async (collectionName: string) => {
@@ -152,13 +155,14 @@ export function BatchOperations({
 				`Added ${result.added} new items to collection "${collectionName}"`,
 			);
 			onOperationComplete();
-		} catch (err) {
-			setError(
-				err instanceof Error ? err.message : "Failed to add to collection",
-			);
-		} finally {
-			setLoading(false);
-		}
+    } catch (err) {
+        setError(
+            err instanceof Error ? err.message : "Failed to add to collection",
+        );
+        handleError(err, { logToServer: true, context: { action: "batch_add_to_collection", component: "BatchOperations", dir: currentDir } });
+    } finally {
+        setLoading(false);
+    }
 	};
 
 	const handleExport = async () => {
@@ -184,11 +188,12 @@ export function BatchOperations({
 			setSuccess(`Exported ${result.copied} files to ${result.dest}`);
 			setExportDest("");
 			onOperationComplete();
-		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to export files");
-		} finally {
-			setLoading(false);
-		}
+    } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to export files");
+        handleError(err, { logToServer: true, context: { action: "batch_export", component: "BatchOperations", dir: currentDir } });
+    } finally {
+        setLoading(false);
+    }
 	};
 
 	const handleBatchEdit = async () => {

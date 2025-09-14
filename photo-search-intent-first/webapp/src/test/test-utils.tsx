@@ -6,6 +6,7 @@ import { ErrorBoundary } from "../components/ErrorBoundary";
 import { HintManager, HintProvider } from "../components/HintSystem";
 import { MobileOptimizations } from "../components/MobileOptimizations";
 import { ThemeProvider } from "../components/ThemeProvider";
+import { ResultsConfigProvider } from "../contexts/ResultsConfigContext";
 import { JobsProvider } from "../contexts/JobsContext";
 import { LibraryProvider } from "../contexts/LibraryContext";
 import { ModalProvider } from "../contexts/ModalContext";
@@ -158,7 +159,7 @@ vi.mock("../components/OnboardingTour", () => ({
 
 // Test wrapper that provides all necessary contexts
 const AllTheProviders: React.FC<{ children: React.ReactNode }> = ({
-	children,
+    children,
 }) => {
 	// Minimal browser polyfills for JSDOM
 	if (typeof window !== "undefined" && !window.matchMedia) {
@@ -176,8 +177,19 @@ const AllTheProviders: React.FC<{ children: React.ReactNode }> = ({
 		});
 	}
 
-	// Initialize API singleton so usePhotoVaultAPI can fallback safely
-	initializeAPI({ dir: "/test", provider: "local" });
+    // Initialize API singleton so usePhotoVaultAPI can fallback safely
+    initializeAPI({ dir: "/test", provider: "local" });
+
+    // Minimal IntersectionObserver polyfill for JSDOM
+    if (typeof window !== "undefined" && !(window as any).IntersectionObserver) {
+        (window as any).IntersectionObserver = class {
+            constructor(_cb: any, _opts?: any) {}
+            observe() {}
+            unobserve() {}
+            disconnect() {}
+            takeRecords() { return []; }
+        } as unknown as typeof IntersectionObserver;
+    }
 
 	return (
 		<ErrorBoundary>
@@ -185,30 +197,39 @@ const AllTheProviders: React.FC<{ children: React.ReactNode }> = ({
 				<ThemeProvider>
 					<UIProvider>
 						<SimpleStoreProvider>
-							<PhotoVaultAPIProvider>
-								<JobsProvider>
-									<LibraryProvider>
-										<SearchProvider>
-											<ModalProvider>
-												<HintProvider>
-													<HintManager>
-														<MobileOptimizations
-															onSwipeLeft={vi.fn()}
-															onSwipeRight={vi.fn()}
-															onSwipeUp={vi.fn()}
-															enableSwipeGestures={false}
-															enablePullToRefresh={false}
-															onPullToRefresh={vi.fn()}
-														>
-															{children}
-														</MobileOptimizations>
-													</HintManager>
-												</HintProvider>
-											</ModalProvider>
-										</SearchProvider>
-									</LibraryProvider>
-								</JobsProvider>
-							</PhotoVaultAPIProvider>
+                <PhotoVaultAPIProvider>
+                    <JobsProvider>
+                        <LibraryProvider>
+                            <SearchProvider>
+                                <ModalProvider>
+                                    <HintProvider>
+                                        <HintManager>
+                                            <ResultsConfigProvider
+                                                value={{
+                                                    resultView: "grid",
+                                                    setResultView: () => {},
+                                                    timelineBucket: "day",
+                                                    setTimelineBucket: () => {},
+                                                }}
+                                            >
+                                                <MobileOptimizations
+                                                    onSwipeLeft={vi.fn()}
+                                                    onSwipeRight={vi.fn()}
+                                                    onSwipeUp={vi.fn()}
+                                                    enableSwipeGestures={false}
+                                                    enablePullToRefresh={false}
+                                                    onPullToRefresh={vi.fn()}
+                                                >
+                                                    {children}
+                                                </MobileOptimizations>
+                                            </ResultsConfigProvider>
+                                        </HintManager>
+                                    </HintProvider>
+                                </ModalProvider>
+                            </SearchProvider>
+                        </LibraryProvider>
+                    </JobsProvider>
+                </PhotoVaultAPIProvider>
 						</SimpleStoreProvider>
 					</UIProvider>
 				</ThemeProvider>

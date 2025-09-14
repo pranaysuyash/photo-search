@@ -62,9 +62,7 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 	} | null>(null);
 
 	// Library state
-	const [photos, setPhotos] = useState<
-		Array<{ path: string; name: string; size: number; modified: Date }>
-	>([]);
+    const [photos, setPhotos] = useState<string[]>([]);
 	const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set());
 	const [searchQuery, setSearchQuery] = useState("");
 	const [searchResults, setSearchResults] = useState<
@@ -166,14 +164,38 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 				api.current.getSavedSearches(),
 			]);
 
-			setPhotos(libraryData.paths || []);
+            setPhotos(libraryData.paths || []);
 			setCollections(collectionsData.collections || {});
 			setSmartCollections(smartData.smart || {});
-			setFaceClusters(facesData.clusters || []);
-			setTrips(tripsData.trips || []);
-			setMapData(mapData);
+			setFaceClusters(
+				(facesData.clusters || []).map((c: any) => ({
+					id: String(c.id),
+					name: c.name as string | undefined,
+					photos: [],
+				})),
+			);
+			setTrips(
+				(tripsData.trips || []).map((t: any) => ({
+					id: String(t.id),
+					name: (t.place as string | undefined) || String(t.id),
+					startDate: t.start_ts ? String(t.start_ts) : "",
+					endDate: t.end_ts ? String(t.end_ts) : "",
+					photos: (t.paths as string[]) || [],
+				})),
+			);
+			setMapData(
+				mapData
+					? {
+						markers: (mapData.points || []).map((pt: any) => ({
+							lat: pt.lat,
+							lng: pt.lon,
+							photos: [],
+						})),
+					}
+					: null,
+			);
 			setTags(tagsData.all || []);
-			setMetadata(metadataData);
+			setMetadata({});
 			setFavorites(favoritesData.favorites || []);
 			setSavedSearches(savedData.saved || []);
 
@@ -343,8 +365,13 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 
 		setLoading(true);
 		try {
-			const dupes = await api.current.findLookalikes(5);
-			setLookalikes(dupes.groups || []);
+            const dupes = await api.current.findLookalikes(5);
+            setLookalikes(
+                (dupes.groups || []).map((g: any) => ({
+                    group: g.paths as string[],
+                    similarity: 1,
+                })),
+            );
 			setActiveView("duplicates");
 			showNotification(
 				"info",

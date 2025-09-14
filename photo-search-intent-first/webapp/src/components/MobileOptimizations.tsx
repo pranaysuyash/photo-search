@@ -119,22 +119,22 @@ export function MobileSearchBar({
 	enableVoiceSearch?: boolean;
 }) {
 	const [isListening, setIsListening] = useState(false);
-	const [recognition, setRecognition] = useState<unknown>(null);
+    const [recognition, setRecognition] = useState<any>(null);
 
 	useEffect(() => {
-		if (enableVoiceSearch && "webkitSpeechRecognition" in window) {
-			const recognition = new (window as unknown).webkitSpeechRecognition();
+        if (enableVoiceSearch && (window as any).webkitSpeechRecognition) {
+            const recognition = new (window as any).webkitSpeechRecognition();
 			recognition.continuous = false;
 			recognition.interimResults = false;
 			recognition.lang = "en-US";
 
 			recognition.onstart = () => setIsListening(true);
 			recognition.onend = () => setIsListening(false);
-			recognition.onresult = (event: unknown) => {
-				const transcript = event.results[0][0].transcript;
-				onChange(transcript);
-				onSubmit(transcript);
-			};
+            recognition.onresult = (event: any) => {
+                const transcript = event?.results?.[0]?.[0]?.transcript ?? "";
+                onChange(transcript);
+                onSubmit(transcript);
+            };
 
 			setRecognition(recognition);
 		}
@@ -217,24 +217,24 @@ export function MobilePhotoGrid({
 	);
 	const [isSelectionMode, setIsSelectionMode] = useState(false);
 
-	const handleTouchStart = (photo: unknown) => {
+    const handleTouchStart = (photo: { id: string }) => {
 		if (onPhotoLongPress) {
 			const timer = setTimeout(() => {
 				setIsSelectionMode(true);
-				onPhotoLongPress(photo);
+                onPhotoLongPress?.(photo);
 			}, 500);
 			setLongPressTimer(timer);
 		}
 	};
 
-	const handleTouchEnd = (_photo: unknown) => {
+    const handleTouchEnd = (_photo: { id: string }) => {
 		if (longPressTimer) {
 			clearTimeout(longPressTimer);
 			setLongPressTimer(null);
 		}
 	};
 
-	const handlePhotoClick = (photo: unknown) => {
+    const handlePhotoClick = (photo: { id: string }) => {
 		if (isSelectionMode && onSelectionChange) {
 			const isSelected = selectedPhotos.includes(photo.id);
 			const newSelected = isSelected
@@ -316,12 +316,12 @@ export function MobileActionSheet({
 				tabIndex={0}
 				className="absolute inset-0 bg-black/50"
 				onClick={onClose}
-				onKeyDown={(e) => {
-					if (e.key === "Enter" || e.key === " ") {
-						e.preventDefault();
-						onClose;
-					}
-				}}
+            onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onClose();
+                }
+            }}
 			/>
 
 			{/* Sheet */}

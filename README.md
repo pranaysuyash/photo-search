@@ -86,3 +86,4 @@ Documentation
 - Frontend Demo Guide: `photo-search-intent-first/docs/FRONTEND_DEMO_GUIDE.md`
 - Intent-First Handbook: `photo-search-intent-first/docs/intent_first_handbook.md`
 - Visual Testing: `docs/VISUAL_TESTING.md`
+- Webapp Error Logging + Deep Links: `photo-search-intent-first/webapp/docs/error-logging-and-deeplinks.md`

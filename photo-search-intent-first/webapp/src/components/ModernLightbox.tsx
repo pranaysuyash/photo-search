@@ -233,14 +233,14 @@ const ModernLightbox: React.FC<ModernLightboxProps> = ({
 	return (
 		<AnimatePresence>
 			<motion.div
-				initial={prefersReducedMotion ? false : { opacity: 0 }}
+            initial={prefersReducedMotion ? undefined : { opacity: 0 }}
 				animate={{ opacity: 1 }}
-				exit={prefersReducedMotion ? false : { opacity: 0 }}
+            exit={prefersReducedMotion ? undefined : { opacity: 0 }}
 				className={clsx("fixed inset-0 z-50 bg-black flex flex-col", className)}
 			>
 				{/* Header */}
 				<motion.div
-					initial={prefersReducedMotion ? false : { opacity: 0, y: -20 }}
+                    initial={prefersReducedMotion ? undefined : { opacity: 0, y: -20 }}
 					animate={{ opacity: 1, y: 0 }}
 					transition={prefersReducedMotion ? undefined : { delay: 0.1 }}
 					className="absolute top-0 left-0 right-0 z-20 p-4 bg-gradient-to-b from-black/80 to-transparent"

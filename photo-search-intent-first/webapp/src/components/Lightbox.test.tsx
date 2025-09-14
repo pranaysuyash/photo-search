@@ -23,9 +23,10 @@ describe("Lightbox", () => {
 				onFavorite={() => {}}
 			/>,
 		);
-		const img = screen.getByRole("img") as HTMLImageElement;
-		// Double click toggles zoom
-		fireEvent.doubleClick(img);
+    const container = screen.getByRole("img", { name: "Image viewer" });
+    const img = screen.getAllByAltText("/a.jpg")[0] as HTMLImageElement;
+    // Double click toggles zoom on the container
+    fireEvent.doubleClick(container);
 		// style transform should include scale(>1)
 		expect(img.style.transform).toMatch(/scale\(/);
 		// Double click again resets

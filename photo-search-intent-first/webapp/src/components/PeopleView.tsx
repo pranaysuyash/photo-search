@@ -53,10 +53,10 @@ export default function PeopleView({
 			setShowClusterPhotos(true);
 			setBusy("");
 			setNote(`Found ${result.photos.length} photos in cluster`);
-		} catch (e: unknown) {
-			setBusy("");
-			setNote(e.message);
-		}
+    } catch (e: unknown) {
+        setBusy("");
+        setNote(e instanceof Error ? e.message : "Failed to load photos");
+    }
 	};
 
 	const _mergeClusters = async (sourceId: string, targetId: string) => {
@@ -66,10 +66,10 @@ export default function PeopleView({
 			setBusy("");
 			setNote("Clusters merged successfully");
 			await onLoadFaces();
-		} catch (e: unknown) {
-			setBusy("");
-			setNote(e.message);
-		}
+    } catch (e: unknown) {
+        setBusy("");
+        setNote(e instanceof Error ? e.message : "Merge failed");
+    }
 	};
 
 	if (showClusterPhotos && selectedClusterId) {
@@ -129,10 +129,10 @@ export default function PeopleView({
 								setBusy("");
 								setNote(`Faces: ${r.faces}, clusters: ${r.clusters}`);
 								await onLoadFaces();
-							} catch (e: unknown) {
-								setBusy("");
-								setNote(e.message);
-							}
+                        } catch (e: unknown) {
+                            setBusy("");
+                            setNote(e instanceof Error ? e.message : "Face build failed");
+                        }
 						}}
 						className="bg-gray-200 rounded px-3 py-1 text-sm"
 					>

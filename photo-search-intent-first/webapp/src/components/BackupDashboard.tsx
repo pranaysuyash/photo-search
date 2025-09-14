@@ -19,6 +19,7 @@ import {
 	type BackupConfig,
 	type BackupJob,
 	type BackupProvider,
+	type BackupFrequency,
 	backupService,
 } from "../services/BackupService";
 
