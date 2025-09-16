@@ -9,6 +9,8 @@ import {
 	apiGetFavorites,
 	apiGetSaved,
 	apiGetTags,
+	apiSetSmart,
+	apiGetSmart,
 	type SearchResult,
 } from "../api";
 import { usePhotoVaultAPI } from "../services/PhotoVaultAPIProvider";
@@ -315,14 +317,22 @@ export const useSearch = (options: UseSearchOptions = {}): UseSearchReturn => {
 					uiActions.setNote(`Found ${finalResults.length} results.`);
 
 					onSearchComplete?.(finalResults, searchQuery);
-				} catch (error) {
-					const errorMessage =
-						error instanceof Error ? error.message : "Search failed";
-					uiActions.setNote(errorMessage);
-					onSearchError?.(error as Error);
-				} finally {
-					uiActions.setBusy("");
-				}
+    } catch (error) {
+        const errorMessage =
+            error instanceof Error ? error.message : "Search failed";
+        uiActions.setNote(errorMessage);
+        // Log with context for diagnostics
+        try {
+            const { handleError } = await import("../utils/errors");
+            handleError(error as Error, {
+                logToServer: true,
+                context: { action: "search", component: "useSearch.performSearch", dir },
+            });
+        } catch {}
+        onSearchError?.(error as Error);
+    } finally {
+        uiActions.setBusy("");
+    }
 			},
 			[
 				dir,
@@ -419,7 +429,6 @@ export const useSearch = (options: UseSearchOptions = {}): UseSearchReturn => {
 					if (ppl.length === 1) rules.person = ppl[0];
 					else if (ppl.length > 1) rules.persons = ppl;
 
-					const { apiSetSmart, apiGetSmart } = await import("../api");
 					await apiSetSmart(dir, _name, rules);
 
 					const r = await apiGetSmart(dir);

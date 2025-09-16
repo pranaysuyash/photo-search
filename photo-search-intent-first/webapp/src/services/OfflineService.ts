@@ -8,6 +8,8 @@ export interface OfflineAction {
 }
 
 import { handleError } from "../utils/errors";
+import { apiSearch, apiSetCollection, apiBatchTag, apiBatchDelete } from "../api";
+import { serviceEnabled } from "../config/logging";
 
 class OfflineService {
 	private readonly QUEUE_KEY = "offline_action_queue";
@@ -147,15 +149,18 @@ class OfflineService {
                     // Log only when we have exhausted retries to avoid noise
                     const payload = (action?.payload as any) || {};
                     const dir = payload?.dir || payload?.path || "";
-                    handleError(error, {
-                        logToServer: true,
-                        context: {
-                            action: `offline_sync_${String(action?.type)}`,
-                            component: "OfflineService.syncQueue",
-                            dir,
-                            metadata: { id: action.id },
-                        },
-                    });
+                    if (serviceEnabled("offline")) {
+                        handleError(error, {
+                            logToServer: true,
+                            logToConsole: false,
+                            context: {
+                                action: `offline_sync_${String(action?.type)}`,
+                                component: "OfflineService.syncQueue",
+                                dir,
+                                metadata: { id: action.id },
+                            },
+                        });
+                    }
                 }
             }
         }
@@ -170,9 +175,6 @@ class OfflineService {
 	}
 
     private async processAction(action: OfflineAction): Promise<void> {
-        const { apiSearch, apiSetCollection, apiBatchTag, apiBatchDelete } =
-            await import("../api");
-
         switch (action.type) {
             case "search":
                 {

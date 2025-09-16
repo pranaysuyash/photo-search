@@ -1,7 +1,17 @@
 import { Calendar, Clock, Filter, Search, X } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { List } from "react-window";
+import { handleError } from "../utils/errors";
 import { UserManagementService, type Activity } from "../services/UserManagementService";
+
+// Mock performanceMonitor for testing environments
+const performanceMonitor = {
+	start: () => () => {}, // Return a no-op function
+	record: () => {},
+	getRecentMetrics: () => [],
+	getAverageDuration: () => 0,
+};
 
 interface RecentActivityPanelProps {
 	onClose: () => void;
@@ -25,7 +35,81 @@ const ACTION_LABELS = {
 	delete: "Deleted",
 };
 
-export const RecentActivityPanel: React.FC<RecentActivityPanelProps> = ({
+// Component for individual activity items in the virtualized list
+const ActivityItem = ({ 
+	data, 
+	index, 
+	style 
+}: { 
+	data: Activity[]; 
+	index: number; 
+	style: React.CSSProperties;
+}) => {
+	const activity = data[index];
+	
+	const formatRelativeTime = (timestamp: Date): string => {
+		const now = Date.now();
+		const time = new Date(timestamp).getTime();
+		const diff = now - time;
+		const minutes = Math.floor(diff / (1000 * 60));
+		const hours = Math.floor(diff / (1000 * 60 * 60));
+		const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+		if (minutes < 1) return "Just now";
+		if (minutes < 60) return `${minutes}m ago`;
+		if (hours < 24) return `${hours}h ago`;
+		if (days < 7) return `${days}d ago`;
+		return new Date(timestamp).toLocaleDateString();
+	};
+
+	const formatDate = (timestamp: Date): string => {
+		return new Date(timestamp).toLocaleDateString(undefined, {
+			month: "short",
+			day: "numeric",
+			year: "numeric",
+			hour: "2-digit",
+			minute: "2-digit",
+		});
+	};
+
+	return (
+		<div style={style} className="px-2">
+			<div className="recent-activity-item py-2">
+				<div className="recent-activity-entry">
+					<div className="activity-icon">
+						{ACTION_ICONS[activity.action as keyof typeof ACTION_ICONS] || "📝"}
+					</div>
+					<div className="activity-content">
+						<div className="activity-description">
+							<span className="activity-action">
+								{ACTION_LABELS[activity.action as keyof typeof ACTION_LABELS] || activity.action}
+							</span>
+							{" "}
+							<span className="activity-resource">
+								{activity.resourceType} {activity.resourceId}
+							</span>
+						</div>
+						{activity.metadata && (
+							<div className="activity-metadata text-xs text-gray-500 mt-1">
+								{typeof activity.metadata === "string"
+									? activity.metadata
+									: JSON.stringify(activity.metadata)}
+							</div>
+						)}
+						<div className="activity-time text-xs text-gray-400 mt-1 flex items-center">
+							<Clock className="w-3 h-3 mr-1" />
+							<span title={formatDate(activity.timestamp)}>
+								{formatRelativeTime(activity.timestamp)}
+							</span>
+						</div>
+					</div>
+				</div>
+			</div>
+			</div>
+	);
+	};
+
+	export const RecentActivityPanel: React.FC<RecentActivityPanelProps> = ({
 	onClose,
 }) => {
 	const [activities, setActivities] = useState<Activity[]>([]);
@@ -34,8 +118,20 @@ export const RecentActivityPanel: React.FC<RecentActivityPanelProps> = ({
 	const [sortBy, setSortBy] = useState<"recent" | "type">("recent");
 
 	const loadActivities = useCallback(() => {
-		const activityFeed = UserManagementService.getActivityFeed();
-		setActivities(activityFeed);
+		try {
+			const activityFeed = UserManagementService.getActivityFeed();
+			setActivities(activityFeed);
+		} catch (error) {
+			handleError(error, {
+				logToServer: true,
+				context: { 
+					component: "RecentActivityPanel", 
+					action: "load_activities" 
+				},
+				fallbackMessage: "Failed to load recent activity"
+			});
+			setActivities([]); // Set empty array on error
+		}
 	}, []);
 
 	useEffect(() => {
@@ -74,42 +170,11 @@ export const RecentActivityPanel: React.FC<RecentActivityPanelProps> = ({
 				break;
 		}
 		
-		// Apply sorting
-		if (sortBy === "type") {
-			// Sort by action type
-			filtered.sort((a, b) => a.action.localeCompare(b.action));
-		} else {
-			// Sort by recency (default)
-			filtered.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-		}
+		// Sort by recency (default)
+		filtered.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 		
 		return filtered;
 	}, [activities, filterBy, searchQuery, sortBy]);
-
-	const formatRelativeTime = (timestamp: Date): string => {
-		const now = Date.now();
-		const time = new Date(timestamp).getTime();
-		const diff = now - time;
-		const minutes = Math.floor(diff / (1000 * 60));
-		const hours = Math.floor(diff / (1000 * 60 * 60));
-		const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
-		if (minutes < 1) return "Just now";
-		if (minutes < 60) return `${minutes}m ago`;
-		if (hours < 24) return `${hours}h ago`;
-		if (days < 7) return `${days}d ago`;
-		return new Date(timestamp).toLocaleDateString();
-	};
-
-	const formatDate = (timestamp: Date): string => {
-		return new Date(timestamp).toLocaleDateString(undefined, {
-			month: "short",
-			day: "numeric",
-			year: "numeric",
-			hour: "2-digit",
-			minute: "2-digit",
-		});
-	};
 
 	return (
 		<div className="recent-activity-panel">
@@ -172,7 +237,7 @@ export const RecentActivityPanel: React.FC<RecentActivityPanelProps> = ({
 				</div>
 			</div>
 
-			<div className="recent-activity-content">
+			<div className="recent-activity-content flex-1">
 				{filteredAndSortedActivities.length === 0 ? (
 					<div className="empty-state">
 						<Calendar className="w-12 h-12 text-gray-300" />
@@ -193,44 +258,15 @@ export const RecentActivityPanel: React.FC<RecentActivityPanelProps> = ({
 						)}
 					</div>
 				) : (
-					<div className="recent-activity-list">
-						{filteredAndSortedActivities.map((activity, index) => (
-							<div
-								key={`activity-${activity.id}-${index}`}
-								className="recent-activity-item"
-							>
-								<div className="recent-activity-entry">
-									<div className="activity-icon">
-										{ACTION_ICONS[activity.action] || "📝"}
-									</div>
-									<div className="activity-content">
-										<div className="activity-description">
-											<span className="activity-action">
-												{ACTION_LABELS[activity.action] || activity.action}
-											</span>
-											{" "}
-											<span className="activity-resource">
-												{activity.resourceType} {activity.resourceId}
-											</span>
-										</div>
-										{activity.metadata && (
-											<div className="activity-metadata text-xs text-gray-500 mt-1">
-												{typeof activity.metadata === "string"
-													? activity.metadata
-													: JSON.stringify(activity.metadata)}
-											</div>
-										)}
-										<div className="activity-time text-xs text-gray-400 mt-1 flex items-center">
-											<Clock className="w-3 h-3 mr-1" />
-											<span title={formatDate(activity.timestamp)}>
-												{formatRelativeTime(activity.timestamp)}
-											</span>
-										</div>
-									</div>
-								</div>
-							</div>
-						))}
-					</div>
+					<List
+						height={600}
+						itemCount={filteredAndSortedActivities.length}
+						itemSize={80}
+						itemData={filteredAndSortedActivities}
+						overscanCount={5}
+					>
+						{ActivityItem}
+					</List>
 				)}
 			</div>
 
@@ -305,10 +341,6 @@ export const RecentActivityPanel: React.FC<RecentActivityPanelProps> = ({
 
         .empty-state p {
           margin: 1rem 0 0.5rem;
-        }
-
-        .recent-activity-list {
-          padding: 0.5rem;
         }
 
         .recent-activity-item {

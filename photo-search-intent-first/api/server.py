@@ -651,42 +651,100 @@ def api_index_resume(dir: str) -> Dict[str, Any]:
         raise HTTPException(500, f"Resume failed: {e}")
 
 
-@app.post("/search")
-def api_search(
+@app.post("/search/cached")
+def api_search_cached(
     dir: str,
     query: str,
     top_k: int = 12,
     provider: str = "local",
+    cache_key: Optional[str] = None,
     hf_token: Optional[str] = None,
     openai_key: Optional[str] = None,
-    favorites_only: bool = False,
-    tags: Optional[List[str]] = None,
-    date_from: Optional[float] = None,
-    date_to: Optional[float] = None,
     use_fast: bool = False,
     fast_kind: Optional[str] = None,
     use_captions: bool = False,
     use_ocr: bool = False,
-    camera: Optional[str] = None,
-    iso_min: Optional[int] = None,
-    iso_max: Optional[int] = None,
-    f_min: Optional[float] = None,
-    f_max: Optional[float] = None,
-    place: Optional[str] = None,
-    flash: Optional[str] = None,  # 'fired' | 'noflash'
-    wb: Optional[str] = None,     # 'auto' | 'manual'
-    metering: Optional[str] = None, # e.g., 'average','center','spot','matrix','partial'
-    alt_min: Optional[float] = None,
-    alt_max: Optional[float] = None,
-    heading_min: Optional[float] = None,
-    heading_max: Optional[float] = None,
-    sharp_only: bool = False,
-    exclude_underexp: bool = False,
-    exclude_overexp: bool = False,
-    has_text: bool = False,
-    person: Optional[str] = None,
-    persons: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
+    """Cached search that reuses previous results when possible."""
+    folder = Path(dir)
+    if not folder.exists():
+        raise HTTPException(400, "Folder not found")
+
+    # Generate cache key if not provided
+    if not cache_key:
+        import hashlib
+        cache_key = hashlib.md5(f"{query}:{top_k}:{provider}:{use_fast}:{fast_kind}:{use_captions}:{use_ocr}".encode()).hexdigest()
+
+    store = IndexStore(folder, index_key=None)
+    cache_file = store.index_dir / f"search_cache_{cache_key}.json"
+
+    # Try to load from cache first
+    if cache_file.exists():
+        try:
+            cache_data = json.loads(cache_file.read_text())
+            cache_time = cache_data.get('timestamp', 0)
+            # Cache valid for 1 hour
+            if time.time() - cache_time < 3600:
+                cached_result = cache_data['results']
+                cached_result['cached'] = True
+                return cached_result
+        except Exception:
+            pass  # Fall through to fresh search
+
+    # Perform fresh search using the main search logic
+    emb = _emb(provider, hf_token, openai_key)
+    store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
+    store.load()
+
+    if use_fast:
+        try:
+            if fast_kind and fast_kind.lower() == 'faiss' and store.faiss_status().get('exists'):
+                results = store.search_faiss(emb, query, top_k=top_k)
+            elif fast_kind and fast_kind.lower() == 'hnsw' and store.hnsw_status().get('exists'):
+                results = store.search_hnsw(emb, query, top_k=top_k)
+            elif fast_kind and fast_kind.lower() == 'annoy' and store.ann_status().get('exists'):
+                results = store.search_annoy(emb, query, top_k=top_k)
+            else:
+                if store.faiss_status().get('exists'):
+                    results = store.search_faiss(emb, query, top_k=top_k)
+                elif store.hnsw_status().get('exists'):
+                    results = store.search_hnsw(emb, query, top_k=top_k)
+                elif store.ann_status().get('exists'):
+                    results = store.search_annoy(emb, query, top_k=top_k)
+                else:
+                    results = store.search(emb, query, top_k=top_k)
+        except Exception:
+            results = store.search(emb, query, top_k=top_k)
+    else:
+        if use_captions and store.captions_available():
+            results = store.search_with_captions(emb, query, top_k=top_k)
+        elif use_ocr and store.ocr_available():
+            results = store.search_with_ocr(emb, query, top_k=top_k)
+        else:
+            results = store.search(emb, query, top_k=top_k)
+
+    out = results
+    sid = log_search(store.index_dir, getattr(emb, 'index_id', 'default'), query, [(str(r.path), float(r.score)) for r in out])
+
+    result_data = {
+        "search_id": sid,
+        "results": [{"path": str(r.path), "score": float(r.score)} for r in out],
+        "cached": False,
+        "cache_key": cache_key
+    }
+
+    # Cache the results
+    try:
+        cache_data = {
+            "timestamp": time.time(),
+            "query": query,
+            "results": result_data
+        }
+        cache_file.write_text(json.dumps(cache_data), encoding='utf-8')
+    except Exception:
+        pass  # Don't fail if caching fails
+
+    return result_data
     folder = Path(dir)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
@@ -1701,16 +1759,32 @@ def api_build_thumbs(dir: str, size: int = 512, provider: str = "local", hf_toke
     _write_event(store.index_dir, { 'type': 'thumbs_build', 'time': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'made': made, 'size': size })
     return out
 
-@app.get("/fast/status")
-def api_fast_status(dir: str) -> Dict[str, Any]:
+@app.get("/status/{operation}")
+def api_operation_status(dir: str, operation: str) -> Dict[str, Any]:
+    """Get status of long-running operations like indexing, caption building, etc."""
     store = IndexStore(Path(dir))
+
+    status_files = {
+        'index': 'index_status.json',
+        'captions': 'captions_status.json',
+        'ocr': 'ocr_status.json',
+        'metadata': 'metadata_status.json',
+        'fast_index': 'fast_status.json'
+    }
+
+    status_file = status_files.get(operation)
+    if not status_file:
+        return {"error": f"Unknown operation: {operation}"}
+
+    status_path = store.index_dir / status_file
+    if not status_path.exists():
+        return {"state": "idle"}
+
     try:
-        p = store.index_dir / 'fast_status.json'
-        if p.exists():
-            return json.loads(p.read_text(encoding='utf-8'))
-        return { 'state': 'idle' }
+        status = json.loads(status_path.read_text(encoding='utf-8'))
+        return status
     except Exception:
-        return { 'state': 'unknown' }
+        return {"state": "error", "error": "Could not read status file"}
 
 
 @app.get("/map")
@@ -1750,24 +1824,37 @@ def api_map(dir: str, limit: int = 1000) -> Dict[str, Any]:
     return {"points": pts}
 
 
-@app.get("/thumb")
-def api_thumb(dir: str, path: str, provider: str = "local", size: int = 512, hf_token: Optional[str] = None, openai_key: Optional[str] = None):
-    from fastapi.responses import FileResponse
+@app.post("/thumb/batch")
+def api_thumb_batch(dir: str, paths: List[str], size: int = 256, provider: str = "local", hf_token: Optional[str] = None, openai_key: Optional[str] = None) -> Dict[str, Any]:
+    """Generate thumbnails for multiple images in batch to reduce API calls."""
     folder = Path(dir)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
+
     emb = _emb(provider, hf_token, openai_key)
     store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
     store.load()
-    try:
-        idx_map = {sp: float(mt) for sp, mt in zip(store.state.paths or [], store.state.mtimes or [])}
-        mtime = idx_map.get(path, 0.0)
-        tp = get_or_create_thumb(store.index_dir, Path(path), float(mtime), size=size)
-        if tp is None or not tp.exists():
-            raise HTTPException(404, "Thumb not found")
-        return FileResponse(str(tp))
-    except Exception:
-        raise HTTPException(404, "Thumb not found")
+
+    results = {}
+    for path in paths:
+        try:
+            idx_map = {sp: float(mt) for sp, mt in zip(store.state.paths or [], store.state.mtimes or [])}
+            mtime = idx_map.get(path, 0.0)
+            tp = get_or_create_thumb(store.index_dir, Path(path), float(mtime), size=size)
+            if tp is None or not tp.exists():
+                results[path] = {"error": "Thumb not found"}
+            else:
+                # Return base64 encoded thumbnail for batch response
+                with open(tp, 'rb') as f:
+                    import base64
+                    results[path] = {
+                        "data": f"data:image/jpeg;base64,{base64.b64encode(f.read()).decode()}",
+                        "size": size
+                    }
+        except Exception as e:
+            results[path] = {"error": str(e)}
+
+    return {"results": results}
 
 
 @app.get("/thumb_face")
@@ -2365,49 +2452,66 @@ def api_get_metadata(dir: str) -> Dict[str, Any]:
         return {"cameras": [], "places": []}
 
 
-@app.get("/metadata/detail")
-def api_metadata_detail(dir: str, path: str) -> Dict[str, Any]:
-    """Return EXIF/derived metadata for a single photo path if available."""
+@app.get("/metadata/batch")
+def api_metadata_batch(dir: str, paths: str) -> Dict[str, Any]:
+    """Return EXIF/derived metadata for multiple photos in batch to reduce API calls."""
+    folder = Path(dir)
+    if not folder.exists():
+        raise HTTPException(400, "Folder not found")
+
+    # Parse comma-separated paths
+    path_list = [p.strip() for p in paths.split(',') if p.strip()]
+    if not path_list:
+        return {"ok": False, "meta": {}}
+
     store = IndexStore(Path(dir))
     p = store.index_dir / 'exif_index.json'
     if not p.exists():
         return {"ok": False, "meta": {}}
+
     try:
         data = json.loads(p.read_text())
-        paths = data.get('paths', [])
-        try:
-            i = paths.index(path)
-        except ValueError:
-            return {"ok": False, "meta": {}}
-        def pick(key):
-            arr = data.get(key, [])
-            return arr[i] if i < len(arr) else None
-        meta = {
-            "camera": pick('camera'),
-            "iso": pick('iso'),
-            "fnumber": pick('fnumber'),
-            "exposure": pick('exposure'),
-            "focal": pick('focal'),
-            "width": pick('width'),
-            "height": pick('height'),
-            "flash": pick('flash'),
-            "white_balance": pick('white_balance'),
-            "metering": pick('metering'),
-            "gps_lat": pick('gps_lat'),
-            "gps_lon": pick('gps_lon'),
-            "gps_altitude": pick('gps_altitude'),
-            "gps_heading": pick('gps_heading'),
-            "place": pick('place'),
-            "sharpness": pick('sharpness'),
-            "brightness": pick('brightness'),
-            "contrast": pick('contrast'),
-        }
-        # Include filesystem modification time for timeline grouping
-        try:
-            meta["mtime"] = float(Path(path).stat().st_mtime)
-        except Exception:
-            meta["mtime"] = None
-        return {"ok": True, "meta": meta}
+        paths_data = data.get('paths', [])
+        meta_dict = {}
+
+        for path in path_list:
+            try:
+                i = paths_data.index(path)
+            except ValueError:
+                continue
+
+            def pick(key):
+                arr = data.get(key, [])
+                return arr[i] if i < len(arr) else None
+
+            meta_dict[path] = {
+                "camera": pick('camera'),
+                "iso": pick('iso'),
+                "fnumber": pick('fnumber'),
+                "exposure": pick('exposure'),
+                "focal": pick('focal'),
+                "width": pick('width'),
+                "height": pick('height'),
+                "flash": pick('flash'),
+                "white_balance": pick('white_balance'),
+                "metering": pick('metering'),
+                "gps_lat": pick('gps_lat'),
+                "gps_lon": pick('gps_lon'),
+                "gps_altitude": pick('gps_altitude'),
+                "gps_heading": pick('gps_heading'),
+                "place": pick('place'),
+                "sharpness": pick('sharpness'),
+                "brightness": pick('brightness'),
+                "contrast": pick('contrast'),
+            }
+
+            # Include filesystem modification time for timeline grouping
+            try:
+                meta_dict[path]["mtime"] = float(Path(path).stat().st_mtime)
+            except Exception:
+                meta_dict[path]["mtime"] = None
+
+        return {"ok": True, "meta": meta_dict}
     except Exception:
         return {"ok": False, "meta": {}}
 
@@ -2798,28 +2902,108 @@ def api_split_face_cluster(dir: str, cluster_id: str, photo_paths: List[str]) ->
 
 
 # Progressive Loading APIs
-@app.get("/search/paginated")
+@app.post("/search/paginated")
 def api_search_paginated(
     dir: str,
     query: str,
     provider: str = "local",
     limit: int = 24,
     offset: int = 0,
-    **kwargs
+    hf_token: Optional[str] = None,
+    openai_key: Optional[str] = None,
+    favorites_only: bool = False,
+    tags: Optional[List[str]] = None,
+    date_from: Optional[float] = None,
+    date_to: Optional[float] = None,
+    use_fast: bool = False,
+    fast_kind: Optional[str] = None,
+    use_captions: bool = False,
+    use_ocr: bool = False,
+    camera: Optional[str] = None,
+    iso_min: Optional[int] = None,
+    iso_max: Optional[int] = None,
+    f_min: Optional[float] = None,
+    f_max: Optional[float] = None,
+    place: Optional[str] = None,
+    flash: Optional[str] = None,
+    wb: Optional[str] = None,
+    metering: Optional[str] = None,
+    alt_min: Optional[float] = None,
+    alt_max: Optional[float] = None,
+    heading_min: Optional[float] = None,
+    heading_max: Optional[float] = None,
+    sharp_only: bool = False,
+    exclude_underexp: bool = False,
+    exclude_overexp: bool = False,
+    has_text: bool = False,
+    person: Optional[str] = None,
+    persons: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Paginated search with cursor support for large result sets."""
-    # Use existing search but add pagination
-    search_result = api_search(dir, query, top_k=limit + offset, provider=provider, **kwargs)
-    
-    results = search_result.get("results", [])
-    total = len(results)
-    
+    folder = Path(dir)
+    if not folder.exists():
+        raise HTTPException(400, "Folder not found")
+
+    emb = _emb(provider, hf_token, openai_key)
+    store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
+    store.load()
+
+    # Get more results than needed for pagination
+    search_top_k = min(limit + offset + 50, len(store.state.paths or []))
+
+    if use_fast:
+        try:
+            if fast_kind and fast_kind.lower() == 'faiss' and store.faiss_status().get('exists'):
+                results = store.search_faiss(emb, query, top_k=search_top_k)
+            elif fast_kind and fast_kind.lower() == 'hnsw' and store.hnsw_status().get('exists'):
+                results = store.search_hnsw(emb, query, top_k=search_top_k)
+            elif fast_kind and fast_kind.lower() == 'annoy' and store.ann_status().get('exists'):
+                results = store.search_annoy(emb, query, top_k=search_top_k)
+            else:
+                if store.faiss_status().get('exists'):
+                    results = store.search_faiss(emb, query, top_k=search_top_k)
+                elif store.hnsw_status().get('exists'):
+                    results = store.search_hnsw(emb, query, top_k=search_top_k)
+                elif store.ann_status().get('exists'):
+                    results = store.search_annoy(emb, query, top_k=search_top_k)
+                else:
+                    results = store.search(emb, query, top_k=search_top_k)
+        except Exception:
+            results = store.search(emb, query, top_k=search_top_k)
+    else:
+        if use_captions and store.captions_available():
+            results = store.search_with_captions(emb, query, top_k=search_top_k)
+        elif use_ocr and store.ocr_available():
+            results = store.search_with_ocr(emb, query, top_k=search_top_k)
+        else:
+            results = store.search(emb, query, top_k=search_top_k)
+
+    out = results
+
+    # Apply filters (simplified version)
+    if favorites_only:
+        coll = load_collections(store.index_dir)
+        favs = set(coll.get('Favorites', []))
+        out = [r for r in out if str(r.path) in favs]
+
+    if tags:
+        tmap = load_tags(store.index_dir)
+        req = set(tags)
+        out = [r for r in out if req.issubset(set(tmap.get(str(r.path), [])))]
+
+    if date_from is not None and date_to is not None:
+        mmap = {sp: float(mt) for sp, mt in zip(store.state.paths or [], store.state.mtimes or [])}
+        out = [r for r in out if date_from <= mmap.get(str(r.path), 0.0) <= date_to]
+
     # Apply pagination
-    paginated_results = results[offset:offset + limit]
-    
+    total = len(out)
+    paginated_results = out[offset:offset + limit]
+
+    sid = log_search(store.index_dir, getattr(emb, 'index_id', 'default'), query, [(str(r.path), float(r.score)) for r in out])
+
     return {
-        "search_id": search_result.get("search_id"),
-        "results": paginated_results,
+        "search_id": sid,
+        "results": [{"path": str(r.path), "score": float(r.score)} for r in paginated_results],
         "pagination": {
             "offset": offset,
             "limit": limit,

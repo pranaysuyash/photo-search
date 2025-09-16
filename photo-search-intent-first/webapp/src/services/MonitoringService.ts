@@ -1,5 +1,6 @@
 // Monitoring and Observability Service
 // Handles error tracking, performance monitoring, and analytics
+import { getLoggingConfig, shouldLogErrorsToServer } from "../config/logging";
 
 interface ErrorReport {
 	message: string;
@@ -39,7 +40,12 @@ class MonitoringService {
 
 	constructor() {
 		this.sessionId = this.generateSessionId();
-		this.setupErrorHandling();
+    // Respect logging gate: avoid noisy global handlers in test unless explicitly allowed
+    const cfg = getLoggingConfig();
+    const enableGlobalHandlers = cfg.mode !== "test" || cfg.envGate === "all";
+    if (enableGlobalHandlers) {
+      this.setupErrorHandling();
+    }
 		this.setupPerformanceObserver();
 		this.startFlushInterval();
 	}
@@ -154,10 +160,15 @@ class MonitoringService {
 			this.flush();
 		}
 
-		// Log to console in development
-		if (import.meta.env.DEV) {
-			console.error("[Monitoring]", report);
-		}
+    // Log to console conditionally:
+    // - in dev normally
+    // - in test only if envGate is set to "all"
+    const cfg = getLoggingConfig();
+    const isDev = Boolean((import.meta as any).env?.DEV);
+    const allowInTest = cfg.mode === "test" && cfg.envGate === "all";
+    if ((isDev && cfg.mode !== "test") || allowInTest) {
+      console.error("[Monitoring]", report);
+    }
 	}
 
 	public trackMetric(
@@ -180,10 +191,13 @@ class MonitoringService {
 			this.flush();
 		}
 
-		// Log to console in development
-		if (import.meta.env.DEV) {
-			console.log("[Metric]", metric);
-		}
+    // Log to console conditionally (same gate as errors)
+    const cfg = getLoggingConfig();
+    const isDev = Boolean((import.meta as any).env?.DEV);
+    const allowInTest = cfg.mode === "test" && cfg.envGate === "all";
+    if ((isDev && cfg.mode !== "test") || allowInTest) {
+      console.log("[Metric]", metric);
+    }
 	}
 
 	public trackEvent(
@@ -257,21 +271,23 @@ class MonitoringService {
 	}
 
 	private async flush(immediate = false) {
-		if (
-			!import.meta.env.VITE_ENABLE_ERROR_REPORTING &&
-			!import.meta.env.VITE_ENABLE_PERFORMANCE_MONITORING &&
-			!import.meta.env.VITE_ENABLE_ANALYTICS
-		) {
-			return;
-		}
+    // Short-circuit if nothing is enabled
+    if (
+      !import.meta.env.VITE_ENABLE_ERROR_REPORTING &&
+      !import.meta.env.VITE_ENABLE_PERFORMANCE_MONITORING &&
+      !import.meta.env.VITE_ENABLE_ANALYTICS
+    ) {
+      return;
+    }
 
-		const payload = {
-			sessionId: this.sessionId,
-			userId: this.userId,
-			errors: [...this.errorQueue],
-			metrics: [...this.metricsQueue],
-			events: [...this.eventsQueue],
-		};
+    const payload = {
+      sessionId: this.sessionId,
+      userId: this.userId,
+      // Respect server logging gate for error shipment
+      errors: shouldLogErrorsToServer() ? [...this.errorQueue] : [],
+      metrics: [...this.metricsQueue],
+      events: [...this.eventsQueue],
+    };
 
 		// Clear queues
 		this.errorQueue = [];

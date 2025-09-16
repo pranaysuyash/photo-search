@@ -2,7 +2,7 @@ import { type RenderOptions, render } from "@testing-library/react";
 import type React from "react";
 import { BrowserRouter } from "react-router-dom";
 import { vi } from "vitest";
-import { ErrorBoundary } from "../components/ErrorBoundary";
+import ErrorBoundary from "../components/ErrorBoundary";
 import { HintManager, HintProvider } from "../components/HintSystem";
 import { MobileOptimizations } from "../components/MobileOptimizations";
 import { ThemeProvider } from "../components/ThemeProvider";

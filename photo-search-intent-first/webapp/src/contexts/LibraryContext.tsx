@@ -7,7 +7,7 @@ import {
 	useMemo,
 	useState,
 } from "react";
-import { apiIndex, apiLibrary } from "../api";
+import { apiIndex, apiLibrary, apiIndexPause, apiIndexResume, apiIndexStatus } from "../api";
 import { handleError } from "../utils/errors";
 import {
 	useDir,
@@ -131,7 +131,6 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
 	const pause = useCallback(
 		async (d?: string) => {
 			try {
-				const { apiIndexPause } = await import("../api");
 				await apiIndexPause(d || settings?.state?.dir);
 				setPaused(true);
 				jobs.add({
@@ -151,7 +150,6 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
 	const resume = useCallback(
 		async (d?: string) => {
 			try {
-				const { apiIndexResume } = await import("../api");
 				await apiIndexResume(d || settings?.state?.dir);
 				setPaused(false);
 				jobs.add({
@@ -180,7 +178,6 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
 		let startTs: number | undefined;
 		const poll = async () => {
 			try {
-				const { apiIndexStatus } = await import("../api");
 				const s: unknown = await apiIndexStatus(
 					dir,
 					engine,

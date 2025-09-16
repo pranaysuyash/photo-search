@@ -1,5 +1,6 @@
 import type React from "react";
 import { FocusTrap } from "../../utils/accessibility";
+import { apiSearchLikePlus } from "../../api";
 
 interface LikePlusModalProps {
 	selected: Set<string>;
@@ -52,14 +53,13 @@ export const LikePlusModal: React.FC<LikePlusModalProps> = ({
 								(form.elements.namedItem("weight") as HTMLInputElement).value,
 							);
 							if (selected.size === 1) {
-								try {
-									const p = Array.from(selected)[0];
-									const { apiSearchLikePlus } = await import("../../api");
-									uiActions.setBusy("Searching…");
-									const r = await apiSearchLikePlus(
-										dir,
-										p,
-										engine,
+                            try {
+                                const p = Array.from(selected)[0];
+                                uiActions.setBusy("Searching…");
+                                const r = await apiSearchLikePlus(
+                                    dir,
+                                    p,
+                                    engine,
 										topK,
 										text || undefined,
 										Number.isNaN(weight) ? 0.5 : weight,

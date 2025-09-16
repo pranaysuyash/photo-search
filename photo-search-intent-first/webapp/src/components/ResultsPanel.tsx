@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiLogEvent, apiOpen, apiSetFavorite } from "../api";
+import { handleError } from "../utils/errors";
 import {
 	useFavorites,
 	useSearchQuery,
@@ -95,13 +96,22 @@ export default function ResultsPanel() {
 					e.preventDefault();
 					navDetail(1);
 				}
-				if (e.key.toLowerCase() === "f") {
-					e.preventDefault();
-					const p = results[detailIdx].path;
-					apiSetFavorite(dir, p, !favorites.includes(p)).catch(() => {});
-				}
-				return;
-			}
+            if (e.key.toLowerCase() === "f") {
+                e.preventDefault();
+                const p = results[detailIdx].path;
+                apiSetFavorite(dir, p, !favorites.includes(p)).catch((err) =>
+                  handleError(err, {
+                    logToServer: true,
+                    context: {
+                      action: "toggle_favorite",
+                      component: "ResultsPanel",
+                      dir,
+                    },
+                  }),
+                );
+            }
+            return;
+          }
 			// Grid shortcuts (no focused detail)
 			if (e.key.toLowerCase() === "a") {
 				e.preventDefault();
@@ -208,12 +218,21 @@ export default function ResultsPanel() {
 								return;
 							}
 							let _added = 0;
-							for (const p of sel) {
-								try {
-									await apiSetFavorite(dir, p, !favorites.includes(p));
-									_added++;
-								} catch {}
-							}
+            for (const p of sel) {
+              try {
+                await apiSetFavorite(dir, p, !favorites.includes(p));
+                _added++;
+              } catch (err) {
+                handleError(err, {
+                  logToServer: true,
+                  context: {
+                    action: "batch_favorite",
+                    component: "ResultsPanel",
+                    dir,
+                  },
+                });
+              }
+            }
 						}}
 						className="bg-pink-600 text-white rounded px-2 py-1"
 					>
@@ -261,7 +280,18 @@ export default function ResultsPanel() {
 					onPrev={() => navDetail(-1)}
 					onNext={() => navDetail(1)}
 					onClose={() => setDetailIdx(null)}
-					onReveal={() => apiOpen(dir, results[detailIdx!].path)}
+                onReveal={() =>
+                  apiOpen(dir, results[detailIdx!].path).catch((err) =>
+                    handleError(err, {
+                      logToServer: true,
+                      context: {
+                        action: "open_in_explorer",
+                        component: "ResultsPanel.Lightbox",
+                        dir,
+                      },
+                    }),
+                  )
+                }
 					onFavorite={() =>
 						apiSetFavorite(
 							dir,

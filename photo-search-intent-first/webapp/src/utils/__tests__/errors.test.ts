@@ -10,6 +10,10 @@ vi.mock("../../api", () => ({
 beforeEach(() => {
   apiAnalyticsLog.mockClear();
   localStorage.clear();
+  // Ensure server logging is enabled in tests regardless of env defaults
+  process.env.VITE_LOG_ERRORS_TO_SERVER = "1";
+  process.env.VITE_LOG_ERRORS_ENV = "all";
+  process.env.VITE_ERROR_LOG_SAMPLE = "1";
 });
 
 describe("errors logging", () => {
@@ -72,4 +76,3 @@ describe("errors logging", () => {
     expect(ok).toBe(false);
   });
 });
-

@@ -1,5 +1,6 @@
 import type React from "react";
 import { FocusTrap } from "../../utils/accessibility";
+import { apiAddSaved, apiGetSaved } from "../../api";
 
 interface SaveModalProps {
 	dir: string;
@@ -49,7 +50,6 @@ export const SaveModal: React.FC<SaveModalProps> = ({
 							).value.trim();
 							if (!name) return;
 							try {
-								const { apiAddSaved, apiGetSaved } = await import("../../api");
 								await apiAddSaved(dir, name, searchText || query || "", topK);
 								const r = await apiGetSaved(dir);
 								photoActions.setSaved(r.saved || []);

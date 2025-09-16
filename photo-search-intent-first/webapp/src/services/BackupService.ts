@@ -4,6 +4,7 @@
 
 import { EventEmitter } from "node:events";
 import { handleError } from "../utils/errors";
+import { serviceEnabled } from "../config/logging";
 
 export type BackupProvider =
 	| "local"
@@ -209,7 +210,9 @@ class BackupService extends EventEmitter {
 			return true;
         } catch (error) {
             this.emit("provider-error", { provider, error });
-            handleError(error, { logToServer: true, context: { action: "backup_add_provider", component: "BackupService.addProvider", metadata: { provider } } });
+            if (serviceEnabled("backup")) {
+                handleError(error, { logToServer: true, logToConsole: false, context: { action: "backup_add_provider", component: "BackupService.addProvider", metadata: { provider } } });
+            }
             return false;
         }
 	}
@@ -505,7 +508,9 @@ class BackupService extends EventEmitter {
             job.status = "error";
             job.errors.push(String(error));
             this.emit("restore-failed", job);
-            handleError(error, { logToServer: true, context: { action: "backup_restore", component: "BackupService.restore", metadata: { versionId, targetPath } } });
+            if (serviceEnabled("backup")) {
+                handleError(error, { logToServer: true, logToConsole: false, context: { action: "backup_restore", component: "BackupService.restore", metadata: { versionId, targetPath } } });
+            }
         } finally {
             this.activeJobs.delete(job.id);
         }

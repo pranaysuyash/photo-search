@@ -1,4 +1,4 @@
-import { type SearchResult, thumbUrl } from "../api";
+import { type SearchResult, thumbUrl, apiTripsBuild, apiTripsList } from "../api";
 import LazyImage from "./LazyImage";
 
 interface TripsViewProps {
@@ -18,7 +18,6 @@ export default function TripsView({
 }: TripsViewProps) {
 	const handleBuildTrips = async () => {
 		try {
-			const { apiTripsBuild } = await import("../api");
 			setBusy("Grouping trips…");
 			const r = await apiTripsBuild(dir, engine);
 			setBusy("");
@@ -32,7 +31,6 @@ export default function TripsView({
 
 	const handleRefreshTrips = async () => {
 		try {
-			const { apiTripsList } = await import("../api");
 			const r = await apiTripsList(dir);
 			(window as unknown)._trips = r.trips || [];
 			setNote(`Loaded ${r.trips.length} trips`);

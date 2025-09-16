@@ -1,5 +1,6 @@
 import type React from "react";
 import { announce, FocusTrap } from "../../utils/accessibility";
+import { apiSetCollection, apiGetCollections } from "../../api";
 
 interface CollectionModalProps {
 	selected: Set<string>;
@@ -47,9 +48,6 @@ export const CollectionModal: React.FC<CollectionModalProps> = ({
 							).value.trim();
 							if (!name) return;
 							try {
-								const { apiSetCollection, apiGetCollections } = await import(
-									"../../api"
-								);
 								await apiSetCollection(dir, name, Array.from(selected));
 								const r = await apiGetCollections(dir);
 								photoActions.setCollections(r.collections || {});

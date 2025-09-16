@@ -1,4 +1,5 @@
 import type { SearchResult } from "../api";
+import { apiSetSmart, apiGetSmart, apiResolveSmart, apiDeleteSmart } from "../api";
 
 interface SmartCollectionsProps {
 	dir: string;
@@ -77,7 +78,6 @@ export default function SmartCollections({
             if (ppl.length === 1) (rules as any).person = ppl[0];
             else if (ppl.length > 1) (rules as any).persons = ppl;
 
-			const { apiSetSmart, apiGetSmart } = await import("../api");
 			await apiSetSmart(dir, name, rules);
 			const r = await apiGetSmart(dir);
 			setSmart(r.smart || {});
@@ -89,7 +89,6 @@ export default function SmartCollections({
 
 	const handleRefreshSmart = async () => {
 		try {
-			const { apiGetSmart } = await import("../api");
 			const r = await apiGetSmart(dir);
 			setSmart(r.smart || {});
         } catch (e: unknown) {
@@ -99,7 +98,6 @@ export default function SmartCollections({
 
 	const handleOpenSmart = async (name: string) => {
 		try {
-			const { apiResolveSmart } = await import("../api");
 			const r = await apiResolveSmart(dir, name, engine, topK);
 			setResults(r.results || []);
 			setSearchId(r.search_id || "");
@@ -112,7 +110,6 @@ export default function SmartCollections({
 	const handleDeleteSmart = async (name: string) => {
 		if (!confirm(`Delete smart collection "${name}"?`)) return;
 		try {
-			const { apiDeleteSmart, apiGetSmart } = await import("../api");
 			await apiDeleteSmart(dir, name);
 			const r = await apiGetSmart(dir);
 			setSmart(r.smart || {});

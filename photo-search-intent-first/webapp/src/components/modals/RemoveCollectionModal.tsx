@@ -1,5 +1,6 @@
 import type React from "react";
 import { announce, FocusTrap } from "../../utils/accessibility";
+import { apiGetCollections, apiSetCollection } from "../../api";
 
 interface RemoveCollectionModalProps {
 	selected: Set<string>;
@@ -47,9 +48,6 @@ export const RemoveCollectionModal: React.FC<RemoveCollectionModalProps> = ({
 							).value.trim();
 							if (!name) return;
 							try {
-								const { apiGetCollections, apiSetCollection } = await import(
-									"../../api"
-								);
 								const r = await apiGetCollections(dir);
 								const existing = r.collections?.[name] || [];
 								const next = existing.filter((p: string) => !selected.has(p));

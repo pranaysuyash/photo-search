@@ -30,19 +30,38 @@ vi.mock("../components/SearchBar", () => ({
 
 // Mock framer-motion
 vi.mock("framer-motion", () => ({
-	motion: {
-		button: ({
-			children,
-			...props
-		}: {
-			children?: React.ReactNode;
-			[key: string]: unknown;
-		}) => (
-			<button type="button" {...props}>
-				{children}
-			</button>
-		),
-	},
+    motion: {
+        button: ({
+            children,
+            ...props
+        }: {
+            children?: React.ReactNode;
+            [key: string]: unknown;
+        }) => {
+            // Strip motion-only props to avoid DOM warnings in tests
+            const {
+                whileHover,
+                whileTap,
+                initial,
+                animate,
+                exit,
+                transition,
+                variants,
+                layout,
+                layoutId,
+                drag,
+                dragConstraints,
+                dragElastic,
+                dragMomentum,
+                ...rest
+            } = props as any
+            return (
+                <button type="button" {...rest}>
+                    {children}
+                </button>
+            )
+        },
+    },
 }));
 
 // Ensure the feature-flagged Search Command Center is disabled so TopBar renders SearchBar

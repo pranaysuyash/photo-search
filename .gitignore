@@ -224,3 +224,5 @@ cypress/screenshots/
 *.run.log
 *.dev.log
 *.pack.log
+
+*storybook.log

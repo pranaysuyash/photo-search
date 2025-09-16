@@ -1,5 +1,6 @@
 import React from "react";
 import { EnhancedEmptyState } from "../components/EnhancedEmptyState";
+import LibraryBrowser from "../components/LibraryBrowser";
 import { humanizeSeconds } from "../utils/time";
 
 export interface LibraryViewProps {
@@ -11,6 +12,13 @@ export interface LibraryViewProps {
   onSelectLibrary: () => void;
   onRunDemo: () => Promise<void>;
   onOpenHelp: () => void;
+  onLoadLibrary: (limit?: number, offset?: number) => void;
+  hasMore?: boolean;
+  isLoading?: boolean;
+  selected?: Set<string>;
+  onToggleSelect?: (path: string) => void;
+  onOpen?: (path: string) => void;
+  tagsMap?: Record<string, string[]>;
 }
 
 export const LibraryView: React.FC<LibraryViewProps> = ({
@@ -22,6 +30,13 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   onSelectLibrary,
   onRunDemo,
   onOpenHelp,
+  onLoadLibrary,
+  hasMore = false,
+  isLoading = false,
+  selected = new Set(),
+  onToggleSelect,
+  onOpen,
+  tagsMap = {},
 }) => {
   // Empty dir state
   if (!dir) {
@@ -33,7 +48,12 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           onDemoAction={onRunDemo}
           onOpenHelp={onOpenHelp}
           onStartTour={onOpenHelp}
-          sampleQueries={["beach sunset", "birthday cake", "mountain hike", "red car"]}
+          sampleQueries={[
+            "beach sunset",
+            "birthday cake",
+            "mountain hike",
+            "red car",
+          ]}
           onRunSample={() => {}}
         />
       </div>
@@ -56,8 +76,23 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     );
   }
 
-  // Default: basic skeleton (actual library browser remains in App for now)
-  return <div className="p-4">{/* Library content is shown by App layout */}</div>;
+  // Display library browser with ScrollLoader integration
+  return (
+    <div className="p-4">
+      <LibraryBrowser
+        dir={dir}
+        engine="default"
+        library={library || []}
+        onLoadLibrary={onLoadLibrary}
+        selected={selected}
+        onToggleSelect={onToggleSelect}
+        onOpen={onOpen}
+        tagsMap={tagsMap}
+        hasMore={hasMore}
+        isLoading={isLoading}
+      />
+    </div>
+  );
 };
 
 export default LibraryView;

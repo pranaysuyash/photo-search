@@ -6,8 +6,42 @@ export default {
 		extend: {
 			// Custom color system using CSS variables
 			colors: {
-				// Primary brand colors
+				// shadcn/ui color variables
+				border: "hsl(var(--border))",
+				input: "hsl(var(--input))",
+				ring: "hsl(var(--ring))",
+				background: "hsl(var(--background))",
+				foreground: "hsl(var(--foreground))",
 				primary: {
+					DEFAULT: "hsl(var(--primary))",
+					foreground: "hsl(var(--primary-foreground))",
+				},
+				secondary: {
+					DEFAULT: "hsl(var(--secondary))",
+					foreground: "hsl(var(--secondary-foreground))",
+				},
+				destructive: {
+					DEFAULT: "hsl(var(--destructive))",
+					foreground: "hsl(var(--destructive-foreground))",
+				},
+				muted: {
+					DEFAULT: "hsl(var(--muted))",
+					foreground: "hsl(var(--muted-foreground))",
+				},
+				accent: {
+					DEFAULT: "hsl(var(--accent))",
+					foreground: "hsl(var(--accent-foreground))",
+				},
+				popover: {
+					DEFAULT: "hsl(var(--popover))",
+					foreground: "hsl(var(--popover-foreground))",
+				},
+				card: {
+					DEFAULT: "hsl(var(--card))",
+					foreground: "hsl(var(--card-foreground))",
+				},
+				// Legacy brand colors (keeping for backward compatibility)
+				"brand-primary": {
 					50: "var(--color-primary-50)",
 					100: "var(--color-primary-100)",
 					200: "var(--color-primary-200)",
@@ -19,8 +53,8 @@ export default {
 					800: "var(--color-primary-800)",
 					900: "var(--color-primary-900)",
 				},
-				// Secondary/gray colors
-				secondary: {
+				// Legacy secondary/gray colors
+				"brand-secondary": {
 					50: "var(--color-secondary-50)",
 					100: "var(--color-secondary-100)",
 					200: "var(--color-secondary-200)",
@@ -37,8 +71,8 @@ export default {
 				warning: "var(--color-state-warning)",
 				error: "var(--color-state-error)",
 				info: "var(--color-state-info)",
-				// Accent colors
-				accent: {
+				// Legacy accent colors
+				"brand-accent": {
 					pink: "var(--color-accent-pink-500)",
 					"pink-dark": "var(--color-accent-pink-600)",
 					emerald: "var(--color-accent-emerald-500)",

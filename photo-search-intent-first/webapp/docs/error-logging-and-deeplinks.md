@@ -14,6 +14,7 @@ Error Logging
 - Explicit logging helper:
   - `await logServerError(error, { dir, action: "export", component: "usePhotoActions" })`
 - Backend endpoint: `POST /analytics/log` with `{ dir, type, data }`. The client uses `apiAnalyticsLog(dir, "error", payload)`.
+  - Central env/sampling helpers: `src/config/logging.ts`.
 
 When to log to server
 - Indexing build failures (index, pause/resume flows)
@@ -63,3 +64,10 @@ Testing Notes
   - `VITE_LOG_ERRORS_ENV`: `prod` (default, only log in production) or `all` (log in all modes).
   - `VITE_ERROR_LOG_SAMPLE`: sampling rate between `0` and `1` (default `1`). Example: `0.1` logs ~10% of events.
   - `VITE_IMAGE_ERROR_SAMPLE`: image-load failure sampling between `0` and `1` (default `0.02`). Example: `0.2` logs ~20% of image load failures.
+  - Per-service toggles (default `1`):
+    - `VITE_LOG_IMAGE_ERRORS`
+    - `VITE_LOG_VIDEO_ERRORS`
+    - `VITE_LOG_OFFLINE_ERRORS`
+    - `VITE_LOG_OFFLINE_PHOTO_ERRORS`
+    - `VITE_LOG_BACKUP_ERRORS`
+  - See `.env.example` in `webapp/` for defaults and `.env.staging` for QA-friendly settings.

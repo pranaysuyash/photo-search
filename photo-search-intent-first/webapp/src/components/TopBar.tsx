@@ -24,6 +24,7 @@ import { useSearchContext } from "../contexts/SearchContext";
 import { useUIContext } from "../contexts/UIContext";
 import { useSearchCommandCenter } from "../stores/settingsStore";
 import { SearchBar } from "./SearchBar";
+import { apiSearchLike } from "../api";
 import type { PhotoActions, UIActions } from "../stores/types";
 import { useResultsConfig } from "../contexts/ResultsConfigContext";
 
@@ -161,7 +162,7 @@ export function TopBar({
 	onOpenThemeModal,
 	onOpenSearchOverlay,
 }: TopBarProps) {
-    const { resultView, setResultView, timelineBucket, setTimelineBucket } = useResultsConfig();
+	const { resultView, setResultView, timelineBucket, setTimelineBucket } = useResultsConfig();
 	const { state: uiState } = useUIContext();
 	const searchCommandCenter = useSearchCommandCenter();
 	const searchCtx = useSearchContext();
@@ -821,27 +822,26 @@ export function TopBar({
 							Tag
 						</button>
 						{selected.size === 1 && (
-							<button
-								type="button"
-								className="action-button"
-								onClick={async () => {
-									const p = Array.from(selected)[0];
-									const { apiSearchLike } = await import("../api");
-									uiActions.setBusy("Searching similar…");
-									try {
-										const r = await apiSearchLike(dir, p, engine, topK);
-										photoActions.setResults(r.results || []);
-										setSelectedView("results");
-									} catch (e) {
-										uiActions.setNote(
-											e instanceof Error ? e.message : "Search failed",
-										);
-									} finally {
-										uiActions.setBusy("");
-									}
-								}}
-								aria-label="Find similar photos to the selected photo"
-							>
+                            <button
+                                type="button"
+                                className="action-button"
+                                onClick={async () => {
+                                    const p = Array.from(selected)[0];
+                                    uiActions.setBusy("Searching similar…");
+                                    try {
+                                        const r = await apiSearchLike(dir, p, engine, topK);
+                                        photoActions.setResults(r.results || []);
+                                        setSelectedView("results");
+                                    } catch (e) {
+                                        uiActions.setNote(
+                                            e instanceof Error ? e.message : "Search failed",
+                                        );
+                                    } finally {
+                                        uiActions.setBusy("");
+                                    }
+                                }}
+                                aria-label="Find similar photos to the selected photo"
+                            >
 								<IconSearch className="w-4 h-4" /> Similar
 							</button>
 						)}

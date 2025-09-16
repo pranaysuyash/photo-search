@@ -33,7 +33,7 @@ React + Vite web UI for Photo Search (intent‑first). Route‑driven navigation
   - `VITE_LOG_ERRORS_ENV` (`prod`|`all`)
   - `VITE_ERROR_LOG_SAMPLE` (0..1)
 - Image‑load failures sampled via `VITE_IMAGE_ERROR_SAMPLE` (default ~0.02).
-- See `.env.example` and `docs/error-logging-and-deeplinks.md`.
+- See `.env.example`, `.env.staging`, and `docs/error-logging-and-deeplinks.md`. Helpers live in `src/config/logging.ts`.
 
 ## Testing Notes
 

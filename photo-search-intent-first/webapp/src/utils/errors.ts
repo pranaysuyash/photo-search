@@ -4,6 +4,8 @@
  */
 
 import React from "react";
+import { apiAnalyticsLog } from "../api";
+import { shouldLogErrorsToServer, shouldSample, getLoggingConfig } from "../config/logging";
 
 /**
  * Extended error type with additional properties
@@ -263,16 +265,10 @@ export const handleError = (
     if (logToServer) {
         void (async () => {
             try {
-                // Feature flags / gating
-                const env: any = (import.meta as unknown as { env?: Record<string, any> })?.env || {};
-                const enabled = String(env.VITE_LOG_ERRORS_TO_SERVER ?? "1") !== "0";
-                const envGate = String(env.VITE_LOG_ERRORS_ENV || "prod"); // 'prod' | 'all'
-                const mode = env.MODE || env.NODE_ENV || "development";
-                const sampleRate = Number(env.VITE_ERROR_LOG_SAMPLE ?? "1"); // 0..1
-                if (!enabled) return;
-                if (envGate === "prod" && mode !== "production") return;
-                if (!(sampleRate > 0) || Math.random() >= Math.min(1, Math.max(0, sampleRate))) return;
-                const { apiAnalyticsLog } = await import("../api");
+                // Central gating + sampling
+                if (!shouldLogErrorsToServer()) return;
+                if (!shouldSample(getLoggingConfig().globalSample)) return;
+                
                 // Best-effort dir resolution: prefer explicit context.dir
                 let dir = context?.dir || "";
                 if (!dir) {
@@ -315,8 +311,7 @@ export async function logServerError(
 	error: unknown,
 	context: ErrorContext & { dir?: string },
 ): Promise<boolean> {
-	try {
-		const { apiAnalyticsLog } = await import("../api");
+    try {
 		let dir = context?.dir || "";
 		if (!dir) return false;
 		const base: Record<string, unknown> = {

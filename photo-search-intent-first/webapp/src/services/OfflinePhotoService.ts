@@ -5,6 +5,7 @@
 
 import React from "react";
 import { handleError } from "../utils/errors";
+import { serviceEnabled } from "../config/logging";
 import { API_BASE } from "../api";
 
 export interface PhotoCacheEntry {
@@ -135,7 +136,9 @@ export class OfflinePhotoService {
                 `[OfflinePhotoService] Failed to cache photo: ${path}`,
                 error,
             );
-            handleError(error, { logToServer: true, context: { action: "offline_cache_photo", component: "OfflinePhotoService.cachePhoto", metadata: { path } } });
+            if (serviceEnabled("offlinePhoto")) {
+                handleError(error, { logToServer: true, logToConsole: false, context: { action: "offline_cache_photo", component: "OfflinePhotoService.cachePhoto", metadata: { path } } });
+            }
         }
 	}
 
@@ -180,7 +183,9 @@ export class OfflinePhotoService {
                 `[OfflinePhotoService] Failed to get cached photo: ${path}`,
                 error,
             );
-            handleError(error, { logToServer: true, context: { action: "offline_get_cached_photo", component: "OfflinePhotoService.getCachedPhotoUrl", metadata: { path, size } } });
+            if (serviceEnabled("offlinePhoto")) {
+                handleError(error, { logToServer: true, logToConsole: false, context: { action: "offline_get_cached_photo", component: "OfflinePhotoService.getCachedPhotoUrl", metadata: { path, size } } });
+            }
         }
 		return null;
 	}
@@ -280,7 +285,9 @@ export class OfflinePhotoService {
 			});
         } catch (error) {
             console.error("[OfflinePhotoService] Cache cleanup failed:", error);
-            handleError(error, { logToServer: true, context: { action: "offline_cache_cleanup", component: "OfflinePhotoService.cleanupCache" } });
+            if (serviceEnabled("offlinePhoto")) {
+                handleError(error, { logToServer: true, logToConsole: false, context: { action: "offline_cache_cleanup", component: "OfflinePhotoService.cleanupCache" } });
+            }
         }
 	}
 
@@ -357,7 +364,9 @@ export class OfflinePhotoService {
                                 "[OfflinePhotoService] Failed to sync action:",
                                 error,
                             );
-                            handleError(error, { logToServer: true, context: { action: "offline_sync_action", component: "OfflinePhotoService.syncOfflineActions" } });
+                            if (serviceEnabled("offlinePhoto")) {
+                                handleError(error, { logToServer: true, logToConsole: false, context: { action: "offline_sync_action", component: "OfflinePhotoService.syncOfflineActions" } });
+                            }
                         }
 					}
 
