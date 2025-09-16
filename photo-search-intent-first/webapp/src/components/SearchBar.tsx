@@ -29,7 +29,13 @@ interface SuggestionItem {
 const searchHistoryKey = "search-history";
 const maxHistoryItems = 10;
 
-const getSearchHistory = (): string[] => {
+interface SearchHistoryItem {
+	query: string;
+	timestamp: number;
+	useCount: number;
+}
+
+const getSearchHistory = (): SearchHistoryItem[] => {
 	try {
 		const raw = localStorage.getItem(searchHistoryKey);
 		return raw ? JSON.parse(raw) : [];
@@ -38,15 +44,54 @@ const getSearchHistory = (): string[] => {
 	}
 };
 
-const _addToSearchHistory = (query: string) => {
+const addToSearchHistory = (query: string) => {
 	if (!query?.trim()) return;
 	try {
 		const history = getSearchHistory();
 		const trimmed = query.trim();
-		const deduped = [trimmed, ...history.filter((q: string) => q !== trimmed)];
-		const pruned = deduped.slice(0, maxHistoryItems);
+		const existingIndex = history.findIndex(item => item.query === trimmed);
+
+		if (existingIndex >= 0) {
+			// Update existing item
+			history[existingIndex].timestamp = Date.now();
+			history[existingIndex].useCount += 1;
+			// Move to front
+			const [item] = history.splice(existingIndex, 1);
+			history.unshift(item);
+		} else {
+			// Add new item
+			const newItem: SearchHistoryItem = {
+				query: trimmed,
+				timestamp: Date.now(),
+				useCount: 1
+			};
+			history.unshift(newItem);
+		}
+
+		// Keep only the most recent items
+		const pruned = history.slice(0, maxHistoryItems);
 		localStorage.setItem(searchHistoryKey, JSON.stringify(pruned));
-	} catch {}
+	} catch (error) {
+		console.warn('Failed to save search history:', error);
+	}
+};
+
+const clearSearchHistory = () => {
+	try {
+		localStorage.removeItem(searchHistoryKey);
+	} catch (error) {
+		console.warn('Failed to clear search history:', error);
+	}
+};
+
+const removeFromSearchHistory = (query: string) => {
+	try {
+		const history = getSearchHistory();
+		const filtered = history.filter(item => item.query !== query);
+		localStorage.setItem(searchHistoryKey, JSON.stringify(filtered));
+	} catch (error) {
+		console.warn('Failed to remove from search history:', error);
+	}
 };
 
 export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
@@ -99,15 +144,15 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 				const cleanup = debouncedSearchText(searchText, () => {
 					const history = getSearchHistory()
 						.filter(
-							(q: string) =>
+							(item: SearchHistoryItem) =>
 								!searchText ||
-								q.toLowerCase().includes(searchText.toLowerCase()),
+								item.query.toLowerCase().includes(searchText.toLowerCase()),
 						)
 						.slice(0, 8)
-						.map((query) => ({
-							query,
+						.map((item) => ({
+							query: item.query,
 							type: "history" as const,
-							metadata: { lastUsed: Date.now(), useCount: 1 },
+							metadata: { lastUsed: item.timestamp, useCount: item.useCount },
 						}));
 					setHistorySuggestions(history);
 				});
@@ -116,6 +161,10 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 		}, [debouncedSearchText, searchText, suggestOpen]);
 
 		const handleSearch = (text: string) => {
+			const trimmedText = text.trim();
+			if (trimmedText) {
+				addToSearchHistory(trimmedText);
+			}
 			onSearch(text);
 			setSuggestOpen(false);
 			setActiveIdx(-1);

@@ -7,10 +7,9 @@ Legend: [x] done • [>] in progress • [ ] planned • (opt) optional
 ## Top Priorities (Now)
 - [x] Index progress UI (determinate + ETA + tooltip)
 - [>] Long‑ops progress UI parity for OCR/Metadata/Fast (determinate where available + notes)
-- [ ] Index chip: show indexed count + coverage inline under count
-- [x] Index chip: show indexed count + coverage inline under count
-- [ ] Index chip hover: multi‑line card (processed N/D • indexed X • target T • coverage P% • drift D • ETA • last index time)
-- [ ] Humanized ETA in tooltip (e.g., 2m 30s) + show rate (items/s)
+- [x] Index chip: show indexed count + coverage inline under count (use diagnostics + library totals)
+- [x] Index chip hover: multi‑line card (processed N/D • indexed X • target T • coverage P% • drift D • ETA • last index time)
+- [x] Humanized ETA in tooltip (e.g., 2m 30s) + show rate (items/s)
 - [ ] OCR pill hover: show OCR text count and CTA to build/update OCR when not ready
 - [ ] One‑click “Extract text (OCR)” from OCR hover (calls /ocr/build and updates status)
 - [x] OCR pill hover: show OCR text count and CTA to build/update OCR when not ready

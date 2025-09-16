@@ -2,7 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { API_BASE } from "../../api";
 import { useSimpleStore } from "../../stores/SimpleStore";
 
-type ScanItem = { path: string; exists: boolean; files: number; bytes: number };
+type ScanItem = {
+	path: string;
+	exists: boolean;
+	files: number;
+	bytes: number;
+	label?: string;
+	source?: string;
+};
 
 function defaultPathsByOS(): string[] {
 	try {
@@ -73,31 +80,67 @@ export default function FirstRunSetup({
 	useEffect(() => {
 		if (!open) return;
 		let cancelled = false;
-		const load = async () => {
+		const loadDefaults = async () => {
 			setLoading(true);
 			try {
-				const r = await fetch(
-					`${API_BASE}/scan_count?include_videos=${includeVideos ? "1" : "0"}`,
-					{
-						method: "POST",
-						headers: { "Content-Type": "application/json" },
-						body: JSON.stringify(paths),
-					},
-				);
-				if (!r.ok) throw new Error(await r.text());
-				const data = (await r.json()) as { items: ScanItem[] };
-				if (!cancelled) setItems(data.items || []);
-			} catch {
-				if (!cancelled) setItems([]);
+				try {
+					const resp = await fetch(
+						`${API_BASE}/library/defaults?include_videos=${includeVideos ? "1" : "0"}`,
+					);
+					if (!resp.ok) {
+						throw new Error(await resp.text());
+					}
+					const data = (await resp.json()) as { items?: ScanItem[] };
+					const list = Array.isArray(data.items) ? data.items : [];
+					if (!cancelled && list.length > 0) {
+						setItems(list);
+						_setPaths(list.map((it) => it.path));
+						return;
+					}
+				} catch {
+					if (cancelled) {
+						return;
+					}
+				}
+
+				if (cancelled) {
+					return;
+				}
+
+				const fallback = defaultPathsByOS();
+				if (!cancelled) {
+					_setPaths(fallback);
+				}
+				if (fallback.length === 0) {
+					if (!cancelled) setItems([]);
+					return;
+				}
+				try {
+					const resp = await fetch(
+						`${API_BASE}/scan_count?include_videos=${includeVideos ? "1" : "0"}`,
+						{
+							method: "POST",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify(fallback),
+						},
+					);
+					if (!resp.ok) {
+						throw new Error(await resp.text());
+					}
+					const data = (await resp.json()) as { items: ScanItem[] };
+					if (!cancelled) setItems(data.items || []);
+				} catch {
+					if (!cancelled) setItems([]);
+				}
 			} finally {
 				if (!cancelled) setLoading(false);
 			}
 		};
-		load();
+		loadDefaults();
 		return () => {
 			cancelled = true;
 		};
-	}, [open, paths, includeVideos]);
+	}, [open, includeVideos]);
 
 	const formatBytes = (n: number) => {
 		if (!n) return "0 B";
@@ -133,11 +176,20 @@ export default function FirstRunSetup({
 						<div className="text-xs text-gray-600 mb-2">
 							Index common locations (local only)
 						</div>
-						<ul className="text-xs text-gray-700 mb-2">
+						<ul className="text-xs text-gray-700 mb-2 space-y-1">
 							{items.map((it) => (
-								<li key={it.path} className="flex justify-between">
-									<span>{it.path}</span>
-									<span>
+								<li key={it.path} className="flex justify-between gap-3">
+									<div className="flex flex-col">
+										<span className="font-medium text-gray-800 dark:text-gray-100">
+											{it.label ?? it.path}
+										</span>
+										{it.label ? (
+											<span className="text-[11px] text-gray-500 dark:text-gray-400">
+												{it.path}
+											</span>
+										) : null}
+									</div>
+									<span className="text-right">
 										{it.exists
 											? `${it.files} • ${formatBytes(it.bytes)} (Found)`
 											: "Not found"}

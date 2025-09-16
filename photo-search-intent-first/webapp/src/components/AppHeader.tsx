@@ -3,6 +3,7 @@ import type React from "react";
 import type { View } from "../App";
 import type { PhotoActions, UIActions, WorkspaceState } from "../stores/types";
 import { TopBar, type ViewType } from "./TopBar";
+import type { IndexStatusDetails } from "../contexts/LibraryContext";
 
 // Define the modal types
 type ModalKind =
@@ -31,6 +32,10 @@ interface AppHeaderProps {
 		places?: (string | number)[];
 	};
 	diag: WorkspaceState["diag"];
+	indexedCount?: number;
+	indexedTotal?: number;
+	coveragePct?: number;
+	indexStatus?: IndexStatusDetails;
 	busy: boolean;
 	gridSize: "small" | "medium" | "large";
 	setGridSize: (size: "small" | "medium" | "large") => void;
@@ -122,6 +127,10 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 	uiActions,
 	toastTimerRef,
 	setToast,
+	indexedCount,
+	indexedTotal,
+	coveragePct,
+	indexStatus,
 	isIndexing,
 	onIndex,
 	activeJobs,
@@ -179,6 +188,10 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 				uiActions={uiActions}
 				toastTimerRef={toastTimerRef}
 				setToast={setToast}
+				indexedCount={indexedCount}
+				indexedTotal={indexedTotal}
+				coveragePct={coveragePct}
+				indexStatus={indexStatus}
 				isIndexing={isIndexing}
 				onIndex={onIndex}
 				activeJobs={activeJobs}

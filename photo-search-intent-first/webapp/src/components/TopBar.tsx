@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import type React from "react";
 import type { SearchResult } from "../api";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { humanizeSeconds } from "../utils/time";
 import { apiDelete, apiUndoDelete } from "../api";
 import { useSearchContext } from "../contexts/SearchContext";
@@ -27,6 +27,7 @@ import { SearchBar } from "./SearchBar";
 import { apiSearchLike } from "../api";
 import type { PhotoActions, UIActions } from "../stores/types";
 import { useResultsConfig } from "../contexts/ResultsConfigContext";
+import type { IndexStatusDetails } from "../contexts/LibraryContext";
 
 export type GridSize = "small" | "medium" | "large";
 export type ViewType =
@@ -81,6 +82,10 @@ export interface TopBarProps {
 	diag?: {
 		engines?: Array<{ key: string; index_dir: string; count: number }>;
 	} | null;
+	indexedCount?: number;
+	indexedTotal?: number;
+	coveragePct?: number;
+	indexStatus?: IndexStatusDetails;
 	isIndexing?: boolean;
 	onIndex?: () => void;
 	// Jobs integration
@@ -144,6 +149,10 @@ export function TopBar({
 	showInfoOverlay,
 	onToggleInfoOverlay,
     diag,
+    indexedCount,
+    indexedTotal,
+    coveragePct,
+    indexStatus,
     isIndexing,
     onIndex,
 	activeJobs,
@@ -167,6 +176,139 @@ export function TopBar({
 	const searchCommandCenter = useSearchCommandCenter();
 	const searchCtx = useSearchContext();
 	const [showMore, setShowMore] = useState(false);
+	const numberFormatter = useMemo(() => new Intl.NumberFormat(), []);
+	const rawIndexedCount =
+		typeof indexedCount === "number"
+			? indexedCount
+			: diag?.engines?.[0]?.count;
+	const totalForDisplay =
+		typeof indexedTotal === "number"
+			? indexedTotal
+			: indexStatus?.target;
+	const formattedIndexedCount =
+		typeof rawIndexedCount === "number"
+			? numberFormatter.format(rawIndexedCount)
+			: undefined;
+	const formattedTotal =
+		typeof totalForDisplay === "number"
+			? numberFormatter.format(totalForDisplay)
+			: undefined;
+	const computedCoverage = (() => {
+		if (typeof coveragePct === "number" && Number.isFinite(coveragePct)) {
+			return Math.min(1, Math.max(0, coveragePct));
+		}
+		if (typeof indexStatus?.coverage === "number") {
+			return indexStatus.coverage;
+		}
+		if (
+			typeof rawIndexedCount === "number" &&
+			typeof totalForDisplay === "number" &&
+			totalForDisplay > 0
+		) {
+			return Math.min(1, Math.max(0, rawIndexedCount / totalForDisplay));
+		}
+		return undefined;
+	})();
+	const coverageText =
+		computedCoverage !== undefined
+			? `${Math.round(computedCoverage * 100)}%`
+			: undefined;
+	const effectiveEtaSeconds =
+		indexStatus?.etaSeconds && Number.isFinite(indexStatus.etaSeconds)
+			? indexStatus.etaSeconds
+			: typeof etaSeconds === "number" && etaSeconds > 0
+			? etaSeconds
+			: undefined;
+	const ratePerSecond =
+		indexStatus?.ratePerSecond && Number.isFinite(indexStatus.ratePerSecond)
+			? indexStatus.ratePerSecond
+			: undefined;
+	const etaInline =
+		effectiveEtaSeconds && effectiveEtaSeconds > 0
+			? `ETA ~${humanizeSeconds(Math.round(effectiveEtaSeconds))}`
+			: undefined;
+	const rateInline =
+		ratePerSecond && ratePerSecond > 0
+			? `Rate ${
+					ratePerSecond * 60 >= 10
+						? (ratePerSecond * 60).toFixed(0)
+						: (ratePerSecond * 60).toFixed(1)
+				 } items/min`
+			: undefined;
+	const lastIndexedText = indexStatus?.lastIndexedAt
+		? new Date(indexStatus.lastIndexedAt).toLocaleString()
+		: undefined;
+	const hoverLines = useMemo(() => {
+		const lines: string[] = [];
+		if (indexStatus?.processed && indexStatus.processed.total > 0) {
+			const processedPctRaw = Math.round(
+				(indexStatus.processed.done / indexStatus.processed.total) * 100,
+			);
+			const baseProcessed = `Processed: ${numberFormatter.format(
+				indexStatus.processed.done,
+			)}/${numberFormatter.format(indexStatus.processed.total)}`;
+			lines.push(
+				Number.isFinite(processedPctRaw)
+					? `${baseProcessed} (${Math.max(
+						0,
+						Math.min(100, processedPctRaw),
+					)}%)`
+					: baseProcessed,
+			);
+		}
+		const targetForHover =
+			indexStatus?.target !== undefined
+				? indexStatus.target
+				: totalForDisplay;
+		const indexedForHover =
+			indexStatus?.indexed !== undefined
+				? indexStatus.indexed
+				: rawIndexedCount;
+		if (
+			typeof indexedForHover === "number" &&
+			typeof targetForHover === "number"
+		) {
+			const coverageLabel = coverageText ? ` (${coverageText})` : "";
+			lines.push(
+				`Indexed: ${numberFormatter.format(
+					indexedForHover,
+				)}/${numberFormatter.format(targetForHover)}${coverageLabel}`,
+			);
+		}
+		if (typeof indexStatus?.drift === "number" && indexStatus.drift !== 0) {
+			const driftAbs = Math.abs(indexStatus.drift);
+			const driftLabel = indexStatus.drift > 0 ? "Remaining" : "Over";
+			lines.push(`${driftLabel}: ${numberFormatter.format(driftAbs)}`);
+		}
+		if (effectiveEtaSeconds) {
+			lines.push(
+				`ETA: ${humanizeSeconds(Math.round(effectiveEtaSeconds))}`,
+			);
+		}
+		if (ratePerSecond && ratePerSecond > 0) {
+			const perMinute = ratePerSecond * 60;
+			const rateText =
+				perMinute >= 10 ? perMinute.toFixed(0) : perMinute.toFixed(1);
+			lines.push(`Rate: ${rateText} items/min`);
+		}
+		if (lastIndexedText) {
+			lines.push(`Last index: ${lastIndexedText}`);
+		}
+		return lines;
+	}, [
+		indexStatus,
+		numberFormatter,
+		totalForDisplay,
+		rawIndexedCount,
+		coverageText,
+		effectiveEtaSeconds,
+		ratePerSecond,
+		lastIndexedText,
+	]);
+	const tooltipFallback = tooltip ? tooltip.split(" • ") : [];
+	const tooltipLines = hoverLines.length > 0 ? hoverLines : tooltipFallback;
+	const showIndexChip =
+		typeof rawIndexedCount === "number" && !Number.isNaN(rawIndexedCount);
 	const q = (searchText ?? searchCtx.state.query) || "";
 	const setQ = (t: string) =>
 		setSearchText ? setSearchText(t) : searchCtx.actions.setQuery(t);
@@ -384,92 +526,99 @@ export function TopBar({
 
 				<div className="top-bar-right">
 					{/* Indexed/progress chip */}
-					{diag && (diag.engines?.length || 0) >= 1 && (
-						<div className="indexed-chip relative">
-							<span className="indexed-label">Indexed</span>
-							<span className="indexed-count">
-								{diag.engines?.[0]?.count || 0}
-							</span>
-							{/* When command center is enabled, surface active jobs here to reduce chip noise */}
-							{searchCommandCenter &&
-								typeof activeJobs === "number" &&
-								activeJobs > 0 && (
-									<span className="ml-2 text-[11px] text-gray-600">
-										• Jobs {activeJobs}
+					{showIndexChip && (
+						<div className="indexed-chip relative flex flex-wrap items-center gap-3 bg-gray-100 dark:bg-gray-800 px-3 py-2 rounded-full border border-gray-200 dark:border-gray-700 shadow-sm">
+							<div className="flex flex-col gap-1 leading-tight">
+								<span className="indexed-label">Indexed</span>
+								<div className="flex items-baseline gap-1">
+									<span className="indexed-count">
+										{formattedIndexedCount ?? "0"}
+									</span>
+									{formattedTotal && (
+										<span className="indexed-total">/ {formattedTotal}</span>
+									)}
+								</div>
+								{coverageText && (
+									<span className="indexed-coverage">{coverageText} coverage</span>
+								)}
+								{isIndexing && (etaInline || rateInline) && (
+									<span className="indexed-meta">
+										{[etaInline, rateInline].filter(Boolean).join(" • ")}
 									</span>
 								)}
-							<button
-								type="button"
-								className="indexed-action"
-								onClick={() => onIndex?.()}
-								disabled={!!isIndexing}
-								aria-label={
-									isIndexing
-										? "Indexing photos (indeterminate)"
-										: diag.engines?.[0]?.count
+								{!isIndexing && lastIndexedText && (
+									<span className="indexed-meta">Last index {lastIndexedText}</span>
+								)}
+								{searchCommandCenter &&
+									typeof activeJobs === "number" &&
+									activeJobs > 0 && (
+										<span className="indexed-meta">Jobs {activeJobs}</span>
+									)}
+							</div>
+							<div className="flex items-center gap-2">
+								<button
+									type="button"
+									className="indexed-action px-3 py-1.5 text-sm font-semibold text-white bg-blue-600 rounded-full transition-colors hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
+									onClick={() => onIndex?.()}
+									disabled={!!isIndexing}
+									aria-label={
+										isIndexing
+											? "Indexing photos (running)"
+											: rawIndexedCount && rawIndexedCount > 0
 											? "Reindex your library"
 											: "Start indexing your library"
-								}
-								title={
-									isIndexing
-										? "Indexing runs in the background. You can keep working."
-										: diag.engines?.[0]?.count
+									}
+									title={
+										isIndexing
+											? "Indexing runs in the background. You can keep working."
+											: rawIndexedCount && rawIndexedCount > 0
 											? "Reindex photos"
 											: "Start indexing"
-								}
-							>
-								{isIndexing
-									? "Indexing…"
-									: diag.engines?.[0]?.count
+									}
+								>
+									{isIndexing
+										? "Indexing…"
+										: rawIndexedCount && rawIndexedCount > 0
 										? "Reindex"
 										: "Index"}
-							</button>
+								</button>
+								{isIndexing && (
+									<button
+										type="button"
+										className="chip"
+										onClick={() => (paused ? onResume?.() : onPause?.())}
+										aria-label={paused ? "Resume indexing" : "Pause indexing"}
+										title={paused ? "Resume indexing" : "Pause indexing"}
+									>
+										{paused ? "Resume" : "Pause"}
+									</button>
+								)}
+							</div>
 							{isIndexing && (
-								<div className="indexed-progress" aria-hidden>
-									<div
-										className="indexed-progress-bar"
-										style={
-											typeof progressPct === "number" &&
-											progressPct >= 0 &&
-											progressPct <= 1
-												? {
+								<div className="basis-full">
+									<div className="indexed-progress" aria-hidden>
+										<div
+											className="indexed-progress-bar"
+											style={
+												typeof progressPct === "number" &&
+												progressPct >= 0 &&
+												progressPct <= 1
+													? {
 														width: `${Math.max(
 															4,
 															Math.round(progressPct * 100),
 														)}%`,
 													}
 												: undefined
-										}
-									/>
+											}
+										/>
+									</div>
 								</div>
 							)}
-							{isIndexing &&
-								typeof etaSeconds === "number" &&
-								Number.isFinite(etaSeconds) &&
-								etaSeconds > 0 && (
-									<span
-										className="ml-2 text-[11px] text-gray-600"
-										title="Estimated time remaining"
-									>
-										~{humanizeSeconds(etaSeconds)}
-									</span>
-								)}
-							{isIndexing && (
-								<button
-									type="button"
-									className="ml-2 chip"
-									onClick={() => (paused ? onResume?.() : onPause?.())}
-									aria-label={paused ? "Resume indexing" : "Pause indexing"}
-									title={paused ? "Resume indexing" : "Pause indexing"}
-								>
-									{paused ? "Resume" : "Pause"}
-								</button>
-							)}
-							{/* Hover card for detailed tooltip */}
-							{tooltip && (
+							{tooltipLines.length > 0 && (
 								<div className="tooltip-card" role="tooltip" aria-hidden>
-									{(tooltip.split(" • ") || []).map((line, _i) => (
-										<div key={`item-${String(line)}`} className="tooltip-line">
+									{tooltipLines.map((line, idx) => (
+										<div key={`index-tip-${idx}`} className="tooltip-line">
 											{line}
 										</div>
 									))}
