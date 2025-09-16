@@ -23,6 +23,7 @@ import {
 	useSettingsActions,
 } from "../stores/useStores";
 import { useJobsContext } from "./JobsContext";
+import { humanizeSeconds } from "../utils/time";
 
 type LibraryState = {
 	paths: string[];
@@ -32,6 +33,7 @@ type LibraryState = {
 	etaSeconds?: number;
 	paused?: boolean;
 	tip?: string;
+	indexStatus?: IndexStatusDetails;
 };
 
 type LibraryActions = {
@@ -47,6 +49,23 @@ type LibraryActions = {
 	resume?: (dir?: string) => Promise<void>;
 };
 
+export interface IndexStatusDetails {
+	state?: string;
+	start?: string;
+	end?: string;
+	processed?: { done: number; total: number };
+	target?: number;
+	existing?: number;
+	indexed?: number;
+	newCount?: number;
+	updatedCount?: number;
+	drift?: number;
+	etaSeconds?: number;
+	ratePerSecond?: number;
+	coverage?: number;
+	lastIndexedAt?: string;
+}
+
 const Ctx = createContext<{
 	state: LibraryState;
 	actions: LibraryActions;
@@ -60,6 +79,9 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
 	const [etaSeconds, setEtaSeconds] = useState<number | undefined>(undefined);
 	const [paused, setPaused] = useState<boolean>(false);
 	const [tip, setTip] = useState<string | undefined>(undefined);
+	const [indexStatusDetails, setIndexStatusDetails] = useState<
+		IndexStatusDetails | undefined
+	>(undefined);
 	const settings = useSettingsActions() as unknown;
 	const dir = useDir();
 	const engine = useEngine();
@@ -68,6 +90,108 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
 	const needsOAI = useNeedsOAI();
 	const openaiKey = useOpenaiKey();
 	const { actions: jobs } = useJobsContext();
+
+	const buildIndexStatusDetails = useCallback(
+		(
+			raw: unknown,
+			extra: { etaSeconds?: number; ratePerSecond?: number } = {},
+		): IndexStatusDetails | undefined => {
+			if (!raw || typeof raw !== "object") return undefined;
+			const value = raw as Record<string, unknown>;
+			const num = (v: unknown) => {
+				if (typeof v === "number" && Number.isFinite(v)) return v;
+				const parsed = Number(v);
+				return Number.isFinite(parsed) ? parsed : undefined;
+			};
+			const str = (v: unknown) =>
+				typeof v === "string" && v.length > 0 ? v : undefined;
+
+			const insertDone = num(value.insert_done) ?? 0;
+			const insertTotal = num(value.insert_total) ?? 0;
+			const updatedDone = num(value.updated_done) ?? 0;
+			const updatedTotal = num(value.updated_total) ?? 0;
+			const processedDone = insertDone + updatedDone;
+			const processedTotal = insertTotal + updatedTotal;
+			const target = num(value.target);
+			const indexed = num(value.total);
+			const existing = num(value.existing);
+			const drift =
+				target !== undefined && indexed !== undefined
+					? target - indexed
+					: undefined;
+			const coverage =
+				target && target > 0 && indexed !== undefined
+					? Math.min(1, Math.max(0, indexed / target))
+					: undefined;
+			const state = str(value.state);
+			const start = str(value.start);
+			const end = str(value.end);
+			const lastIndexedAt = end ?? start;
+
+			return {
+				state,
+				start,
+				end,
+				processed:
+					processedTotal > 0
+						? { done: processedDone, total: processedTotal }
+						: undefined,
+				target,
+				indexed,
+				existing,
+				newCount: num(value.new),
+				updatedCount: num(value.updated),
+				drift,
+				etaSeconds: extra.etaSeconds,
+				ratePerSecond: extra.ratePerSecond,
+				coverage,
+				lastIndexedAt,
+			};
+		},
+		[],
+	);
+
+	const composeIndexTip = useCallback(
+		(
+			details?: IndexStatusDetails,
+			extra: { etaSeconds?: number; ratePerSecond?: number } = {},
+		) => {
+			if (!details) return undefined;
+			const parts: string[] = [];
+			if (details.processed && details.processed.total > 0) {
+				parts.push(
+					`processed ${details.processed.done}/${details.processed.total}`,
+				);
+			}
+			if (details.indexed !== undefined && details.target !== undefined) {
+				const coveragePct =
+					details.coverage !== undefined
+						? Math.round(details.coverage * 100)
+						: undefined;
+				const indexedLine = coveragePct !== undefined
+					? `indexed ${details.indexed}/${details.target} (${coveragePct}%)`
+					: `indexed ${details.indexed}/${details.target}`;
+				parts.push(indexedLine);
+			}
+			if (typeof details.drift === "number") {
+				const driftValue = Math.abs(details.drift);
+				const label = details.drift >= 0 ? "remaining" : "over";
+				parts.push(`${label} ${driftValue}`);
+			}
+			const etaValue = extra.etaSeconds ?? details.etaSeconds;
+			if (etaValue && Number.isFinite(etaValue)) {
+				parts.push(`eta ${humanizeSeconds(Math.round(etaValue))}`);
+			}
+			const rateValue = extra.ratePerSecond ?? details.ratePerSecond;
+			if (rateValue && Number.isFinite(rateValue)) {
+				const perMinute = rateValue * 60;
+				const rateText = perMinute >= 10 ? perMinute.toFixed(0) : perMinute.toFixed(1);
+				parts.push(`rate ${rateText}/min`);
+			}
+			return parts.length > 0 ? parts.join(" • ") : undefined;
+		},
+		[],
+	);
 
 	const index = useCallback(
 		async (opts?: { dir?: string; provider?: string }) => {
@@ -167,7 +291,15 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
 
 	// Poll index status to compute progress/ETA/paused/tip while indexing
 	useEffect(() => {
-		if (!isIndexing || !dir) {
+		if (!dir) {
+			setProgressPct(undefined);
+			setEtaSeconds(undefined);
+			setPaused(false);
+			setTip(undefined);
+			setIndexStatusDetails(undefined);
+			return;
+		}
+		if (!isIndexing) {
 			setProgressPct(undefined);
 			setEtaSeconds(undefined);
 			setPaused(false);
@@ -178,43 +310,53 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
 		let startTs: number | undefined;
 		const poll = async () => {
 			try {
-				const s: unknown = await apiIndexStatus(
+				const rawStatus = await apiIndexStatus(
 					dir,
 					engine,
 					needsHf ? hfToken : undefined,
 					needsOAI ? openaiKey : undefined,
 				);
-				// Compute progress using insert/update totals when present
-				const insDone = Number(s.insert_done || 0);
-				const insTot = Number(s.insert_total || 0);
-				const updDone = Number(s.updated_done || 0);
-				const updTot = Number(s.updated_total || 0);
-				const num = insDone + updDone;
-				const den = Math.max(1, insTot + updTot);
-				const pct = Math.min(1, Math.max(0, num / den));
-				if (den > 1) setProgressPct(pct);
-				setPaused(Boolean(s?.paused) || s.state === "paused");
-
-				const parts: string[] = [];
-				if (den > 1) parts.push(`processed ${num}/${den}`);
-				if (typeof s.target === "number" && s.target > 0)
-					parts.push(`target ${s.target}`);
-				if (typeof s.state === "string" && s.state)
-					parts.push(`state ${s.state}`);
-
-				// ETA based on elapsed rate
-				if (!startTs && s.start) startTs = Date.parse(s.start);
-				const now = Date.now();
-				const elapsed = startTs
-					? Math.max(1, (now - startTs) / 1000)
-					: undefined;
-				if (elapsed && num > 5) {
-					const rate = num / elapsed;
-					const remaining = Math.max(0, den - num);
-					const eta = rate > 0 ? remaining / rate : undefined;
-					if (eta && Number.isFinite(eta)) setEtaSeconds(eta);
+				const baseDetails = buildIndexStatusDetails(rawStatus);
+				const processed = baseDetails?.processed;
+				if (processed && processed.total > 0) {
+					const pct = Math.min(
+						1,
+						Math.max(0, processed.done / processed.total),
+					);
+					setProgressPct(pct);
+				} else {
+					setProgressPct(undefined);
 				}
-				if (parts.length > 0) setTip(parts.join(" • "));
+				const pausedFlag =
+					Boolean((rawStatus as Record<string, unknown>)?.paused) ||
+					baseDetails?.state === "paused";
+				setPaused(pausedFlag);
+
+				if (!startTs) {
+					const startVal = (rawStatus as Record<string, unknown>).start;
+					if (typeof startVal === "string") startTs = Date.parse(startVal);
+				}
+				const elapsed =
+					startTs !== undefined
+						? Math.max(1, (Date.now() - startTs) / 1000)
+						: undefined;
+				let eta: number | undefined;
+				let rate: number | undefined;
+				if (elapsed && processed && processed.done > 5) {
+					rate = processed.done / elapsed;
+					const remaining = Math.max(0, processed.total - processed.done);
+					eta = rate > 0 ? remaining / rate : undefined;
+				}
+				const etaValue = eta && Number.isFinite(eta) ? eta : undefined;
+				setEtaSeconds(etaValue);
+				const rateValue = rate && Number.isFinite(rate) ? rate : undefined;
+				const extras = {
+					etaSeconds: etaValue,
+					ratePerSecond: rateValue,
+				};
+				const detailsWithExtras = buildIndexStatusDetails(rawStatus, extras);
+				setIndexStatusDetails(detailsWithExtras);
+				setTip(composeIndexTip(detailsWithExtras, extras));
 			} catch {
 				// ignore transient errors
 			}
@@ -224,7 +366,57 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
 		return () => {
 			if (timer) window.clearInterval(timer);
 		};
-	}, [isIndexing, dir, engine, needsHf, hfToken, needsOAI, openaiKey]);
+	}, [
+		isIndexing,
+		dir,
+		engine,
+		needsHf,
+		hfToken,
+		needsOAI,
+		openaiKey,
+		buildIndexStatusDetails,
+		composeIndexTip,
+	]);
+
+	useEffect(() => {
+		if (!dir || isIndexing) {
+			return;
+		}
+		let cancelled = false;
+		const fetchStatus = async () => {
+			try {
+				const rawStatus = await apiIndexStatus(
+					dir,
+					engine,
+					needsHf ? hfToken : undefined,
+					needsOAI ? openaiKey : undefined,
+				);
+				if (cancelled) return;
+				const details = buildIndexStatusDetails(rawStatus);
+				setIndexStatusDetails(details);
+				setTip(composeIndexTip(details));
+			} catch {
+				if (!cancelled) {
+					setIndexStatusDetails(undefined);
+					setTip(undefined);
+				}
+			}
+		};
+		fetchStatus();
+		return () => {
+			cancelled = true;
+		};
+	}, [
+		dir,
+		engine,
+		needsHf,
+		hfToken,
+		needsOAI,
+		openaiKey,
+		isIndexing,
+		buildIndexStatusDetails,
+		composeIndexTip,
+	]);
 
 	const value = useMemo(
 		() => ({
@@ -236,6 +428,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
 				etaSeconds,
 				paused,
 				tip,
+				indexStatus: indexStatusDetails,
 			},
 			actions: { index, load, pause, resume },
 		}),
@@ -247,6 +440,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
 			etaSeconds,
 			paused,
 			tip,
+			indexStatusDetails,
 			index,
 			load,
 			pause,

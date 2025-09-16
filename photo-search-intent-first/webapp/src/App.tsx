@@ -1899,6 +1899,10 @@ export default function App() {
                         uiActions,
                         toastTimerRef,
                         setToast,
+                        indexedCount: diag?.engines?.[0]?.count,
+                        indexedTotal: library?.length,
+                        coveragePct: _indexCoverage,
+                        indexStatus: libState.indexStatus,
                         isIndexing: libState.isIndexing,
                         onIndex: () => lib.index(),
                         activeJobs: jobs.filter((j) => j.status === "running")

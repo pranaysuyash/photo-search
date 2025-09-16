@@ -40,7 +40,7 @@ from infra.shares import (
     revoke_share as _share_revoke,
     is_expired as _share_expired,
 )
-import shutil, os
+import shutil, os, platform
 import json
 import time
 
@@ -156,6 +156,197 @@ def api_demo_dir() -> Dict[str, Any]:
         return {"ok": False}
     except Exception:
         return {"ok": False}
+
+
+
+def _normcase_path(path: str) -> str:
+    """Normalize a path string for deduplication across platforms."""
+    try:
+        expanded = os.path.expanduser(path)
+    except Exception:
+        expanded = path
+    try:
+        resolved = Path(expanded).resolve()
+        target = str(resolved)
+    except Exception:
+        try:
+            target = os.path.abspath(expanded)
+        except Exception:
+            target = expanded
+    return os.path.normcase(target)
+
+
+def _scan_media_counts(paths: List[str], include_videos: bool = True) -> Dict[str, Any]:
+    """Calculate media counts for a list of filesystem paths."""
+    import os as _os
+    from pathlib import Path as _P
+
+    img_exts = {
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".webp",
+        ".gif",
+        ".tif",
+        ".tiff",
+        ".bmp",
+        ".heic",
+        ".heif",
+        ".avif",
+    }
+    vid_exts = {".mp4", ".mov", ".mkv", ".avi", ".webm"}
+    valid_exts = set(img_exts) | (set(vid_exts) if include_videos else set())
+    items: List[Dict[str, Any]] = []
+    total_files = 0
+    total_bytes = 0
+    for raw in paths or []:
+        try:
+            expanded = _os.path.expanduser(raw)
+            p = _P(expanded).resolve()
+        except Exception:
+            items.append({"path": raw, "exists": False, "files": 0, "bytes": 0})
+            continue
+        if not p.exists():
+            items.append({"path": str(p), "exists": False, "files": 0, "bytes": 0})
+            continue
+        count = 0
+        size = 0
+        try:
+            for root, dirs, files in _os.walk(p):
+                dirs[:] = [d for d in dirs if not d.startswith('.')]
+                for name in files:
+                    ext = _P(name).suffix.lower()
+                    if ext in valid_exts:
+                        count += 1
+                        try:
+                            size += (_P(root) / name).stat().st_size
+                        except Exception:
+                            pass
+                if count >= 50000:
+                    break
+        except Exception:
+            count = count
+            size = size
+        items.append({"path": str(p), "exists": True, "files": count, "bytes": size})
+        total_files += count
+        total_bytes += size
+    return {"items": items, "total_files": total_files, "total_bytes": total_bytes}
+
+
+def _default_photo_dir_candidates() -> List[Dict[str, str]]:
+    """Discover common photo directories for the current platform."""
+    home = Path.home()
+    sysname = platform.system().lower()
+    candidates: List[Dict[str, str]] = []
+
+    def _add(path: Path, label: str, source: str) -> None:
+        try:
+            if not path:
+                return
+            candidates.append(
+                {"path": str(path.expanduser()), "label": label, "source": source}
+            )
+        except Exception:
+            pass
+
+    core_dirs = [
+        home / "Pictures",
+        home / "Photos",
+        home / "DCIM",
+        home / "Downloads",
+        home / "Desktop",
+        home / "Documents" / "Screenshots",
+    ]
+    core_labels = {
+        "Pictures": "Pictures",
+        "Photos": "Photos",
+        "DCIM": "Camera Uploads",
+        "Downloads": "Downloads",
+        "Desktop": "Desktop",
+        "Screenshots": "Screenshots",
+    }
+    for path in core_dirs:
+        label = core_labels.get(path.name, path.name)
+        _add(path, label, "home")
+
+    if "windows" in sysname:
+        pictures = home / "Pictures"
+        _add(pictures / "Saved Pictures", "Saved Pictures", "windows")
+        _add(pictures / "Camera Roll", "Camera Roll", "windows")
+        one_drive_env = os.environ.get("OneDrive")
+        if one_drive_env:
+            _add(Path(one_drive_env) / "Pictures", "OneDrive Pictures", "onedrive")
+        try:
+            for entry in home.glob("OneDrive*"):
+                if entry.is_dir():
+                    _add(entry / "Pictures", f"{entry.name} Pictures", "onedrive")
+        except Exception:
+            pass
+        public_dir = os.environ.get("PUBLIC")
+        if public_dir:
+            _add(Path(public_dir) / "Pictures", "Public Pictures", "windows")
+
+    if "darwin" in sysname:
+        icloud_docs = home / "Library" / "Mobile Documents" / "com~apple~CloudDocs"
+        _add(icloud_docs / "Photos", "iCloud Drive Photos", "icloud")
+        _add(icloud_docs / "Pictures", "iCloud Drive Pictures", "icloud")
+        _add(
+            home / "Library" / "CloudStorage" / "iCloud Drive" / "Photos",
+            "iCloud Photos",
+            "icloud",
+        )
+
+    if "linux" in sysname:
+        user_dirs = home / ".config" / "user-dirs.dirs"
+        try:
+            text = user_dirs.read_text(encoding="utf-8")
+            for line in text.splitlines():
+                if line.startswith("XDG_PICTURES_DIR") or line.startswith("XDG_DOWNLOAD_DIR"):
+                    parts = line.split("=")
+                    if len(parts) == 2:
+                        raw = parts[1].strip().strip('"')
+                        resolved = raw.replace("$HOME", str(home))
+                        label = "Pictures" if "PICTURES" in parts[0] else "Downloads"
+                        _add(Path(resolved), label, "xdg")
+        except Exception:
+            pass
+
+    seen: set[str] = set()
+    unique: List[Dict[str, str]] = []
+    for item in candidates:
+        key = _normcase_path(item["path"])
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(item)
+    return unique
+
+
+@app.get("/library/defaults")
+def api_library_defaults(include_videos: bool = True) -> Dict[str, Any]:
+    """Return likely local photo folders with media counts."""
+    candidates = _default_photo_dir_candidates()
+    if not candidates:
+        return {"items": [], "total_files": 0, "total_bytes": 0}
+
+    counts = _scan_media_counts([c["path"] for c in candidates], include_videos)
+    label_map = {}
+    for item in candidates:
+        key = _normcase_path(item["path"])
+        label_map.setdefault(key, item)
+
+    enriched = []
+    for entry in counts.get("items", []):
+        info = label_map.get(_normcase_path(entry.get("path", "")))
+        data = dict(entry)
+        if info:
+            data["label"] = info.get("label")
+            data["source"] = info.get("source")
+        enriched.append(data)
+
+    counts["items"] = enriched
+    return counts
+
 
 # Auth status (dev helper)
 @app.get("/auth/status")
@@ -2029,44 +2220,7 @@ def api_open(dir: str, path: str) -> Dict[str, Any]:
 @app.post("/scan_count")
 def api_scan_count(paths: List[str], include_videos: bool = True) -> Dict[str, Any]:
     """Best-effort count of media files under given paths. Privacy-friendly preview."""
-    import os
-    from pathlib import Path as _P
-    IMG = {'.jpg','.jpeg','.png','.webp','.gif','.tif','.tiff','.bmp','.heic','.heif','.avif'}
-    VID = {'.mp4','.mov','.mkv','.avi','.webm'}
-    EXT = set(IMG) | (set(VID) if include_videos else set())
-    items: List[Dict[str, Any]] = []
-    total_files = 0
-    total_bytes = 0
-    for raw in (paths or []):
-        try:
-            p = _P(os.path.expanduser(raw)).resolve()
-        except Exception:
-            items.append({"path": raw, "exists": False, "files": 0, "bytes": 0})
-            continue
-        if not p.exists():
-            items.append({"path": str(p), "exists": False, "files": 0, "bytes": 0})
-            continue
-        cnt = 0; size = 0
-        try:
-            for root, dirs, files in os.walk(p):
-                # Skip hidden directories for safety
-                dirs[:] = [d for d in dirs if not d.startswith('.')]
-                for name in files:
-                    ext = _P(name).suffix.lower()
-                    if ext in EXT:
-                        cnt += 1
-                        try:
-                            size += (_P(root) / name).stat().st_size
-                        except Exception:
-                            pass
-                # Light limit to keep responsive
-                if cnt >= 50000:
-                    break
-        except Exception:
-            cnt = cnt; size = size
-        items.append({"path": str(p), "exists": True, "files": cnt, "bytes": size})
-        total_files += cnt; total_bytes += size
-    return {"items": items, "total_files": total_files, "total_bytes": total_bytes}
+    return _scan_media_counts(paths, include_videos)
 
 
 @app.post("/edit/ops")
