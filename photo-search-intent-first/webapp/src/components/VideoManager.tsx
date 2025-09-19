@@ -24,8 +24,16 @@ export function VideoManager({ currentDir, provider }: VideoManagerProps) {
 	const [loading, setLoading] = useState(false);
 	const [indexing, setIndexing] = useState(false);
 	const [selectedVideo, setSelectedVideo] = useState<VideoFile | null>(null);
-    interface VideoMetadata { width?: number; height?: number; fps?: number; duration?: number; frame_count?: number }
-    const [videoMetadata, setVideoMetadata] = useState<VideoMetadata | null>(null);
+	interface VideoMetadata {
+		width?: number;
+		height?: number;
+		fps?: number;
+		duration?: number;
+		frame_count?: number;
+	}
+	const [videoMetadata, setVideoMetadata] = useState<VideoMetadata | null>(
+		null,
+	);
 	const [error, setError] = useState<string | null>(null);
 
 	const loadVideos = useCallback(async () => {
@@ -135,8 +143,9 @@ export function VideoManager({ currentDir, provider }: VideoManagerProps) {
 					) : (
 						<div className="space-y-2 max-h-96 overflow-y-auto">
 							{videos.map((video, index) => (
-								<div
+								<button
 									key={`video-${video.path}-${index}`}
+									type="button"
 									onClick={() => selectVideo(video)}
 									onKeyDown={(e) => {
 										if (e.key === "Enter" || e.key === " ") {
@@ -144,12 +153,13 @@ export function VideoManager({ currentDir, provider }: VideoManagerProps) {
 											selectVideo(video);
 										}
 									}}
-									role="button"
-									tabIndex={0}
-									className={`p-3 border rounded cursor-pointer transition-colors ${
+									className={`p-3 border rounded cursor-pointer transition-colors text-left w-full ${
 										selectedVideo?.path === video.path
 											? "border-blue-500 bg-blue-50"
 											: "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+									}`}
+									aria-label={`Select video ${
+										video.path.split("/").pop() || video.path
 									}`}
 								>
 									<div className="font-medium truncate" title={video.path}>
@@ -159,7 +169,7 @@ export function VideoManager({ currentDir, provider }: VideoManagerProps) {
 										{formatFileSize(video.size)} •{" "}
 										{new Date(video.mtime * 1000).toLocaleDateString()}
 									</div>
-								</div>
+								</button>
 							))}
 						</div>
 					)}
@@ -205,24 +215,32 @@ export function VideoManager({ currentDir, provider }: VideoManagerProps) {
 								{videoMetadata && (
 									<>
 										<div className="font-medium mt-4">Video Metadata</div>
-                            <div className="text-sm space-y-1">
-                                <div>
-                                    <span className="font-medium">Dimensions:</span>{" "}
-                                    {videoMetadata?.width ?? "?"} × {videoMetadata?.height ?? "?"}
-                                </div>
-                                <div>
-                                    <span className="font-medium">Frame Rate:</span>{" "}
-                                    {typeof videoMetadata?.fps === 'number' ? videoMetadata.fps.toFixed(2) : "?"} fps
-                                </div>
-                                <div>
-                                    <span className="font-medium">Duration:</span>{" "}
-                                    {typeof videoMetadata?.duration === 'number' ? formatDuration(videoMetadata.duration) : "?"}
-                                </div>
-                                <div>
-                                    <span className="font-medium">Frame Count:</span>{" "}
-                                    {typeof videoMetadata?.frame_count === 'number' ? videoMetadata.frame_count.toLocaleString() : "?"}
-                                </div>
-                            </div>
+										<div className="text-sm space-y-1">
+											<div>
+												<span className="font-medium">Dimensions:</span>{" "}
+												{videoMetadata?.width ?? "?"} ×{" "}
+												{videoMetadata?.height ?? "?"}
+											</div>
+											<div>
+												<span className="font-medium">Frame Rate:</span>{" "}
+												{typeof videoMetadata?.fps === "number"
+													? videoMetadata.fps.toFixed(2)
+													: "?"}{" "}
+												fps
+											</div>
+											<div>
+												<span className="font-medium">Duration:</span>{" "}
+												{typeof videoMetadata?.duration === "number"
+													? formatDuration(videoMetadata.duration)
+													: "?"}
+											</div>
+											<div>
+												<span className="font-medium">Frame Count:</span>{" "}
+												{typeof videoMetadata?.frame_count === "number"
+													? videoMetadata.frame_count.toLocaleString()
+													: "?"}
+											</div>
+										</div>
 									</>
 								)}
 							</div>

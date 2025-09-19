@@ -150,12 +150,19 @@ export const EnhancedSharingModal: React.FC<EnhancedSharingModalProps> = ({
 			setCopiedToClipboard(true);
 			uiActions.setNote("Share link created and copied to clipboard!");
 			announce("Share link ready: copied to clipboard", "polite");
-    } catch (e) {
-        uiActions.setNote(e instanceof Error ? e.message : "Share failed");
-        handleError(e, { logToServer: true, context: { action: "create_share", component: "EnhancedSharingModal.handleCreateShare", dir } });
-    } finally {
-        setIsGenerating(false);
-    }
+		} catch (e) {
+			uiActions.setNote(e instanceof Error ? e.message : "Share failed");
+			handleError(e, {
+				logToServer: true,
+				context: {
+					action: "create_share",
+					component: "EnhancedSharingModal.handleCreateShare",
+					dir,
+				},
+			});
+		} finally {
+			setIsGenerating(false);
+		}
 	};
 
 	const handleExport = async () => {
@@ -188,12 +195,19 @@ export const EnhancedSharingModal: React.FC<EnhancedSharingModalProps> = ({
 			uiActions.setNote(`Exported ${r.copied} photos to ${exportDestination}`);
 			announce(`Exported ${r.copied} photos`, "polite");
 			onClose();
-    } catch (e) {
-        uiActions.setNote(e instanceof Error ? e.message : "Export failed");
-        handleError(e, { logToServer: true, context: { action: "export", component: "EnhancedSharingModal.handleExport", dir } });
-    } finally {
-        setIsGenerating(false);
-    }
+		} catch (e) {
+			uiActions.setNote(e instanceof Error ? e.message : "Export failed");
+			handleError(e, {
+				logToServer: true,
+				context: {
+					action: "export",
+					component: "EnhancedSharingModal.handleExport",
+					dir,
+				},
+			});
+		} finally {
+			setIsGenerating(false);
+		}
 	};
 
 	const ensureShareLink = async () => {
@@ -218,12 +232,19 @@ export const EnhancedSharingModal: React.FC<EnhancedSharingModalProps> = ({
 		try {
 			window.location.href = mailto;
 			onClose();
-    } catch (e) {
-        uiActions.setNote(
-            e instanceof Error ? e.message : "Could not open email client",
-        );
-        handleError(e, { logToServer: true, context: { action: "email_share", component: "EnhancedSharingModal.handleSendEmail", dir } });
-    }
+		} catch (e) {
+			uiActions.setNote(
+				e instanceof Error ? e.message : "Could not open email client",
+			);
+			handleError(e, {
+				logToServer: true,
+				context: {
+					action: "email_share",
+					component: "EnhancedSharingModal.handleSendEmail",
+					dir,
+				},
+			});
+		}
 	};
 
 	const handleSocialShare = (platform: SocialPlatform) => {

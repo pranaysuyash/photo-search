@@ -2,10 +2,14 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ResultsGrid } from "./ResultsGrid";
 
-vi.mock("../api", () => ({
-	thumbUrl: (_dir: string, _engine: string, path: string, _size: number) =>
-		`mock://thumb${path}`,
-}));
+vi.mock("../api", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../api")>();
+	return {
+		...actual,
+		thumbUrl: (_dir: string, _engine: string, path: string, _size: number) =>
+			`mock://thumb${path}`,
+	};
+});
 
 describe("ResultsGrid", () => {
 	const results = [
@@ -27,9 +31,11 @@ describe("ResultsGrid", () => {
 			/>,
 		);
 		expect(screen.getAllByRole("img")).toHaveLength(2);
-		fireEvent.click(screen.getAllByRole("img")[0]);
+		const firstTile = screen.getByRole("button", { name: "Select /a.jpg" });
+		fireEvent.click(firstTile);
 		expect(onToggle).toHaveBeenCalledWith("/a.jpg");
-		fireEvent.dblClick(screen.getAllByRole("img")[1]);
+		const secondTile = screen.getByRole("button", { name: "Select /b.jpg" });
+		fireEvent.dblClick(secondTile);
 		expect(onOpen).toHaveBeenCalledWith("/b.jpg");
 	});
 

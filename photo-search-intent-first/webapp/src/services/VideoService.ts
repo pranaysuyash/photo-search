@@ -25,8 +25,8 @@ export interface VideoFile {
 	streamUrl?: string;
 }
 
-import { handleError } from "../utils/errors";
 import { serviceEnabled } from "../config/logging";
+import { handleError } from "../utils/errors";
 
 export class VideoService {
 	private static supportedFormats = [
@@ -235,14 +235,22 @@ export class VideoService {
 			}
 
 			return videoFile;
-        } catch (error) {
-            console.error("Failed to get video info:", error);
-            if (serviceEnabled("video")) {
-                handleError(error, { logToServer: true, logToConsole: false, context: { action: "video_info", component: "VideoService.getVideoInfo", metadata: { path, videoUrl } } });
-            }
-            throw error;
-        }
-    }
+		} catch (error) {
+			console.error("Failed to get video info:", error);
+			if (serviceEnabled("video")) {
+				handleError(error, {
+					logToServer: true,
+					logToConsole: false,
+					context: {
+						action: "video_info",
+						component: "VideoService.getVideoInfo",
+						metadata: { path, videoUrl },
+					},
+				});
+			}
+			throw error;
+		}
+	}
 
 	/**
 	 * Clear video cache

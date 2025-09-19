@@ -1,4 +1,6 @@
 import { useCallback, useMemo } from "react";
+import { ToastAction } from "@/components/ui/toast";
+import { useToast } from "@/hooks/use-toast";
 import {
 	apiDelete,
 	apiExport,
@@ -45,6 +47,7 @@ export interface PhotoActionsOptions {
 }
 
 export const usePhotoActions = (_options: PhotoActionsOptions) => {
+	const { toast } = useToast();
 	const {
 		dir,
 		engine: _engine,
@@ -79,11 +82,14 @@ export const usePhotoActions = (_options: PhotoActionsOptions) => {
 						? `Cleared rating for ${selectedPaths.length}`
 						: `Set rating ${rating} for ${selectedPaths.length}`,
 				);
-            } catch (error: unknown) {
-                // @ts-ignore
-                uiActions.setNote(error?.message || "Rating update failed");
-                handleError(error, { logToServer: true, context: { action: "set_rating", component: "usePhotoActions", dir } });
-            }
+			} catch (error: unknown) {
+				// @ts-ignore
+				uiActions.setNote(error?.message || "Rating update failed");
+				handleError(error, {
+					logToServer: true,
+					context: { action: "set_rating", component: "usePhotoActions", dir },
+				});
+			}
 		},
 		[dir, uiActions, tagsMap, normalizePaths],
 	);
@@ -104,11 +110,14 @@ export const usePhotoActions = (_options: PhotoActionsOptions) => {
 					selectedPaths.map((p) => apiSetTags(dir, p, tagList)),
 				);
 				uiActions.setNote(`Updated tags for ${selectedPaths.length} photos`);
-            } catch (error: unknown) {
-                // @ts-ignore
-                uiActions.setNote(error?.message || "Tag update failed");
-                handleError(error, { logToServer: true, context: { action: "set_tags", component: "usePhotoActions", dir } });
-            }
+			} catch (error: unknown) {
+				// @ts-ignore
+				uiActions.setNote(error?.message || "Tag update failed");
+				handleError(error, {
+					logToServer: true,
+					context: { action: "set_tags", component: "usePhotoActions", dir },
+				});
+			}
 		},
 		[dir, uiActions, normalizePaths],
 	);
@@ -150,11 +159,14 @@ export const usePhotoActions = (_options: PhotoActionsOptions) => {
 				uiActions.setNote(
 					`Exported ${r.copied}, skipped ${r.skipped}, errors ${r.errors} → ${r.dest}`,
 				);
-            } catch (error: unknown) {
-                // @ts-ignore
-                uiActions.setNote(error?.message || "Export failed");
-                handleError(error, { logToServer: true, context: { action: "export", component: "usePhotoActions", dir } });
-            }
+			} catch (error: unknown) {
+				// @ts-ignore
+				uiActions.setNote(error?.message || "Export failed");
+				handleError(error, {
+					logToServer: true,
+					context: { action: "export", component: "usePhotoActions", dir },
+				});
+			}
 		},
 		[dir, uiActions, normalizePaths],
 	);
@@ -171,18 +183,48 @@ export const usePhotoActions = (_options: PhotoActionsOptions) => {
 			if (!confirmed) return;
 			try {
 				await apiDelete(dir, selectedPaths, useOsTrash);
-				uiActions.setNote(
-					useOsTrash
-						? `Moved ${selectedPaths.length} to OS Trash`
-						: `Moved ${selectedPaths.length} to Trash`,
-				);
-            } catch (error: unknown) {
-                // @ts-ignore
-                uiActions.setNote(error?.message || "Delete failed");
-                handleError(error, { logToServer: true, context: { action: "delete", component: "usePhotoActions", dir } });
-            }
+
+				// Show undo toast only when not using OS trash
+				if (!useOsTrash) {
+					const undoToast = toast({
+						description: `Moved ${selectedPaths.length} to Trash`,
+						action: (
+							<ToastAction
+								altText="Undo delete"
+								onClick={async () => {
+									try {
+										const u = await apiUndoDelete(dir);
+										uiActions.setNote(`Restored ${u.restored}`);
+									} catch (undoError) {
+										uiActions.setNote(
+											undoError instanceof Error
+												? undoError.message
+												: "Undo failed",
+										);
+									}
+									undoToast.dismiss();
+								}}
+							>
+								Undo
+							</ToastAction>
+						),
+					});
+				} else {
+					// For OS trash, just show a regular toast
+					toast({
+						description: `Moved ${selectedPaths.length} to OS Trash`,
+					});
+				}
+			} catch (error: unknown) {
+				// @ts-ignore
+				uiActions.setNote(error?.message || "Delete failed");
+				handleError(error, {
+					logToServer: true,
+					context: { action: "delete", component: "usePhotoActions", dir },
+				});
+			}
 		},
-		[dir, useOsTrash, uiActions, normalizePaths],
+		[dir, useOsTrash, uiActions, normalizePaths, toast],
 	);
 
 	const undoDelete = useCallback(async () => {
@@ -191,11 +233,14 @@ export const usePhotoActions = (_options: PhotoActionsOptions) => {
 			const r = await apiUndoDelete(dir as string);
 			const restored = (r as unknown)?.restored ?? 0;
 			uiActions.setNote(`Restored ${restored}`);
-        } catch (error: unknown) {
-            // @ts-ignore
-            uiActions.setNote(error?.message || "Undo failed");
-            handleError(error, { logToServer: true, context: { action: "undo_delete", component: "usePhotoActions", dir } });
-        }
+		} catch (error: unknown) {
+			// @ts-ignore
+			uiActions.setNote(error?.message || "Undo failed");
+			handleError(error, {
+				logToServer: true,
+				context: { action: "undo_delete", component: "usePhotoActions", dir },
+			});
+		}
 	}, [dir, uiActions]);
 
 	const toggleFavorite = useCallback(
@@ -204,10 +249,17 @@ export const usePhotoActions = (_options: PhotoActionsOptions) => {
 			try {
 				const isFav = (tagsMap?.[photoPath] || []).includes("favorite");
 				await apiSetFavorite(dir, photoPath, !isFav);
-        } catch (error) {
-            // Swallow per tests; log for diagnostics
-            handleError(error, { logToServer: true, context: { action: "toggle_favorite", component: "usePhotoActions", dir } });
-        }
+			} catch (error) {
+				// Swallow per tests; log for diagnostics
+				handleError(error, {
+					logToServer: true,
+					context: {
+						action: "toggle_favorite",
+						component: "usePhotoActions",
+						dir,
+					},
+				});
+			}
 		},
 		[dir, tagsMap],
 	);

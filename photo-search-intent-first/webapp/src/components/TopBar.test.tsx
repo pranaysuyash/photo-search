@@ -1,6 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
+import { act, fireEvent } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TopBar } from "../components/TopBar";
 import { render, screen } from "../test/test-utils";
+import type { MutableRefObject } from "react";
 
 // Mock the UIContext (partial: keep UIProvider export)
 vi.mock("../contexts/UIContext", async (importOriginal) => {
@@ -30,38 +32,23 @@ vi.mock("../components/SearchBar", () => ({
 
 // Mock framer-motion
 vi.mock("framer-motion", () => ({
-    motion: {
-        button: ({
-            children,
-            ...props
-        }: {
-            children?: React.ReactNode;
-            [key: string]: unknown;
-        }) => {
-            // Strip motion-only props to avoid DOM warnings in tests
-            const {
-                whileHover,
-                whileTap,
-                initial,
-                animate,
-                exit,
-                transition,
-                variants,
-                layout,
-                layoutId,
-                drag,
-                dragConstraints,
-                dragElastic,
-                dragMomentum,
-                ...rest
-            } = props as any
-            return (
-                <button type="button" {...rest}>
-                    {children}
-                </button>
-            )
-        },
-    },
+	motion: {
+		button: ({
+			children,
+			...props
+		}: {
+			children?: React.ReactNode;
+			[key: string]: unknown;
+		}) => {
+			// Strip motion-only props to avoid DOM warnings in tests
+			const { ...rest } = props;
+			return (
+				<button type="button" {...rest}>
+					{children}
+				</button>
+			);
+		},
+	},
 }));
 
 // Ensure the feature-flagged Search Command Center is disabled so TopBar renders SearchBar
@@ -99,7 +86,27 @@ vi.mock("lucide-react", () => ({
 	RefreshCw: () => <div>RefreshCw</div>,
 }));
 
+const { apiDeleteMock, apiUndoDeleteMock } = vi.hoisted(() => ({
+	apiDeleteMock: vi.fn(),
+	apiUndoDeleteMock: vi.fn(),
+}));
+
+vi.mock("../api", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../api")>();
+	return {
+		...actual,
+		apiDelete: apiDeleteMock,
+		apiUndoDelete: apiUndoDeleteMock,
+		apiSearchLike: vi.fn(),
+	};
+});
+
 describe("TopBar", () => {
+	beforeEach(() => {
+		apiDeleteMock.mockReset();
+		apiUndoDeleteMock.mockReset();
+	});
+
 	const defaultProps = {
 		// Search and filter state
 		searchText: "",
@@ -168,9 +175,7 @@ describe("TopBar", () => {
 			setBusy: vi.fn(),
 			setNote: vi.fn(),
 		},
-
-		// Toast system
-		toastTimerRef: { current: null },
+		toastTimerRef: { current: null } as MutableRefObject<number | null>,
 		setToast: vi.fn(),
 
 		// Theme modal
@@ -219,6 +224,18 @@ describe("TopBar", () => {
 		expect(screen.getByText("OCR")).toBeInTheDocument();
 	});
 
+	it("shows OCR readiness indicator", () => {
+		const props = {
+			...defaultProps,
+			ocrReady: true,
+		};
+
+		render(<TopBar {...props} />);
+		expect(
+			screen.getByTitle("OCR ready: search text inside images"),
+		).toBeInTheDocument();
+	});
+
 	it("shows active jobs indicator when activeJobs > 0", () => {
 		const props = {
 			...defaultProps,
@@ -227,5 +244,61 @@ describe("TopBar", () => {
 
 		render(<TopBar {...props} />);
 		expect(screen.getByText("Jobs (3)")).toBeInTheDocument();
+	});
+
+	it("surfaces undo toast with action handler when deleting to app trash", async () => {
+		apiDeleteMock.mockResolvedValueOnce({ moved: 2 });
+		apiUndoDeleteMock.mockResolvedValueOnce({ restored: 2 });
+		const setToast = vi.fn();
+		const toastTimerRef = { current: null } as MutableRefObject<number | null>;
+		const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+		const setTimeoutSpy = vi.spyOn(window, "setTimeout");
+		const clearTimeoutSpy = vi.spyOn(window, "clearTimeout");
+
+		try {
+			const setSelected = vi.fn();
+			const props = {
+				...defaultProps,
+				selected: new Set(["a"]),
+				setSelected,
+				useOsTrash: false,
+				toastTimerRef,
+				setToast,
+			};
+
+			render(<TopBar {...props} />);
+
+			fireEvent.click(screen.getByText("Delete"));
+
+			await act(async () => {
+				fireEvent.click(screen.getByText("Delete"));
+				await Promise.resolve();
+			});
+
+			expect(apiDeleteMock).toHaveBeenCalled();
+
+				expect(setSelected).toHaveBeenCalledWith(new Set());
+				expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 10000);
+				expect(setToast).toHaveBeenCalledWith(
+					expect.objectContaining({
+						actionLabel: "Undo",
+						message: expect.stringContaining("Moved 2"),
+					}),
+				);
+
+				const toastCall = setToast.mock.calls[0]?.[0];
+				expect(typeof toastCall?.onAction).toBe("function");
+
+				await toastCall?.onAction?.();
+
+				expect(apiUndoDeleteMock).toHaveBeenCalledTimes(1);
+				expect(setToast).toHaveBeenCalledWith(null);
+				expect(clearTimeoutSpy).toHaveBeenCalled();
+				expect(toastTimerRef.current).toBeNull();
+			} finally {
+				confirmSpy.mockRestore();
+				setTimeoutSpy.mockRestore();
+				clearTimeoutSpy.mockRestore();
+			}
 	});
 });

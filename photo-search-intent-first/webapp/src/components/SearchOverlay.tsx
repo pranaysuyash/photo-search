@@ -1,8 +1,11 @@
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchContext } from "../contexts/SearchContext";
+import { cn } from "../lib/utils";
 import { FocusTrap } from "../utils/accessibility";
 import { SearchBar } from "./SearchBar";
+import { Button, buttonVariants } from "./ui/shadcn";
+import { VideoFilterDropdown } from "./VideoFilterDropdown";
 
 interface SearchOverlayProps {
 	open: boolean;
@@ -67,12 +70,17 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
 
 	const [showFilters, setShowFilters] = useState(false);
 	const [showAdvanced, setShowAdvanced] = useState(false);
+	const [selectedVideoFilter, setSelectedVideoFilter] = useState<{
+		label: string;
+		expr: string;
+	} | null>(null);
 
 	if (!open) return null;
 
 	return (
 		<div
-			className="fixed inset-0 z-50 bg-black/40 flex items-start md:items-center justify-center p-3 md:p-6"
+			className="fixed inset-0 z-50 flex items-start md:items-center justify-center p-3 md:p-6"
+			style={{ background: "var(--color-surface-overlay)" }}
 			role="dialog"
 			aria-modal="true"
 			aria-label="Search Photos"
@@ -85,22 +93,22 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
 						apply.
 					</div>
 				)}
-				<div className="w-full max-w-3xl rounded-xl shadow-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
-					<div className="flex items-center justify-between px-4 py-3 md:px-6 md:py-4 border-b border-gray-200 dark:border-gray-800">
-						<div className="text-base md:text-lg font-semibold text-gray-800 dark:text-gray-100">
+				<div className="w-full max-w-3xl rounded-2xl shadow-lg border border-border bg-card text-foreground">
+					<div className="flex items-center justify-between px-4 py-3 md:px-6 md:py-4 border-b border-border">
+						<div className="text-base md:text-lg font-semibold">
 							Search Photos
 						</div>
-						<button
-							type="button"
-							className="px-2 py-1 text-sm rounded-md border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+						<Button
+							variant="pillOutline"
+							size="pill"
 							onClick={onClose}
 							aria-label="Close search"
 						>
 							Close
-						</button>
+						</Button>
 					</div>
 
-					<div className="px-4 md:px-6 py-4 md:py-6">
+					<div className="px-4 md:px-6 py-4 md:py-6 space-y-4">
 						<SearchBar
 							searchText={q}
 							setSearchText={setQ}
@@ -135,15 +143,15 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
 						/>
 
 						{/* Quick scopes – minimal, more in Filters Drawer in later phases */}
-						<div
-							className="mt-3 flex flex-wrap gap-2"
-							aria-label="Quick time filters"
-						>
+						<div className="mt-3 flex flex-wrap gap-2">
 							{["All", "Today", "This Week", "This Month"].map((label) => (
 								<button
 									key={label}
 									type="button"
-									className="chip"
+									className={cn(
+										buttonVariants({ variant: "pillOutline", size: "pill" }),
+										"justify-start",
+									)}
 									onClick={() => {
 										const now = new Date();
 										const startOfDay = new Date(
@@ -165,11 +173,17 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
 										// Compute token
 										let tok = "";
 										if (label === "Today")
-											tok = `mtime:>=${Math.floor(startOfDay.getTime() / 1000)}`;
+											tok = `mtime:>=${Math.floor(
+												startOfDay.getTime() / 1000,
+											)}`;
 										else if (label === "This Week")
-											tok = `mtime:>=${Math.floor(startOfWeek.getTime() / 1000)}`;
+											tok = `mtime:>=${Math.floor(
+												startOfWeek.getTime() / 1000,
+											)}`;
 										else if (label === "This Month")
-											tok = `mtime:>=${Math.floor(startOfMonth.getTime() / 1000)}`;
+											tok = `mtime:>=${Math.floor(
+												startOfMonth.getTime() / 1000,
+											)}`;
 
 										// Remove existing mtime tokens to avoid duplication
 										const base = (q || "")
@@ -192,7 +206,10 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
 						<div className="mt-4 flex items-center gap-2">
 							<button
 								type="button"
-								className="px-3 py-1 rounded-md border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm"
+								className={buttonVariants({
+									variant: "pillOutline",
+									size: "pill",
+								})}
 								onClick={() => setShowFilters((v) => !v)}
 								aria-expanded={showFilters}
 								aria-controls="overlay-filters"
@@ -201,7 +218,10 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
 							</button>
 							<button
 								type="button"
-								className="px-3 py-1 rounded-md border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm"
+								className={buttonVariants({
+									variant: "pillOutline",
+									size: "pill",
+								})}
 								onClick={() => setShowAdvanced((v) => !v)}
 								aria-expanded={showAdvanced}
 								aria-controls="overlay-advanced"
@@ -223,15 +243,14 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
 									{ label: "Large", expr: "width:>=3000 height:>=2000" },
 									{ label: "Underexposed", expr: "brightness:<50" },
 									{ label: "Sharp Only", expr: "sharpness:>=60" },
-									{
-										label: "Video > 30s",
-										expr: "filetype:mp4 OR filetype:mov OR filetype:webm OR filetype:mkv OR filetype:avi AND duration:>30",
-									},
 								].map((p) => (
 									<button
 										key={p.label}
 										type="button"
-										className="chip"
+										className={cn(
+											buttonVariants({ variant: "pillOutline", size: "pill" }),
+											"justify-start",
+										)}
 										title={p.expr}
 										onClick={() => {
 											const tok = p.expr;
@@ -245,6 +264,29 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
 										{p.label}
 									</button>
 								))}
+
+								{/* Video filters dropdown */}
+								<VideoFilterDropdown
+									value={selectedVideoFilter?.label || null}
+									onValueChange={(filter) => {
+										setSelectedVideoFilter(filter);
+										if (filter) {
+											const next = (searchText || "").trim();
+											const q = next ? `${next} ${filter.expr}` : filter.expr;
+											if (setSearchText) setSearchText(q);
+											if (onSearch) onSearch(q);
+											onClose();
+										}
+									}}
+									currentQuery={searchText || ""}
+									setQuery={(newQuery) => {
+										if (setSearchText) setSearchText(newQuery);
+										if (onSearch) onSearch(newQuery);
+										onClose();
+									}}
+									placeholder="Video filters..."
+									className="w-40"
+								/>
 							</div>
 						)}
 
@@ -297,15 +339,15 @@ function AppliedTokens({
 		(query || "").match(/(?:[a-z_]+:"[^"]+"|[a-z_]+:[^\s)]+)/gi) || [];
 	if (tokens.length === 0) return null;
 	return (
-		<div
-			className="mt-2 flex flex-wrap gap-2 items-center"
-			aria-label="Active filters"
-		>
-			{tokens.map((t, idx) => (
+		<div className="mt-2 flex flex-wrap gap-2 items-center">
+			{tokens.map((t) => (
 				<button
-					key={`${t}-${idx}`}
+					key={t}
 					type="button"
-					className="chip"
+					className={cn(
+						buttonVariants({ variant: "pillOutline", size: "pill" }),
+						"justify-start",
+					)}
 					title={`Remove ${t}`}
 					onClick={() => onRemove(t)}
 				>

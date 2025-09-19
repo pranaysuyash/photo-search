@@ -137,15 +137,17 @@ export function KeyboardShortcuts({ isOpen, onClose }: KeyboardShortcutsProps) {
 				{/* Content */}
 				<div className="p-6 overflow-y-auto max-h-[60vh]">
 					<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-						{shortcutGroups.map((group, idx) => (
-							<div key={`group-${group.title}-${idx}`} className="space-y-2">
+						{shortcutGroups.map((group) => (
+							<div key={`group-${group.title}`} className="space-y-2">
 								<h3 className="font-semibold text-gray-900 dark:text-white mb-3">
 									{group.title}
 								</h3>
 								<div className="space-y-1">
-									{group.shortcuts.map((shortcut, sidx) => (
+									{group.shortcuts.map((shortcut) => (
 										<div
-											key={sidx}
+											key={`sc-${group.title}-${
+												shortcut.description
+											}-${shortcut.keys.join("+")}`}
 											className={`flex items-center justify-between p-2 rounded ${
 												shortcut.available === false
 													? "opacity-50"
@@ -157,7 +159,9 @@ export function KeyboardShortcuts({ isOpen, onClose }: KeyboardShortcutsProps) {
 											</span>
 											<div className="flex items-center gap-1">
 												{shortcut.keys.map((key, kidx) => (
-													<React.Fragment key={kidx}>
+													<React.Fragment
+														key={`key-${group.title}-${shortcut.description}-${kidx}-${key}`}
+													>
 														{kidx > 0 && (
 															<span className="text-xs text-gray-400">+</span>
 														)}

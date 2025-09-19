@@ -12,6 +12,13 @@ The UserManagementService is responsible for managing user-related functionality
 - Activity tracking
 - Collections and favorites management
 
+## Implementation Notes (September 2025)
+
+- The current implementation is an in-memory stub that mirrors the production API surface so the web UI can run offline. No network requests are made.
+- All data is reset whenever the page reloads; use the new `reset()` helper in tests to clear state between scenarios.
+- The service seeds a small set of mock collaborators via `addMockCollaborators()` so that UI components (Recent Activity, Sharing modals) have data to display during development.
+- Production deployments should replace this module with a real backend integration while keeping the same method contracts.
+
 ## Core Concepts
 
 ### UserProfile
@@ -251,6 +258,20 @@ Delete share link:
 static async deleteShareLink(linkId: string): Promise<void>
 ```
 
+### reset()
+
+Reset in-memory state (primarily for tests):
+
+```typescript
+static reset(): void
+```
+
+## Integration Points
+
+- `components/RecentActivityPanel.tsx` consumes `getActivityFeed()` to build the user activity drawer.
+- Storybook stories and tests mock this service (`components/RecentActivityPanel.stories.tsx`, `components/ActivityPanels.test.tsx`) to validate collaboration UX in isolation.
+- Future sharing flows (e.g., `ShareManageOverlay`) can swap in the real backend by reusing the same method contracts without touching UI code.
+
 ## Usage Examples
 
 ### Initializing User Management
@@ -484,7 +505,7 @@ import { UserManagementService } from "./UserManagementService";
 describe("UserManagementService", () => {
   beforeEach(() => {
     // Reset service state before each test
-    UserManagementService.reset(); // Hypothetical method
+    UserManagementService.reset();
   });
 
   it("should initialize with default user", async () => {

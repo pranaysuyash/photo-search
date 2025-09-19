@@ -16,13 +16,11 @@ export const TagModal: React.FC<TagModalProps> = ({
 			onKeyDown={(e) => {
 				if (e.key === "Escape") onClose();
 			}}
+			role="dialog"
+			aria-modal="true"
 		>
 			<FocusTrap onEscape={onClose}>
-				<div
-					className="bg-white rounded-lg p-4 w-full max-w-md"
-					role="dialog"
-					aria-modal="true"
-				>
+				<div className="bg-white rounded-lg p-4 w-full max-w-md">
 					<div className="font-semibold mb-2">Tag Selected</div>
 					<div className="text-sm text-gray-600 mb-2">
 						Enter comma-separated tags

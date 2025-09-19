@@ -2,15 +2,19 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import SmartCollections from "./SmartCollections";
 
-vi.mock("../api", () => ({
-	apiSetSmart: vi.fn(async () => ({ ok: true })),
-	apiGetSmart: vi.fn(async () => ({ smart: { Trip: { query: "beach" } } })),
-	apiResolveSmart: vi.fn(async () => ({
-		search_id: "s1",
-		results: [{ path: "/a.jpg", score: 1 }],
-	})),
-	apiDeleteSmart: vi.fn(async () => ({ ok: true, deleted: "Trip" })),
-}));
+vi.mock("../api", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../api")>();
+	return {
+		...actual,
+		apiSetSmart: vi.fn(async () => ({ ok: true })),
+		apiGetSmart: vi.fn(async () => ({ smart: { Trip: { query: "beach" } } })),
+		apiResolveSmart: vi.fn(async () => ({
+			search_id: "s1",
+			results: [{ path: "/a.jpg", score: 1 }],
+		})),
+		apiDeleteSmart: vi.fn(async () => ({ ok: true, deleted: "Trip" })),
+	};
+});
 
 describe("SmartCollections", () => {
 	const baseProps = {

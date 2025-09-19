@@ -65,8 +65,6 @@ const meta = {
     tooltip: 'indexed 1234 • coverage 76% • target 1600',
     photoActions: { setFavOnly: () => {}, setResults: () => {} },
     uiActions: { setBusy: () => {}, setNote: () => {} },
-    toastTimerRef: { current: null } as unknown,
-    setToast: () => {},
   }
 } satisfies Meta<typeof TopBar>;
 

@@ -1,3 +1,4 @@
+import type { LucideProps } from "lucide-react";
 import {
 	Calendar,
 	Camera,
@@ -8,7 +9,6 @@ import {
 	MapPin,
 	Settings,
 } from "lucide-react";
-import type { LucideProps } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import {
@@ -84,7 +84,8 @@ const METADATA_SECTIONS: MetadataSection[] = [
 			{
 				key: "fileSize",
 				label: "File Size",
-            formatter: (v) => metadataService.formatExifValue("file_size", v as number | string),
+				formatter: (v) =>
+					metadataService.formatExifValue("file_size", v as number | string),
 			},
 		],
 	},
@@ -275,9 +276,9 @@ export function MetadataPanel({
 							if (value === null || value === undefined || value === "")
 								return null;
 
-            const displayValue = field.formatter
-                ? field.formatter(value as string | number)
-                : String(value);
+							const displayValue = field.formatter
+								? field.formatter(value as string | number)
+								: String(value);
 							if (!displayValue) return null;
 
 							return (

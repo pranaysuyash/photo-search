@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 
 interface PerformanceMetrics {
-    renderCount: number;
-    lastRenderTime: number;
-    averageRenderTime: number;
-    maxRenderTime: number;
-    memoryUsage?: { usedJSHeapSize?: number } | null;
+	renderCount: number;
+	lastRenderTime: number;
+	averageRenderTime: number;
+	maxRenderTime: number;
+	memoryUsage?: { usedJSHeapSize?: number } | null;
 }
 
 /**
@@ -40,14 +40,14 @@ export function usePerformanceMonitor(
 			}
 
 			const renderTimes = renderTimesRef.current;
-            const newMetrics: PerformanceMetrics = {
-                renderCount: renderTimes.length,
-                lastRenderTime: renderTime,
-                averageRenderTime:
-                    renderTimes.reduce((a, b) => a + b, 0) / renderTimes.length,
-                maxRenderTime: Math.max(...renderTimes),
-                memoryUsage: (performance as any)?.memory ?? null,
-            };
+			const newMetrics: PerformanceMetrics = {
+				renderCount: renderTimes.length,
+				lastRenderTime: renderTime,
+				averageRenderTime:
+					renderTimes.reduce((a, b) => a + b, 0) / renderTimes.length,
+				maxRenderTime: Math.max(...renderTimes),
+				memoryUsage: (performance as unknown)?.memory ?? null,
+			};
 
 			setMetrics(newMetrics);
 

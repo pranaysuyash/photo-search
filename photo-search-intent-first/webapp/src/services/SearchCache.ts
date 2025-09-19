@@ -67,7 +67,7 @@ export class SearchCache {
 		// Update hit count and return data
 		entry.hits++;
 		SearchCache.metrics.hits++;
-        return entry.data as T;
+		return entry.data as T;
 	}
 
 	/**

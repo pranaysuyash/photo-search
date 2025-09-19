@@ -1,11 +1,14 @@
-// biome-ignore lint/complexity/noStaticOnlyClass: <explanation>
 /**
  * Comprehensive error handling utilities for the photo search application
  */
 
 import React from "react";
 import { apiAnalyticsLog } from "../api";
-import { shouldLogErrorsToServer, shouldSample, getLoggingConfig } from "../config/logging";
+import {
+	getLoggingConfig,
+	shouldLogErrorsToServer,
+	shouldSample,
+} from "../config/logging";
 
 /**
  * Extended error type with additional properties
@@ -181,7 +184,7 @@ export const getUserErrorMessage = (
 	error: AppError | Error | unknown,
 ): string => {
 	if ((error as ExtendedError)?.userMessage)
-		return (error as ExtendedError).userMessage;
+		return (error as ExtendedError).userMessage as string;
 
 	const type = classifyError(error);
 
@@ -212,8 +215,8 @@ export const getUserErrorMessage = (
  * Comprehensive error handler with logging and user feedback
  */
 export const handleError = (
-    error: Error | unknown,
-    options: ErrorHandlerOptions = {},
+	error: Error | unknown,
+	options: ErrorHandlerOptions = {},
 ): void => {
 	const {
 		showToast: shouldShowToast = true,
@@ -261,18 +264,18 @@ export const handleError = (
 		});
 	}
 
-    // Log to server (if enabled)
-    if (logToServer) {
-        void (async () => {
-            try {
-                // Central gating + sampling
-                if (!shouldLogErrorsToServer()) return;
-                if (!shouldSample(getLoggingConfig().globalSample)) return;
-                
-                // Best-effort dir resolution: prefer explicit context.dir
-                let dir = context?.dir || "";
-                if (!dir) {
-                    try {
+	// Log to server (if enabled)
+	if (logToServer) {
+		void (async () => {
+			try {
+				// Central gating + sampling
+				if (!shouldLogErrorsToServer()) return;
+				if (!shouldSample(getLoggingConfig().globalSample)) return;
+
+				// Best-effort dir resolution: prefer explicit context.dir
+				let dir = context?.dir || "";
+				if (!dir) {
+					try {
 						const raw = localStorage.getItem("photo-search-settings");
 						if (raw) {
 							const js = JSON.parse(raw);
@@ -281,27 +284,31 @@ export const handleError = (
 						}
 					} catch {}
 				}
-                if (dir) {
-                    const payload = {
-                        component: context?.component,
-                        action: context?.action,
-                        userId: context?.userId,
-                        sessionId: context?.sessionId,
-                        metadata: context?.metadata || {},
-                        type: classifyError(appError),
-                        message: (appError as Error)?.message,
-                        name: (appError as Error)?.name,
-                        stack: (appError as Error)?.stack,
-                        timestamp: new Date().toISOString(),
-                    };
-                    await apiAnalyticsLog(dir, "error", payload as Record<string, unknown>);
-                }
-            } catch (e) {
-                // Fail quiet; never crash calling sites on logging
-                console.debug("Server error logging failed", e);
-            }
-        })();
-    }
+				if (dir) {
+					const payload = {
+						component: context?.component,
+						action: context?.action,
+						userId: context?.userId,
+						sessionId: context?.sessionId,
+						metadata: context?.metadata || {},
+						type: classifyError(appError),
+						message: (appError as Error)?.message,
+						name: (appError as Error)?.name,
+						stack: (appError as Error)?.stack,
+						timestamp: new Date().toISOString(),
+					};
+					await apiAnalyticsLog(
+						dir,
+						"error",
+						payload as Record<string, unknown>,
+					);
+				}
+			} catch (e) {
+				// Fail quiet; never crash calling sites on logging
+				console.debug("Server error logging failed", e);
+			}
+		})();
+	}
 };
 
 /**
@@ -311,8 +318,8 @@ export async function logServerError(
 	error: unknown,
 	context: ErrorContext & { dir?: string },
 ): Promise<boolean> {
-    try {
-		let dir = context?.dir || "";
+	try {
+		const dir = context?.dir || "";
 		if (!dir) return false;
 		const base: Record<string, unknown> = {
 			component: context?.component,

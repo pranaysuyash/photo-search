@@ -1,13 +1,13 @@
 import type React from "react";
-import { announce, FocusTrap } from "../../utils/accessibility";
+import { useToast } from "@/hooks/use-toast";
 import { apiGetCollections, apiSetCollection } from "../../api";
+import { announce, FocusTrap } from "../../utils/accessibility";
 
 interface RemoveCollectionModalProps {
 	selected: Set<string>;
 	dir: string;
 	collections: Record<string, string[]> | null;
 	onClose: () => void;
-	setToast: (toast: { message: string } | null) => void;
 	photoActions: {
 		setCollections: (collections: Record<string, string[]>) => void;
 	};
@@ -21,23 +21,21 @@ export const RemoveCollectionModal: React.FC<RemoveCollectionModalProps> = ({
 	dir,
 	collections,
 	onClose,
-	setToast,
 	photoActions,
 	uiActions,
 }) => {
+	const { toast } = useToast();
 	return (
 		<div
 			className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
 			onKeyDown={(e) => {
 				if (e.key === "Escape") onClose();
 			}}
+			role="dialog"
+			aria-modal="true"
 		>
 			<FocusTrap onEscape={onClose}>
-				<div
-					className="bg-white rounded-lg p-4 w-full max-w-md"
-					role="dialog"
-					aria-modal="true"
-				>
+				<div className="bg-white rounded-lg p-4 w-full max-w-md">
 					<div className="font-semibold mb-2">Remove from Collection</div>
 					<form
 						onSubmit={async (e) => {
@@ -54,8 +52,10 @@ export const RemoveCollectionModal: React.FC<RemoveCollectionModalProps> = ({
 								await apiSetCollection(dir, name, next);
 								const r2 = await apiGetCollections(dir);
 								photoActions.setCollections(r2.collections || {});
-								setToast({
-									message: `Removed ${existing.length - next.length} from ${name}`,
+								toast({
+									description: `Removed ${
+										existing.length - next.length
+									} from ${name}`,
 								});
 								announce(
 									`Removed ${existing.length - next.length} from ${name}`,

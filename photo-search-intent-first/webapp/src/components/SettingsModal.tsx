@@ -36,20 +36,18 @@ export function SettingsModal({
 	} | null>(null);
 	const [modelBusy, setModelBusy] = useState(false);
 	const [nukeBusy, setNukeBusy] = useState(false);
-	const canManage = // biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency exclusion
-		useMemo(() => !!dir, [dir]);
+	const canManage = useMemo(() => !!dir, [dir]);
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency exclusion
 	useEffect(() => {
 		if (!isOpen) return;
 		let cancelled = false;
 		(async () => {
-            try {
-                await apiWatchStatus();
-                if (!cancelled) setWatchAvail(true);
-            } catch {
-                if (!cancelled) setWatchAvail(false);
-            }
+			try {
+				await apiWatchStatus();
+				if (!cancelled) setWatchAvail(true);
+			} catch {
+				if (!cancelled) setWatchAvail(false);
+			}
 			try {
 				const caps = await apiModelsCapabilities();
 				if (!cancelled) setModelCaps(caps.capabilities);

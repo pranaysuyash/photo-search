@@ -112,6 +112,7 @@ export const useSettingsStore = create<SettingsStore>()(
 			showExplain: false,
 			showInfoOverlay: false,
 			highContrast: false,
+			enableDemoLibrary: true,
 
 			// EXIF filters
 			camera: "",
@@ -139,9 +140,13 @@ export const useSettingsStore = create<SettingsStore>()(
 			setShowExplain: (showExplain) => set({ showExplain }),
 			setShowInfoOverlay: (showInfoOverlay) => set({ showInfoOverlay }),
 			setHighContrast: (highContrast) => set({ highContrast }),
+			setEnableDemoLibrary: (enableDemoLibrary: boolean) =>
+				set({ enableDemoLibrary }),
 			setCamera: (camera) => set({ camera }),
-			setIsoMin: (isoMin: number | string) => set({ isoMin: Number(isoMin) || 0 }),
-			setIsoMax: (isoMax: number | string) => set({ isoMax: Number(isoMax) || 0 }),
+			setIsoMin: (isoMin: number | string) =>
+				set({ isoMin: Number(isoMin) || 0 }),
+			setIsoMax: (isoMax: number | string) =>
+				set({ isoMax: Number(isoMax) || 0 }),
 			setFMin: (fMin: number | string) => set({ fMin: Number(fMin) || 0 }),
 			setFMax: (fMax: number | string) => set({ fMax: Number(fMax) || 0 }),
 			setPlace: (place) => set({ place }),
@@ -168,6 +173,7 @@ export const useSettingsStore = create<SettingsStore>()(
 				fMin: state.fMin,
 				fMax: state.fMax,
 				place: state.place,
+				enableDemoLibrary: state.enableDemoLibrary,
 				// Don't persist sensitive tokens
 				// hfToken and openaiKey are not included
 			}),
@@ -198,6 +204,8 @@ export const useShowInfoOverlay = () =>
 	useSettingsStore((state) => state.showInfoOverlay);
 export const useHighContrast = () =>
 	useSettingsStore((state) => state.highContrast);
+export const useEnableDemoLibrary = () =>
+	useSettingsStore((state) => state.enableDemoLibrary);
 export const useCamera = () => useSettingsStore((state) => state.camera);
 export const useIsoMin = () => useSettingsStore((state) => state.isoMin);
 export const useIsoMax = () => useSettingsStore((state) => state.isoMax);
@@ -242,6 +250,7 @@ export const useSettingsActions = () => {
 	const setShowExplain = useSettingsStore((s) => s.setShowExplain);
 	const setShowInfoOverlay = useSettingsStore((s) => s.setShowInfoOverlay);
 	const setHighContrast = useSettingsStore((s) => s.setHighContrast);
+	const setEnableDemoLibrary = useSettingsStore((s) => s.setEnableDemoLibrary);
 	const setCamera = useSettingsStore((s) => s.setCamera);
 	const setIsoMin = useSettingsStore((s) => s.setIsoMin);
 	const setIsoMax = useSettingsStore((s) => s.setIsoMax);
@@ -265,6 +274,7 @@ export const useSettingsActions = () => {
 			setShowExplain,
 			setShowInfoOverlay,
 			setHighContrast,
+			setEnableDemoLibrary,
 			setCamera,
 			setIsoMin,
 			setIsoMax,
@@ -287,6 +297,7 @@ export const useSettingsActions = () => {
 			setShowExplain,
 			setShowInfoOverlay,
 			setHighContrast,
+			setEnableDemoLibrary,
 			setCamera,
 			setIsoMin,
 			setIsoMax,

@@ -15,11 +15,12 @@ describe("settingsStore", () => {
 			vlmModel: "Qwen/Qwen2-VL-2B-Instruct",
 			useOcr: false,
 			hasText: false,
+			enableDemoLibrary: true,
 			camera: "",
-			isoMin: "",
-			isoMax: "",
-			fMin: "",
-			fMax: "",
+			isoMin: 0,
+			isoMax: 0,
+			fMin: 0,
+			fMax: 0,
 			place: "",
 		});
 	});
@@ -28,6 +29,7 @@ describe("settingsStore", () => {
 		const s = useSettingsStore.getState();
 		expect(s.engine).toBe("local");
 		expect(s.vlmModel).toBeTruthy();
+		expect(s.enableDemoLibrary).toBe(true);
 		expect({
 			camera: s.camera,
 			isoMin: s.isoMin,
@@ -37,10 +39,10 @@ describe("settingsStore", () => {
 			place: s.place,
 		}).toEqual({
 			camera: "",
-			isoMin: "",
-			isoMax: "",
-			fMin: "",
-			fMax: "",
+			isoMin: 0,
+			isoMax: 0,
+			fMin: 0,
+			fMax: 0,
 			place: "",
 		});
 	});
@@ -57,6 +59,21 @@ describe("settingsStore", () => {
 		expect(useSettingsStore.getState().fastKind).toBe("faiss");
 	});
 
+	it("demo library toggle works correctly", () => {
+		const s = useSettingsStore.getState();
+
+		// Default should be true
+		expect(s.enableDemoLibrary).toBe(true);
+
+		// Disable demo library
+		s.setEnableDemoLibrary(false);
+		expect(useSettingsStore.getState().enableDemoLibrary).toBe(false);
+
+		// Re-enable demo library
+		s.setEnableDemoLibrary(true);
+		expect(useSettingsStore.getState().enableDemoLibrary).toBe(true);
+	});
+
 	it("computed flags for providers", () => {
 		function Flags() {
 			const hf = useNeedsHf();
@@ -67,12 +84,20 @@ describe("settingsStore", () => {
 		// HF
 		useSettingsStore.getState().setEngine("hf");
 		rerender(<Flags />);
-		expect(container.firstChild).toHaveAttribute("data-hf", "true");
-		expect(container.firstChild).toHaveAttribute("data-oai", "false");
+		expect((container.firstChild as HTMLElement)?.getAttribute("data-hf")).toBe(
+			"true",
+		);
+		expect(
+			(container.firstChild as HTMLElement)?.getAttribute("data-oai"),
+		).toBe("false");
 		// OpenAI
 		useSettingsStore.getState().setEngine("openai");
 		rerender(<Flags />);
-		expect(container.firstChild).toHaveAttribute("data-hf", "false");
-		expect(container.firstChild).toHaveAttribute("data-oai", "true");
+		expect((container.firstChild as HTMLElement)?.getAttribute("data-hf")).toBe(
+			"false",
+		);
+		expect(
+			(container.firstChild as HTMLElement)?.getAttribute("data-oai"),
+		).toBe("true");
 	});
 });

@@ -62,7 +62,7 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 	} | null>(null);
 
 	// Library state
-    const [photos, setPhotos] = useState<string[]>([]);
+	const [photos, setPhotos] = useState<string[]>([]);
 	const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set());
 	const [searchQuery, setSearchQuery] = useState("");
 	const [searchResults, setSearchResults] = useState<
@@ -148,7 +148,7 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 				tripsData,
 				mapData,
 				tagsData,
-				metadataData,
+				_metadataData,
 				favoritesData,
 				savedData,
 			] = await Promise.all([
@@ -164,34 +164,46 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 				api.current.getSavedSearches(),
 			]);
 
-            setPhotos(libraryData.paths || []);
+			setPhotos(libraryData.paths || []);
 			setCollections(collectionsData.collections || {});
 			setSmartCollections(smartData.smart || {});
 			setFaceClusters(
-				(facesData.clusters || []).map((c: any) => ({
-					id: String(c.id),
-					name: c.name as string | undefined,
-					photos: [],
-				})),
+				(facesData.clusters || []).map(
+					(c: { id: string | number; name?: string }) => ({
+						id: String(c.id),
+						name: c.name as string | undefined,
+						photos: [],
+					}),
+				),
 			);
 			setTrips(
-				(tripsData.trips || []).map((t: any) => ({
-					id: String(t.id),
-					name: (t.place as string | undefined) || String(t.id),
-					startDate: t.start_ts ? String(t.start_ts) : "",
-					endDate: t.end_ts ? String(t.end_ts) : "",
-					photos: (t.paths as string[]) || [],
-				})),
+				(tripsData.trips || []).map(
+					(t: {
+						id: string | number;
+						place?: string;
+						start_ts?: string | number;
+						end_ts?: string | number;
+						paths?: string[];
+					}) => ({
+						id: String(t.id),
+						name: (t.place as string | undefined) || String(t.id),
+						startDate: t.start_ts ? String(t.start_ts) : "",
+						endDate: t.end_ts ? String(t.end_ts) : "",
+						photos: (t.paths as string[]) || [],
+					}),
+				),
 			);
 			setMapData(
 				mapData
 					? {
-						markers: (mapData.points || []).map((pt: any) => ({
-							lat: pt.lat,
-							lng: pt.lon,
-							photos: [],
-						})),
-					}
+							markers: (mapData.points || []).map(
+								(pt: { lat: number; lon: number; paths?: string[] }) => ({
+									lat: pt.lat,
+									lng: pt.lon,
+									photos: [],
+								}),
+							),
+						}
 					: null,
 			);
 			setTags(tagsData.all || []);
@@ -365,13 +377,13 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 
 		setLoading(true);
 		try {
-            const dupes = await api.current.findLookalikes(5);
-            setLookalikes(
-                (dupes.groups || []).map((g: any) => ({
-                    group: g.paths as string[],
-                    similarity: 1,
-                })),
-            );
+			const dupes = await api.current.findLookalikes(5);
+			setLookalikes(
+				(dupes.groups || []).map((g: { paths: string[] }) => ({
+					group: g.paths as string[],
+					similarity: 1,
+				})),
+			);
 			setActiveView("duplicates");
 			showNotification(
 				"info",
@@ -427,7 +439,9 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 					<button
 						type="button"
 						onClick={() => setActiveView("library")}
-						className={`w-full text-left p-2 rounded ${activeView === "library" ? "bg-blue-600" : "hover:bg-gray-800"}`}
+						className={`w-full text-left p-2 rounded ${
+							activeView === "library" ? "bg-blue-600" : "hover:bg-gray-800"
+						}`}
 					>
 						<Grid3x3 className="inline w-4 h-4 mr-2" />
 						Library ({photos.length})
@@ -436,7 +450,9 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 					<button
 						type="button"
 						onClick={() => setActiveView("search")}
-						className={`w-full text-left p-2 rounded ${activeView === "search" ? "bg-blue-600" : "hover:bg-gray-800"}`}
+						className={`w-full text-left p-2 rounded ${
+							activeView === "search" ? "bg-blue-600" : "hover:bg-gray-800"
+						}`}
 					>
 						<Search className="inline w-4 h-4 mr-2" />
 						Search Results ({searchResults.length})
@@ -445,25 +461,31 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 					<button
 						type="button"
 						onClick={() => setActiveView("collections")}
-						className={`w-full text-left p-2 rounded ${activeView === "collections" ? "bg-blue-600" : "hover:bg-gray-800"}`}
+						className={`w-full text-left p-2 rounded ${
+							activeView === "collections" ? "bg-blue-600" : "hover:bg-gray-800"
+						}`}
 					>
 						<Folder className="inline w-4 h-4 mr-2" />
-						Collections ({collections.length})
+						Collections ({Object.keys(collections).length})
 					</button>
 
 					<button
 						type="button"
 						onClick={() => setActiveView("smart")}
-						className={`w-full text-left p-2 rounded ${activeView === "smart" ? "bg-blue-600" : "hover:bg-gray-800"}`}
+						className={`w-full text-left p-2 rounded ${
+							activeView === "smart" ? "bg-blue-600" : "hover:bg-gray-800"
+						}`}
 					>
 						<Sparkles className="inline w-4 h-4 mr-2" />
-						Smart Albums ({smartCollections.length})
+						Smart Albums ({Object.keys(smartCollections).length})
 					</button>
 
 					<button
 						type="button"
 						onClick={() => setActiveView("people")}
-						className={`w-full text-left p-2 rounded ${activeView === "people" ? "bg-blue-600" : "hover:bg-gray-800"}`}
+						className={`w-full text-left p-2 rounded ${
+							activeView === "people" ? "bg-blue-600" : "hover:bg-gray-800"
+						}`}
 					>
 						<Users className="inline w-4 h-4 mr-2" />
 						People ({faceClusters.length})
@@ -472,7 +494,9 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 					<button
 						type="button"
 						onClick={() => setActiveView("places")}
-						className={`w-full text-left p-2 rounded ${activeView === "places" ? "bg-blue-600" : "hover:bg-gray-800"}`}
+						className={`w-full text-left p-2 rounded ${
+							activeView === "places" ? "bg-blue-600" : "hover:bg-gray-800"
+						}`}
 					>
 						<MapIcon className="inline w-4 h-4 mr-2" />
 						Places & Trips ({trips.length})
@@ -481,7 +505,9 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 					<button
 						type="button"
 						onClick={() => setActiveView("favorites")}
-						className={`w-full text-left p-2 rounded ${activeView === "favorites" ? "bg-blue-600" : "hover:bg-gray-800"}`}
+						className={`w-full text-left p-2 rounded ${
+							activeView === "favorites" ? "bg-blue-600" : "hover:bg-gray-800"
+						}`}
 					>
 						<Heart className="inline w-4 h-4 mr-2" />
 						Favorites ({favorites.length})
@@ -490,7 +516,9 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 					<button
 						type="button"
 						onClick={() => setActiveView("duplicates")}
-						className={`w-full text-left p-2 rounded ${activeView === "duplicates" ? "bg-blue-600" : "hover:bg-gray-800"}`}
+						className={`w-full text-left p-2 rounded ${
+							activeView === "duplicates" ? "bg-blue-600" : "hover:bg-gray-800"
+						}`}
 					>
 						<Copy className="inline w-4 h-4 mr-2" />
 						Duplicates ({lookalikes.length})
@@ -661,7 +689,9 @@ export const ComprehensiveUI: React.FC<ComprehensiveUIProps> = ({
 								<button
 									type="button"
 									key={photo}
-									className={`relative cursor-pointer ${selectedPhotos.has(photo) ? "ring-2 ring-blue-500" : ""}`}
+									className={`relative cursor-pointer ${
+										selectedPhotos.has(photo) ? "ring-2 ring-blue-500" : ""
+									}`}
 									onClick={() => {
 										const newSelection = new Set(selectedPhotos);
 										if (newSelection.has(photo)) {

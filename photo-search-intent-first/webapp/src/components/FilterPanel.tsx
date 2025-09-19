@@ -1,12 +1,20 @@
-import { Filter, FolderOpen, Save, Trash2, X, Zap, SlidersHorizontal } from "lucide-react";
+import {
+	Filter,
+	FolderOpen,
+	Save,
+	SlidersHorizontal,
+	Trash2,
+	X,
+	Zap,
+} from "lucide-react";
 import { useState } from "react";
 import {
 	applyFilterPreset,
 	createFilterPreset,
 	type FilterPreset,
 } from "../models/FilterPreset";
-import { QuickFilters } from "./QuickFilters";
 import { AdvancedFilterPanel } from "./AdvancedFilterPanel";
+import { QuickFilters } from "./QuickFilters";
 
 interface FilterPanelProps {
 	show: boolean;
@@ -201,10 +209,25 @@ export function FilterPanel({
 	};
 
 	// Check if any filters are active
-	const hasActiveFilters =
-		favOnly || tagFilter || place || camera || isoMin || isoMax || 
-		fMin || fMax || dateFrom || dateTo || useCaps || useOcr || 
-		hasText || ratingMin > 0 || person || collection || color || orientation;
+	const _hasActiveFilters =
+		favOnly ||
+		tagFilter ||
+		place ||
+		camera ||
+		isoMin ||
+		isoMax ||
+		fMin ||
+		fMax ||
+		dateFrom ||
+		dateTo ||
+		useCaps ||
+		useOcr ||
+		hasText ||
+		ratingMin > 0 ||
+		person ||
+		collection ||
+		color ||
+		orientation;
 
 	return (
 		<>
@@ -242,14 +265,22 @@ export function FilterPanel({
 					<div className="flex border-b">
 						<button
 							type="button"
-							className={`flex-1 py-3 text-sm font-medium ${!showPresets ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-500"}`}
+							className={`flex-1 py-3 text-sm font-medium ${
+								!showPresets
+									? "border-b-2 border-blue-500 text-blue-600"
+									: "text-gray-500"
+							}`}
 							onClick={() => setShowPresets(false)}
 						>
 							Filters
 						</button>
 						<button
 							type="button"
-							className={`flex-1 py-3 text-sm font-medium ${showPresets ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-500"}`}
+							className={`flex-1 py-3 text-sm font-medium ${
+								showPresets
+									? "border-b-2 border-blue-500 text-blue-600"
+									: "text-gray-500"
+							}`}
 							onClick={() => setShowPresets(true)}
 						>
 							Presets
@@ -423,7 +454,9 @@ export function FilterPanel({
 
 									{/* Search Features */}
 									<div className="space-y-3 pt-3 border-t">
-										<h4 className="font-medium text-gray-900">Search Features</h4>
+										<h4 className="font-medium text-gray-900">
+											Search Features
+										</h4>
 										<div className="flex items-center justify-between">
 											<label htmlFor="flt-caps">
 												<span>Use AI captions</span>

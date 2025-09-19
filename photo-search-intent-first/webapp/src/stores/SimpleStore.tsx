@@ -288,9 +288,8 @@ export const useSettingsActions = () => {
 				setSettings({ showInfoOverlay }),
 			setResultView: (resultView: "grid" | "film" | "timeline" | "map") =>
 				setSettings({ resultView }),
-			setTimelineBucket: (
-				timelineBucket: "day" | "week" | "month" | "year",
-			) => setSettings({ timelineBucket }),
+			setTimelineBucket: (timelineBucket: "day" | "week" | "month" | "year") =>
+				setSettings({ timelineBucket }),
 			setIncludeVideos: (includeVideos: boolean) =>
 				setSettings({ includeVideos }),
 		}),
@@ -320,8 +319,9 @@ export const usePhotoActions = () => {
 				setPhoto((prev: SimpleStore) => ({
 					tags: { ...prev.photo.tags, tagFilter },
 				})),
-			setSaved: (saved: Array<{ name: string; query: string; top_k?: number }>) =>
-				setPhoto({ saved }),
+			setSaved: (
+				saved: Array<{ name: string; query: string; top_k?: number }>,
+			) => setPhoto({ saved }),
 			setCollections: (collections: Record<string, string[]>) =>
 				setPhoto({ collections }),
 			setSmart: (smart: Record<string, unknown>) => setPhoto({ smart }),

@@ -5,7 +5,7 @@
 
 import { Camera, Download, Heart, MoreVertical, Share2 } from "lucide-react";
 import type React from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { thumbUrl } from "../api";
 import { useTouchGestures } from "../services/TouchGestureService";
 import { MobilePhotoCapture } from "./MobilePhotoCapture";
@@ -57,7 +57,7 @@ const GridItem: React.FC<GridItemProps> = ({
 	isSelected,
 	onSelect,
 }) => {
-	const itemRef = useRef<HTMLDivElement>(null);
+	const itemRef = useRef<HTMLButtonElement>(null);
 	const [showActions, setShowActions] = useState(false);
 	const [imageLoaded, setImageLoaded] = useState(false);
 	const [imageError, setImageError] = useState(false);
@@ -116,8 +116,8 @@ const GridItem: React.FC<GridItemProps> = ({
 		};
 	}, [touchGestureService, photo.path, onSelect, onToggleFavorite]);
 
-    const handleClick = (e: React.SyntheticEvent) => {
-        e.preventDefault();
+	const handleClick = (e: React.SyntheticEvent) => {
+		e.preventDefault();
 		if (isSelected) {
 			onSelect(photo.path);
 		} else {
@@ -125,28 +125,28 @@ const GridItem: React.FC<GridItemProps> = ({
 		}
 	};
 
-    const handleFavoriteClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        onToggleFavorite(photo.path);
-    };
+	const handleFavoriteClick = (e: React.MouseEvent) => {
+		e.stopPropagation();
+		onToggleFavorite(photo.path);
+	};
 
-    const handleShareClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        onShare(photo.path);
-    };
+	const handleShareClick = (e: React.MouseEvent) => {
+		e.stopPropagation();
+		onShare(photo.path);
+	};
 
-    const handleDownloadClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        onDownload(photo.path);
-    };
+	const handleDownloadClick = (e: React.MouseEvent) => {
+		e.stopPropagation();
+		onDownload(photo.path);
+	};
 
 	const imageUrl = thumbUrl(dir, engine, photo.path, 400);
 
 	return (
-		<div
-			role="button"
+		<button
+			type="button"
 			ref={itemRef}
-			className={`relative aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer select-none transition-all duration-200 ${
+			className={`relative aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer select-none transition-all duration-200 text-left ${
 				isSelected ? "ring-2 ring-blue-500" : ""
 			}`}
 			onClick={handleClick}
@@ -156,7 +156,6 @@ const GridItem: React.FC<GridItemProps> = ({
 					handleClick(e);
 				}
 			}}
-			tabIndex={0}
 		>
 			{/* Image */}
 			<div className="w-full h-full relative">
@@ -166,7 +165,7 @@ const GridItem: React.FC<GridItemProps> = ({
 
 				<img
 					src={imageUrl}
-					alt={`Photo ${index + 1}`}
+					alt={(photo.path.split("/").pop() || photo.path) as string}
 					className={`w-full h-full object-cover transition-opacity duration-300 ${
 						imageLoaded ? "opacity-100" : "opacity-0"
 					}`}
@@ -263,7 +262,7 @@ const GridItem: React.FC<GridItemProps> = ({
 			<div className="absolute bottom-1 right-1 text-xs text-white/70 bg-black/30 px-1 py-0.5 rounded">
 				{photo.score ? `${Math.round(photo.score * 100)}%` : ""}
 			</div>
-		</div>
+		</button>
 	);
 };
 
@@ -324,7 +323,7 @@ export function MobileGridLayout({
 	}, [onLoadMore, hasMore, isLoading]);
 
 	// Handle photo selection
-	const handleSelect = (path: string) => {
+	const handleSelect = useCallback((path: string) => {
 		setSelectedPhotos((prev) => {
 			const newSet = new Set(prev);
 			if (newSet.has(path)) {
@@ -334,7 +333,7 @@ export function MobileGridLayout({
 			}
 			return newSet;
 		});
-	};
+	}, []);
 
 	// Handle photo capture
 	const handlePhotoCaptured = (file: File) => {
@@ -412,6 +411,7 @@ export function MobileGridLayout({
 							type="button"
 							onClick={handleBatchShare}
 							className="p-2 bg-blue-500 text-white rounded-lg"
+							aria-label="Share selected"
 						>
 							<Share2 className="w-4 h-4" />
 						</button>
@@ -419,6 +419,7 @@ export function MobileGridLayout({
 							type="button"
 							onClick={handleBatchDownload}
 							className="p-2 bg-green-500 text-white rounded-lg"
+							aria-label="Download selected"
 						>
 							<Download className="w-4 h-4" />
 						</button>
@@ -431,6 +432,7 @@ export function MobileGridLayout({
 				type="button"
 				onClick={() => setShowCamera(true)}
 				className="fixed bottom-20 right-4 z-30 p-4 bg-blue-600 text-white rounded-full shadow-lg"
+				aria-label="Open camera"
 			>
 				<Camera className="w-6 h-6" />
 			</button>

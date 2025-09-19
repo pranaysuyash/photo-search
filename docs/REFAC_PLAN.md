@@ -150,20 +150,40 @@ Utility: `viewToPath(view)` in `src/utils/router.ts` centralizes view→path map
 ## Current Status
 
 - Phase 1 (MVP Extraction):
-  - Major views extracted and routed; AppShell integrated.
-  - Modals/overlays centralized.
+- Major views render through `Routes`, with `pathToView` driving navigation state.
+- `AppShell` component exists but many header/toolbar controls still live inside `App.tsx`.
+- Modal/overlay helpers are centralized; filter presets (`useFilterPresets`), onboarding flows (`useOnboardingFlows`), and toast orchestration (`useToast`) live in dedicated hooks.
+
 - Phase 2 (Iterative Enhancement):
-  - Global side-effects moved to hooks.
+  - Some global side-effects (shortcuts, connectivity) live in dedicated hooks.
   - Results view-local state moved to contexts.
-  - Router drives view; remaining non-routed views are legacy-only.
+  - Additional cross-cutting logic (e.g., accessibility settings sync, search history toggles) still inline.
 - Phase 3 (Next):
   - Shared UI primitives, performance profiling, accessibility rounds.
+
+## Task Board (2025-09-16)
+
+| Area | Task | Status | Notes |
+| ---- | ---- | ------ | ----- |
+| Layout | Move header quick-actions and help hint into `AppShell` (or child component) | ✅ Done | `AppShell` now renders `HeaderQuickActions`; related state stays in `App.tsx` via props. |
+| Filters | Extract filter preset state/effects into `useFilterPresets` hook | ✅ Done | Hook + tests (`useFilterPresets.test.ts`) keep persistence/apply logic out of `App.tsx`. |
+| Onboarding | Modularize onboarding + hint state via `useOnboardingFlows` | ✅ Done | New hook (`src/hooks/useOnboardingFlows.ts`) now owns tour state, hints, contextual help, and checklist logic. |
+| Modals | Formalize `ModalManager` interface and move inline modal toggles | ✅ In Progress | Added `useModalControls`/`useModalStatus`; `ModalManager` now owns share management, view navigation, and only consumes the specific state setters each modal needs. Continue migrating remaining modal wiring. |
+| Side Effects | Audit remaining `useEffect` blocks for extraction to focused hooks | ✅ In Progress | New hooks (`useToast`, `usePageViewTracking`) isolate global handlers; continue reviewing URL parsing / theme effects. |
+| Testing | Define smoke/regression suites per extracted module | ✅ In Progress | Hook/unit tests added for presets + onboarding; see Testing Strategy snapshot for upcoming coverage. |
 
 ## Next Targets
 
 - Migrate any remaining non-routed views or remove them if deprecated.
 - Increase unit/integration tests for containers and hooks.
 - Continue reducing prop drilling by introducing focused contexts where helpful.
+
+## Testing Strategy Snapshot
+
+- `useFilterPresets` – unit tests cover localStorage bootstrap, save/update/delete, and setter invocation.
+- `useOnboardingFlows` – unit tests confirm hint dismissal and search action tracking; additional UI smoke tests planned once modal flows are validated.
+- `HeaderQuickActions` – component test ensures buttons trigger handlers and the hint toggles visibility.
+- Pending suites: modal orchestration (jobs/search/folder flows), AdvancedFilterPanel integration, and end-to-end onboarding checklist navigation.
 Final Route-Driven Migration Plan
 =================================
 

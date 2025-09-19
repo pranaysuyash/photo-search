@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import Any, Callable, Dict, List, Mapping, Optional, TypeVar
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Body, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel
 
 from adapters.provider_factory import get_provider
@@ -43,6 +43,7 @@ from infra.shares import (
 import shutil, os, platform
 import json
 import time
+import logging
 
 from PIL import Image, ExifTags
 from infra.watcher import WatchManager
@@ -50,6 +51,7 @@ from domain.models import SUPPORTED_EXTS
 
 
 app = FastAPI(title="Photo Search – Intent-First API")
+_START_TIME = time.time()
 
 # CORS / Origin policy – prefer explicit local origins when possible
 _allowed_origins = [
@@ -60,6 +62,7 @@ _allowed_origins = [
     "http://127.0.0.1:8000",
     "http://localhost:8000",
     "http://0.0.0.0:8000",  # Add this for when backend runs on 0.0.0.0
+    "app://local",  # Electron packaged build origin when using the custom protocol
 ]
 
 app.add_middleware(
@@ -79,6 +82,62 @@ def _write_event(index_dir: Path, event: Dict[str, Any]) -> None:
             fh.write(json.dumps(event) + "\n")
     except Exception:
         pass
+
+
+T = TypeVar("T")
+
+
+def _from_body(
+    body: Optional[Mapping[str, Any]],
+    current: Optional[T],
+    key: str,
+    *,
+    default: Optional[T] = None,
+    cast: Optional[Callable[[Any], T]] = None,
+) -> Optional[T]:
+    """Prefer query parameters, but fall back to JSON body/defaults."""
+
+    if current is not None:
+        return current
+    if body is not None and key in body:
+        value = body[key]
+        if value is None:
+            return default
+        if cast is not None:
+            try:
+                return cast(value)
+            except Exception:
+                return default
+        return value  # type: ignore[return-value]
+    return default
+
+
+def _require(value: Optional[T], name: str) -> T:
+    if value is None:
+        raise HTTPException(status_code=422, detail=f"Missing required field: {name}")
+    return value
+
+
+def _as_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        val = value.strip().lower()
+        if val in {"1", "true", "yes", "y", "on"}:
+            return True
+        if val in {"0", "false", "no", "n", "off"}:
+            return False
+    return bool(value)
+
+
+def _as_str_list(value: Any) -> List[str]:
+    if isinstance(value, list):
+        return [str(v) for v in value]
+    if value is None:
+        return []
+    return [str(value)]
 
 # Static frontend serving
 # Prefer the built React app (webapp/dist) when present; otherwise fall back to api/web demo.
@@ -134,6 +193,49 @@ else:
 @app.get("/api/ping")
 def api_ping() -> Dict[str, Any]:
     return {"ok": True}
+
+
+@app.post("/monitoring")
+@app.post("/api/monitoring")
+async def api_monitoring(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Accept monitoring payloads from the Electron/web client.
+
+    The current implementation just acknowledges receipt so the frontend
+    background flushes don't surface 404 noise in the console when running
+    offline. In the future we can persist or forward these reports.
+    """
+    # TODO: Persist metrics/events once a storage backend is in place.
+    return {"ok": True, "received": bool(payload)}
+
+
+@app.get("/monitoring")
+@app.get("/api/monitoring")
+def api_monitoring_get() -> Dict[str, Any]:
+    """Lightweight monitoring health check endpoint for connection testing."""
+    return {"ok": True, "uptime_seconds": round(max(0.0, time.time() - _START_TIME), 3)}
+
+
+@app.get("/health")
+@app.get("/api/health")
+def api_health(dir: Optional[str] = None) -> Dict[str, Any]:
+    """Lightweight health endpoint for monitoring integrations."""
+
+    info: Dict[str, Any] = {
+        "ok": True,
+        "uptime_seconds": round(max(0.0, time.time() - _START_TIME), 3),
+    }
+
+    if dir:
+        try:
+            folder = Path(dir)
+            store = IndexStore(folder)
+            index_dir = store.index_dir
+            info["index_dir"] = str(index_dir)
+            info["index_exists"] = index_dir.exists()
+        except Exception:
+            info["index_exists"] = False
+
+    return info
 
 # Demo directory locator (for onboarding/empty states)
 @app.get("/demo/dir")
@@ -375,12 +477,34 @@ def api_watch_status() -> Dict[str, Any]:
 
 # Sharing APIs
 @app.post("/share")
-def api_share(dir: str, provider: str, paths: List[str], expiry_hours: Optional[int] = 24, password: Optional[str] = None, view_only: bool = True) -> Dict[str, Any]:
-    folder = Path(dir)
+def api_share(
+    dir: Optional[str] = None,
+    provider: Optional[str] = None,
+    paths: Optional[List[str]] = None,
+    expiry_hours: Optional[int] = None,
+    password: Optional[str] = None,
+    view_only: Optional[bool] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+    paths_value = _from_body(body, paths, "paths", default=[], cast=_as_str_list) or []
+    expiry_value = _from_body(body, expiry_hours, "expiry_hours", default=24, cast=lambda v: int(v))
+    password_value = _from_body(body, password, "password")
+    view_only_value = _from_body(body, view_only, "view_only", default=True, cast=_as_bool)
+
+    folder = Path(dir_value)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
     try:
-        rec = _share_create(str(folder), provider or "local", [str(p) for p in paths or []], expiry_hours=expiry_hours, password=password, view_only=bool(view_only))
+        rec = _share_create(
+            str(folder),
+            provider_value or "local",
+            [str(p) for p in paths_value],
+            expiry_hours=expiry_value,
+            password=password_value,
+            view_only=bool(view_only_value),
+        )
         url = f"/share/{rec.token}/view"
         return {"ok": True, "token": rec.token, "url": url, "expires": rec.expires}
     except Exception as e:
@@ -409,10 +533,14 @@ def api_share_list(dir: Optional[str] = None) -> Dict[str, Any]:
 
 
 @app.post("/share/revoke")
-def api_share_revoke(token: str) -> Dict[str, Any]:
+def api_share_revoke(
+    token: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    token_value = _require(_from_body(body, token, "token"), "token")
     ok = False
     try:
-        ok = _share_revoke(str(token))
+        ok = _share_revoke(str(token_value))
     except Exception:
         ok = False
     return {"ok": bool(ok)}
@@ -566,28 +694,64 @@ _DEV_NO_AUTH = (os.environ.get("DEV_NO_AUTH", "").strip() == "1") or (
     os.environ.get("ENV", "").strip().lower() in ("dev", "development")
 )
 
+_API_LOG_LEVEL = os.environ.get("API_LOG_LEVEL", "").strip().lower()
+_LOG_HTTP = _API_LOG_LEVEL in {"debug", "info"}
+_http_logger: Optional[logging.Logger] = None
+if _LOG_HTTP:
+    _http_logger = logging.getLogger("photo_search.api")
+    if not _http_logger.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+        _http_logger.addHandler(handler)
+    _http_logger.setLevel(logging.DEBUG if _API_LOG_LEVEL == "debug" else logging.INFO)
+
 @app.middleware("http")
 async def _auth_middleware(request, call_next):
+    path = str(request.url.path or "")
+    loggable = not path.startswith(("/assets", "/app"))
+    start_ns = time.perf_counter_ns() if _LOG_HTTP and loggable else None
+    response: Optional[Response] = None
     try:
         # Skip in development or if no token configured
         if _DEV_NO_AUTH or not _API_TOKEN:
-            return await call_next(request)
-        path = str(request.url.path or "")
+            response = await call_next(request)
+            return response
         # Allow static assets and share viewer endpoints without auth
-        if path.startswith("/app") or path.startswith("/assets") or path.startswith("/share/") or path == "/api/ping" or path == "/scan_count":
-            return await call_next(request)
+        if (
+            path.startswith("/app")
+            or path.startswith("/assets")
+            or path.startswith("/share/")
+            or path in {"/api/ping", "/scan_count", "/monitoring", "/api/monitoring"}
+        ):
+            response = await call_next(request)
+            return response
         # Enforce Authorization for mutating methods
         if request.method in ("POST", "PUT", "PATCH", "DELETE"):
             auth = request.headers.get("authorization") or request.headers.get("Authorization")
             if not auth or auth != f"Bearer {_API_TOKEN}":
-                return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
-        return await call_next(request)
+                response = JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+                return response
+        response = await call_next(request)
+        return response
     except Exception:
         # Fail open (but log) if middleware raises unexpectedly
         try:
-            return await call_next(request)
+            response = await call_next(request)
+            return response
         except Exception:
-            return JSONResponse(status_code=500, content={"detail": "Server error"})
+            response = JSONResponse(status_code=500, content={"detail": "Server error"})
+            return response
+    finally:
+        if _LOG_HTTP and loggable and start_ns is not None and _http_logger is not None:
+            duration_ms = (time.perf_counter_ns() - start_ns) / 1_000_000
+            status = getattr(response, "status_code", "error")
+            _http_logger.info(
+                "%s %s -> %s %.2fms",
+                request.method,
+                path,
+                status,
+                duration_ms,
+            )
 
 # Exclude patterns per directory (privacy filters)
 @app.get("/settings/excludes")
@@ -620,6 +784,22 @@ def api_set_excludes(req: ExcludeReq) -> Dict[str, Any]:
         return {"ok": True}
     except Exception as e:
         raise HTTPException(500, f"Failed to save excludes: {e}")
+
+# Config settings (for env vars like PHOTOVAULT_MODEL_DIR)
+class ConfigSetReq(BaseModel):
+    key: str
+    value: str
+
+
+@app.post("/config/set")
+def api_config_set(req: ConfigSetReq) -> Dict[str, Any]:
+    try:
+        # Set in process environment for immediate effect
+        os.environ[req.key] = req.value
+        return {"ok": True, "key": req.key, "value": req.value}
+    except Exception as e:
+        raise HTTPException(500, f"Failed to set config: {e}")
+
 
 # Removed deprecated developer-only TODO endpoint
 
@@ -687,8 +867,12 @@ def api_watch_start(req: WatchReq) -> Dict[str, Any]:
 
 
 @app.post("/watch/stop")
-def api_watch_stop(dir: str) -> Dict[str, Any]:
-    folder = Path(dir)
+def api_watch_stop(
+    dir: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    folder = Path(dir_value)
     _WATCH.stop(folder)
     return {"ok": True}
 
@@ -728,10 +912,103 @@ def api_models_download(req: ModelDownloadReq) -> Dict[str, Any]:
         raise HTTPException(500, f"Model download failed: {e}")
 
 
-@app.post("/data/nuke")
-def api_data_nuke(dir: Optional[str] = None, all: bool = False) -> Dict[str, Any]:  # type: ignore[assignment]
+class ModelValidateReq(BaseModel):
+    dir: str
+
+
+@app.post("/models/validate")
+def api_models_validate(req: ModelValidateReq) -> Dict[str, Any]:
+    """Validate CLIP models in a directory for offline use."""
     try:
-        if all:
+        model_dir = Path(req.dir)
+        if not model_dir.exists():
+            return {"ok": False, "error": "Directory not found"}
+
+        # Check for CLIP model components
+        required_files = [
+            "config.json",
+            "pytorch_model.bin",  # or model.safetensors
+            "preprocessor_config.json"
+        ]
+
+        optional_files = [
+            "model.safetensors",
+            "tokenizer.json",
+            "vocab.json",
+            "merges.txt",
+            "special_tokens_map.json",
+            "tokenizer_config.json"
+        ]
+
+        found_required = []
+        found_optional = []
+        missing_required = []
+
+        # Check required files
+        for filename in required_files:
+            if (model_dir / filename).exists():
+                found_required.append(filename)
+            else:
+                missing_required.append(filename)
+
+        # Check for alternative model file
+        if "pytorch_model.bin" not in found_required:
+            if (model_dir / "model.safetensors").exists():
+                found_required.append("model.safetensors")
+            else:
+                if "pytorch_model.bin" not in missing_required:
+                    missing_required.append("pytorch_model.bin")
+
+        # Check optional files
+        for filename in optional_files:
+            if (model_dir / filename).exists():
+                found_optional.append(filename)
+
+        # Determine if model is valid
+        is_valid = len(missing_required) == 0
+
+        # Try to extract model info from config
+        model_info = {}
+        config_path = model_dir / "config.json"
+        if config_path.exists():
+            try:
+                import json
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    model_info = {
+                        "model_type": config.get("model_type", "unknown"),
+                        "hidden_size": config.get("hidden_size"),
+                        "num_attention_heads": config.get("num_attention_heads"),
+                        "num_hidden_layers": config.get("num_hidden_layers"),
+                        "vocab_size": config.get("vocab_size")
+                    }
+            except Exception:
+                pass
+
+        return {
+            "ok": True,
+            "valid": is_valid,
+            "model_dir": str(model_dir),
+            "model_info": model_info,
+            "found_required": found_required,
+            "found_optional": found_optional,
+            "missing_required": missing_required,
+            "message": "Model validation complete"
+        }
+
+    except Exception as e:
+        return {"ok": False, "error": f"Validation failed: {str(e)}"}
+
+
+@app.post("/data/nuke")
+def api_data_nuke(
+    dir: Optional[str] = None,
+    all: Optional[bool] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    try:
+        wipe_all = _from_body(body, all, "all", default=False, cast=_as_bool) or False
+        if wipe_all:
             base = os.environ.get("PS_APPDATA_DIR", "").strip()
             if base:
                 bp = Path(base).expanduser().resolve()
@@ -742,9 +1019,10 @@ def api_data_nuke(dir: Optional[str] = None, all: bool = False) -> Dict[str, Any
                     raise HTTPException(400, "Unsafe app data path")
             else:
                 raise HTTPException(400, "PS_APPDATA_DIR not set")
-        if not dir:
+        dir_value = _from_body(body, dir, "dir")
+        if not dir_value:
             raise HTTPException(400, "dir required unless all=1")
-        folder = Path(dir)
+        folder = Path(dir_value)
         emb = _emb("local", None, None)
         store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
         idx = store.index_dir
@@ -818,8 +1096,12 @@ def api_index_status(dir: str, provider: str = "local", hf_token: Optional[str] 
 
 
 @app.post("/index/pause")
-def api_index_pause(dir: str) -> Dict[str, Any]:
-    store = IndexStore(Path(dir))
+def api_index_pause(
+    dir: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    store = IndexStore(Path(dir_value))
     p = store.index_dir / 'index_control.json'
     try:
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -831,8 +1113,12 @@ def api_index_pause(dir: str) -> Dict[str, Any]:
 
 
 @app.post("/index/resume")
-def api_index_resume(dir: str) -> Dict[str, Any]:
-    store = IndexStore(Path(dir))
+def api_index_resume(
+    dir: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    store = IndexStore(Path(dir_value))
     p = store.index_dir / 'index_control.json'
     try:
         if p.exists():
@@ -844,27 +1130,43 @@ def api_index_resume(dir: str) -> Dict[str, Any]:
 
 @app.post("/search/cached")
 def api_search_cached(
-    dir: str,
-    query: str,
-    top_k: int = 12,
-    provider: str = "local",
+    dir: Optional[str] = None,
+    query: Optional[str] = None,
+    top_k: Optional[int] = None,
+    provider: Optional[str] = None,
     cache_key: Optional[str] = None,
     hf_token: Optional[str] = None,
     openai_key: Optional[str] = None,
-    use_fast: bool = False,
+    use_fast: Optional[bool] = None,
     fast_kind: Optional[str] = None,
-    use_captions: bool = False,
-    use_ocr: bool = False,
+    use_captions: Optional[bool] = None,
+    use_ocr: Optional[bool] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
 ) -> Dict[str, Any]:
     """Cached search that reuses previous results when possible."""
-    folder = Path(dir)
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    query_value = _require(_from_body(body, query, "query"), "query")
+    top_k_value = _from_body(body, top_k, "top_k", default=12, cast=lambda v: int(v)) or 12
+    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+    cache_key_value = _from_body(body, cache_key, "cache_key")
+    hf_token_value = _from_body(body, hf_token, "hf_token")
+    openai_key_value = _from_body(body, openai_key, "openai_key")
+    use_fast_value = _from_body(body, use_fast, "use_fast", default=False, cast=_as_bool) or False
+    fast_kind_value = _from_body(body, fast_kind, "fast_kind")
+    use_captions_value = _from_body(body, use_captions, "use_captions", default=False, cast=_as_bool) or False
+    use_ocr_value = _from_body(body, use_ocr, "use_ocr", default=False, cast=_as_bool) or False
+
+    folder = Path(dir_value)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
 
     # Generate cache key if not provided
+    cache_key = cache_key_value
     if not cache_key:
         import hashlib
-        cache_key = hashlib.md5(f"{query}:{top_k}:{provider}:{use_fast}:{fast_kind}:{use_captions}:{use_ocr}".encode()).hexdigest()
+        cache_key = hashlib.md5(
+            f"{query_value}:{top_k_value}:{provider_value}:{use_fast_value}:{fast_kind_value}:{use_captions_value}:{use_ocr_value}".encode()
+        ).hexdigest()
 
     store = IndexStore(folder, index_key=None)
     cache_file = store.index_dir / f"search_cache_{cache_key}.json"
@@ -883,39 +1185,39 @@ def api_search_cached(
             pass  # Fall through to fresh search
 
     # Perform fresh search using the main search logic
-    emb = _emb(provider, hf_token, openai_key)
+    emb = _emb(provider_value, hf_token_value, openai_key_value)
     store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
     store.load()
 
-    if use_fast:
+    if use_fast_value:
         try:
-            if fast_kind and fast_kind.lower() == 'faiss' and store.faiss_status().get('exists'):
-                results = store.search_faiss(emb, query, top_k=top_k)
-            elif fast_kind and fast_kind.lower() == 'hnsw' and store.hnsw_status().get('exists'):
-                results = store.search_hnsw(emb, query, top_k=top_k)
-            elif fast_kind and fast_kind.lower() == 'annoy' and store.ann_status().get('exists'):
-                results = store.search_annoy(emb, query, top_k=top_k)
+            if fast_kind_value and fast_kind_value.lower() == 'faiss' and store.faiss_status().get('exists'):
+                results = store.search_faiss(emb, query_value, top_k=top_k_value)
+            elif fast_kind_value and fast_kind_value.lower() == 'hnsw' and store.hnsw_status().get('exists'):
+                results = store.search_hnsw(emb, query_value, top_k=top_k_value)
+            elif fast_kind_value and fast_kind_value.lower() == 'annoy' and store.ann_status().get('exists'):
+                results = store.search_annoy(emb, query_value, top_k=top_k_value)
             else:
                 if store.faiss_status().get('exists'):
-                    results = store.search_faiss(emb, query, top_k=top_k)
+                    results = store.search_faiss(emb, query_value, top_k=top_k_value)
                 elif store.hnsw_status().get('exists'):
-                    results = store.search_hnsw(emb, query, top_k=top_k)
+                    results = store.search_hnsw(emb, query_value, top_k=top_k_value)
                 elif store.ann_status().get('exists'):
-                    results = store.search_annoy(emb, query, top_k=top_k)
+                    results = store.search_annoy(emb, query_value, top_k=top_k_value)
                 else:
-                    results = store.search(emb, query, top_k=top_k)
+                    results = store.search(emb, query_value, top_k=top_k_value)
         except Exception:
-            results = store.search(emb, query, top_k=top_k)
+            results = store.search(emb, query_value, top_k=top_k_value)
     else:
-        if use_captions and store.captions_available():
-            results = store.search_with_captions(emb, query, top_k=top_k)
-        elif use_ocr and store.ocr_available():
-            results = store.search_with_ocr(emb, query, top_k=top_k)
+        if use_captions_value and store.captions_available():
+            results = store.search_with_captions(emb, query_value, top_k=top_k_value)
+        elif use_ocr_value and store.ocr_available():
+            results = store.search_with_ocr(emb, query_value, top_k=top_k_value)
         else:
-            results = store.search(emb, query, top_k=top_k)
+            results = store.search(emb, query_value, top_k=top_k_value)
 
     out = results
-    sid = log_search(store.index_dir, getattr(emb, 'index_id', 'default'), query, [(str(r.path), float(r.score)) for r in out])
+    sid = log_search(store.index_dir, getattr(emb, 'index_id', 'default'), query_value, [(str(r.path), float(r.score)) for r in out])
 
     result_data = {
         "search_id": sid,
@@ -936,435 +1238,582 @@ def api_search_cached(
         pass  # Don't fail if caching fails
 
     return result_data
-    folder = Path(dir)
-    if not folder.exists():
-        raise HTTPException(400, "Folder not found")
-    emb = _emb(provider, hf_token, openai_key)
-    # Basic search via usecase or fast search
-    store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
-    store.load()
-    if use_fast:
-        try:
-            if fast_kind and fast_kind.lower() == 'faiss' and store.faiss_status().get('exists'):
-                results = store.search_faiss(emb, query, top_k=top_k)
-            elif fast_kind and fast_kind.lower() == 'hnsw' and store.hnsw_status().get('exists'):
-                results = store.search_hnsw(emb, query, top_k=top_k)
-            elif fast_kind and fast_kind.lower() == 'annoy' and store.ann_status().get('exists'):
-                results = store.search_annoy(emb, query, top_k=top_k)
-            else:
-                # Choose best available
-                if store.faiss_status().get('exists'):
-                    results = store.search_faiss(emb, query, top_k=top_k)
-                elif store.hnsw_status().get('exists'):
-                    results = store.search_hnsw(emb, query, top_k=top_k)
-                elif store.ann_status().get('exists'):
-                    results = store.search_annoy(emb, query, top_k=top_k)
-                else:
-                    results = store.search(emb, query, top_k=top_k)
-        except Exception:
-            results = store.search(emb, query, top_k=top_k)
-    else:
-        if use_captions and store.captions_available():
-            results = store.search_with_captions(emb, query, top_k=top_k)
-        elif use_ocr and store.ocr_available():
-            results = store.search_with_ocr(emb, query, top_k=top_k)
-        else:
-            results = store.search(emb, query, top_k=top_k)
-    out = results
-    # Favorites filter
-    if favorites_only:
-        coll = load_collections(store.index_dir)
-        favs = set(coll.get('Favorites', []))
-        out = [r for r in out if str(r.path) in favs]
-    # Person filter (named face clusters)
-    if person:
-        try:
-            ppl = set(_face_photos(store.index_dir, person))
-            out = [r for r in out if str(r.path) in ppl]
-        except Exception:
-            out = out
-    # Tags filter
-    if tags:
-        tmap = load_tags(store.index_dir)
-        req = set(tags)
-        out = [r for r in out if req.issubset(set(tmap.get(str(r.path), [])))]
-    # Person filters (single or AND across multiple people)
-    try:
-        if persons and isinstance(persons, list) and len(persons) > 0:
-            sets: List[set] = []
-            for nm in persons:
-                try:
-                    sets.append(set(_face_photos(store.index_dir, str(nm))))
-                except Exception:
-                    sets.append(set())
-            if sets:
-                inter = set.intersection(*sets) if len(sets) > 1 else sets[0]
-                out = [r for r in out if str(r.path) in inter]
-        elif person:
-            ppl = set(_face_photos(store.index_dir, str(person)))
-            out = [r for r in out if str(r.path) in ppl]
-    except Exception:
-        out = out
-    # Date filter (by mtimes)
-    if date_from is not None and date_to is not None:
-        mmap = {sp: float(mt) for sp, mt in zip(store.state.paths or [], store.state.mtimes or [])}
-        out = [r for r in out if date_from <= mmap.get(str(r.path), 0.0) <= date_to]
-    # Log search
-    # EXIF-based filtering if metadata exists
-    try:
-        meta_p = store.index_dir / 'exif_index.json'
-        if meta_p.exists() and any([
-            camera,
-            iso_min is not None, iso_max is not None,
-            f_min is not None, f_max is not None,
-            place,
-            flash, wb, metering,
-            alt_min is not None, alt_max is not None,
-            heading_min is not None, heading_max is not None,
-        ]):
-            m = json.loads(meta_p.read_text())
-            cam_map = {p: (c or '') for p, c in zip(m.get('paths',[]), m.get('camera',[]))}
-            iso_map = {p: (i if isinstance(i,int) else None) for p, i in zip(m.get('paths',[]), m.get('iso',[]))}
-            f_map = {p: (float(x) if isinstance(x,(int,float)) else None) for p, x in zip(m.get('paths',[]), m.get('fnumber',[]))}
-            place_map = {p: (s or '') for p, s in zip(m.get('paths',[]), m.get('place',[]))}
-            flash_map = {p: (int(x) if isinstance(x,(int,float)) else None) for p, x in zip(m.get('paths',[]), m.get('flash',[]))}
-            wb_map = {p: (int(x) if isinstance(x,(int,float)) else None) for p, x in zip(m.get('paths',[]), m.get('white_balance',[]))}
-            met_map = {p: (int(x) if isinstance(x,(int,float)) else None) for p, x in zip(m.get('paths',[]), m.get('metering',[]))}
-            alt_map = {p: (float(x) if isinstance(x,(int,float)) else None) for p, x in zip(m.get('paths',[]), m.get('gps_altitude',[]))}
-            head_map = {p: (float(x) if isinstance(x,(int,float)) else None) for p, x in zip(m.get('paths',[]), m.get('gps_heading',[]))}
-            sharp_map = {p: (float(x) if isinstance(x,(int,float)) else None) for p, x in zip(m.get('paths',[]), m.get('sharpness',[]))}
-            bright_map = {p: (float(x) if isinstance(x,(int,float)) else None) for p, x in zip(m.get('paths',[]), m.get('brightness',[]))}
-            def ok(p:str) -> bool:
-                if camera and camera.strip():
-                    if camera.strip().lower() not in (cam_map.get(p,'') or '').lower():
-                        return False
-                if iso_min is not None:
-                    v = iso_map.get(p)
-                    if v is None or v < int(iso_min):
-                        return False
-                if iso_max is not None:
-                    v = iso_map.get(p)
-                    if v is None or v > int(iso_max):
-                        return False
-                if f_min is not None:
-                    v = f_map.get(p)
-                    if v is None or v < float(f_min):
-                        return False
-                if f_max is not None:
-                    v = f_map.get(p)
-                    if v is None or v > float(f_max):
-                        return False
-                if place and place.strip():
-                    if place.strip().lower() not in (place_map.get(p,'') or '').lower():
-                        return False
-                if flash:
-                    fv = flash_map.get(p)
-                    if fv is None:
-                        return False
-                    fired = 1 if fv & 1 else 0
-                    if flash == 'fired' and fired != 1:
-                        return False
-                    if flash in ('no','noflash') and fired != 0:
-                        return False
-                if wb:
-                    wv = wb_map.get(p)
-                    # EXIF WhiteBalance: 0 Auto, 1 Manual
-                    if wv is None:
-                        return False
-                    if wb == 'auto' and wv != 0:
-                        return False
-                    if wb == 'manual' and wv != 1:
-                        return False
-                if metering:
-                    mv = met_map.get(p)
-                    if mv is None:
-                        return False
-                    name = str(metering).lower()
-                    # Common EXIF MeteringMode values
-                    mm = {
-                        0: 'unknown', 1: 'average', 2: 'center', 3: 'spot', 4: 'multispot', 5: 'pattern', 6: 'partial', 255: 'other'
-                    }
-                    label = mm.get(int(mv), 'other')
-                    if name not in (label, 'any'):
-                        # Allow 'matrix' as alias for 'pattern'
-                        if not (name == 'matrix' and label == 'pattern'):
-                            return False
-                if alt_min is not None or alt_max is not None:
-                    av = alt_map.get(p)
-                    if av is None:
-                        return False
-                    if alt_min is not None and av < float(alt_min):
-                        return False
-                    if alt_max is not None and av > float(alt_max):
-                        return False
-                if heading_min is not None or heading_max is not None:
-                    hv = head_map.get(p)
-                    if hv is None:
-                        return False
-                    # Normalize heading 0..360
-                    try:
-                        hh = float(hv) % 360.0
-                    except Exception:
-                        hh = hv
-                    if heading_min is not None and hh < float(heading_min):
-                        return False
-                if heading_max is not None and hh > float(heading_max):
-                    return False
-                # Quality heuristics (optional)
-                if sharp_only:
-                    sv = sharp_map.get(p)
-                    if sv is None or sv < 60.0:
-                        return False
-                if exclude_underexp:
-                    bv = bright_map.get(p)
-                    if bv is not None and bv < 50.0:
-                        return False
-                if exclude_overexp:
-                    bv = bright_map.get(p)
-                    if bv is not None and bv > 205.0:
-                        return False
-                if place and str(place).strip():
-                    if str(place).strip().lower() not in (place_map.get(p,'') or '').lower():
-                        return False
-                return True
-            out = [r for r in out if ok(str(r.path))]
-    except Exception:
-        pass
 
-    # OCR filters: has_text and quoted exact match (if OCR built)
-    try:
-        texts_map = {}
-        if hasattr(store, 'ocr_texts_file') and store.ocr_texts_file.exists():
-            d = json.loads(store.ocr_texts_file.read_text())
-            texts_map = {p: (t or '') for p, t in zip(d.get('paths', []), d.get('texts', []))}
-        # has_text filter
-        if 'has_text' in locals() and bool(locals().get('has_text')):
-            out = [r for r in out if (texts_map.get(str(r.path), '').strip() != '')]
-        # quoted substrings inside query (both double and single quotes)
-        import re as _re
-        d_parts = _re.findall(r'"([^"]+)"', query)
-        s_parts = _re.findall(r"'([^']+)'", query)
-        req = (d_parts or []) + (s_parts or [])
-        if req:
-            low = {p: texts_map.get(p, '').lower() for p in texts_map.keys()}
-            def has_all(pth: str) -> bool:
-                s = low.get(pth, '')
-                return all(x.lower() in s for x in req)
-            out = [r for r in out if has_all(str(r.path))]
-        # Boolean operators (AND/OR/NOT) with parentheses and fielded terms over OCR+captions+filename
-        # Fields: camera:, place:, tag:, rating:, person:, has_text:
-        try:
-            q_full = (query or '').strip()
-            if any(op in q_full.upper() for op in [' AND ', ' OR ', ' NOT ', '(', ')', ':']):
-                import re as _re
-                # Tokenize
-                tokens: List[str] = []
-                i = 0
-                while i < len(q_full):
-                    ch = q_full[i]
-                    if ch.isspace(): i += 1; continue
-                    if ch in '()': tokens.append(ch); i += 1; continue
-                    if ch in ('"', "'"):
-                        quote = ch; i += 1; start = i
-                        while i < len(q_full) and q_full[i] != quote: i += 1
-                        tokens.append(q_full[start:i]); i += 1; continue
-                    m = _re.match(r"(?i)AND|OR|NOT", q_full[i:])
-                    if m and m.start() == 0:
-                        tokens.append(m.group(0).upper()); i += len(m.group(0)); continue
-                    m2 = _re.match(r"[^\s()]+", q_full[i:])
-                    if m2:
-                        tokens.append(m2.group(0)); i += len(m2.group(0)); continue
-                    i += 1
-                # Shunting-yard to RPN
-                prec = {'NOT':3, 'AND':2, 'OR':1}
-                out_q: List[str] = []; ops: List[str] = []
-                for t in tokens:
-                    tu = t.upper()
-                    if tu in prec:
-                        while ops and ops[-1] in prec and prec[ops[-1]] >= prec[tu]: out_q.append(ops.pop())
-                        ops.append(tu)
-                    elif t == '(':
-                        ops.append(t)
-                    elif t == ')':
-                        while ops and ops[-1] != '(': out_q.append(ops.pop())
-                        if ops and ops[-1] == '(': ops.pop()
-                    else:
-                        out_q.append(t)
-                while ops: out_q.append(ops.pop())
-                # Build maps
-                cap_map = {}
-                try:
-                    if hasattr(store, 'cap_texts_file') and store.cap_texts_file.exists():
-                        cd = json.loads(store.cap_texts_file.read_text())
-                        cap_map = {p: (t or '') for p, t in zip(cd.get('paths', []), cd.get('texts', []))}
-                except Exception:
-                    pass
-                cam_map: Dict[str,str] = {}; place_map: Dict[str,str] = {}
-                iso_map: Dict[str, Optional[int]] = {}; f_map: Dict[str, Optional[float]] = {}
-                w_map: Dict[str, Optional[int]] = {}; h_map: Dict[str, Optional[int]] = {}
-                bright_map: Dict[str, Optional[float]] = {}; sharp_map_b: Dict[str, Optional[float]] = {}
-                exp_map: Dict[str, Optional[float]] = {}; focal_map: Dict[str, Optional[float]] = {}
-                try:
-                    meta_p = store.index_dir / 'exif_index.json'
-                    if meta_p.exists():
-                        m = json.loads(meta_p.read_text())
-                        cam_map = {p: (c or '') for p, c in zip(m.get('paths',[]), m.get('camera',[]))}
-                        place_map = {p: (s or '') for p, s in zip(m.get('paths',[]), m.get('place',[]))}
-                        iso_map = {p: (i if isinstance(i,int) else None) for p, i in zip(m.get('paths',[]), m.get('iso',[]))}
-                        f_map = {p: (float(x) if isinstance(x,(int,float)) else None) for p, x in zip(m.get('paths',[]), m.get('fnumber',[]))}
-                        w_map = {p: (int(x) if isinstance(x,(int,float)) else None) for p, x in zip(m.get('paths',[]), m.get('width',[]))}
-                        h_map = {p: (int(x) if isinstance(x,(int,float)) else None) for p, x in zip(m.get('paths',[]), m.get('height',[]))}
-                        bright_map = {p: (float(x) if isinstance(x,(int,float)) else None) for p, x in zip(m.get('paths',[]), m.get('brightness',[]))}
-                        sharp_map_b = {p: (float(x) if isinstance(x,(int,float)) else None) for p, x in zip(m.get('paths',[]), m.get('sharpness',[]))}
-                        # Normalize exposure and focal to floats
-                        def _cv(v):
-                            try:
-                                if isinstance(v, (list, tuple)) and len(v) == 2:
-                                    a,b = v; return float(a)/float(b) if b else None
-                                if isinstance(v, str) and '/' in v:
-                                    a,b = v.split('/',1); return float(a)/float(b)
-                                return float(v) if isinstance(v,(int,float)) else None
-                            except Exception:
-                                return None
-                        exp_map = {p: _cv(x) for p, x in zip(m.get('paths',[]), m.get('exposure',[]))}
-                        focal_map = {p: _cv(x) for p, x in zip(m.get('paths',[]), m.get('focal',[]))}
-                except Exception:
-                    pass
-                tags_map: Dict[str,List[str]] = {}
-                try:
-                    tags_map = load_tags(store.index_dir)
-                except Exception:
-                    pass
-                person_cache: Dict[str,set] = {}
-                # Mtime map from current index state
-                mt_map: Dict[str, float] = {p: float(mt) for p, mt in zip(store.state.paths or [], store.state.mtimes or [])}
-                def doc_text(pth: str) -> str:
-                    name = Path(pth).name
-                    return f"{cap_map.get(pth,'')}\n{texts_map.get(pth,'')}\n{name}".lower()
-                def eval_field(tok: str, pth: str) -> bool:
-                    if ':' not in tok:
-                        return tok.lower() in doc_text(pth)
-                    try:
-                        field, val = tok.split(':', 1)
-                        fv = (val or '').strip().strip('"').strip("'")
-                        field = field.lower(); lp = pth
-                        # Support numeric comparators like ">=400", "<2.8", "=1024"
-                        def parse_num_op(s: str):
-                            ops = ['>=','<=','>','<','=']
-                            for op in ops:
-                                if s.startswith(op):
-                                    rest = s[len(op):].strip()
-                                    try:
-                                        return op, float(rest)
-                                    except Exception:
-                                        return op, None
-                            # default equality if numeric
-                            try:
-                                return '=', float(s)
-                            except Exception:
-                                return None, None
-                        if field == 'camera':
-                            return fv.lower() in (cam_map.get(lp,'') or '').lower()
-                        if field == 'place':
-                            return fv.lower() in (place_map.get(lp,'') or '').lower()
-                        if field == 'tag':
-                            return fv in (tags_map.get(lp, []) or [])
-                        if field == 'rating':
-                            return f"rating:{fv}" in (tags_map.get(lp, []) or [])
-                        if field == 'person':
-                            key = fv
-                            if key not in person_cache:
-                                try: person_cache[key] = set(_face_photos(store.index_dir, key))
-                                except Exception: person_cache[key] = set()
-                            return lp in person_cache.get(key, set())
-                        if field == 'has_text':
-                            if fv == '' or fv.lower() in ('1','true','yes','y'): return (texts_map.get(lp,'').strip() != '')
-                            return (texts_map.get(lp,'').strip() == '')
-                        if field in ('iso','fnumber','width','height','mtime','brightness','sharpness','exposure','focal','duration'):
-                            op, num = parse_num_op(fv)
-                            if num is None or op is None:
-                                return False
-                            cur = None
-                            if field == 'iso': cur = iso_map.get(lp)
-                            elif field == 'fnumber': cur = f_map.get(lp)
-                            elif field == 'width': cur = w_map.get(lp)
-                            elif field == 'height': cur = h_map.get(lp)
-                            elif field == 'mtime': cur = mt_map.get(lp)
-                            elif field == 'brightness': cur = bright_map.get(lp)
-                            elif field == 'sharpness': cur = sharp_map_b.get(lp)
-                            elif field == 'exposure': cur = exp_map.get(lp)
-                            elif field == 'focal': cur = focal_map.get(lp)
-                            elif field == 'duration':
-                                # Attempt to extract duration for video files
-                                ext = str(Path(lp).suffix or '').lower()
-                                if ext in ('.mp4','.mov','.mkv','.avi','.webm'):
-                                    try:
-                                        from adapters.video_processor import get_video_metadata as _gvm
-                                        info = _gvm(Path(lp)) or {}
-                                        cur = float(info.get('duration') or 0.0)
-                                    except Exception:
-                                        cur = None
-                                else:
-                                    cur = None
-                            try:
-                                if cur is None: return False
-                                cv = float(cur)
-                                if op == '>=': return cv >= num
-                                if op == '<=': return cv <= num
-                                if op == '>': return cv > num
-                                if op == '<': return cv < num
-                                if op == '=': return abs(cv - num) < 1e-6
-                                return False
-                            except Exception:
-                                return False
-                        if field == 'filetype':
-                            # Compare by extension without dot
-                            ext = (Path(lp).suffix or '').lower().lstrip('.')
-                            return ext == fv.lower()
-                        return fv.lower() in doc_text(pth)
-                    except Exception:
-                        return False
-                def eval_rpn(pth: str) -> bool:
-                    stack: List[bool] = []
-                    for tok in out_q:
-                        tu = tok.upper()
-                        if tu == 'NOT':
-                            v = stack.pop() if stack else False; stack.append(not v)
-                        elif tu in ('AND','OR'):
-                            b = stack.pop() if stack else False; a = stack.pop() if stack else False
-                            stack.append((a and b) if tu == 'AND' else (a or b))
-                        else:
-                            stack.append(eval_field(tok, pth))
-                    return bool(stack[-1]) if stack else True
-                out = [r for r in out if eval_rpn(str(r.path))]
-        except Exception:
-            pass
-    except Exception:
-        pass
-    sid = log_search(store.index_dir, getattr(emb, 'index_id', 'default'), query, [(str(r.path), float(r.score)) for r in out])
-    return {"search_id": sid, "results": [{"path": str(r.path), "score": float(r.score)} for r in out]}
+
+@app.post("/search")
+def api_search(
+	dir: Optional[str] = None,
+	query: Optional[str] = None,
+	top_k: Optional[int] = None,
+	provider: Optional[str] = None,
+	hf_token: Optional[str] = None,
+	openai_key: Optional[str] = None,
+	use_fast: Optional[bool] = None,
+	fast_kind: Optional[str] = None,
+	use_captions: Optional[bool] = None,
+	use_ocr: Optional[bool] = None,
+	favorites_only: Optional[bool] = None,
+	tags: Optional[List[str]] = None,
+	date_from: Optional[float] = None,
+	date_to: Optional[float] = None,
+	camera: Optional[str] = None,
+	iso_min: Optional[int] = None,
+	iso_max: Optional[int] = None,
+	f_min: Optional[float] = None,
+	f_max: Optional[float] = None,
+	flash: Optional[str] = None,
+	wb: Optional[str] = None,
+	metering: Optional[str] = None,
+	alt_min: Optional[float] = None,
+	alt_max: Optional[float] = None,
+	heading_min: Optional[float] = None,
+	heading_max: Optional[float] = None,
+	place: Optional[str] = None,
+	has_text: Optional[bool] = None,
+	person: Optional[str] = None,
+	persons: Optional[List[str]] = None,
+	sharp_only: Optional[bool] = None,
+	exclude_underexp: Optional[bool] = None,
+	exclude_overexp: Optional[bool] = None,
+	body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+	dir_value = _require(_from_body(body, dir, "dir"), "dir")
+	query_value = _require(_from_body(body, query, "query"), "query")
+	top_k_value = _from_body(body, top_k, "top_k", default=12, cast=lambda v: int(v)) or 12
+	provider_value = _from_body(body, provider, "provider", default="local") or "local"
+	hf_token_value = _from_body(body, hf_token, "hf_token")
+	openai_key_value = _from_body(body, openai_key, "openai_key")
+	use_fast_value = _from_body(body, use_fast, "use_fast", default=False, cast=_as_bool) or False
+	fast_kind_value = _from_body(body, fast_kind, "fast_kind")
+	use_captions_value = _from_body(body, use_captions, "use_captions", default=False, cast=_as_bool) or False
+	use_ocr_value = _from_body(body, use_ocr, "use_ocr", default=False, cast=_as_bool) or False
+	favorites_only_value = _from_body(body, favorites_only, "favorites_only", default=False, cast=_as_bool) or False
+	tags_value = _from_body(body, tags, "tags")
+	tags_list = _as_str_list(tags_value)
+	date_from_value = _from_body(body, date_from, "date_from", cast=lambda v: float(v))
+	date_to_value = _from_body(body, date_to, "date_to", cast=lambda v: float(v))
+	camera_value = _from_body(body, camera, "camera")
+	iso_min_value = _from_body(body, iso_min, "iso_min", cast=lambda v: int(v))
+	iso_max_value = _from_body(body, iso_max, "iso_max", cast=lambda v: int(v))
+	f_min_value = _from_body(body, f_min, "f_min", cast=lambda v: float(v))
+	f_max_value = _from_body(body, f_max, "f_max", cast=lambda v: float(v))
+	flash_value = _from_body(body, flash, "flash")
+	wb_value = _from_body(body, wb, "wb")
+	metering_value = _from_body(body, metering, "metering")
+	alt_min_value = _from_body(body, alt_min, "alt_min", cast=lambda v: float(v))
+	alt_max_value = _from_body(body, alt_max, "alt_max", cast=lambda v: float(v))
+	heading_min_value = _from_body(body, heading_min, "heading_min", cast=lambda v: float(v))
+	heading_max_value = _from_body(body, heading_max, "heading_max", cast=lambda v: float(v))
+	place_value = _from_body(body, place, "place")
+	has_text_value = _from_body(body, has_text, "has_text", default=False, cast=_as_bool) or False
+	person_value = _from_body(body, person, "person")
+	persons_value = _from_body(body, persons, "persons")
+	persons_list = _as_str_list(persons_value) if persons_value is not None else []
+	sharp_only_value = _from_body(body, sharp_only, "sharp_only", default=False, cast=_as_bool) or False
+	exclude_under_value = _from_body(body, exclude_underexp, "exclude_underexp", default=False, cast=_as_bool) or False
+	exclude_over_value = _from_body(body, exclude_overexp, "exclude_overexp", default=False, cast=_as_bool) or False
+
+	# Alias variables to reuse existing filtering logic
+	dir = dir_value
+	query = query_value
+	top_k = top_k_value
+	provider = provider_value
+	hf_token = hf_token_value
+	openai_key = openai_key_value
+	use_fast = use_fast_value
+	fast_kind = fast_kind_value
+	use_captions = use_captions_value
+	use_ocr = use_ocr_value
+	favorites_only = favorites_only_value
+	tags = tags_list
+	date_from = date_from_value
+	date_to = date_to_value
+	camera = camera_value
+	iso_min = iso_min_value
+	iso_max = iso_max_value
+	f_min = f_min_value
+	f_max = f_max_value
+	flash = flash_value
+	wb = wb_value
+	metering = metering_value
+	alt_min = alt_min_value
+	alt_max = alt_max_value
+	heading_min = heading_min_value
+	heading_max = heading_max_value
+	place = place_value
+	has_text = has_text_value
+	person = person_value
+	persons = persons_list
+	sharp_only = sharp_only_value
+	exclude_under = exclude_under_value
+	exclude_over = exclude_over_value
+
+	cam_map: Dict[str, str] = {}
+	place_map: Dict[str, str] = {}
+	iso_map: Dict[str, Optional[int]] = {}
+	f_map: Dict[str, Optional[float]] = {}
+	flash_map: Dict[str, Optional[int]] = {}
+	wb_map: Dict[str, Optional[int]] = {}
+	met_map: Dict[str, Optional[int]] = {}
+	alt_map: Dict[str, Optional[float]] = {}
+	head_map: Dict[str, Optional[float]] = {}
+	sharp_map: Dict[str, Optional[float]] = {}
+	bright_map: Dict[str, Optional[float]] = {}
+	tags_map: Dict[str, List[str]] = {}
+	texts_map: Dict[str, str] = {}
+
+	folder = Path(dir)
+	if not folder.exists():
+		raise HTTPException(400, "Folder not found")
+	emb = _emb(provider, hf_token, openai_key)
+	store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
+	store.load()
+	if use_fast:
+		try:
+			if fast_kind and fast_kind.lower() == 'faiss' and store.faiss_status().get('exists'):
+				results = store.search_faiss(emb, query, top_k=top_k)
+			elif fast_kind and fast_kind.lower() == 'hnsw' and store.hnsw_status().get('exists'):
+				results = store.search_hnsw(emb, query, top_k=top_k)
+			elif fast_kind and fast_kind.lower() == 'annoy' and store.ann_status().get('exists'):
+				results = store.search_annoy(emb, query, top_k=top_k)
+			else:
+				if store.faiss_status().get('exists'):
+					results = store.search_faiss(emb, query, top_k=top_k)
+				elif store.hnsw_status().get('exists'):
+					results = store.search_hnsw(emb, query, top_k=top_k)
+				elif store.ann_status().get('exists'):
+					results = store.search_annoy(emb, query, top_k=top_k)
+				else:
+					results = store.search(emb, query, top_k=top_k)
+		except Exception:
+			results = store.search(emb, query, top_k=top_k)
+	else:
+		if use_captions and store.captions_available():
+			results = store.search_with_captions(emb, query, top_k=top_k)
+		elif use_ocr and store.ocr_available():
+			results = store.search_with_ocr(emb, query, top_k=top_k)
+		else:
+			results = store.search(emb, query, top_k=top_k)
+	out = results
+	if favorites_only:
+		try:
+			coll = load_collections(store.index_dir)
+			favs = set(coll.get('Favorites', []))
+			out = [r for r in out if str(r.path) in favs]
+		except Exception:
+			pass
+	if tags:
+		try:
+			tmap = load_tags(store.index_dir)
+			req = set(tags)
+			out = [r for r in out if req.issubset(set(tmap.get(str(r.path), [])))]
+		except Exception:
+			pass
+	try:
+		if persons and isinstance(persons, list) and len(persons) > 0:
+			sets: List[set] = []
+			for nm in persons:
+				try:
+					sets.append(set(_face_photos(store.index_dir, str(nm))))
+				except Exception:
+					sets.append(set())
+			if sets:
+				inter = set.intersection(*sets) if len(sets) > 1 else sets[0]
+				out = [r for r in out if str(r.path) in inter]
+		elif person:
+			ppl = set(_face_photos(store.index_dir, str(person)))
+			out = [r for r in out if str(r.path) in ppl]
+	except Exception:
+		pass
+	if date_from is not None and date_to is not None:
+		try:
+			mmap = {sp: float(mt) for sp, mt in zip(store.state.paths or [], store.state.mtimes or [])}
+			out = [r for r in out if date_from <= mmap.get(str(r.path), 0.0) <= date_to]
+		except Exception:
+			pass
+	try:
+		meta_p = store.index_dir / 'exif_index.json'
+		if meta_p.exists() and any([
+			camera,
+			iso_min is not None, iso_max is not None,
+			f_min is not None, f_max is not None,
+			place,
+			flash, wb, metering,
+			alt_min is not None, alt_max is not None,
+			heading_min is not None, heading_max is not None,
+		]):
+			m = json.loads(meta_p.read_text())
+			cam_map = {p: (c or '') for p, c in zip(m.get('paths',[]), m.get('camera',[]))}
+			iso_map = {p: (i if isinstance(i,int) else None) for p, i in zip(m.get('paths',[]), m.get('iso',[]))}
+			f_map = {p: (float(x) if isinstance(x,(int,float)) else None) for p, x in zip(m.get('paths',[]), m.get('fnumber',[]))}
+			place_map = {p: (s or '') for p, s in zip(m.get('paths',[]), m.get('place',[]))}
+			flash_map = {p: (int(x) if isinstance(x,(int,float)) else None) for p, x in zip(m.get('paths',[]), m.get('flash',[]))}
+			wb_map = {p: (int(x) if isinstance(x,(int,float)) else None) for p, x in zip(m.get('paths',[]), m.get('white_balance',[]))}
+			met_map = {p: (int(x) if isinstance(x,(int,float)) else None) for p, x in zip(m.get('paths',[]), m.get('metering',[]))}
+			alt_map = {p: (float(x) if isinstance(x,(int,float)) else None) for p, x in zip(m.get('paths',[]), m.get('gps_altitude',[]))}
+			head_map = {p: (float(x) if isinstance(x,(int,float)) else None) for p, x in zip(m.get('paths',[]), m.get('gps_heading',[]))}
+			sharp_map = {p: (float(x) if isinstance(x,(int,float)) else None) for p, x in zip(m.get('paths',[]), m.get('sharpness',[]))}
+			bright_map = {p: (float(x) if isinstance(x,(int,float)) else None) for p, x in zip(m.get('paths',[]), m.get('brightness',[]))}
+			def _matches_meta(p: str) -> bool:
+				if camera and camera.strip():
+					if camera.strip().lower() not in (cam_map.get(p,'') or '').lower():
+						return False
+				if iso_min is not None:
+					v = iso_map.get(p)
+					if v is None or v < int(iso_min):
+						return False
+				if iso_max is not None:
+					v = iso_map.get(p)
+					if v is None or v > int(iso_max):
+						return False
+				if f_min is not None:
+					v = f_map.get(p)
+					if v is None or v < float(f_min):
+						return False
+				if f_max is not None:
+					v = f_map.get(p)
+					if v is None or v > float(f_max):
+						return False
+				if place and place.strip():
+					if place.strip().lower() not in (place_map.get(p,'') or '').lower():
+						return False
+				if flash:
+					fv = flash_map.get(p)
+					if fv is None:
+						return False
+					fired = 1 if fv & 1 else 0
+					if flash == 'fired' and fired != 1:
+						return False
+					if flash in ('no','noflash') and fired != 0:
+						return False
+				if wb:
+					wv = wb_map.get(p)
+					if wv is None:
+						return False
+					if wb == 'auto' and wv != 0:
+						return False
+					if wb == 'manual' and wv != 1:
+						return False
+				if metering:
+					mv = met_map.get(p)
+					if mv is None:
+						return False
+					name = str(metering).lower()
+					mm = {0: 'unknown', 1: 'average', 2: 'center', 3: 'spot', 4: 'multispot', 5: 'pattern', 6: 'partial', 255: 'other'}
+					label = mm.get(int(mv), 'other')
+					if name not in (label, 'any'):
+						if not (name == 'matrix' and label == 'pattern'):
+							return False
+				if alt_min is not None or alt_max is not None:
+					av = alt_map.get(p)
+					if av is None:
+						return False
+					if alt_min is not None and av < float(alt_min):
+						return False
+					if alt_max is not None and av > float(alt_max):
+						return False
+				if heading_min is not None or heading_max is not None:
+					hv = head_map.get(p)
+					if hv is None:
+						return False
+					try:
+						hh = float(hv) % 360.0
+					except Exception:
+						hh = hv
+					if heading_min is not None and hh < float(heading_min):
+						return False
+					if heading_max is not None and hh > float(heading_max):
+						return False
+				if sharp_only:
+					sv = sharp_map.get(p)
+					if sv is None or sv < 60.0:
+						return False
+				if exclude_under:
+					bv = bright_map.get(p)
+					if bv is not None and bv < 50.0:
+						return False
+				if exclude_over:
+					bv = bright_map.get(p)
+					if bv is not None and bv > 205.0:
+						return False
+				return True
+			out = [r for r in out if _matches_meta(str(r.path))]
+	except Exception:
+		pass
+	try:
+		texts_map: Dict[str, str] = {}
+		if hasattr(store, 'ocr_texts_file') and store.ocr_texts_file.exists():
+			d = json.loads(store.ocr_texts_file.read_text())
+			texts_map = {p: (t or '') for p, t in zip(d.get('paths', []), d.get('texts', []))}
+		if has_text:
+			out = [r for r in out if (texts_map.get(str(r.path), '').strip() != '')]
+		import re as _re
+		d_parts = _re.findall(r'"([^"]+)"', query)
+		s_parts = _re.findall(r"'([^']+)'", query)
+		req = (d_parts or []) + (s_parts or [])
+		if req:
+			low = {p: texts_map.get(p, '').lower() for p in texts_map.keys()}
+			def _has_all(pth: str) -> bool:
+				s = low.get(pth, '')
+				return all(x.lower() in s for x in req)
+			out = [r for r in out if _has_all(str(r.path))]
+	except Exception:
+		pass
+	try:
+		cap_map: Dict[str, str] = {}
+		if store.captions_available() and store.captions_file.exists():
+			cd = json.loads(store.captions_file.read_text())
+			cap_map = {p: (t or '') for p, t in zip(cd.get('paths', []), cd.get('texts', []))}
+		if cap_map:
+			import shlex
+			tokens = shlex.split(query)
+			if tokens:
+				out_q: List[str] = []
+				op_set = {'AND','OR','NOT'}
+				for tok in tokens:
+					tu = tok.upper()
+					if tu in op_set:
+						out_q.append(tu)
+					elif tok in ('(', ')'):
+						out_q.append(tok)
+					else:
+						out_q.append(tok)
+				precedence = {'NOT': 3, 'AND': 2, 'OR': 1}
+				output: List[str] = []
+				stack: List[str] = []
+				for tok in out_q:
+					tu = tok.upper()
+					if tu in op_set:
+						while stack and stack[-1] != '(' and precedence.get(stack[-1], 0) >= precedence[tu]:
+							output.append(stack.pop())
+						stack.append(tu)
+					elif tok == '(':
+						stack.append(tok)
+					elif tok == ')':
+						while stack and stack[-1] != '(':
+							output.append(stack.pop())
+						if stack and stack[-1] == '(':
+							stack.pop()
+					else:
+						output.append(tok)
+				while stack:
+					output.append(stack.pop())
+				out_q = output
+				tags_map: Dict[str, List[str]] = {}
+				try:
+					tags_map = load_tags(store.index_dir)
+				except Exception:
+					pass
+				person_cache: Dict[str, set] = {}
+				cap_texts = cap_map
+				texts_map_local = {}
+				try:
+					d = json.loads(store.ocr_texts_file.read_text()) if hasattr(store, 'ocr_texts_file') and store.ocr_texts_file.exists() else {}
+					texts_map_local = {p: (t or '') for p, t in zip(d.get('paths', []), d.get('texts', []))}
+				except Exception:
+					pass
+				meta_maps: Dict[str, Dict[str, Optional[float]]] = {}
+				mt_map: Dict[str, float] = {p: float(mt) for p, mt in zip(store.state.paths or [], store.state.mtimes or [])}
+				iso_map_local: Dict[str, Optional[int]] = {}
+				f_map_local: Dict[str, Optional[float]] = {}
+				w_map: Dict[str, Optional[int]] = {}
+				h_map: Dict[str, Optional[int]] = {}
+				bright_map_local: Dict[str, Optional[float]] = {}
+				sharp_map_local: Dict[str, Optional[float]] = {}
+				exp_map: Dict[str, Optional[float]] = {}
+				focal_map: Dict[str, Optional[float]] = {}
+				try:
+					meta_p = store.index_dir / 'exif_index.json'
+					if meta_p.exists():
+						m = json.loads(meta_p.read_text())
+						iso_map_local = {p: (i if isinstance(i,int) else None) for p, i in zip(m.get('paths',[]), m.get('iso',[]))}
+						f_map_local = {p: (float(x) if isinstance(x,(int,float)) else None) for p, x in zip(m.get('paths',[]), m.get('fnumber',[]))}
+						w_map = {p: (int(x) if isinstance(x,(int,float)) else None) for p, x in zip(m.get('paths',[]), m.get('width',[]))}
+						h_map = {p: (int(x) if isinstance(x,(int,float)) else None) for p, x in zip(m.get('paths',[]), m.get('height',[]))}
+						bright_map_local = {p: (float(x) if isinstance(x,(int,float)) else None) for p, x in zip(m.get('paths',[]), m.get('brightness',[]))}
+						sharp_map_local = {p: (float(x) if isinstance(x,(int,float)) else None) for p, x in zip(m.get('paths',[]), m.get('sharpness',[]))}
+						def _cv(v):
+							try:
+								if isinstance(v, (list, tuple)) and len(v) == 2:
+									a, b = v
+									return float(a) / float(b) if b else None
+								if isinstance(v, str) and '/' in v:
+									a, b = v.split('/', 1)
+									return float(a) / float(b)
+								return float(v) if isinstance(v, (int, float)) else None
+							except Exception:
+								return None
+						exp_map = {p: _cv(x) for p, x in zip(m.get('paths',[]), m.get('exposure',[]))}
+						focal_map = {p: _cv(x) for p, x in zip(m.get('paths',[]), m.get('focal',[]))}
+				except Exception:
+					pass
+				def doc_text(pth: str) -> str:
+					name = Path(pth).name
+					return f"{cap_texts.get(pth,'')}\n{texts_map_local.get(pth,'')}\n{name}".lower()
+				def eval_field(tok: str, pth: str) -> bool:
+					if ':' not in tok:
+						return tok.lower() in doc_text(pth)
+					try:
+						field, val = tok.split(':', 1)
+						fv = (val or '').strip().strip('"').strip("'")
+						field = field.lower()
+						lp = pth
+						def parse_num_op(s: str):
+							opers = ['>=','<=','>','<','=']
+							for op in opers:
+								if s.startswith(op):
+									rest = s[len(op):].strip()
+									try:
+										return op, float(rest)
+									except Exception:
+										return op, None
+							try:
+								return '=', float(s)
+							except Exception:
+								return None, None
+						if field == 'camera':
+							return fv.lower() in (cam_map.get(lp,'') or '').lower()
+						if field == 'place':
+							return fv.lower() in (place_map.get(lp,'') or '').lower()
+						if field == 'tag':
+							return fv in (tags_map.get(lp, []) or [])
+						if field == 'rating':
+							return f"rating:{fv}" in (tags_map.get(lp, []) or [])
+						if field == 'person':
+							key = fv
+							if key not in person_cache:
+								try:
+									person_cache[key] = set(_face_photos(store.index_dir, key))
+								except Exception:
+									person_cache[key] = set()
+							return lp in person_cache.get(key, set())
+						if field == 'has_text':
+							if fv == '' or fv.lower() in ('1','true','yes','y'):
+								return (texts_map_local.get(lp,'').strip() != '')
+							return (texts_map_local.get(lp,'').strip() == '')
+						if field in ('iso','fnumber','width','height','mtime','brightness','sharpness','exposure','focal','duration'):
+							op, num = parse_num_op(fv)
+							if num is None or op is None:
+								return False
+							cur = None
+							if field == 'iso':
+								cur = iso_map_local.get(lp)
+							elif field == 'fnumber':
+								cur = f_map_local.get(lp)
+							elif field == 'width':
+								cur = w_map.get(lp)
+							elif field == 'height':
+								cur = h_map.get(lp)
+							elif field == 'mtime':
+								cur = mt_map.get(lp)
+							elif field == 'brightness':
+								cur = bright_map_local.get(lp)
+							elif field == 'sharpness':
+								cur = sharp_map_local.get(lp)
+							elif field == 'exposure':
+								cur = exp_map.get(lp)
+							elif field == 'focal':
+								cur = focal_map.get(lp)
+							elif field == 'duration':
+								ext = str(Path(lp).suffix or '').lower()
+								if ext in ('.mp4','.mov','.mkv','.avi','.webm'):
+									try:
+										from adapters.video_processor import get_video_metadata as _gvm
+										info = _gvm(Path(lp)) or {}
+										cur = float(info.get('duration') or 0.0)
+									except Exception:
+										cur = None
+								else:
+									cur = None
+							try:
+								if cur is None:
+									return False
+								cv = float(cur)
+								if op == '>=':
+									return cv >= num
+								if op == '<=':
+									return cv <= num
+								if op == '>':
+									return cv > num
+								if op == '<':
+									return cv < num
+								if op == '=':
+									return abs(cv - num) < 1e-6
+								return False
+							except Exception:
+								return False
+						if field == 'filetype':
+							ext = (Path(lp).suffix or '').lower().lstrip('.')
+							return ext == fv.lower()
+						return fv.lower() in doc_text(pth)
+					except Exception:
+						return False
+				def eval_rpn(pth: str) -> bool:
+					stack: List[bool] = []
+					for tok in out_q:
+						tu = tok.upper()
+						if tu == 'NOT':
+							v = stack.pop() if stack else False
+							stack.append(not v)
+						elif tu in ('AND','OR'):
+							b = stack.pop() if stack else False
+							a = stack.pop() if stack else False
+							stack.append((a and b) if tu == 'AND' else (a or b))
+						else:
+							stack.append(eval_field(tok, pth))
+					return bool(stack[-1]) if stack else True
+				out = [r for r in out if eval_rpn(str(r.path))]
+	except Exception:
+		pass
+
+	sid = log_search(store.index_dir, getattr(emb, 'index_id', 'default'), query, [(str(r.path), float(r.score)) for r in out])
+	return {
+		"search_id": sid,
+		"results": [{"path": str(r.path), "score": float(r.score)} for r in out],
+		"cached": False,
+	}
 
 
 @app.post("/captions/build")
-def api_build_captions(dir: str, vlm_model: str = "Qwen/Qwen2-VL-2B-Instruct", provider: str = "local", hf_token: Optional[str] = None, openai_key: Optional[str] = None) -> Dict[str, Any]:
-    folder = Path(dir)
+def api_build_captions(
+    dir: Optional[str] = None,
+    vlm_model: Optional[str] = None,
+    provider: Optional[str] = None,
+    hf_token: Optional[str] = None,
+    openai_key: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    model_value = _from_body(body, vlm_model, "vlm_model", default="Qwen/Qwen2-VL-2B-Instruct") or "Qwen/Qwen2-VL-2B-Instruct"
+    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+    hf_token_value = _from_body(body, hf_token, "hf_token")
+    openai_key_value = _from_body(body, openai_key, "openai_key")
+
+    folder = Path(dir_value)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
-    vlm = VlmCaptionHF(model=vlm_model, hf_token=hf_token)
-    emb = _emb(provider, hf_token, openai_key)
+    vlm = VlmCaptionHF(model=model_value, hf_token=hf_token_value)
+    emb = _emb(provider_value, hf_token_value, openai_key_value)
     store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
     updated = store.build_captions(vlm, emb)
-    _write_event(store.index_dir, { 'type': 'captions_build', 'time': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'updated': updated, 'model': vlm_model })
+    _write_event(store.index_dir, { 'type': 'captions_build', 'time': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'updated': updated, 'model': model_value })
     return {"updated": updated}
 
 
 # Faces (People & Pets)
 @app.post("/faces/build")
-def api_build_faces(dir: str, provider: str = "local") -> Dict[str, Any]:
-    folder = Path(dir)
+def api_build_faces(
+    dir: Optional[str] = None,
+    provider: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+
+    folder = Path(dir_value)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
-    emb = _emb(provider, None, None)
+    emb = _emb(provider_value, None, None)
     store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
     store.load()
     out = _build_faces(store.index_dir, store.state.paths or [])
@@ -1379,18 +1828,33 @@ def api_faces_clusters(dir: str) -> Dict[str, Any]:
 
 
 @app.post("/faces/name")
-def api_faces_name(dir: str, cluster_id: str, name: str) -> Dict[str, Any]:
-    store = IndexStore(Path(dir))
-    return _face_name(store.index_dir, cluster_id, name)
+def api_faces_name(
+    dir: Optional[str] = None,
+    cluster_id: Optional[str] = None,
+    name: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    cluster_value = _require(_from_body(body, cluster_id, "cluster_id"), "cluster_id")
+    name_value = _require(_from_body(body, name, "name"), "name")
+    store = IndexStore(Path(dir_value))
+    return _face_name(store.index_dir, cluster_value, name_value)
 
 
 # Trips & Events
 @app.post("/trips/build")
-def api_trips_build(dir: str, provider: str = "local") -> Dict[str, Any]:
-    folder = Path(dir)
+def api_trips_build(
+    dir: Optional[str] = None,
+    provider: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+
+    folder = Path(dir_value)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
-    emb = _emb(provider, None, None)
+    emb = _emb(provider_value, None, None)
     store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
     store.load()
     res = _build_trips(store.index_dir, store.state.paths or [], store.state.mtimes or [])
@@ -1408,13 +1872,42 @@ def api_trips_list(dir: str) -> Dict[str, Any]:
 
 
 @app.post("/search_workspace")
-def api_search_workspace(dir: str, query: str, top_k: int = 12, provider: str = "local", hf_token: Optional[str] = None, openai_key: Optional[str] = None,
-                         favorites_only: bool = False, tags: Optional[List[str]] = None, date_from: Optional[float] = None, date_to: Optional[float] = None,
-                         place: Optional[str] = None, has_text: bool = False, person: Optional[str] = None, persons: Optional[List[str]] = None) -> Dict[str, Any]:
-    folder = Path(dir)
+def api_search_workspace(
+    dir: Optional[str] = None,
+    query: Optional[str] = None,
+    top_k: Optional[int] = None,
+    provider: Optional[str] = None,
+    hf_token: Optional[str] = None,
+    openai_key: Optional[str] = None,
+    favorites_only: Optional[bool] = None,
+    tags: Optional[List[str]] = None,
+    date_from: Optional[float] = None,
+    date_to: Optional[float] = None,
+    place: Optional[str] = None,
+    has_text: Optional[bool] = None,
+    person: Optional[str] = None,
+    persons: Optional[List[str]] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    query_value = _require(_from_body(body, query, "query"), "query")
+    top_k_value = _from_body(body, top_k, "top_k", default=12, cast=lambda v: int(v)) or 12
+    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+    hf_token_value = _from_body(body, hf_token, "hf_token")
+    openai_key_value = _from_body(body, openai_key, "openai_key")
+    favorites_value = _from_body(body, favorites_only, "favorites_only", default=False, cast=_as_bool) or False
+    tags_value = _from_body(body, tags, "tags", default=[], cast=_as_str_list) or []
+    date_from_value = _from_body(body, date_from, "date_from")
+    date_to_value = _from_body(body, date_to, "date_to")
+    place_value = _from_body(body, place, "place")
+    has_text_value = _from_body(body, has_text, "has_text", default=False, cast=_as_bool) or False
+    person_value = _from_body(body, person, "person")
+    persons_value = _from_body(body, persons, "persons", default=[], cast=_as_str_list) or []
+
+    folder = Path(dir_value)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
-    emb = _emb(provider, hf_token, openai_key)
+    emb = _emb(provider_value, hf_token_value, openai_key_value)
     primary = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
     primary.load()
     from infra.workspace import load_workspace
@@ -1425,13 +1918,13 @@ def api_search_workspace(dir: str, query: str, top_k: int = 12, provider: str = 
             s = IndexStore(p, index_key=getattr(emb, 'index_id', None))
             s.load()
             stores.append(s)
-    # build combined search
     try:
-        qv = emb.embed_text(query)
+        qv = emb.embed_text(query_value)
     except Exception:
         raise HTTPException(500, "Embedding failed")
     import numpy as np
-    E_list = []; paths: List[str] = []
+    E_list = []
+    paths: List[str] = []
     for s in stores:
         if s.state.embeddings is not None and len(s.state.embeddings) > 0:
             E_list.append(s.state.embeddings)
@@ -1440,36 +1933,33 @@ def api_search_workspace(dir: str, query: str, top_k: int = 12, provider: str = 
         return {"search_id": None, "results": []}
     E = np.vstack(E_list).astype('float32')
     sims = (E @ qv).astype(float)
-    k = max(1, min(top_k, len(sims)))
+    k = max(1, min(top_k_value, len(sims)))
     idx = np.argpartition(-sims, k - 1)[:k]
     idx = idx[np.argsort(-sims[idx])]
-    # Convert to SearchResults-like tuples for filters
     out_pairs = [(paths[i], float(sims[i])) for i in idx]
-    # Apply filters
-    if favorites_only:
+
+    if favorites_value:
         favset = set()
         for s in stores:
             coll = load_collections(s.index_dir)
             favset.update(coll.get('Favorites', []))
         out_pairs = [(p, s) for (p, s) in out_pairs if p in favset]
-    if tags:
-        req = set(tags)
-        # merge tags
+    if tags_value:
+        req = set(tags_value)
         tmap: Dict[str, List[str]] = {}
         for s in stores:
-            for k,v in (load_tags(s.index_dir)).items():
+            for k, v in load_tags(s.index_dir).items():
                 tmap[k] = v
         out_pairs = [(p, s) for (p, s) in out_pairs if req.issubset(set(tmap.get(p, [])))]
-    if date_from is not None and date_to is not None:
+    if date_from_value is not None and date_to_value is not None:
         mmap: Dict[str, float] = {}
         for s in stores:
             mmap.update({sp: float(mt) for sp, mt in zip(s.state.paths or [], s.state.mtimes or [])})
-        out_pairs = [(p, s) for (p, s) in out_pairs if date_from <= mmap.get(p, 0.0) <= date_to]
-    # Person filter(s)
+        out_pairs = [(p, s) for (p, s) in out_pairs if date_from_value <= mmap.get(p, 0.0) <= date_to_value]
     try:
-        if persons and isinstance(persons, list) and len(persons) > 0:
+        if persons_value:
             sets: List[set] = []
-            for nm in persons:
+            for nm in persons_value:
                 pp = set()
                 for s in stores:
                     try:
@@ -1480,31 +1970,29 @@ def api_search_workspace(dir: str, query: str, top_k: int = 12, provider: str = 
             if sets:
                 inter = set.intersection(*sets) if len(sets) > 1 else sets[0]
                 out_pairs = [(p, sc) for (p, sc) in out_pairs if p in inter]
-        elif person:
+        elif person_value:
             ppl = set()
             for s in stores:
                 try:
-                    ppl.update(set(_face_photos(s.index_dir, str(person))))
+                    ppl.update(set(_face_photos(s.index_dir, str(person_value))))
                 except Exception:
                     continue
             out_pairs = [(p, sc) for (p, sc) in out_pairs if p in ppl]
     except Exception:
         pass
-    # EXIF place filter
-    if place and str(place).strip():
+    if place_value and str(place_value).strip():
         place_map: Dict[str, str] = {}
         for s in stores:
             try:
                 meta_p = s.index_dir / 'exif_index.json'
                 if meta_p.exists():
                     m = json.loads(meta_p.read_text())
-                    place_map.update({p: (str(v or '')) for p, v in zip(m.get('paths',[]), m.get('place',[]))})
+                    place_map.update({p: (str(v or '')) for p, v in zip(m.get('paths', []), m.get('place', []))})
             except Exception:
                 continue
-        pl = str(place).strip().lower()
-        out_pairs = [(p, sc) for (p, sc) in out_pairs if pl in (place_map.get(p,'') or '').lower()]
-    # OCR has_text filter
-    if has_text:
+        pl = str(place_value).strip().lower()
+        out_pairs = [(p, sc) for (p, sc) in out_pairs if pl in (place_map.get(p, '') or '').lower()]
+    if has_text_value:
         texts_map: Dict[str, str] = {}
         for s in stores:
             try:
@@ -1513,9 +2001,9 @@ def api_search_workspace(dir: str, query: str, top_k: int = 12, provider: str = 
                     texts_map.update({p: (t or '') for p, t in zip(d.get('paths', []), d.get('texts', []))})
             except Exception:
                 continue
-        out_pairs = [(p, sc) for (p, sc) in out_pairs if (texts_map.get(p, '').strip() != '')]
-    # Log
-    sid = log_search(primary.index_dir, getattr(emb, 'index_id', 'default'), query, out_pairs)
+        out_pairs = [(p, sc) for (p, sc) in out_pairs if texts_map.get(p, '').strip()]
+
+    sid = log_search(primary.index_dir, getattr(emb, 'index_id', 'default'), query_value, out_pairs)
     return {"search_id": sid, "results": [{"path": p, "score": sc} for (p, sc) in out_pairs]}
 
 
@@ -1527,15 +2015,24 @@ def api_get_favorites(dir: str) -> Dict[str, Any]:
 
 
 @app.post("/favorites")
-def api_set_favorite(dir: str, path: str, favorite: bool = True) -> Dict[str, Any]:
-    store = IndexStore(Path(dir))
+def api_set_favorite(
+    dir: Optional[str] = None,
+    path: Optional[str] = None,
+    favorite: Optional[bool] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    path_value = _require(_from_body(body, path, "path"), "path")
+    favorite_value = _from_body(body, favorite, "favorite", default=True, cast=_as_bool)
+
+    store = IndexStore(Path(dir_value))
     coll = load_collections(store.index_dir)
     fav = coll.get('Favorites', [])
-    if favorite:
-        if path not in fav:
-            fav.append(path)
+    if favorite_value:
+        if path_value not in fav:
+            fav.append(path_value)
     else:
-        fav = [p for p in fav if p != path]
+        fav = [p for p in fav if p != path_value]
     coll['Favorites'] = fav
     save_collections(store.index_dir, coll)
     return {"ok": True, "favorites": fav}
@@ -1548,12 +2045,21 @@ def api_get_tags(dir: str) -> Dict[str, Any]:
 
 
 @app.post("/tags")
-def api_set_tags(dir: str, path: str, tags: List[str]) -> Dict[str, Any]:
-    store = IndexStore(Path(dir))
+def api_set_tags(
+    dir: Optional[str] = None,
+    path: Optional[str] = None,
+    tags: Optional[List[str]] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    path_value = _require(_from_body(body, path, "path"), "path")
+    tags_value = _from_body(body, tags, "tags", default=[], cast=_as_str_list) or []
+
+    store = IndexStore(Path(dir_value))
     t = load_tags(store.index_dir)
-    t[path] = sorted({s.strip() for s in tags if s.strip()})
+    t[path_value] = sorted({s.strip() for s in tags_value if s.strip()})
     save_tags(store.index_dir, t)
-    return {"ok": True, "tags": t[path]}
+    return {"ok": True, "tags": t[path_value]}
 
 
 @app.get("/saved")
@@ -1563,20 +2069,38 @@ def api_get_saved(dir: str) -> Dict[str, Any]:
 
 
 @app.post("/saved")
-def api_add_saved(dir: str, name: str, query: str, top_k: int = 12) -> Dict[str, Any]:
-    store = IndexStore(Path(dir))
+def api_add_saved(
+    dir: Optional[str] = None,
+    name: Optional[str] = None,
+    query: Optional[str] = None,
+    top_k: Optional[int] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    name_value = _require(_from_body(body, name, "name"), "name")
+    query_value = _require(_from_body(body, query, "query"), "query")
+    top_k_value = _from_body(body, top_k, "top_k", default=12, cast=lambda v: int(v)) or 12
+
+    store = IndexStore(Path(dir_value))
     saved = load_saved(store.index_dir)
-    saved.append({"name": name, "query": query, "top_k": int(top_k)})
+    saved.append({"name": name_value, "query": query_value, "top_k": int(top_k_value)})
     save_saved(store.index_dir, saved)
     return {"ok": True, "saved": saved}
 
 
 @app.post("/saved/delete")
-def api_delete_saved(dir: str, name: str) -> Dict[str, Any]:
-    store = IndexStore(Path(dir))
+def api_delete_saved(
+    dir: Optional[str] = None,
+    name: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    name_value = _require(_from_body(body, name, "name"), "name")
+
+    store = IndexStore(Path(dir_value))
     saved = load_saved(store.index_dir)
     before = len(saved)
-    saved = [s for s in saved if str(s.get("name")) != name]
+    saved = [s for s in saved if str(s.get("name")) != name_value]
     save_saved(store.index_dir, saved)
     return {"ok": True, "deleted": before - len(saved), "saved": saved}
 
@@ -1589,29 +2113,45 @@ def api_get_presets(dir: str) -> Dict[str, Any]:
 
 
 @app.post("/presets")
-def api_add_preset(dir: str, name: str, query: str) -> Dict[str, Any]:
-    store = IndexStore(Path(dir))
+def api_add_preset(
+    dir: Optional[str] = None,
+    name: Optional[str] = None,
+    query: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    name_value = _require(_from_body(body, name, "name"), "name")
+    query_value = _require(_from_body(body, query, "query"), "query")
+
+    store = IndexStore(Path(dir_value))
     items = load_presets(store.index_dir)
     # Upsert by name
     found = False
     for it in items:
-        if str(it.get('name')) == name:
-            it['query'] = query
+        if str(it.get('name')) == name_value:
+            it['query'] = query_value
             found = True
             break
     if not found:
-        items.append({"name": name, "query": query})
+        items.append({"name": name_value, "query": query_value})
     save_presets(store.index_dir, items)
-    _write_event(store.index_dir, { 'type': 'preset_save', 'time': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'name': name })
+    _write_event(store.index_dir, { 'type': 'preset_save', 'time': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'name': name_value })
     return {"ok": True, "presets": items}
 
 
 @app.post("/presets/delete")
-def api_delete_preset(dir: str, name: str) -> Dict[str, Any]:
-    store = IndexStore(Path(dir))
+def api_delete_preset(
+    dir: Optional[str] = None,
+    name: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    name_value = _require(_from_body(body, name, "name"), "name")
+
+    store = IndexStore(Path(dir_value))
     items = load_presets(store.index_dir)
     before = len(items)
-    items = [it for it in items if str(it.get('name')) != name]
+    items = [it for it in items if str(it.get('name')) != name_value]
     save_presets(store.index_dir, items)
     return {"ok": True, "deleted": before - len(items), "presets": items}
 
@@ -1623,21 +2163,37 @@ def api_get_collections(dir: str) -> Dict[str, Any]:
     return {"collections": load_collections(store.index_dir)}
 
 @app.post("/collections")
-def api_set_collection(dir: str, name: str, paths: List[str]) -> Dict[str, Any]:
-    store = IndexStore(Path(dir))
+def api_set_collection(
+    dir: Optional[str] = None,
+    name: Optional[str] = None,
+    paths: Optional[List[str]] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    name_value = _require(_from_body(body, name, "name"), "name")
+    paths_value = _from_body(body, paths, "paths", default=[], cast=_as_str_list) or []
+
+    store = IndexStore(Path(dir_value))
     coll = load_collections(store.index_dir)
-    coll[name] = sorted(set(paths))
+    coll[name_value] = sorted(set(paths_value))
     save_collections(store.index_dir, coll)
     return {"ok": True, "collections": coll}
 
 @app.post("/collections/delete")
-def api_delete_collection(dir: str, name: str) -> Dict[str, Any]:
-    store = IndexStore(Path(dir))
+def api_delete_collection(
+    dir: Optional[str] = None,
+    name: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    name_value = _require(_from_body(body, name, "name"), "name")
+
+    store = IndexStore(Path(dir_value))
     coll = load_collections(store.index_dir)
-    if name in coll:
-        del coll[name]
+    if name_value in coll:
+        del coll[name_value]
         save_collections(store.index_dir, coll)
-        return {"ok": True, "deleted": name}
+        return {"ok": True, "deleted": name_value}
     return {"ok": False, "deleted": None}
 
 
@@ -1649,35 +2205,66 @@ def api_get_smart_collections(dir: str) -> Dict[str, Any]:
 
 
 @app.post("/smart_collections")
-def api_set_smart_collection(dir: str, name: str, rules: Dict[str, Any]) -> Dict[str, Any]:
-    store = IndexStore(Path(dir))
+def api_set_smart_collection(
+    dir: Optional[str] = None,
+    name: Optional[str] = None,
+    rules: Optional[Dict[str, Any]] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    name_value = _require(_from_body(body, name, "name"), "name")
+    rules_value = _from_body(body, rules, "rules", default={}) or {}
+
+    store = IndexStore(Path(dir_value))
     data = load_smart_collections(store.index_dir)
-    data[name] = rules
+    data[name_value] = rules_value
     save_smart_collections(store.index_dir, data)
     return {"ok": True, "smart": data}
 
 
 @app.post("/smart_collections/delete")
-def api_delete_smart_collection(dir: str, name: str) -> Dict[str, Any]:
-    store = IndexStore(Path(dir))
+def api_delete_smart_collection(
+    dir: Optional[str] = None,
+    name: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    name_value = _require(_from_body(body, name, "name"), "name")
+
+    store = IndexStore(Path(dir_value))
     data = load_smart_collections(store.index_dir)
-    if name in data:
-        del data[name]
+    if name_value in data:
+        del data[name_value]
         save_smart_collections(store.index_dir, data)
-        return {"ok": True, "deleted": name}
+        return {"ok": True, "deleted": name_value}
     return {"ok": False, "deleted": None}
 
 
 @app.post("/smart_collections/resolve")
-def api_resolve_smart_collection(dir: str, name: str, provider: str = "local", top_k: int = 24, hf_token: Optional[str] = None, openai_key: Optional[str] = None) -> Dict[str, Any]:
-    folder = Path(dir)
+def api_resolve_smart_collection(
+    dir: Optional[str] = None,
+    name: Optional[str] = None,
+    provider: Optional[str] = None,
+    top_k: Optional[int] = None,
+    hf_token: Optional[str] = None,
+    openai_key: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    name_value = _require(_from_body(body, name, "name"), "name")
+    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+    top_k_value = _from_body(body, top_k, "top_k", default=24, cast=lambda v: int(v)) or 24
+    hf_token_value = _from_body(body, hf_token, "hf_token")
+    openai_key_value = _from_body(body, openai_key, "openai_key")
+
+    folder = Path(dir_value)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
-    emb = _emb(provider, hf_token, openai_key)
+    emb = _emb(provider_value, hf_token_value, openai_key_value)
     store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
     store.load()
     data = load_smart_collections(store.index_dir)
-    rules = data.get(name)
+    rules = data.get(name_value)
     if not isinstance(rules, dict):
         return {"search_id": None, "results": []}
     # Extract rules with safe defaults
@@ -1696,11 +2283,11 @@ def api_resolve_smart_collection(dir: str, name: str, provider: str = "local", t
     sharp_only = bool(rules.get('sharpOnly')); exclude_underexp = bool(rules.get('excludeUnder')); exclude_overexp = bool(rules.get('excludeOver'))
     # Run same pathway as api_search (simplified: no fast indexes switch here)
     if use_captions and store.captions_available():
-        results = store.search_with_captions(emb, query or '', top_k=top_k)
+        results = store.search_with_captions(emb, query or '', top_k=top_k_value)
     elif use_ocr and store.ocr_available():
-        results = store.search_with_ocr(emb, query or '', top_k=top_k)
+        results = store.search_with_ocr(emb, query or '', top_k=top_k_value)
     else:
-        results = store.search(emb, query or '', top_k=top_k)
+        results = store.search(emb, query or '', top_k=top_k_value)
     out = results
     # Favorites filter
     if fav_only:
@@ -1863,9 +2450,22 @@ def api_resolve_smart_collection(dir: str, name: str, provider: str = "local", t
 
 
 @app.post("/feedback")
-def api_feedback(dir: str, search_id: str, query: str, positives: List[str], note: str = "") -> Dict[str, Any]:
-    store = IndexStore(Path(dir))
-    log_feedback(store.index_dir, search_id, query, positives, note)
+def api_feedback(
+    dir: Optional[str] = None,
+    search_id: Optional[str] = None,
+    query: Optional[str] = None,
+    positives: Optional[List[str]] = None,
+    note: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    search_id_value = _require(_from_body(body, search_id, "search_id"), "search_id")
+    query_value = _require(_from_body(body, query, "query"), "query")
+    positives_value = _from_body(body, positives, "positives", default=[], cast=_as_str_list) or []
+    note_value = _from_body(body, note, "note", default="") or ""
+
+    store = IndexStore(Path(dir_value))
+    log_feedback(store.index_dir, search_id_value, query_value, positives_value, note_value)
     return {"ok": True}
 
 
@@ -1882,9 +2482,16 @@ def api_lookalikes(dir: str, max_distance: int = 5) -> Dict[str, Any]:
 
 
 @app.post("/lookalikes/resolve")
-def api_resolve_lookalike(dir: str, group_paths: List[str]) -> Dict[str, Any]:
-    store = IndexStore(Path(dir))
-    gid = _group_id(group_paths)
+def api_resolve_lookalike(
+    dir: Optional[str] = None,
+    group_paths: Optional[List[str]] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    group_paths_value = _from_body(body, group_paths, "group_paths", default=[], cast=_as_str_list) or []
+
+    store = IndexStore(Path(dir_value))
+    gid = _group_id(group_paths_value)
     ids = load_resolved(store.index_dir)
     if gid not in ids:
         ids.append(gid)
@@ -1894,60 +2501,103 @@ def api_resolve_lookalike(dir: str, group_paths: List[str]) -> Dict[str, Any]:
 
 # Extras now that we have a proper frontend
 @app.post("/ocr/build")
-def api_build_ocr(dir: str, provider: str = "local", languages: Optional[List[str]] = None, hf_token: Optional[str] = None, openai_key: Optional[str] = None) -> Dict[str, Any]:
-    folder = Path(dir)
+def api_build_ocr(
+    dir: Optional[str] = None,
+    provider: Optional[str] = None,
+    languages: Optional[List[str]] = None,
+    hf_token: Optional[str] = None,
+    openai_key: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+    languages_value = _from_body(body, languages, "languages")
+    if languages_value is not None and not isinstance(languages_value, list):
+        languages_value = _as_str_list(languages_value)
+    hf_token_value = _from_body(body, hf_token, "hf_token")
+    openai_key_value = _from_body(body, openai_key, "openai_key")
+
+    folder = Path(dir_value)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
-    emb = _emb(provider, hf_token, openai_key)
+    emb = _emb(provider_value, hf_token_value, openai_key_value)
     store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
-    updated = store.build_ocr(emb, languages=languages)
-    _write_event(store.index_dir, { 'type': 'ocr_build', 'time': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'updated': updated, 'langs': languages or [] })
+    updated = store.build_ocr(emb, languages=languages_value)
+    _write_event(store.index_dir, { 'type': 'ocr_build', 'time': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'updated': updated, 'langs': languages_value or [] })
     return {"updated": updated}
 
 
 @app.post("/fast/build")
-def api_build_fast(dir: str, kind: str = "faiss", trees: int = 50, provider: str = "local", hf_token: Optional[str] = None, openai_key: Optional[str] = None) -> Dict[str, Any]:
-    folder = Path(dir)
+def api_build_fast(
+    dir: Optional[str] = None,
+    kind: Optional[str] = None,
+    trees: Optional[int] = None,
+    provider: Optional[str] = None,
+    hf_token: Optional[str] = None,
+    openai_key: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    kind_value = (_from_body(body, kind, "kind", default="faiss") or "faiss").lower()
+    trees_value = _from_body(body, trees, "trees", default=50, cast=lambda v: int(v)) or 50
+    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+    hf_token_value = _from_body(body, hf_token, "hf_token")
+    openai_key_value = _from_body(body, openai_key, "openai_key")
+
+    folder = Path(dir_value)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
-    emb = _emb(provider, hf_token, openai_key)
+    emb = _emb(provider_value, hf_token_value, openai_key_value)
     store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
     # Write fast status (best-effort, no incremental progress available)
     status_path = store.index_dir / 'fast_status.json'
     try:
-        status_path.write_text(json.dumps({ 'state': 'running', 'kind': kind, 'start': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()) }), encoding='utf-8')
+        status_path.write_text(json.dumps({ 'state': 'running', 'kind': kind_value, 'start': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()) }), encoding='utf-8')
     except Exception:
         pass
     ok = False
-    if kind.lower() == 'faiss':
+    if kind_value.lower() == 'faiss':
         ok = store.build_faiss()
-    elif kind.lower() == 'hnsw':
+    elif kind_value.lower() == 'hnsw':
         ok = store.build_hnsw()
     else:
-        ok = store.build_annoy(trees=trees)
-    _write_event(store.index_dir, { 'type': 'fast_build', 'time': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'ok': ok, 'kind': kind })
+        ok = store.build_annoy(trees=trees_value)
+    _write_event(store.index_dir, { 'type': 'fast_build', 'time': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'ok': ok, 'kind': kind_value })
     try:
-        status_path.write_text(json.dumps({ 'state': 'complete', 'kind': kind, 'end': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'ok': bool(ok) }), encoding='utf-8')
+        status_path.write_text(json.dumps({ 'state': 'complete', 'kind': kind_value, 'end': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'ok': bool(ok) }), encoding='utf-8')
     except Exception:
         pass
-    return {"ok": ok, "kind": kind}
+    return {"ok": ok, "kind": kind_value}
 
 
 @app.post("/thumbs")
-def api_build_thumbs(dir: str, size: int = 512, provider: str = "local", hf_token: Optional[str] = None, openai_key: Optional[str] = None) -> Dict[str, Any]:
-    folder = Path(dir)
+def api_build_thumbs(
+    dir: Optional[str] = None,
+    size: Optional[int] = None,
+    provider: Optional[str] = None,
+    hf_token: Optional[str] = None,
+    openai_key: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    size_value = _from_body(body, size, "size", default=512, cast=lambda v: int(v)) or 512
+    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+    hf_token_value = _from_body(body, hf_token, "hf_token")
+    openai_key_value = _from_body(body, openai_key, "openai_key")
+
+    folder = Path(dir_value)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
-    emb = _emb(provider, hf_token, openai_key)
+    emb = _emb(provider_value, hf_token_value, openai_key_value)
     store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
     store.load()
     made = 0
     for sp, mt in zip(store.state.paths or [], store.state.mtimes or []):
-        tp = get_or_create_thumb(store.index_dir, Path(sp), float(mt), size=size)
+        tp = get_or_create_thumb(store.index_dir, Path(sp), float(mt), size=size_value)
         if tp is not None:
             made += 1
     out = {"made": made}
-    _write_event(store.index_dir, { 'type': 'thumbs_build', 'time': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'made': made, 'size': size })
+    _write_event(store.index_dir, { 'type': 'thumbs_build', 'time': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'made': made, 'size': size_value })
     return out
 
 @app.get("/status/{operation}")
@@ -2016,22 +2666,37 @@ def api_map(dir: str, limit: int = 1000) -> Dict[str, Any]:
 
 
 @app.post("/thumb/batch")
-def api_thumb_batch(dir: str, paths: List[str], size: int = 256, provider: str = "local", hf_token: Optional[str] = None, openai_key: Optional[str] = None) -> Dict[str, Any]:
+def api_thumb_batch(
+    dir: Optional[str] = None,
+    paths: Optional[List[str]] = None,
+    size: Optional[int] = None,
+    provider: Optional[str] = None,
+    hf_token: Optional[str] = None,
+    openai_key: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
     """Generate thumbnails for multiple images in batch to reduce API calls."""
-    folder = Path(dir)
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    paths_value = _from_body(body, paths, "paths", default=[], cast=_as_str_list) or []
+    size_value = _from_body(body, size, "size", default=256, cast=lambda v: int(v)) or 256
+    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+    hf_token_value = _from_body(body, hf_token, "hf_token")
+    openai_key_value = _from_body(body, openai_key, "openai_key")
+
+    folder = Path(dir_value)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
 
-    emb = _emb(provider, hf_token, openai_key)
+    emb = _emb(provider_value, hf_token_value, openai_key_value)
     store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
     store.load()
 
     results = {}
-    for path in paths:
+    for path in paths_value:
         try:
             idx_map = {sp: float(mt) for sp, mt in zip(store.state.paths or [], store.state.mtimes or [])}
             mtime = idx_map.get(path, 0.0)
-            tp = get_or_create_thumb(store.index_dir, Path(path), float(mtime), size=size)
+            tp = get_or_create_thumb(store.index_dir, Path(path), float(mtime), size=size_value)
             if tp is None or not tp.exists():
                 results[path] = {"error": "Thumb not found"}
             else:
@@ -2040,7 +2705,7 @@ def api_thumb_batch(dir: str, paths: List[str], size: int = 256, provider: str =
                     import base64
                     results[path] = {
                         "data": f"data:image/jpeg;base64,{base64.b64encode(f.read()).decode()}",
-                        "size": size
+                        "size": size_value
                     }
         except Exception as e:
             results[path] = {"error": str(e)}
@@ -2088,41 +2753,75 @@ def api_thumb_face(dir: str, path: str, emb: int, provider: str = "local", size:
 
 
 @app.post("/search_like")
-def api_search_like(dir: str, path: str, top_k: int = 12, provider: str = "local", hf_token: Optional[str] = None, openai_key: Optional[str] = None) -> Dict[str, Any]:
-    folder = Path(dir)
+def api_search_like(
+    dir: Optional[str] = None,
+    path: Optional[str] = None,
+    top_k: Optional[int] = None,
+    provider: Optional[str] = None,
+    hf_token: Optional[str] = None,
+    openai_key: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    path_value = _require(_from_body(body, path, "path"), "path")
+    top_k_value = _from_body(body, top_k, "top_k", default=12, cast=lambda v: int(v)) or 12
+    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+    hf_token_value = _from_body(body, hf_token, "hf_token")
+    openai_key_value = _from_body(body, openai_key, "openai_key")
+
+    folder = Path(dir_value)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
-    emb = _emb(provider, hf_token, openai_key)
+    emb = _emb(provider_value, hf_token_value, openai_key_value)
     store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
     store.load()
-    out = store.search_like(path, top_k=top_k)
+    out = store.search_like(path_value, top_k=top_k_value)
     return {"results": [{"path": str(r.path), "score": float(r.score)} for r in out]}
 
 
 @app.post("/search_like_plus")
-def api_search_like_plus(dir: str, path: str, top_k: int = 12, text: Optional[str] = None, weight: float = 0.5, provider: str = "local", hf_token: Optional[str] = None, openai_key: Optional[str] = None) -> Dict[str, Any]:
-    folder = Path(dir)
+def api_search_like_plus(
+    dir: Optional[str] = None,
+    path: Optional[str] = None,
+    top_k: Optional[int] = None,
+    text: Optional[str] = None,
+    weight: Optional[float] = None,
+    provider: Optional[str] = None,
+    hf_token: Optional[str] = None,
+    openai_key: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    path_value = _require(_from_body(body, path, "path"), "path")
+    top_k_value = _from_body(body, top_k, "top_k", default=12, cast=lambda v: int(v)) or 12
+    text_value = _from_body(body, text, "text")
+    weight_value = _from_body(body, weight, "weight", default=0.5, cast=lambda v: float(v)) or 0.5
+    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+    hf_token_value = _from_body(body, hf_token, "hf_token")
+    openai_key_value = _from_body(body, openai_key, "openai_key")
+
+    folder = Path(dir_value)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
-    emb = _emb(provider, hf_token, openai_key)
+    emb = _emb(provider_value, hf_token_value, openai_key_value)
     store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
     store.load()
     if store.state.embeddings is None or not store.state.paths:
         return {"results": []}
     try:
-        i = store.state.paths.index(path)
+        i = store.state.paths.index(path_value)
     except ValueError:
         return {"results": []}
     import numpy as np
     q_img = store.state.embeddings[i].astype('float32')
-    if text and text.strip():
+    if text_value and text_value.strip():
         try:
-            q_txt = emb.embed_text(text).astype('float32')
+            q_txt = emb.embed_text(text_value).astype('float32')
         except Exception:
             q_txt = np.zeros_like(q_img)
     else:
         q_txt = np.zeros_like(q_img)
-    w = max(0.0, min(1.0, float(weight)))
+    w = max(0.0, min(1.0, float(weight_value)))
     q = ((1.0 - w) * q_img + w * q_txt).astype('float32')
     # Normalize if possible
     norm = float(np.linalg.norm(q))
@@ -2130,15 +2829,24 @@ def api_search_like_plus(dir: str, path: str, top_k: int = 12, text: Optional[st
         q = q / norm
     E = store.state.embeddings.astype('float32')
     sims = (E @ q).astype(float)
-    k = max(1, min(top_k, len(sims)))
+    k = max(1, min(top_k_value, len(sims)))
     idx = np.argpartition(-sims, k - 1)[:k]
     idx = idx[np.argsort(-sims[idx])]
     return {"results": [{"path": str(store.state.paths[i]), "score": float(sims[i])} for i in idx]}
 
 
 @app.post("/ocr/snippets")
-def api_ocr_snippets(dir: str, paths: List[str], limit: int = 160) -> Dict[str, Any]:
-    store = IndexStore(Path(dir))
+def api_ocr_snippets(
+    dir: Optional[str] = None,
+    paths: Optional[List[str]] = None,
+    limit: Optional[int] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    paths_value = _from_body(body, paths, "paths", default=[], cast=_as_str_list) or []
+    limit_value = _from_body(body, limit, "limit", default=160, cast=lambda v: int(v)) or 160
+
+    store = IndexStore(Path(dir_value))
     texts: Dict[str, str] = {}
     try:
         if not store.ocr_texts_file.exists():
@@ -2148,10 +2856,10 @@ def api_ocr_snippets(dir: str, paths: List[str], limit: int = 160) -> Dict[str, 
         def mk_snip(s: str) -> str:
             try:
                 s = ' '.join(s.split())
-                return s[: max(0, limit)].strip()
+                return s[: max(0, limit_value)].strip()
             except Exception:
-                return s[: max(0, limit)] if s else ''
-        for p in paths or []:
+                return s[: max(0, limit_value)] if s else ''
+        for p in paths_value or []:
             t = base.get(p, '')
             if t:
                 texts[p] = mk_snip(t)
@@ -2199,8 +2907,14 @@ def api_ocr_status(dir: str) -> Dict[str, Any]:
     except Exception:
         return { 'ready': False }
 @app.post("/open")
-def api_open(dir: str, path: str) -> Dict[str, Any]:
-    p = Path(path)
+def api_open(
+    dir: Optional[str] = None,
+    path: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    _require(_from_body(body, dir, "dir"), "dir")
+    path_value = _require(_from_body(body, path, "path"), "path")
+    p = Path(path_value)
     if not p.exists():
         raise HTTPException(404, "File not found")
     import os as _os, platform as _pf
@@ -2218,19 +2932,38 @@ def api_open(dir: str, path: str) -> Dict[str, Any]:
 
 
 @app.post("/scan_count")
-def api_scan_count(paths: List[str], include_videos: bool = True) -> Dict[str, Any]:
+def api_scan_count(
+    paths: Optional[List[str]] = None,
+    include_videos: Optional[bool] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
     """Best-effort count of media files under given paths. Privacy-friendly preview."""
-    return _scan_media_counts(paths, include_videos)
+    paths_value = _from_body(body, paths, "paths", default=[], cast=_as_str_list) or []
+    include_videos_value = _from_body(body, include_videos, "include_videos", default=True, cast=_as_bool)
+    return _scan_media_counts(paths_value, bool(include_videos_value))
 
 
 @app.post("/edit/ops")
-def api_edit_ops(dir: str, path: str, rotate: int = 0, flip: Optional[str] = None, crop: Optional[Dict[str, int]] = None) -> Dict[str, Any]:
-    folder = Path(dir)
-    p = Path(path)
+def api_edit_ops(
+    dir: Optional[str] = None,
+    path: Optional[str] = None,
+    rotate: Optional[int] = None,
+    flip: Optional[str] = None,
+    crop: Optional[Dict[str, int]] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    path_value = _require(_from_body(body, path, "path"), "path")
+    rotate_value = _from_body(body, rotate, "rotate", default=0, cast=lambda v: int(v)) or 0
+    flip_value = _from_body(body, flip, "flip")
+    crop_value = _from_body(body, crop, "crop")
+
+    folder = Path(dir_value)
+    p = Path(path_value)
     if not folder.exists() or not p.exists():
         raise HTTPException(400, "Folder or file not found")
     store = IndexStore(folder)
-    ops = _EditOps(rotate=int(rotate or 0), flip=flip, crop=crop)
+    ops = _EditOps(rotate=int(rotate_value or 0), flip=flip_value, crop=crop_value)
     out = _edit_apply_ops(store.index_dir, p, ops)
     return {"out_path": str(out)}
 
@@ -2239,36 +2972,62 @@ def api_edit_ops(dir: str, path: str, rotate: int = 0, flip: Optional[str] = Non
 _last_delete = None
 
 @app.post("/edit/upscale")
-def api_edit_upscale(dir: str, path: str, scale: int = 2, engine: str = "pil") -> Dict[str, Any]:
-    folder = Path(dir)
-    p = Path(path)
+def api_edit_upscale(
+    dir: Optional[str] = None,
+    path: Optional[str] = None,
+    scale: Optional[int] = None,
+    engine: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    path_value = _require(_from_body(body, path, "path"), "path")
+    scale_value = _from_body(body, scale, "scale", default=2, cast=lambda v: int(v)) or 2
+    engine_value = _from_body(body, engine, "engine", default="pil") or "pil"
+
+    folder = Path(dir_value)
+    p = Path(path_value)
     if not folder.exists() or not p.exists():
         raise HTTPException(400, "Folder or file not found")
     store = IndexStore(folder)
-    out = _edit_upscale(store.index_dir, p, scale=scale, engine=engine)
+    out = _edit_upscale(store.index_dir, p, scale=scale_value, engine=engine_value)
     return {"out_path": str(out)}
 
 
 @app.post("/export")
-def api_export(dir: str, paths: List[str], dest: str, mode: str = "copy", strip_exif: bool = False, overwrite: bool = False) -> Dict[str, Any]:
-    folder = Path(dir)
+def api_export(
+    dir: Optional[str] = None,
+    paths: Optional[List[str]] = None,
+    dest: Optional[str] = None,
+    mode: Optional[str] = None,
+    strip_exif: Optional[bool] = None,
+    overwrite: Optional[bool] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    paths_value = _from_body(body, paths, "paths", default=[], cast=_as_str_list) or []
+    dest_value = _require(_from_body(body, dest, "dest"), "dest")
+    mode_value = (_from_body(body, mode, "mode", default="copy") or "copy").lower()
+    strip_exif_value = _from_body(body, strip_exif, "strip_exif", default=False, cast=_as_bool) or False
+    overwrite_value = _from_body(body, overwrite, "overwrite", default=False, cast=_as_bool) or False
+
+    folder = Path(dir_value)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
-    dest_dir = Path(dest).expanduser()
+    dest_dir = Path(dest_value).expanduser()
     try:
         dest_dir.mkdir(parents=True, exist_ok=True)
     except Exception:
         raise HTTPException(400, "Cannot create destination")
     copied = 0; skipped = 0; errors = 0
-    for sp in paths:
+    for sp in paths_value:
         src = Path(sp)
         if not src.exists():
             errors += 1; continue
         out = dest_dir / src.name
-        if out.exists() and not overwrite:
+        if out.exists() and not overwrite_value:
             skipped += 1; continue
         try:
-            if mode.lower() == 'symlink':
+            if mode_value == 'symlink':
                 try:
                     if out.exists(): out.unlink()
                     os.symlink(src, out)
@@ -2276,7 +3035,7 @@ def api_export(dir: str, paths: List[str], dest: str, mode: str = "copy", strip_
                     continue
                 except Exception:
                     pass
-            if strip_exif:
+            if strip_exif_value:
                 try:
                     from PIL import Image
                     with Image.open(src) as img:
@@ -2575,11 +3334,22 @@ def _build_exif_index(index_dir: Path, paths: List[str]) -> Dict[str, Any]:
     return out
 
 @app.post("/metadata/build")
-def api_build_metadata(dir: str, provider: str = "local", hf_token: Optional[str] = None, openai_key: Optional[str] = None) -> Dict[str, Any]:
-    folder = Path(dir)
+def api_build_metadata(
+    dir: Optional[str] = None,
+    provider: Optional[str] = None,
+    hf_token: Optional[str] = None,
+    openai_key: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+    hf_token_value = _from_body(body, hf_token, "hf_token")
+    openai_key_value = _from_body(body, openai_key, "openai_key")
+
+    folder = Path(dir_value)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
-    emb = _emb(provider, hf_token, openai_key)
+    emb = _emb(provider_value, hf_token_value, openai_key_value)
     store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
     store.load()
     if not store.state.paths:
@@ -2671,12 +3441,23 @@ def api_metadata_batch(dir: str, paths: str) -> Dict[str, Any]:
 
 
 @app.post("/autotag")
-def api_autotag(dir: str, provider: str = "local", min_len: int = 4, max_tags_per_image: int = 8) -> Dict[str, Any]:
+def api_autotag(
+    dir: Optional[str] = None,
+    provider: Optional[str] = None,
+    min_len: Optional[int] = None,
+    max_tags_per_image: Optional[int] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
     """Derive simple tags from captions (if available) and add them to tags.json.
     Heuristic: split on non-letters, lowercase, drop stopwords/short tokens, keep unique tokens.
     """
-    folder = Path(dir)
-    emb = _emb(provider, None, None)
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+    min_len_value = _from_body(body, min_len, "min_len", default=4, cast=lambda v: int(v)) or 4
+    max_tags_value = _from_body(body, max_tags_per_image, "max_tags_per_image", default=8, cast=lambda v: int(v)) or 8
+
+    folder = Path(dir_value)
+    emb = _emb(provider_value, None, None)
     store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
     store.load()
     cap_p = store.cap_texts_file
@@ -2694,7 +3475,7 @@ def api_autotag(dir: str, provider: str = "local", min_len: int = 4, max_tags_pe
     for p, txt in texts.items():
         if not txt:
             continue
-        toks = [w.lower() for w in re.split(r"[^A-Za-z]+", txt) if len(w)>=min_len and w.lower() not in stop]
+        toks = [w.lower() for w in re.split(r"[^A-Za-z]+", txt) if len(w)>=min_len_value and w.lower() not in stop]
         uniq = []
         for w in toks:
             if w and w not in uniq:
@@ -2703,7 +3484,7 @@ def api_autotag(dir: str, provider: str = "local", min_len: int = 4, max_tags_pe
             continue
         cur = set(tmap.get(p, []))
         before = len(cur)
-        for w in uniq[:max_tags_per_image]:
+        for w in uniq[:max_tags_value]:
             cur.add(w)
         if len(cur) != before:
             tmap[p] = sorted(cur)
@@ -2713,19 +3494,28 @@ def api_autotag(dir: str, provider: str = "local", min_len: int = 4, max_tags_pe
 
 
 @app.post("/delete")
-def api_delete(dir: str, paths: list[str], os_trash: bool = False) -> dict[str, object]:
+def api_delete(
+    dir: Optional[str] = None,
+    paths: Optional[List[str]] = None,
+    os_trash: Optional[bool] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> dict[str, object]:
     """Delete files either to OS Trash (if enabled) or to a local trash folder for undo."""
-    folder = Path(dir)
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    paths_value = _from_body(body, paths, "paths", default=[], cast=_as_str_list) or []
+    os_trash_value = _from_body(body, os_trash, "os_trash", default=False, cast=_as_bool) or False
+
+    folder = Path(dir_value)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
     store = IndexStore(folder, index_key=None)
     store.load()
-    if os_trash:
+    if os_trash_value:
         # Try to use OS trash via send2trash; fall back to app trash on failure
         try:
             from send2trash import send2trash  # type: ignore
             moved = 0
-            for p in paths:
+            for p in paths_value:
                 sp = Path(p)
                 try:
                     sp_res = sp.resolve(); folder_res = folder.resolve()
@@ -2748,7 +3538,7 @@ def api_delete(dir: str, paths: list[str], os_trash: bool = False) -> dict[str, 
     dest_root = trash_root / ts
     moved_list: list[dict[str,str]] = []
     os.makedirs(dest_root, exist_ok=True)
-    for p in paths:
+    for p in paths_value:
         sp = Path(p)
         try:
             sp_res = sp.resolve(); folder_res = folder.resolve()
@@ -2774,9 +3564,13 @@ def api_delete(dir: str, paths: list[str], os_trash: bool = False) -> dict[str, 
 
 
 @app.post("/undo_delete")
-def api_undo_delete(dir: str) -> dict[str, object]:
+def api_undo_delete(
+    dir: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> dict[str, object]:
     """Undo last delete by moving files back from trash. Best‑effort."""
-    folder = Path(dir)
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    folder = Path(dir_value)
     trash_root = IndexStore(folder, index_key=None).index_dir / 'trash'
     state = None
     global _last_delete
@@ -2829,17 +3623,25 @@ def api_analytics(dir: str, limit: int = 200) -> Dict[str, Any]:
 
 
 @app.post("/analytics/log")
-def api_analytics_log(dir: str, type: str, data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def api_analytics_log(
+    dir: Optional[str] = None,
+    type: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
     """Append a simple event record to analytics log."""
-    store = IndexStore(Path(dir))
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    type_value = _require(_from_body(body, type, "type"), "type")
+    data_value = _from_body(body, None, "data")
+
+    store = IndexStore(Path(dir_value))
     rec = {
-        "type": str(type),
+        "type": str(type_value),
         "time": time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
     }
-    if isinstance(data, dict):
+    if isinstance(data_value, dict):
         try:
             # shallow merge, preferring base keys for safety
-            for k, v in data.items():
+            for k, v in data_value.items():
                 if k not in rec:
                     rec[k] = v
         except Exception:
@@ -2924,18 +3726,25 @@ def api_get_video_thumbnail(dir: str, path: str, frame_time: float = 1.0, size: 
 
 
 @app.post("/videos/index")
-def api_index_videos(dir: str, provider: str = "local") -> Dict[str, Any]:
+def api_index_videos(
+    dir: Optional[str] = None,
+    provider: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
     """Index video files for search (extract metadata and generate thumbnails)."""
-    folder = Path(dir)
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+
+    folder = Path(dir_value)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
-    
+
     store = IndexStore(folder)
     video_store = VideoIndexStore(folder)
-    
+
     videos = list_videos(folder)
     indexed = 0
-    
+
     for video in videos:
         try:
             # Extract metadata
@@ -2946,77 +3755,103 @@ def api_index_videos(dir: str, provider: str = "local") -> Dict[str, Any]:
                 indexed += 1
         except Exception:
             continue
-    
+
     video_store.save()
-    return {"indexed": indexed, "total": len(videos)}
+    return {"indexed": indexed, "total": len(videos), "provider": provider_value}
 
 
 # Batch Operations APIs
 @app.post("/batch/delete")
-def api_batch_delete(dir: str, paths: List[str], os_trash: bool = False) -> Dict[str, Any]:
+def api_batch_delete(
+    dir: Optional[str] = None,
+    paths: Optional[List[str]] = None,
+    os_trash: Optional[bool] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
     """Delete multiple files in batch."""
-    # Reuse existing delete logic but return more detailed results
-    result = api_delete(dir, paths, os_trash)
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    paths_value = _from_body(body, paths, "paths", default=[], cast=_as_str_list) or []
+    os_trash_value = _from_body(body, os_trash, "os_trash", default=False, cast=_as_bool) or False
+
+    result = api_delete(dir_value, paths_value, os_trash_value)
     return {
         "ok": result["ok"],
-        "processed": len(paths),
+        "processed": len(paths_value),
         "moved": result["moved"],
-        "failed": len(paths) - result["moved"],
+        "failed": len(paths_value) - int(result["moved"]),
         "undoable": result.get("undoable", False),
         "os_trash": result.get("os_trash", False)
     }
 
 
 @app.post("/batch/tag")
-def api_batch_tag(dir: str, paths: List[str], tags: List[str], operation: str = "add") -> Dict[str, Any]:
+def api_batch_tag(
+    dir: Optional[str] = None,
+    paths: Optional[List[str]] = None,
+    tags: Optional[List[str]] = None,
+    operation: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
     """Apply tags to multiple files in batch. Operation can be 'add', 'remove', or 'replace'."""
-    folder = Path(dir)
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    paths_value = _from_body(body, paths, "paths", default=[], cast=_as_str_list) or []
+    tags_value = _from_body(body, tags, "tags", default=[], cast=_as_str_list) or []
+    operation_value = (_from_body(body, operation, "operation", default="add") or "add").lower()
+
+    folder = Path(dir_value)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
-    
     store = IndexStore(folder)
     tag_map = load_tags(store.index_dir)
-    
     updated = 0
-    for path in paths:
-        if operation == "replace":
-            tag_map[path] = sorted(set(tags))
+    for path in paths_value:
+        if operation_value == "replace":
+            tag_map[path] = sorted(set(tags_value))
             updated += 1
-        elif operation == "add":
+        elif operation_value == "add":
             current_tags = set(tag_map.get(path, []))
-            new_tags = current_tags.union(set(tags))
+            new_tags = current_tags.union(set(tags_value))
             if new_tags != current_tags:
                 tag_map[path] = sorted(new_tags)
                 updated += 1
-        elif operation == "remove":
+        elif operation_value == "remove":
             current_tags = set(tag_map.get(path, []))
-            new_tags = current_tags - set(tags)
+            new_tags = current_tags - set(tags_value)
             if new_tags != current_tags:
                 tag_map[path] = sorted(new_tags)
                 updated += 1
-    
+
     save_tags(store.index_dir, tag_map)
-    return {"ok": True, "updated": updated, "processed": len(paths)}
+    return {"ok": True, "updated": updated, "processed": len(paths_value), "operation": operation_value}
 
 
 @app.post("/batch/collections")
-def api_batch_add_to_collection(dir: str, paths: List[str], collection_name: str) -> Dict[str, Any]:
+def api_batch_add_to_collection(
+    dir: Optional[str] = None,
+    paths: Optional[List[str]] = None,
+    collection_name: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
     """Add multiple files to a collection in batch."""
-    folder = Path(dir)
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    paths_value = _from_body(body, paths, "paths", default=[], cast=_as_str_list) or []
+    collection_value = _require(_from_body(body, collection_name, "collection_name"), "collection_name")
+
+    folder = Path(dir_value)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
-    
+
     store = IndexStore(folder)
     collections = load_collections(store.index_dir)
-    
-    current_paths = set(collections.get(collection_name, []))
-    new_paths = current_paths.union(set(paths))
-    
-    collections[collection_name] = sorted(new_paths)
+
+    current_paths = set(collections.get(collection_value, []))
+    new_paths = current_paths.union(set(paths_value))
+
+    collections[collection_value] = sorted(new_paths)
     save_collections(store.index_dir, collections)
-    
+
     added = len(new_paths) - len(current_paths)
-    return {"ok": True, "collection": collection_name, "added": added, "total": len(new_paths)}
+    return {"ok": True, "collection": collection_value, "added": added, "total": len(new_paths)}
 
 
 # Face Clustering Enhancement APIs
@@ -3032,25 +3867,43 @@ def api_get_face_photos(dir: str, cluster_id: str) -> Dict[str, Any]:
 
 
 @app.post("/faces/merge")
-def api_merge_face_clusters(dir: str, source_cluster_id: str, target_cluster_id: str) -> Dict[str, Any]:
+def api_merge_face_clusters(
+    dir: Optional[str] = None,
+    source_cluster_id: Optional[str] = None,
+    target_cluster_id: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
     """Merge two face clusters together."""
-    store = IndexStore(Path(dir))
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    source_value = _require(_from_body(body, source_cluster_id, "source_cluster_id"), "source_cluster_id")
+    target_value = _require(_from_body(body, target_cluster_id, "target_cluster_id"), "target_cluster_id")
+
+    store = IndexStore(Path(dir_value))
     try:
         # This would need implementation in the faces infrastructure
         # For now, return a placeholder response
-        return {"ok": True, "merged_into": target_cluster_id, "message": "Cluster merge functionality needs implementation"}
+        return {"ok": True, "merged_into": target_value, "source": source_value, "message": "Cluster merge functionality needs implementation"}
     except Exception:
         raise HTTPException(500, "Could not merge face clusters")
 
 
 @app.post("/faces/split")
-def api_split_face_cluster(dir: str, cluster_id: str, photo_paths: List[str]) -> Dict[str, Any]:
+def api_split_face_cluster(
+    dir: Optional[str] = None,
+    cluster_id: Optional[str] = None,
+    photo_paths: Optional[List[str]] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
     """Split selected photos from a face cluster into a new cluster."""
-    store = IndexStore(Path(dir))
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    cluster_value = _require(_from_body(body, cluster_id, "cluster_id"), "cluster_id")
+    photo_values = _from_body(body, photo_paths, "photo_paths", default=[], cast=_as_str_list) or []
+
+    store = IndexStore(Path(dir_value))
     try:
         # This would need implementation in the faces infrastructure
         # For now, return a placeholder response
-        return {"ok": True, "new_cluster_id": f"split_{cluster_id}", "message": "Cluster split functionality needs implementation"}
+        return {"ok": True, "new_cluster_id": f"split_{cluster_value}", "photos": photo_values, "message": "Cluster split functionality needs implementation"}
     except Exception:
         raise HTTPException(500, "Could not split face cluster")
 
@@ -3058,21 +3911,21 @@ def api_split_face_cluster(dir: str, cluster_id: str, photo_paths: List[str]) ->
 # Progressive Loading APIs
 @app.post("/search/paginated")
 def api_search_paginated(
-    dir: str,
-    query: str,
-    provider: str = "local",
-    limit: int = 24,
-    offset: int = 0,
+    dir: Optional[str] = None,
+    query: Optional[str] = None,
+    provider: Optional[str] = None,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
     hf_token: Optional[str] = None,
     openai_key: Optional[str] = None,
-    favorites_only: bool = False,
+    favorites_only: Optional[bool] = None,
     tags: Optional[List[str]] = None,
     date_from: Optional[float] = None,
     date_to: Optional[float] = None,
-    use_fast: bool = False,
+    use_fast: Optional[bool] = None,
     fast_kind: Optional[str] = None,
-    use_captions: bool = False,
-    use_ocr: bool = False,
+    use_captions: Optional[bool] = None,
+    use_ocr: Optional[bool] = None,
     camera: Optional[str] = None,
     iso_min: Optional[int] = None,
     iso_max: Optional[int] = None,
@@ -3086,83 +3939,119 @@ def api_search_paginated(
     alt_max: Optional[float] = None,
     heading_min: Optional[float] = None,
     heading_max: Optional[float] = None,
-    sharp_only: bool = False,
-    exclude_underexp: bool = False,
-    exclude_overexp: bool = False,
-    has_text: bool = False,
+    sharp_only: Optional[bool] = None,
+    exclude_underexp: Optional[bool] = None,
+    exclude_overexp: Optional[bool] = None,
+    has_text: Optional[bool] = None,
     person: Optional[str] = None,
     persons: Optional[List[str]] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
 ) -> Dict[str, Any]:
     """Paginated search with cursor support for large result sets."""
-    folder = Path(dir)
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    query_value = _require(_from_body(body, query, "query"), "query")
+    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+    limit_value = _from_body(body, limit, "limit", default=24, cast=lambda v: int(v)) or 24
+    offset_value = _from_body(body, offset, "offset", default=0, cast=lambda v: int(v)) or 0
+    hf_token_value = _from_body(body, hf_token, "hf_token")
+    openai_key_value = _from_body(body, openai_key, "openai_key")
+    favorites_value = _from_body(body, favorites_only, "favorites_only", default=False, cast=_as_bool) or False
+    tags_value = _from_body(body, tags, "tags", default=[], cast=_as_str_list) or []
+    date_from_value = _from_body(body, date_from, "date_from")
+    date_to_value = _from_body(body, date_to, "date_to")
+    use_fast_value = _from_body(body, use_fast, "use_fast", default=False, cast=_as_bool) or False
+    fast_kind_value = _from_body(body, fast_kind, "fast_kind")
+    use_captions_value = _from_body(body, use_captions, "use_captions", default=False, cast=_as_bool) or False
+    use_ocr_value = _from_body(body, use_ocr, "use_ocr", default=False, cast=_as_bool) or False
+    camera_value = _from_body(body, camera, "camera")
+    iso_min_value = _from_body(body, iso_min, "iso_min")
+    iso_max_value = _from_body(body, iso_max, "iso_max")
+    f_min_value = _from_body(body, f_min, "f_min")
+    f_max_value = _from_body(body, f_max, "f_max")
+    place_value = _from_body(body, place, "place")
+    flash_value = _from_body(body, flash, "flash")
+    wb_value = _from_body(body, wb, "wb")
+    metering_value = _from_body(body, metering, "metering")
+    alt_min_value = _from_body(body, alt_min, "alt_min")
+    alt_max_value = _from_body(body, alt_max, "alt_max")
+    heading_min_value = _from_body(body, heading_min, "heading_min")
+    heading_max_value = _from_body(body, heading_max, "heading_max")
+    sharp_only_value = _from_body(body, sharp_only, "sharp_only", default=False, cast=_as_bool) or False
+    exclude_under_value = _from_body(body, exclude_underexp, "exclude_underexp", default=False, cast=_as_bool) or False
+    exclude_over_value = _from_body(body, exclude_overexp, "exclude_overexp", default=False, cast=_as_bool) or False
+    has_text_value = _from_body(body, has_text, "has_text", default=False, cast=_as_bool) or False
+    person_value = _from_body(body, person, "person")
+    persons_value = _from_body(body, persons, "persons", default=[], cast=_as_str_list) or []
+
+    folder = Path(dir_value)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
 
-    emb = _emb(provider, hf_token, openai_key)
+    emb = _emb(provider_value, hf_token_value, openai_key_value)
     store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
     store.load()
 
     # Get more results than needed for pagination
-    search_top_k = min(limit + offset + 50, len(store.state.paths or []))
+    search_top_k = min(limit_value + offset_value + 50, len(store.state.paths or []))
 
-    if use_fast:
+    if use_fast_value:
         try:
-            if fast_kind and fast_kind.lower() == 'faiss' and store.faiss_status().get('exists'):
-                results = store.search_faiss(emb, query, top_k=search_top_k)
-            elif fast_kind and fast_kind.lower() == 'hnsw' and store.hnsw_status().get('exists'):
-                results = store.search_hnsw(emb, query, top_k=search_top_k)
-            elif fast_kind and fast_kind.lower() == 'annoy' and store.ann_status().get('exists'):
-                results = store.search_annoy(emb, query, top_k=search_top_k)
+            if fast_kind_value and fast_kind_value.lower() == 'faiss' and store.faiss_status().get('exists'):
+                results = store.search_faiss(emb, query_value, top_k=search_top_k)
+            elif fast_kind_value and fast_kind_value.lower() == 'hnsw' and store.hnsw_status().get('exists'):
+                results = store.search_hnsw(emb, query_value, top_k=search_top_k)
+            elif fast_kind_value and fast_kind_value.lower() == 'annoy' and store.ann_status().get('exists'):
+                results = store.search_annoy(emb, query_value, top_k=search_top_k)
             else:
                 if store.faiss_status().get('exists'):
-                    results = store.search_faiss(emb, query, top_k=search_top_k)
+                    results = store.search_faiss(emb, query_value, top_k=search_top_k)
                 elif store.hnsw_status().get('exists'):
-                    results = store.search_hnsw(emb, query, top_k=search_top_k)
+                    results = store.search_hnsw(emb, query_value, top_k=search_top_k)
                 elif store.ann_status().get('exists'):
-                    results = store.search_annoy(emb, query, top_k=search_top_k)
+                    results = store.search_annoy(emb, query_value, top_k=search_top_k)
                 else:
-                    results = store.search(emb, query, top_k=search_top_k)
+                    results = store.search(emb, query_value, top_k=search_top_k)
         except Exception:
-            results = store.search(emb, query, top_k=search_top_k)
+            results = store.search(emb, query_value, top_k=search_top_k)
     else:
-        if use_captions and store.captions_available():
-            results = store.search_with_captions(emb, query, top_k=search_top_k)
-        elif use_ocr and store.ocr_available():
-            results = store.search_with_ocr(emb, query, top_k=search_top_k)
+        if use_captions_value and store.captions_available():
+            results = store.search_with_captions(emb, query_value, top_k=search_top_k)
+        elif use_ocr_value and store.ocr_available():
+            results = store.search_with_ocr(emb, query_value, top_k=search_top_k)
         else:
-            results = store.search(emb, query, top_k=search_top_k)
+            results = store.search(emb, query_value, top_k=search_top_k)
 
     out = results
 
     # Apply filters (simplified version)
-    if favorites_only:
+    if favorites_value:
         coll = load_collections(store.index_dir)
         favs = set(coll.get('Favorites', []))
         out = [r for r in out if str(r.path) in favs]
 
-    if tags:
+    if tags_value:
         tmap = load_tags(store.index_dir)
-        req = set(tags)
+        req = set(tags_value)
         out = [r for r in out if req.issubset(set(tmap.get(str(r.path), [])))]
 
-    if date_from is not None and date_to is not None:
+    if date_from_value is not None and date_to_value is not None:
         mmap = {sp: float(mt) for sp, mt in zip(store.state.paths or [], store.state.mtimes or [])}
-        out = [r for r in out if date_from <= mmap.get(str(r.path), 0.0) <= date_to]
+        out = [r for r in out if date_from_value <= mmap.get(str(r.path), 0.0) <= date_to_value]
 
     # Apply pagination
     total = len(out)
-    paginated_results = out[offset:offset + limit]
+    paginated_results = out[offset_value:offset_value + limit_value]
 
-    sid = log_search(store.index_dir, getattr(emb, 'index_id', 'default'), query, [(str(r.path), float(r.score)) for r in out])
+    sid = log_search(store.index_dir, getattr(emb, 'index_id', 'default'), query_value, [(str(r.path), float(r.score)) for r in out])
 
     return {
         "search_id": sid,
         "results": [{"path": str(r.path), "score": float(r.score)} for r in paginated_results],
         "pagination": {
-            "offset": offset,
-            "limit": limit,
+            "offset": offset_value,
+            "limit": limit_value,
             "total": total,
-            "has_more": offset + limit < total
+            "has_more": offset_value + limit_value < total
         }
     }
 
@@ -3215,56 +4104,72 @@ def api_library_paginated(dir: str, provider: str = "local", limit: int = 120, o
 # Video Search API
 @app.post("/search_video")
 def api_search_video(
-    dir: str,
-    query: str,
-    top_k: int = 12,
-    provider: str = "local",
+    dir: Optional[str] = None,
+    query: Optional[str] = None,
+    top_k: Optional[int] = None,
+    provider: Optional[str] = None,
     hf_token: Optional[str] = None,
     openai_key: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
 ) -> Dict[str, Any]:
     """Search for videos using semantic search on extracted metadata and keyframes."""
-    folder = Path(dir)
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    query_value = _require(_from_body(body, query, "query"), "query")
+    top_k_value = _from_body(body, top_k, "top_k", default=12, cast=lambda v: int(v)) or 12
+    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+    hf_token_value = _from_body(body, hf_token, "hf_token")
+    openai_key_value = _from_body(body, openai_key, "openai_key")
+
+    folder = Path(dir_value)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
-    
+
     # Get video index store
     video_store = VideoIndexStore(folder)
     if not video_store.load():
         return {"results": []}
-    
+
     # Embed query
-    emb = _emb(provider, hf_token, openai_key)
+    emb = _emb(provider_value, hf_token_value, openai_key_value)
     try:
-        qv = emb.embed_text(query)
+        qv = emb.embed_text(query_value)
     except Exception:
         raise HTTPException(500, "Embedding failed")
-    
+
     # Search in video store
-    results = video_store.search(qv, top_k=top_k)
-    
+    results = video_store.search(qv, top_k=top_k_value)
+
     return {"results": [{"path": r.path, "score": float(r.score)} for r in results]}
 
 
 @app.post("/search_video_like")
 def api_search_video_like(
-    dir: str,
-    path: str,
-    top_k: int = 12,
-    provider: str = "local",
+    dir: Optional[str] = None,
+    path: Optional[str] = None,
+    top_k: Optional[int] = None,
+    provider: Optional[str] = None,
     hf_token: Optional[str] = None,
     openai_key: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
 ) -> Dict[str, Any]:
     """Find visually similar videos based on a reference video."""
-    folder = Path(dir)
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    path_value = _require(_from_body(body, path, "path"), "path")
+    top_k_value = _from_body(body, top_k, "top_k", default=12, cast=lambda v: int(v)) or 12
+    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+    hf_token_value = _from_body(body, hf_token, "hf_token")
+    openai_key_value = _from_body(body, openai_key, "openai_key")
+
+    folder = Path(dir_value)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
-    
+
     # Get video index store
     video_store = VideoIndexStore(folder)
     if not video_store.load():
         return {"results": []}
-    
+
     # Search for similar videos
-    results = video_store.search_like(path, top_k=top_k)
-    
+    results = video_store.search_like(path_value, top_k=top_k_value)
+
     return {"results": [{"path": r.path, "score": float(r.score)} for r in results]}

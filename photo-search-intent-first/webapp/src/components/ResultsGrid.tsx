@@ -1,4 +1,5 @@
 import { type SearchResult, thumbUrl } from "../api";
+import { ProgressiveImage } from "./ProgressiveImage";
 
 export function ResultsGrid({
 	dir,
@@ -33,27 +34,34 @@ export function ResultsGrid({
 		);
 	}
 	return (
-		<div
-			className="mt-2 grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-2"
-			role="grid"
-		>
+		<div className="mt-2 grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-2">
 			{results.map((r, _index) => {
 				const p = r.path;
 				const isSel = !!selected[p];
 				return (
 					<div
 						key={p}
-						className={`relative cursor-pointer border rounded ${isSel ? "ring-2 ring-blue-600" : ""}`}
-						onClick={() => onToggleSelect(p)}
-							onDoubleClick={() => onOpen(p)}
-						role="gridcell"
-						aria-selected={isSel}
-						tabIndex={0}
+						className={`relative border rounded ${
+							isSel ? "ring-2 ring-blue-600" : ""
+						}`}
+						tabIndex={-1}
 					>
-						<img
+						<ProgressiveImage
 							src={thumbUrl(dir, engine, p, 256)}
-							className="w-full h-24 object-cover rounded"
+							alt={p.split("/").pop() || p}
+							className="w-full h-24 object-cover rounded pointer-events-none select-none"
+							thumbSize={96}
+							mediumSize={256}
+							fullSize={512}
 							title={p}
+						/>
+						{/* Cover button for selection/open */}
+						<button
+							type="button"
+							className="absolute inset-0 w-full h-full text-left"
+							aria-label={`Select ${p}`}
+							onClick={() => onToggleSelect(p)}
+							onDoubleClick={() => onOpen(p)}
 						/>
 						{showScore && (
 							<div className="absolute top-1 left-1 bg-white/80 rounded px-1 text-xs">
@@ -89,7 +97,7 @@ export function ResultsGrid({
 								)}
 							</div>
 						)}
-						<div className="absolute top-1 right-1">
+						<div className="absolute top-1 right-1 z-10">
 							<input
 								type="checkbox"
 								checked={isSel}

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiLogEvent, apiOpen, apiSetFavorite } from "../api";
-import { handleError } from "../utils/errors";
 import {
 	useFavorites,
 	useSearchQuery,
@@ -17,6 +16,7 @@ import {
 	useShowExplain,
 } from "../stores/settingsStore";
 import { useBusy } from "../stores/uiStore";
+import { handleError } from "../utils/errors";
 import { Lightbox } from "./Lightbox";
 import { ResultsGrid } from "./ResultsGrid";
 import { NoResultsEmpty } from "./ui/EmptyState";
@@ -78,7 +78,7 @@ export default function ResultsPanel() {
 				t &&
 				(t.tagName === "INPUT" ||
 					t.tagName === "TEXTAREA" ||
-					(t as unknown).isContentEditable)
+					(t as HTMLElement).isContentEditable)
 			)
 				return;
 			if (!hasResults) return;
@@ -96,22 +96,22 @@ export default function ResultsPanel() {
 					e.preventDefault();
 					navDetail(1);
 				}
-            if (e.key.toLowerCase() === "f") {
-                e.preventDefault();
-                const p = results[detailIdx].path;
-                apiSetFavorite(dir, p, !favorites.includes(p)).catch((err) =>
-                  handleError(err, {
-                    logToServer: true,
-                    context: {
-                      action: "toggle_favorite",
-                      component: "ResultsPanel",
-                      dir,
-                    },
-                  }),
-                );
-            }
-            return;
-          }
+				if (e.key.toLowerCase() === "f") {
+					e.preventDefault();
+					const p = results[detailIdx].path;
+					apiSetFavorite(dir, p, !favorites.includes(p)).catch((err) =>
+						handleError(err, {
+							logToServer: true,
+							context: {
+								action: "toggle_favorite",
+								component: "ResultsPanel",
+								dir,
+							},
+						}),
+					);
+				}
+				return;
+			}
 			// Grid shortcuts (no focused detail)
 			if (e.key.toLowerCase() === "a") {
 				e.preventDefault();
@@ -188,7 +188,9 @@ export default function ResultsPanel() {
 								} catch {}
 							}
 						}}
-						className={`rounded px-2 py-1 ${showExplain ? "bg-blue-600 text-white" : "bg-gray-200"}`}
+						className={`rounded px-2 py-1 ${
+							showExplain ? "bg-blue-600 text-white" : "bg-gray-200"
+						}`}
 						title="Toggle explainability chips"
 					>
 						{showExplain ? "Hide Explain" : "Show Explain"}
@@ -218,21 +220,21 @@ export default function ResultsPanel() {
 								return;
 							}
 							let _added = 0;
-            for (const p of sel) {
-              try {
-                await apiSetFavorite(dir, p, !favorites.includes(p));
-                _added++;
-              } catch (err) {
-                handleError(err, {
-                  logToServer: true,
-                  context: {
-                    action: "batch_favorite",
-                    component: "ResultsPanel",
-                    dir,
-                  },
-                });
-              }
-            }
+							for (const p of sel) {
+								try {
+									await apiSetFavorite(dir, p, !favorites.includes(p));
+									_added++;
+								} catch (err) {
+									handleError(err, {
+										logToServer: true,
+										context: {
+											action: "batch_favorite",
+											component: "ResultsPanel",
+											dir,
+										},
+									});
+								}
+							}
 						}}
 						className="bg-pink-600 text-white rounded px-2 py-1"
 					>
@@ -280,25 +282,23 @@ export default function ResultsPanel() {
 					onPrev={() => navDetail(-1)}
 					onNext={() => navDetail(1)}
 					onClose={() => setDetailIdx(null)}
-                onReveal={() =>
-                  apiOpen(dir, results[detailIdx!].path).catch((err) =>
-                    handleError(err, {
-                      logToServer: true,
-                      context: {
-                        action: "open_in_explorer",
-                        component: "ResultsPanel.Lightbox",
-                        dir,
-                      },
-                    }),
-                  )
-                }
-					onFavorite={() =>
-						apiSetFavorite(
-							dir,
-							results[detailIdx!].path,
-							!favorites.includes(results[detailIdx!].path),
-						).catch(() => {})
+					onReveal={() =>
+						apiOpen(dir, results[detailIdx]?.path || "").catch((err) =>
+							handleError(err, {
+								logToServer: true,
+								context: {
+									action: "open_in_explorer",
+									component: "ResultsPanel.Lightbox",
+									dir,
+								},
+							}),
+						)
 					}
+					onFavorite={() => {
+						const p = results[detailIdx]?.path;
+						if (!p) return;
+						apiSetFavorite(dir, p, !favorites.includes(p)).catch(() => {});
+					}}
 				/>
 			)}
 

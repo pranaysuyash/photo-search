@@ -11,7 +11,27 @@ import {
 	RotateCw,
 } from "lucide-react";
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+type BeforeInstallPromptEvent = Event & {
+	prompt: () => Promise<void>;
+	userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+};
+
+// Get error message
+function getErrorMessage(err: unknown): string {
+	const e = (err as { name?: string; message?: string }) || {};
+	if (e?.name === "NotAllowedError") {
+		return "Camera access denied. Please allow camera permissions.";
+	} else if (e?.name === "NotFoundError") {
+		return "No camera found on this device.";
+	} else if (e?.name === "NotReadableError") {
+		return "Camera is already in use by another application.";
+	} else if (typeof e?.message === "string") {
+		return e.message;
+	}
+	return "An unknown error occurred";
+}
 
 interface MobilePhotoCaptureProps {
 	onPhotoCaptured: (file: File) => void;
@@ -57,7 +77,7 @@ export function MobilePhotoCapture({
 	}, []);
 
 	// Initialize camera
-	const initializeCamera = async () => {
+	const initializeCamera = useCallback(async () => {
 		if (!isSupported) {
 			setError("Camera not supported on this device");
 			return;
@@ -93,10 +113,10 @@ export function MobilePhotoCapture({
 			console.error("Camera initialization failed:", err);
 			setError(getErrorMessage(err));
 		}
-	};
+	}, [isSupported, stream, settings.facingMode]);
 
 	// Stop camera
-	const stopCamera = () => {
+	const stopCamera = useCallback(() => {
 		if (stream) {
 			stream.getTracks().forEach((track) => track.stop());
 			setStream(null);
@@ -105,7 +125,7 @@ export function MobilePhotoCapture({
 			videoRef.current.srcObject = null;
 		}
 		setIsActive(false);
-	};
+	}, [stream]);
 
 	// Capture photo
 	const capturePhoto = async () => {
@@ -195,19 +215,7 @@ export function MobilePhotoCapture({
 	};
 
 	// Get error message
-    const getErrorMessage = (err: unknown): string => {
-        const e = err as any;
-        if (e?.name === "NotAllowedError") {
-            return "Camera access denied. Please allow camera permissions.";
-        } else if (e?.name === "NotFoundError") {
-            return "No camera found on this device.";
-        } else if (e?.name === "NotReadableError") {
-            return "Camera is already in use by another application.";
-        } else if (typeof e?.message === 'string') {
-            return e.message;
-        }
-        return "An unknown error occurred";
-    };
+	// getErrorMessage moved to module scope for stability
 
 	// Update camera when settings change
 	useEffect(() => {
@@ -246,6 +254,7 @@ export function MobilePhotoCapture({
 					accept="image/*"
 					onChange={handleFileSelect}
 					className="hidden"
+					title="Choose image from gallery"
 				/>
 			</div>
 		);
@@ -262,18 +271,18 @@ export function MobilePhotoCapture({
 				accept="image/*"
 				onChange={handleFileSelect}
 				className="hidden"
+				title="Choose image from gallery"
 			/>
 
 			{/* Video preview */}
 			<div className="relative aspect-video">
 				<video
 					ref={videoRef}
-					className="w-full h-full object-cover"
+					className={`w-full h-full object-cover ${
+						settings.facingMode === "user" ? "scale-x-[-1]" : ""
+					}`}
 					playsInline
 					muted
-					style={{
-						transform: settings.facingMode === "user" ? "scaleX(-1)" : "none",
-					}}
 				/>
 
 				{/* Canvas for capture */}
@@ -397,16 +406,25 @@ export function useCameraSupport() {
 			setIsSupported(hasCamera);
 
 			// Check permission status
-            if ((navigator as any).permissions) {
-                try {
-                    const result = await (navigator as any).permissions.query({
-                        name: "camera" as PermissionName,
-                    });
-                    setPermission(result.state as "granted" | "denied" | "prompt");
-                } catch {
-                    setPermission("unknown");
-                }
-            }
+			const navPerms = (
+				navigator as unknown as {
+					permissions?: {
+						query: (opts: {
+							name: PermissionName;
+						}) => Promise<{ state: string }>;
+					};
+				}
+			).permissions;
+			if (navPerms) {
+				try {
+					const result = await navPerms.query({
+						name: "camera" as PermissionName,
+					});
+					setPermission(result.state as "granted" | "denied" | "prompt");
+				} catch {
+					setPermission("unknown");
+				}
+			}
 		};
 
 		checkSupport();
@@ -417,13 +435,14 @@ export function useCameraSupport() {
 
 // PWA Install Prompt Component
 export function PWAInstallPrompt() {
-	const [deferredPrompt, setDeferredPrompt] = useState<unknown>(null);
+	const [deferredPrompt, setDeferredPrompt] =
+		useState<BeforeInstallPromptEvent | null>(null);
 	const [showInstall, setShowInstall] = useState(false);
 
 	useEffect(() => {
 		const handleBeforeInstallPrompt = (e: Event) => {
 			e.preventDefault();
-			setDeferredPrompt(e);
+			setDeferredPrompt(e as BeforeInstallPromptEvent);
 			setShowInstall(true);
 		};
 
@@ -441,7 +460,7 @@ export function PWAInstallPrompt() {
 		if (!deferredPrompt) return;
 
 		try {
-			deferredPrompt.prompt();
+			await deferredPrompt.prompt();
 			const { outcome } = await deferredPrompt.userChoice;
 
 			if (outcome === "accepted") {

@@ -1,35 +1,42 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { performanceMonitor } from "../utils/performance";
 
 interface PerformanceMetricsProps {
 	visible?: boolean;
 }
 
-export const PerformanceMetrics = ({ visible = false }: PerformanceMetricsProps) => {
+type Metric = { name: string; count: number; total: number; avg: number };
+
+export const PerformanceMetrics = ({
+	visible = false,
+}: PerformanceMetricsProps) => {
 	const [isVisible, setIsVisible] = useState(visible);
-	const [metrics, setMetrics] = useState<any[]>([]);
+	const [metrics, setMetrics] = useState<Metric[]>([]);
 
 	useEffect(() => {
 		if (!isVisible) return;
 
 		const updateMetrics = () => {
 			const recentMetrics = performanceMonitor.getRecentMetrics(1);
-			const groupedMetrics: Record<string, { count: number; total: number; avg: number }> = {};
+			const groupedMetrics: Record<
+				string,
+				{ count: number; total: number; avg: number }
+			> = {};
 
 			// Group metrics by name and calculate averages
-			recentMetrics.forEach(metric => {
+			recentMetrics.forEach((metric) => {
 				if (!groupedMetrics[metric.name]) {
 					groupedMetrics[metric.name] = { count: 0, total: 0, avg: 0 };
 				}
-				
+
 				groupedMetrics[metric.name].count += 1;
 				groupedMetrics[metric.name].total += metric.duration;
-				groupedMetrics[metric.name].avg = 
+				groupedMetrics[metric.name].avg =
 					groupedMetrics[metric.name].total / groupedMetrics[metric.name].count;
 			});
 
 			// Convert to array and sort by average duration
-			const metricsArray = Object.entries(groupedMetrics)
+			const metricsArray: Metric[] = Object.entries(groupedMetrics)
 				.map(([name, data]) => ({ name, ...data }))
 				.sort((a, b) => b.avg - a.avg);
 
@@ -47,20 +54,9 @@ export const PerformanceMetrics = ({ visible = false }: PerformanceMetricsProps)
 	if (!isVisible) {
 		return (
 			<button
+				type="button"
 				onClick={() => setIsVisible(true)}
-				style={{
-					position: "fixed",
-					bottom: "10px",
-					right: "10px",
-					zIndex: 9999,
-					background: "#3b82f6",
-					color: "white",
-					border: "none",
-					borderRadius: "4px",
-					padding: "8px 12px",
-					cursor: "pointer",
-					fontSize: "12px"
-				}}
+				className="fixed bottom-2 right-2 z-[9999] bg-blue-600 text-white rounded px-3 py-2 text-xs shadow"
 			>
 				Show Perf
 			</button>
@@ -68,67 +64,43 @@ export const PerformanceMetrics = ({ visible = false }: PerformanceMetricsProps)
 	}
 
 	return (
-		<div
-			style={{
-				position: "fixed",
-				bottom: "10px",
-				right: "10px",
-				zIndex: 9999,
-				background: "rgba(0, 0, 0, 0.9)",
-				color: "white",
-				borderRadius: "8px",
-				padding: "16px",
-				maxWidth: "400px",
-				maxHeight: "300px",
-				overflow: "auto",
-				fontFamily: "monospace",
-				fontSize: "12px"
-			}}
-		>
-			<div style={{ 
-				display: "flex", 
-				justifyContent: "space-between", 
-				alignItems: "center", 
-				marginBottom: "12px" 
-			}}>
-				<h3 style={{ margin: 0, fontSize: "14px" }}>Performance Metrics</h3>
+		<div className="fixed bottom-2 right-2 z-[9999] bg-black/90 text-white rounded-lg p-4 max-w-[400px] max-h-[300px] overflow-auto font-mono text-xs">
+			<div className="flex items-center justify-between mb-3">
+				<h3 className="m-0 text-sm">Performance Metrics</h3>
 				<button
+					type="button"
 					onClick={() => setIsVisible(false)}
-					style={{
-						background: "transparent",
-						color: "white",
-						border: "1px solid #6b7280",
-						borderRadius: "4px",
-						padding: "4px 8px",
-						cursor: "pointer",
-						fontSize: "12px"
-					}}
+					className="px-2 py-1 border border-gray-500 rounded text-white"
 				>
 					Hide
 				</button>
 			</div>
-			
-			<div style={{ marginBottom: "8px" }}>
+
+			<div className="mb-2">
 				<strong>Recent Operations (last 1 min):</strong>
 			</div>
-			
+
 			{metrics.length === 0 ? (
 				<div>No metrics available</div>
 			) : (
-				<table style={{ width: "100%", borderCollapse: "collapse" }}>
+				<table className="w-full border-collapse">
 					<thead>
 						<tr>
-							<th style={{ textAlign: "left", borderBottom: "1px solid #4b5563", padding: "4px" }}>Operation</th>
-							<th style={{ textAlign: "right", borderBottom: "1px solid #4b5563", padding: "4px" }}>Count</th>
-							<th style={{ textAlign: "right", borderBottom: "1px solid #4b5563", padding: "4px" }}>Avg (ms)</th>
+							<th className="text-left border-b border-gray-600 p-1">
+								Operation
+							</th>
+							<th className="text-right border-b border-gray-600 p-1">Count</th>
+							<th className="text-right border-b border-gray-600 p-1">
+								Avg (ms)
+							</th>
 						</tr>
 					</thead>
 					<tbody>
-						{metrics.map((metric, index) => (
-							<tr key={index}>
-								<td style={{ padding: "4px" }}>{metric.name}</td>
-								<td style={{ textAlign: "right", padding: "4px" }}>{metric.count}</td>
-								<td style={{ textAlign: "right", padding: "4px" }}>{metric.avg.toFixed(2)}</td>
+						{metrics.map((metric) => (
+							<tr key={metric.name}>
+								<td className="p-1">{metric.name}</td>
+								<td className="text-right p-1">{metric.count}</td>
+								<td className="text-right p-1">{metric.avg.toFixed(2)}</td>
 							</tr>
 						))}
 					</tbody>

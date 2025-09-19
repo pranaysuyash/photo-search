@@ -43,24 +43,29 @@ export default function TimelineResults({
 		need.forEach((p) => next.add(p));
 		setInflight(next);
 		let cancelled = false;
-        Promise.all(
-            need.map(async (p) => {
-                try {
-                    const r = await apiMetadataDetail(dir, p);
-                    if (!cancelled && r && r.meta) {
-                        setMeta((m) => ({
-                            ...m,
-                            [p]: {
-                                mtime: typeof r.meta.mtime === 'number' ? r.meta.mtime : undefined,
-                                camera: typeof r.meta.camera === 'string' ? r.meta.camera : undefined,
-                                fnumber: typeof r.meta.fnumber === 'number' ? r.meta.fnumber : undefined,
-                                iso: typeof r.meta.iso === 'number' ? r.meta.iso : undefined,
-                            },
-                        }));
-                    }
-                } catch {}
-            }),
-        ).finally(() => {
+		Promise.all(
+			need.map(async (p) => {
+				try {
+					const r = await apiMetadataDetail(dir, p);
+					if (!cancelled && r && r.meta) {
+						setMeta((m) => ({
+							...m,
+							[p]: {
+								mtime:
+									typeof r.meta.mtime === "number" ? r.meta.mtime : undefined,
+								camera:
+									typeof r.meta.camera === "string" ? r.meta.camera : undefined,
+								fnumber:
+									typeof r.meta.fnumber === "number"
+										? r.meta.fnumber
+										: undefined,
+								iso: typeof r.meta.iso === "number" ? r.meta.iso : undefined,
+							},
+						}));
+					}
+				} catch {}
+			}),
+		).finally(() => {
 			if (!cancelled) {
 				setInflight((s) => {
 					const n = new Set(s);
@@ -75,9 +80,30 @@ export default function TimelineResults({
 	}, [items, dir, meta, inflight]);
 
 	const grouped = useMemo(() => {
+		const now = new Date();
+		const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+		const yesterday = new Date(today);
+		yesterday.setDate(yesterday.getDate() - 1);
+		const thisWeekStart = new Date(today);
+		thisWeekStart.setDate(thisWeekStart.getDate() - today.getDay());
+		const lastWeekStart = new Date(thisWeekStart);
+		lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+		const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+		const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
 		const fmtDay = (ts?: number) => {
 			if (!ts || !Number.isFinite(ts)) return "Unknown";
 			const d = new Date(ts * 1000);
+			const date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+			// Smart date labels
+			if (date.getTime() === today.getTime()) return "Today";
+			if (date.getTime() === yesterday.getTime()) return "Yesterday";
+			if (date >= thisWeekStart) return "This Week";
+			if (date >= lastWeekStart) return "Last Week";
+			if (date >= thisMonthStart) return "This Month";
+			if (date >= lastMonthStart) return "Last Month";
+
 			return d.toLocaleDateString(undefined, {
 				year: "numeric",
 				month: "short",
@@ -87,6 +113,12 @@ export default function TimelineResults({
 		const fmtMonth = (ts?: number) => {
 			if (!ts || !Number.isFinite(ts)) return "Unknown";
 			const d = new Date(ts * 1000);
+			const month = new Date(d.getFullYear(), d.getMonth(), 1);
+
+			// Smart month labels
+			if (month.getTime() === thisMonthStart.getTime()) return "This Month";
+			if (month.getTime() === lastMonthStart.getTime()) return "Last Month";
+
 			return d.toLocaleDateString(undefined, {
 				year: "numeric",
 				month: "short",
@@ -105,6 +137,12 @@ export default function TimelineResults({
 			const weekNo = Math.ceil(
 				((tmp.getTime() - yearStart.getTime()) / 86400000 + 1) / 7,
 			);
+
+			// Check if this is current or last week
+			const weekDate = new Date(tmp.getTime());
+			if (weekDate >= thisWeekStart) return "This Week";
+			if (weekDate >= lastWeekStart) return "Last Week";
+
 			return `${tmp.getUTCFullYear()} • W${String(weekNo).padStart(2, "0")}`;
 		};
 		const keyFor = (ts?: number) =>
@@ -230,11 +268,11 @@ export default function TimelineResults({
 	}, []);
 
 	// Listen for global jump events dispatched by the app for keyboard shortcuts
-    useEffect(() => {
-        const onJump = (e: CustomEvent<{ kind?: string }>) => {
-            try {
-                const kind = e.detail?.kind as string;
-                if (!kind) return;
+	useEffect(() => {
+		const onJump = (e: CustomEvent<{ kind?: string }>) => {
+			try {
+				const kind = e.detail?.kind as string;
+				if (!kind) return;
 				const now = Date.now() / 1000;
 				if (kind === "today") {
 					const key =
@@ -295,9 +333,16 @@ export default function TimelineResults({
 				}
 			} catch {}
 		};
-        window.addEventListener("timeline-jump", onJump as unknown as EventListener);
-        return () => window.removeEventListener("timeline-jump", onJump as unknown as EventListener);
-    }, [bucket]);
+		window.addEventListener(
+			"timeline-jump",
+			onJump as unknown as EventListener,
+		);
+		return () =>
+			window.removeEventListener(
+				"timeline-jump",
+				onJump as unknown as EventListener,
+			);
+	}, [bucket]);
 
 	return (
 		<div
@@ -305,126 +350,202 @@ export default function TimelineResults({
 			className="space-y-8 relative"
 			style={{ scrollSnapType: "y proximity" }}
 		>
-			{/* Jump controls */}
-			<button
-				type="button"
-				className="hidden md:flex items-center gap-1 fixed right-4 bottom-4 z-10 bg-blue-600 text-white px-3 py-1 rounded shadow"
-				onClick={() => {
-					// Build today's key based on bucket formatters
-					const now = Date.now() / 1000;
-					const key =
-						bucket === "month"
-							? new Date(now * 1000).toLocaleDateString(undefined, {
+			{/* Enhanced jump controls */}
+			<div className="hidden md:flex flex-col gap-2 fixed left-4 bottom-4 z-10">
+				<div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border border-gray-200 dark:border-gray-700 rounded-2xl shadow-lg p-2">
+					<div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 px-2">
+						Quick Jump
+					</div>
+					<div className="flex flex-col gap-1">
+						<button
+							type="button"
+							className="group flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 bg-blue-500 text-white hover:bg-blue-600 hover:scale-105 shadow-md"
+							onClick={() => {
+								const now = Date.now() / 1000;
+								const key =
+									bucket === "month"
+										? new Date(now * 1000).toLocaleDateString(undefined, {
+												year: "numeric",
+												month: "short",
+											})
+										: bucket === "week"
+											? (() => {
+													const d = new Date(now * 1000);
+													const tmp = new Date(
+														Date.UTC(
+															d.getFullYear(),
+															d.getMonth(),
+															d.getDate(),
+														),
+													);
+													const dayNum = tmp.getUTCDay() || 7;
+													tmp.setUTCDate(tmp.getUTCDate() + 4 - dayNum);
+													const ys = new Date(
+														Date.UTC(tmp.getUTCFullYear(), 0, 1),
+													);
+													const wn = Math.ceil(
+														((tmp.getTime() - ys.getTime()) / 86400000 + 1) / 7,
+													);
+													return `${tmp.getUTCFullYear()} • W${String(wn).padStart(2, "0")}`;
+												})()
+											: new Date(now * 1000).toLocaleDateString(undefined, {
+													year: "numeric",
+													month: "short",
+													day: "2-digit",
+												});
+								const target = sectionRefs.current[key];
+								if (target)
+									target.scrollIntoView({ behavior: "smooth", block: "start" });
+							}}
+							aria-label="Jump to today"
+						>
+							<span className="text-sm font-medium">📅 Today</span>
+							<span className="text-xs opacity-80 group-hover:opacity-100">
+								(T)
+							</span>
+						</button>
+						<button
+							type="button"
+							className="group flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 hover:scale-105"
+							onClick={() => {
+								const now = Date.now() / 1000;
+								const m = new Date(now * 1000).toLocaleDateString(undefined, {
 									year: "numeric",
 									month: "short",
-								})
-							: bucket === "week"
-								? (() => {
-										const d = new Date(now * 1000);
-										const tmp = new Date(
-											Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()),
-										);
-										const dayNum = tmp.getUTCDay() || 7;
-										tmp.setUTCDate(tmp.getUTCDate() + 4 - dayNum);
-										const ys = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 1));
-										const wn = Math.ceil(
-											((tmp.getTime() - ys.getTime()) / 86400000 + 1) / 7,
-										);
-										return `${tmp.getUTCFullYear()} • W${String(wn).padStart(2, "0")}`;
-									})()
-								: new Date(now * 1000).toLocaleDateString(undefined, {
-										year: "numeric",
-										month: "short",
-										day: "2-digit",
-									});
-					const target = sectionRefs.current[key];
-					if (target)
-						target.scrollIntoView({ behavior: "smooth", block: "start" });
-				}}
-				aria-label="Jump to today"
-			>
-				Today
-			</button>
-			<button
-				type="button"
-				className="hidden md:flex items-center gap-1 fixed right-4 bottom-14 z-10 bg-gray-700 text-white px-3 py-1 rounded shadow"
-				onClick={() => {
-					// Jump to this month header
-					const now = Date.now() / 1000;
-					const m = new Date(now * 1000).toLocaleDateString(undefined, {
-						year: "numeric",
-						month: "short",
-					});
-					const target = Object.values(sectionRefs.current).find(
-						(sec) =>
-							sec?.dataset.month && (sec.dataset.month as string).startsWith(m),
-					);
-					target?.scrollIntoView({ behavior: "smooth", block: "start" });
-				}}
-				aria-label="Jump to this month"
-			>
-				This Month
-			</button>
-			<button
-				type="button"
-				className="hidden md:flex items-center gap-1 fixed right-4 bottom-20 z-10 bg-gray-700 text-white px-3 py-1 rounded shadow"
-				onClick={() => {
-					const now = new Date();
-					const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-					const m = prev.toLocaleDateString(undefined, {
-						year: "numeric",
-						month: "short",
-					});
-					const target = Object.values(sectionRefs.current).find(
-						(sec) =>
-							sec?.dataset.month && (sec.dataset.month as string).startsWith(m),
-					);
-					target?.scrollIntoView({ behavior: "smooth", block: "start" });
-				}}
-				aria-label="Jump to last month"
-			>
-				Last Month
-			</button>
-			<button
-				type="button"
-				className="hidden md:flex items-center gap-1 fixed right-4 bottom-24 z-10 bg-gray-600 text-white px-3 py-1 rounded shadow"
-				onClick={() => {
-					// Jump to oldest section
-					const keys = Object.keys(sectionRefs.current);
-					if (keys.length > 0) {
-						const target = sectionRefs.current[keys[keys.length - 1]];
-						target?.scrollIntoView({ behavior: "smooth", block: "start" });
-					}
-				}}
-				aria-label="Jump to oldest"
-			>
-				Oldest
-			</button>
-			{/* Mini scrubber */}
-			{monthKeys.length > 1 && (
-				<div className="hidden md:flex flex-col gap-1 fixed right-4 top-1/2 -translate-y-1/2 z-10 bg-white/80 dark:bg-gray-900/80 backdrop-blur p-2 rounded shadow max-h-[60vh] overflow-auto">
-					{monthKeys.map((m) => (
-						<button
-							key={m}
-							type="button"
-							className={`text-xs px-2 py-0.5 rounded flex items-center gap-1 ${activeMonth === m ? "bg-blue-600 text-white" : "text-blue-700 hover:bg-blue-100"}`}
-							onClick={() => {
+								});
 								const target = Object.values(sectionRefs.current).find(
-									(sec) => sec?.dataset.month === m,
+									(sec) =>
+										sec?.dataset.month &&
+										(sec.dataset.month as string).startsWith(m),
 								);
 								target?.scrollIntoView({ behavior: "smooth", block: "start" });
 							}}
+							aria-label="Jump to this month"
 						>
-							<span>{m}</span>
-							<span className="opacity-70">({monthCounts[m] || 0})</span>
-							<span
-								className="inline-block h-1 bg-current opacity-50"
-								style={{
-									width: `${Math.max(6, Math.round(((monthCounts[m] || 0) / maxMonthCount) * 60))}px`,
-								}}
-							/>
+							<span className="text-sm font-medium">📆 This Month</span>
+							<span className="text-xs opacity-60 group-hover:opacity-80">
+								(M)
+							</span>
 						</button>
-					))}
+						<button
+							type="button"
+							className="group flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 hover:scale-105"
+							onClick={() => {
+								const now = new Date();
+								const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+								const m = prev.toLocaleDateString(undefined, {
+									year: "numeric",
+									month: "short",
+								});
+								const target = Object.values(sectionRefs.current).find(
+									(sec) =>
+										sec?.dataset.month &&
+										(sec.dataset.month as string).startsWith(m),
+								);
+								target?.scrollIntoView({ behavior: "smooth", block: "start" });
+							}}
+							aria-label="Jump to last month"
+						>
+							<span className="text-sm font-medium">📅 Last Month</span>
+							<span className="text-xs opacity-60 group-hover:opacity-80">
+								(L)
+							</span>
+						</button>
+						<button
+							type="button"
+							className="group flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 hover:scale-105"
+							onClick={() => {
+								const keys = Object.keys(sectionRefs.current);
+								if (keys.length > 0) {
+									const target = sectionRefs.current[keys[keys.length - 1]];
+									target?.scrollIntoView({
+										behavior: "smooth",
+										block: "start",
+									});
+								}
+							}}
+							aria-label="Jump to oldest"
+						>
+							<span className="text-sm font-medium">🕰️ Oldest</span>
+							<span className="text-xs opacity-60 group-hover:opacity-80">
+								(O)
+							</span>
+						</button>
+					</div>
+				</div>
+			</div>
+			{/* Enhanced timeline scrubber */}
+			{monthKeys.length > 1 && (
+				<div className="hidden md:flex flex-col gap-2 fixed right-4 top-1/2 -translate-y-1/2 z-10">
+					<div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border border-gray-200 dark:border-gray-700 rounded-2xl shadow-lg p-3 max-h-[70vh] overflow-y-auto">
+						<div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 px-1">
+							Timeline Navigator
+						</div>
+						{monthKeys.map((m) => {
+							const isActive = activeMonth === m;
+							const count = monthCounts[m] || 0;
+							const percentage =
+								maxMonthCount > 0 ? (count / maxMonthCount) * 100 : 0;
+
+							return (
+								<button
+									key={m}
+									type="button"
+									className={`group relative w-full p-2 rounded-xl transition-all duration-200 text-left ${
+										isActive
+											? "bg-blue-500 text-white shadow-lg scale-105"
+											: "bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:scale-102"
+									}`}
+									onClick={() => {
+										const target = Object.values(sectionRefs.current).find(
+											(sec) => sec?.dataset.month === m,
+										);
+										target?.scrollIntoView({
+											behavior: "smooth",
+											block: "start",
+										});
+									}}
+									title={`${m}: ${count} photos`}
+								>
+									<div className="flex items-center justify-between mb-1">
+										<span
+											className={`text-xs font-medium truncate ${
+												isActive ? "text-white" : "text-current"
+											}`}
+										>
+											{m}
+										</span>
+										<span
+											className={`text-xs font-semibold ${
+												isActive
+													? "text-blue-100"
+													: "text-gray-500 dark:text-gray-400"
+											}`}
+										>
+											{count}
+										</span>
+									</div>
+									{/* Visual indicator bar */}
+									<div
+										className={`w-full h-1.5 rounded-full overflow-hidden ${
+											isActive ? "bg-blue-400" : "bg-gray-300 dark:bg-gray-600"
+										}`}
+									>
+										<div
+											className={`h-full rounded-full transition-all duration-300 ${
+												isActive ? "bg-white" : "bg-blue-500 dark:bg-blue-400"
+											}`}
+											style={{ width: `${Math.max(8, percentage * 100)}%` }}
+										/>
+									</div>
+									{/* Hover enhancement */}
+									{!isActive && (
+										<div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-transparent rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+									)}
+								</button>
+							);
+						})}
+					</div>
 				</div>
 			)}
 			{grouped.map((g) => (
@@ -437,8 +558,45 @@ export default function TimelineResults({
 					data-month={g.key.split(" ").slice(0, 2).join(" ")}
 					style={{ scrollSnapAlign: "start" }}
 				>
-					<div className="sticky top-0 z-10 bg-white/80 dark:bg-gray-900/80 backdrop-blur px-2 py-1 border-b text-sm font-medium">
-						{g.key} • {g.items.length}
+					<div
+						className={`sticky top-0 z-10 backdrop-blur px-3 py-2 border-b text-sm font-medium transition-all duration-200 ${
+							g.key.includes("Today") ||
+							g.key.includes("Yesterday") ||
+							g.key.includes("This") ||
+							g.key.includes("Last")
+								? "bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300"
+								: "bg-white/90 dark:bg-gray-900/90 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
+						}`}
+					>
+						<div className="flex items-center justify-between">
+							<span
+								className={`font-semibold ${
+									g.key.includes("Today")
+										? "text-blue-600 dark:text-blue-400"
+										: g.key.includes("Yesterday")
+											? "text-purple-600 dark:text-purple-400"
+											: g.key.includes("This")
+												? "text-green-600 dark:text-green-400"
+												: g.key.includes("Last")
+													? "text-orange-600 dark:text-orange-400"
+													: ""
+								}`}
+							>
+								{g.key}
+							</span>
+							<span
+								className={`text-xs px-2 py-1 rounded-full ${
+									g.key.includes("Today") ||
+									g.key.includes("Yesterday") ||
+									g.key.includes("This") ||
+									g.key.includes("Last")
+										? "bg-current/10 text-current"
+										: "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+								}`}
+							>
+								{g.items.length} photos
+							</span>
+						</div>
 					</div>
 					<div className="mt-3 grid gap-2 grid-cols-[repeat(auto-fill,minmax(160px,1fr))]">
 						{g.items.map((it) => {

@@ -1,4 +1,14 @@
 import type React from "react";
+import { cloneElement, isValidElement } from "react";
+import { cn } from "@/lib/utils";
+import { Button } from "./shadcn/Button";
+import {
+	Card,
+	CardDescription,
+	CardFooter,
+	CardHeader,
+	CardTitle,
+} from "./shadcn/Card";
 
 interface EmptyStateProps {
 	icon?: React.ReactNode;
@@ -17,25 +27,39 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 	title,
 	description,
 	action,
-	className = "",
+	className,
 }) => {
-	return (
-		<div className={`empty-state ${className}`}>
-			{icon && <div className="empty-state-icon">{icon}</div>}
-			<h3 className="empty-state-title">{title}</h3>
-			<p className="empty-state-description">{description}</p>
-			{action && (
-				<button
-					type="button"
-					onClick={action.onClick}
-					className={
-						action.variant === "secondary" ? "btn-secondary" : "btn-primary"
-					}
-				>
-					{action.label}
-				</button>
-			)}
+	const renderedIcon = icon ? (
+		<div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
+			{isValidElement(icon)
+				? cloneElement(icon, {
+						className: cn("h-6 w-6", icon.props.className),
+					})
+				: icon}
 		</div>
+	) : null;
+
+	return (
+		<Card className={cn("mx-auto max-w-md text-center", className)}>
+			<CardHeader className="flex flex-col items-center space-y-3">
+				{renderedIcon}
+				<CardTitle className="text-xl font-semibold">{title}</CardTitle>
+				<CardDescription className="text-sm text-muted-foreground">
+					{description}
+				</CardDescription>
+			</CardHeader>
+			{action && (
+				<CardFooter className="flex justify-center">
+					<Button
+						type="button"
+						variant={action.variant === "secondary" ? "outline" : "default"}
+						onClick={action.onClick}
+					>
+						{action.label}
+					</Button>
+				</CardFooter>
+			)}
+		</Card>
 	);
 };
 

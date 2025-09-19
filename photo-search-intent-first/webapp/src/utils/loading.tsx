@@ -61,13 +61,12 @@ export const ScrollLoader: React.FC<ScrollLoaderProps> = ({
 		<div
 			ref={ref}
 			className={`h-8 w-full flex items-center justify-center text-xs text-gray-500 ${className}`}
-			role="status"
 			aria-live="polite"
 		>
 			{isLoading ? (
 				<div className="flex items-center gap-2">
 					<Loader2 className="w-4 h-4 animate-spin" />
-					<span>{loadingText || "Loading more photos..."}</span>
+					<output>{loadingText || "Loading more photos..."}</output>
 				</div>
 			) : (
 				!hasMore && <span className="text-gray-400">No more items</span>
@@ -118,7 +117,9 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 			/>
 			{message && (
 				<span
-					className={`ml-2 text-sm ${color === "white" ? "text-white" : "text-gray-600"}`}
+					className={`ml-2 text-sm ${
+						color === "white" ? "text-white" : "text-gray-600"
+					}`}
 				>
 					{message}
 				</span>
@@ -157,12 +158,12 @@ export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
 			{children}
 			<AnimatePresence>
 				{isLoading && (
-                    <motion.div
-                        initial={prefersReducedMotion ? undefined : { opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={prefersReducedMotion ? undefined : { opacity: 0 }}
-                        className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-                    >
+					<motion.div
+						initial={prefersReducedMotion ? undefined : { opacity: 0 }}
+						animate={{ opacity: 1 }}
+						exit={prefersReducedMotion ? undefined : { opacity: 0 }}
+						className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+					>
 						<div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-xl">
 							<LoadingSpinner size="lg" message={message || "Loading..."} />
 						</div>

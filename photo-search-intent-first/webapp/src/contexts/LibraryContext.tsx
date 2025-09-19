@@ -7,8 +7,13 @@ import {
 	useMemo,
 	useState,
 } from "react";
-import { apiIndex, apiLibrary, apiIndexPause, apiIndexResume, apiIndexStatus } from "../api";
-import { handleError } from "../utils/errors";
+import {
+	apiIndex,
+	apiIndexPause,
+	apiIndexResume,
+	apiIndexStatus,
+	apiLibrary,
+} from "../api";
 import {
 	useDir,
 	useEngine,
@@ -22,10 +27,11 @@ import {
 	useLibrary,
 	useSettingsActions,
 } from "../stores/useStores";
-import { useJobsContext } from "./JobsContext";
+import { handleError } from "../utils/errors";
 import { humanizeSeconds } from "../utils/time";
+import { useJobsContext } from "./JobsContext";
 
-type LibraryState = {
+export type LibraryState = {
 	paths: string[];
 	hasMore: boolean;
 	isIndexing: boolean;
@@ -36,7 +42,7 @@ type LibraryState = {
 	indexStatus?: IndexStatusDetails;
 };
 
-type LibraryActions = {
+export type LibraryActions = {
 	index: (opts?: { dir?: string; provider?: string }) => Promise<void>;
 	load: (opts?: {
 		dir?: string;
@@ -168,9 +174,10 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
 					details.coverage !== undefined
 						? Math.round(details.coverage * 100)
 						: undefined;
-				const indexedLine = coveragePct !== undefined
-					? `indexed ${details.indexed}/${details.target} (${coveragePct}%)`
-					: `indexed ${details.indexed}/${details.target}`;
+				const indexedLine =
+					coveragePct !== undefined
+						? `indexed ${details.indexed}/${details.target} (${coveragePct}%)`
+						: `indexed ${details.indexed}/${details.target}`;
 				parts.push(indexedLine);
 			}
 			if (typeof details.drift === "number") {
@@ -185,7 +192,8 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
 			const rateValue = extra.ratePerSecond ?? details.ratePerSecond;
 			if (rateValue && Number.isFinite(rateValue)) {
 				const perMinute = rateValue * 60;
-				const rateText = perMinute >= 10 ? perMinute.toFixed(0) : perMinute.toFixed(1);
+				const rateText =
+					perMinute >= 10 ? perMinute.toFixed(0) : perMinute.toFixed(1);
 				parts.push(`rate ${rateText}/min`);
 			}
 			return parts.length > 0 ? parts.join(" • ") : undefined;
@@ -217,21 +225,25 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
 					status: "completed",
 					endTime: new Date(),
 				} as unknown);
-            } catch (e) {
-                const err = e instanceof Error ? e.message : "Index failed";
-                jobs.update(jobId, {
-                    status: "failed",
-                    endTime: new Date(),
-                    error: err,
-                } as unknown);
-                handleError(e, {
-                    logToConsole: true,
-                    logToServer: true,
-                    context: { action: "index", component: "LibraryContext.index", dir: d },
-                });
-            } finally {
-                setIsIndexing(false);
-            }
+			} catch (e) {
+				const err = e instanceof Error ? e.message : "Index failed";
+				jobs.update(jobId, {
+					status: "failed",
+					endTime: new Date(),
+					error: err,
+				} as unknown);
+				handleError(e, {
+					logToConsole: true,
+					logToServer: true,
+					context: {
+						action: "index",
+						component: "LibraryContext.index",
+						dir: d,
+					},
+				});
+			} finally {
+				setIsIndexing(false);
+			}
 		},
 		[settings, jobs, lib],
 	);

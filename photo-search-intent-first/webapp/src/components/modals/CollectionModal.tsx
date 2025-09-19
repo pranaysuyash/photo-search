@@ -1,13 +1,13 @@
 import type React from "react";
+import { useToast } from "@/hooks/use-toast";
+import { apiGetCollections, apiSetCollection } from "../../api";
 import { announce, FocusTrap } from "../../utils/accessibility";
-import { apiSetCollection, apiGetCollections } from "../../api";
 
 interface CollectionModalProps {
 	selected: Set<string>;
 	dir: string;
 	collections: Record<string, string[]> | null;
 	onClose: () => void;
-	setToast: (toast: { message: string } | null) => void;
 	photoActions: {
 		setCollections: (collections: Record<string, string[]>) => void;
 	};
@@ -21,23 +21,21 @@ export const CollectionModal: React.FC<CollectionModalProps> = ({
 	dir,
 	collections,
 	onClose,
-	setToast,
 	photoActions,
 	uiActions,
 }) => {
+	const { toast } = useToast();
 	return (
 		<div
 			className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
 			onKeyDown={(e) => {
 				if (e.key === "Escape") onClose();
 			}}
+			role="dialog"
+			aria-modal="true"
 		>
 			<FocusTrap onEscape={onClose}>
-				<div
-					className="bg-white rounded-lg p-4 w-full max-w-md"
-					role="dialog"
-					aria-modal="true"
-				>
+				<div className="bg-white rounded-lg p-4 w-full max-w-md">
 					<div className="font-semibold mb-2">Add to Collection</div>
 					<form
 						onSubmit={async (e) => {
@@ -51,7 +49,7 @@ export const CollectionModal: React.FC<CollectionModalProps> = ({
 								await apiSetCollection(dir, name, Array.from(selected));
 								const r = await apiGetCollections(dir);
 								photoActions.setCollections(r.collections || {});
-								setToast({ message: `Added ${selected.size} to ${name}` });
+								toast({ description: `Added ${selected.size} to ${name}` });
 								announce(`Added ${selected.size} to ${name}`, "polite");
 							} catch (e) {
 								uiActions.setNote(

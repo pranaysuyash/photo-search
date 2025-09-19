@@ -66,7 +66,7 @@ export function Lightbox({
 		enablePullToRefresh: false,
 	});
 
-    // Gesture callbacks are registered after zoom/resetZoom are defined below
+	// Gesture callbacks are registered after zoom/resetZoom are defined below
 
 	const zoom = useCallback(
 		(delta: number, cx?: number, cy?: number) => {
@@ -121,27 +121,27 @@ export function Lightbox({
 	function zoomIn() {
 		zoom(0.2);
 	}
-  function zoomOut() {
-    zoom(-0.2);
-  }
+	function zoomOut() {
+		zoom(-0.2);
+	}
 
-  // Set up gesture callbacks (after zoom/resetZoom are declared)
-  useEffect(() => {
-    if (!touchGestureService) return;
+	// Set up gesture callbacks (after zoom/resetZoom are declared)
+	useEffect(() => {
+		if (!touchGestureService) return;
 
-    touchGestureService
-      .onSwipe((direction) => {
-        if (direction.left) onNext();
-        else if (direction.right) onPrev();
-      })
-      .onPinch((newScale, centerX, centerY) => {
-        zoom(newScale - scale, centerX, centerY);
-      })
-      .onDoubleTap((x, y) => {
-        if (scale === 1) zoom(1, x, y);
-        else resetZoom();
-      });
-  }, [touchGestureService, onPrev, onNext, scale, resetZoom, zoom]);
+		touchGestureService
+			.onSwipe((direction) => {
+				if (direction.left) onNext();
+				else if (direction.right) onPrev();
+			})
+			.onPinch((newScale, centerX, centerY) => {
+				zoom(newScale - scale, centerX, centerY);
+			})
+			.onDoubleTap((x, y) => {
+				if (scale === 1) zoom(1, x, y);
+				else resetZoom();
+			});
+	}, [touchGestureService, onPrev, onNext, scale, resetZoom, zoom]);
 
 	function onDblClick(e: ReactMouseEvent) {
 		if (scale === 1) zoom(1, e.clientX, e.clientY);
@@ -437,13 +437,13 @@ export function Lightbox({
 										</div>
 									</div>
 								)}
-          {info.place && (
+								{info.place && (
 									<div className="col-span-2">
 										<div className="text-gray-500">Place</div>
 										<div className="font-medium">{info.place}</div>
 									</div>
 								)}
-          {Array.isArray(info.tags) && info.tags.length > 0 && (
+								{Array.isArray(info.tags) && info.tags.length > 0 && (
 									<div className="col-span-2">
 										<div className="text-gray-500">Tags</div>
 										<div className="mt-1 flex flex-wrap gap-1">

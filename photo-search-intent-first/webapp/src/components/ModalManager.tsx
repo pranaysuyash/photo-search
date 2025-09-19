@@ -1,10 +1,13 @@
-import React, { Suspense, lazy } from "react";
+import type React from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { FOLDER_MODAL_EVENT } from "@/constants/events";
+import { useToast } from "@/hooks/use-toast";
 import { useModalContext } from "../contexts/ModalContext";
-import type { PhotoActions, UIActions } from "../stores/types";
-import type { SettingsActions } from "../stores/types";
+import { useModalStatus } from "../hooks/useModalStatus";
+import type { PhotoActions, SettingsActions, UIActions } from "../stores/types";
 import { FocusTrap } from "../utils/accessibility";
-import { SuspenseFallback } from "./SuspenseFallback";
-
+import { viewToPath } from "../utils/router";
 // Modals
 import {
   CollectionModal,
@@ -15,23 +18,39 @@ import {
   SaveModal,
   TagModal,
 } from "./modals";
+import { ShareManageOverlay } from "./ShareManageOverlay";
+import { SuspenseFallback } from "./SuspenseFallback";
 
-const DiagnosticsDrawer = lazy(() => import("./DiagnosticsDrawer"));
+const _DiagnosticsDrawer = lazy(() => import("./DiagnosticsDrawer"));
 const JobsDrawer = lazy(() => import("./JobsDrawer"));
-const AdvancedSearchModal = lazy(
-  () => import("./modals/AdvancedSearchModal")
-);
+const AdvancedSearchModal = lazy(() => import("./modals/AdvancedSearchModal"));
 const EnhancedSharingModal = lazy(() =>
-  import("./modals/EnhancedSharingModal").then((m) => ({ default: m.EnhancedSharingModal }))
+  import("./modals/EnhancedSharingModal").then((m) => ({
+    default: m.EnhancedSharingModal,
+  }))
 );
 const ThemeSettingsModal = lazy(() =>
-  import("./ThemeSettingsModal").then((m) => ({ default: m.ThemeSettingsModal }))
+  import("./ThemeSettingsModal").then((m) => ({
+    default: m.ThemeSettingsModal,
+  }))
 );
 const SearchOverlay = lazy(() => import("./SearchOverlay"));
-import { HelpModal } from "./HelpModal";
-import { ShareManager } from "../modules/ShareManager";
-import { apiCreateShare, apiAddPreset } from "../api";
+
+import { apiAddPreset, apiCreateShare } from "../api";
 import { handleError } from "../utils/errors";
+import { HelpModal } from "./HelpModal";
+
+type FolderSettingsActions = Pick<
+  SettingsActions,
+  | "setDir"
+  | "setUseOsTrash"
+  | "setUseFast"
+  | "setFastKind"
+  | "setUseCaps"
+  | "setUseOcr"
+  | "setHasText"
+  | "setHighContrast"
+>;
 
 export interface ModalManagerProps {
   // Core
@@ -50,18 +69,16 @@ export interface ModalManagerProps {
   useOsTrash: boolean;
 
   // Actions
-  settingsActions: SettingsActions;
-  uiActions: Pick<UIActions, "setBusy" | "setNote">;
-  photoActions: Pick<
-    PhotoActions,
-    "setResults" | "setSmart" | "setSearchId" | "setFavOnly" | "setSaved" | "setCollections"
-  >;
+  settingsActions: FolderSettingsActions;
+  setBusy: UIActions["setBusy"];
+  setNote: UIActions["setNote"];
+  setResults: PhotoActions["setResults"];
+  setSaved: PhotoActions["setSaved"];
+  setCollections: PhotoActions["setCollections"];
   libIndex: () => Promise<void> | void;
   prepareFast: (kind: "annoy" | "faiss" | "hnsw") => void;
   buildOCR: () => Promise<void> | void;
   buildMetadata: () => Promise<void> | void;
-  setSelectedView: (view: string) => void; // now expected to navigate
-
   // Search context
   searchText: string;
   query: string;
@@ -69,9 +86,6 @@ export interface ModalManagerProps {
   // Collections & tags
   collections: Record<string, string[]>;
   tagSelected: (tag: string) => void;
-
-  // Toast
-  setToast: (toast: { message: string; actionLabel?: string; onAction?: () => void } | null) => void;
 
   // Search overlay support
   clusters: Array<{ name?: string }>;
@@ -92,23 +106,49 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
   hasText,
   useOsTrash,
   settingsActions,
-  uiActions,
-  photoActions,
+  setBusy,
+  setNote,
+  setResults,
+  setSaved,
+  setCollections,
   libIndex,
   prepareFast,
   buildOCR,
   buildMetadata,
-  setSelectedView,
   searchText,
   query,
   collections,
   tagSelected,
-  setToast,
   clusters,
   allTags,
   meta,
 }) => {
-  const { state: modalState, actions: modal } = useModalContext();
+  const { actions: modal } = useModalContext();
+  const modalStatus = useModalStatus();
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleExternalOpen = () => modal.open("folder");
+    window.addEventListener(FOLDER_MODAL_EVENT, handleExternalOpen);
+    return () => {
+      window.removeEventListener(FOLDER_MODAL_EVENT, handleExternalOpen);
+    };
+  }, [modal]);
+  const navigate = useNavigate();
+  const navigateToView = useCallback(
+    (view: string) => navigate(viewToPath(view)),
+    [navigate]
+  );
+  const { toast } = useToast();
+  const uiActionsForModals = useMemo(
+    () => ({ setBusy, setNote }),
+    [setBusy, setNote]
+  );
+  const likePlusPhotoActions = useMemo(() => ({ setResults }), [setResults]);
+  const savePhotoActions = useMemo(() => ({ setSaved }), [setSaved]);
+  const collectionPhotoActions = useMemo(
+    () => ({ setCollections }),
+    [setCollections]
+  );
 
   // Basic v1 share modal submit handler
   async function createBasicShare(e: React.FormEvent) {
@@ -120,10 +160,15 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
       return;
     }
     const form = e.target as HTMLFormElement;
-    const expiryStr = (form.elements.namedItem("expiry") as HTMLInputElement)?.value || "24";
+    const expiryStr =
+      (form.elements.namedItem("expiry") as HTMLInputElement)?.value || "24";
     const expiry = parseInt(expiryStr, 10);
-    const pw = (form.elements.namedItem("pw") as HTMLInputElement)?.value?.trim();
-    const viewOnly = (form.elements.namedItem("viewonly") as HTMLInputElement)?.checked ?? true;
+    const pw = (
+      form.elements.namedItem("pw") as HTMLInputElement
+    )?.value?.trim();
+    const viewOnly =
+      (form.elements.namedItem("viewonly") as HTMLInputElement)?.checked ??
+      true;
     try {
       const r = await apiCreateShare(dir, engine, sel, {
         expiryHours: Number.isNaN(expiry) ? 24 : expiry,
@@ -131,10 +176,17 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
         viewOnly,
       });
       await navigator.clipboard.writeText(window.location.origin + r.url);
-      uiActions.setNote("Share link copied to clipboard");
+      setNote("Share link copied to clipboard");
     } catch (err) {
-      uiActions.setNote(err instanceof Error ? err.message : "Share failed");
-      handleError(err, { logToServer: true, context: { action: "create_share_basic", component: "ModalManager.createBasicShare", dir } });
+      setNote(err instanceof Error ? err.message : "Share failed");
+      handleError(err, {
+        logToServer: true,
+        context: {
+          action: "create_share_basic",
+          component: "ModalManager.createBasicShare",
+          dir,
+        },
+      });
     }
     modal.close("share");
   }
@@ -142,38 +194,55 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
   return (
     <>
       {/* Jobs & Diagnostics drawers */}
-      {modalState.jobs && (
-        <Suspense fallback={<SuspenseFallback label="Loading jobs…" /> }>
+      {modalStatus.isOpen("jobs") && (
+        <Suspense fallback={<SuspenseFallback label="Loading jobs…" />}>
           <JobsDrawer open={true} onClose={() => modal.close("jobs")} />
         </Suspense>
       )}
-      {modalState.diagnostics && (
-        <Suspense fallback={<SuspenseFallback label="Loading diagnostics…" /> }>
-          <DiagnosticsDrawer open={true} onClose={() => modal.close("diagnostics")} />
+      {modalStatus.isOpen("diagnostics") && (
+        <Suspense fallback={<SuspenseFallback label="Loading diagnostics…" />}>
+          <_DiagnosticsDrawer
+            open={modalStatus.isOpen("diagnostics")}
+            onClose={() => modal.close("diagnostics")}
+          />
         </Suspense>
+      )}
+      {modalStatus.isOpen("shareManage") && (
+        <ShareManageOverlay
+          isOpen={modalStatus.isOpen("shareManage")}
+          onClose={() => modal.close("shareManage")}
+          dir={dir}
+        />
       )}
 
       {/* Advanced Search */}
-      {modalState.advanced && (
-        <Suspense fallback={<SuspenseFallback label="Loading advanced search…" /> }>
+      {modalStatus.isOpen("advanced") && (
+        <Suspense
+          fallback={<SuspenseFallback label="Loading advanced search…" />}
+        >
           <AdvancedSearchModal
             open={true}
             onClose={() => modal.close("advanced")}
             onApply={(q) => {
               window.dispatchEvent(
-                new CustomEvent("advanced-search-apply", { detail: { q } }),
+                new CustomEvent("advanced-search-apply", { detail: { q } })
               );
               modal.close("advanced");
             }}
             onSave={async (name, q) => {
               try {
                 await apiAddPreset(dir, name, q);
-                setToast({ message: `Saved preset ${name}` });
+                toast({ description: `Saved preset ${name}` });
               } catch (e) {
-                uiActions.setNote(
-                  e instanceof Error ? e.message : "Save failed",
-                );
-                handleError(e, { logToServer: true, context: { action: "save_preset", component: "ModalManager.AdvancedSearch.onSave", dir } });
+                setNote(e instanceof Error ? e.message : "Save failed");
+                handleError(e, {
+                  logToServer: true,
+                  context: {
+                    action: "save_preset",
+                    component: "ModalManager.AdvancedSearch.onSave",
+                    dir,
+                  },
+                });
               }
             }}
             allTags={allTags || []}
@@ -186,18 +255,27 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
       )}
 
       {/* Help / Theme */}
-      <HelpModal isOpen={modalState.help} onClose={() => modal.close("help")} initialSection="getting-started" />
-      {modalState.theme && (
-        <Suspense fallback={<SuspenseFallback label="Loading theme settings…" /> }>
-          <ThemeSettingsModal isOpen={true} onClose={() => modal.close("theme")} />
+      <HelpModal
+        isOpen={modalStatus.isOpen("help")}
+        onClose={() => modal.close("help")}
+        initialSection="getting-started"
+      />
+      {modalStatus.isOpen("theme") && (
+        <Suspense
+          fallback={<SuspenseFallback label="Loading theme settings…" />}
+        >
+          <ThemeSettingsModal
+            isOpen={true}
+            onClose={() => modal.close("theme")}
+          />
         </Suspense>
       )}
 
       {/* Search Command Center overlay */}
-      {modalState.search && (
-        <Suspense fallback={<SuspenseFallback label="Opening search…" /> }>
+      {modalStatus.isOpen("search") && (
+        <Suspense fallback={<SuspenseFallback label="Opening search…" />}>
           <SearchOverlay
-            open={modalState.search}
+            open={modalStatus.isOpen("search")}
             onClose={() => modal.close("search")}
             clusters={clusters}
             allTags={allTags}
@@ -206,76 +284,97 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
         </Suspense>
       )}
 
-      {/* Share Management (v2 manager) */}
-      {modalState.shareManage && (
-        <div
-          role="button"
-          tabIndex={0}
-          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
-          onKeyDown={(e) => {
-            if (e.key === "Escape") modal.close("shareManage");
-          }}
-        >
-          <FocusTrap onEscape={() => modal.close("shareManage")}>
-            <div className="bg-white rounded-lg p-4 w-full max-w-2xl" role="dialog" aria-modal="true">
-              <div className="flex items-center justify-between mb-3">
-                <div className="font-semibold">Manage Shares</div>
-                <button type="button" className="px-2 py-1 border rounded" onClick={() => modal.close("shareManage")}>
-                  Close
-                </button>
-              </div>
-              <ShareManager dir={dir} />
-            </div>
-          </FocusTrap>
-        </div>
-      )}
-
       {/* Export / Enhanced Share */}
-      {modalState.export && (
-        <ExportModal selected={selected} dir={dir} onClose={() => modal.close("export")} uiActions={uiActions} />
+      {modalStatus.isOpen("export") && (
+        <ExportModal
+          selected={selected}
+          dir={dir}
+          onClose={() => modal.close("export")}
+          uiActions={uiActionsForModals}
+        />
       )}
-      {modalState["enhanced-share"] && (
-        <Suspense fallback={<SuspenseFallback label="Loading sharing…" /> }>
-          <EnhancedSharingModal selected={selected} dir={dir} onClose={() => modal.close("enhanced-share")} uiActions={uiActions} />
+      {modalStatus.isOpen("enhanced-share") && (
+        <Suspense fallback={<SuspenseFallback label="Loading sharing…" />}>
+          <EnhancedSharingModal
+            selected={selected}
+            dir={dir}
+            onClose={() => modal.close("enhanced-share")}
+            uiActions={uiActionsForModals}
+          />
         </Suspense>
       )}
 
       {/* Basic Share (v1) */}
-      {modalState.share && (
-        <div
-          role="button"
-          tabIndex={0}
-          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
-          onKeyDown={(e) => {
-            if (e.key === "Escape") modal.close("share");
-          }}
-        >
+      {modalStatus.isOpen("share") && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
+          <button
+            type="button"
+            aria-label="Close share"
+            className="absolute inset-0 w-full h-full"
+            onClick={() => modal.close("share")}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") modal.close("share");
+            }}
+          />
           <FocusTrap onEscape={() => modal.close("share")}>
-            <div className="bg-white rounded-lg p-4 w-full max-w-md" role="dialog" aria-modal="true">
+            <div
+              className="bg-white rounded-lg p-4 w-full max-w-md"
+              role="dialog"
+              aria-modal="true"
+            >
               <div className="font-semibold mb-2">Share (v1)</div>
               <form onSubmit={createBasicShare}>
                 <div className="grid gap-3">
                   <div>
-                    <label className="block text-sm text-gray-600 mb-1" htmlFor="expiry-input">
+                    <label
+                      className="block text-sm text-gray-600 mb-1"
+                      htmlFor="expiry-input"
+                    >
                       Expiry (hours)
                     </label>
-                    <input id="expiry-input" name="expiry" type="number" min={1} defaultValue={24} className="w-full border rounded px-2 py-1" />
+                    <input
+                      id="expiry-input"
+                      name="expiry"
+                      type="number"
+                      min={1}
+                      defaultValue={24}
+                      className="w-full border rounded px-2 py-1"
+                    />
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-600 mb-1" htmlFor="pw-input">
+                    <label
+                      className="block text-sm text-gray-600 mb-1"
+                      htmlFor="pw-input"
+                    >
                       Password (optional)
                     </label>
-                    <input id="pw-input" name="pw" type="password" className="w-full border rounded px-2 py-1" placeholder="••••••" />
+                    <input
+                      id="pw-input"
+                      name="pw"
+                      type="password"
+                      className="w-full border rounded px-2 py-1"
+                      placeholder="••••••"
+                    />
                   </div>
                   <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" name="viewonly" defaultChecked /> View-only (disable downloads)
+                    <input type="checkbox" name="viewonly" defaultChecked />{" "}
+                    View-only (disable downloads)
                   </label>
                 </div>
                 <div className="mt-4 flex justify-end gap-2">
-                  <button type="button" className="px-3 py-1 rounded border" onClick={() => modal.close("share")} aria-label="Cancel sharing">
+                  <button
+                    type="button"
+                    className="px-3 py-1 rounded border"
+                    onClick={() => modal.close("share")}
+                    aria-label="Cancel sharing"
+                  >
                     Cancel
                   </button>
-                  <button type="submit" className="px-3 py-1 rounded bg-blue-600 text-white" aria-label="Create shareable link">
+                  <button
+                    type="submit"
+                    className="px-3 py-1 rounded bg-blue-600 text-white"
+                    aria-label="Create shareable link"
+                  >
                     Create Link
                   </button>
                 </div>
@@ -286,8 +385,13 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
       )}
 
       {/* Tag & Folder */}
-      {modalState.tag && <TagModal onClose={() => modal.close("tag")} onTagSelected={tagSelected} />}
-      {modalState.folder && (
+      {modalStatus.isOpen("tag") && (
+        <TagModal
+          onClose={() => modal.close("tag")}
+          onTagSelected={tagSelected}
+        />
+      )}
+      {modalStatus.isOpen("folder") && (
         <FolderModal
           dir={dir}
           useOsTrash={useOsTrash}
@@ -299,59 +403,59 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
           highContrast={highContrast}
           onClose={() => modal.close("folder")}
           settingsActions={settingsActions}
-          uiActions={uiActions}
+          uiActions={uiActionsForModals}
           doIndex={() => libIndex()}
-          prepareFast={(k: string) => prepareFast(k as "annoy" | "faiss" | "hnsw")}
+          prepareFast={(k: string) =>
+            prepareFast(k as "annoy" | "faiss" | "hnsw")
+          }
           buildOCR={buildOCR}
           buildMetadata={buildMetadata}
         />
       )}
 
       {/* Like+, Save, Collections */}
-      {modalState.likeplus && (
+      {modalStatus.isOpen("likeplus") && (
         <LikePlusModal
           selected={selected}
           dir={dir}
           engine={engine}
           topK={topK}
           onClose={() => modal.close("likeplus")}
-          setSelectedView={(view: string) => setSelectedView(view)}
-          photoActions={photoActions}
-          uiActions={uiActions}
+          setSelectedView={navigateToView}
+          photoActions={likePlusPhotoActions}
+          uiActions={uiActionsForModals}
         />
       )}
-      {modalState.save && (
+      {modalStatus.isOpen("save") && (
         <SaveModal
           dir={dir}
           searchText={searchText}
           query={query}
           topK={topK}
           onClose={() => modal.close("save")}
-          setSelectedView={(view: string) => setSelectedView(view)}
-          photoActions={photoActions}
-          uiActions={uiActions}
+          setSelectedView={navigateToView}
+          photoActions={savePhotoActions}
+          uiActions={uiActionsForModals}
         />
       )}
-      {modalState.collect && (
+      {modalStatus.isOpen("collect") && (
         <CollectionModal
           selected={selected}
           dir={dir}
           collections={collections}
           onClose={() => modal.close("collect")}
-          setToast={setToast}
-          photoActions={photoActions}
-          uiActions={uiActions}
+          photoActions={collectionPhotoActions}
+          uiActions={uiActionsForModals}
         />
       )}
-      {modalState.removeCollect && (
+      {modalStatus.isOpen("removeCollect") && (
         <RemoveCollectionModal
           selected={selected}
           dir={dir}
           collections={collections}
           onClose={() => modal.close("removeCollect")}
-          setToast={setToast}
-          photoActions={photoActions}
-          uiActions={uiActions}
+          photoActions={collectionPhotoActions}
+          uiActions={uiActionsForModals}
         />
       )}
     </>

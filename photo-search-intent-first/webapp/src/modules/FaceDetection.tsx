@@ -70,10 +70,9 @@ export function FaceDetection() {
 
 	const FaceClusterCard = ({ cluster }: { cluster: FaceCluster }) => (
 		<div
-			className={`face-cluster-card ${selectedCluster === cluster.id ? "selected" : ""}`}
-			onClick={() => setSelectedCluster(cluster.id)}
-			role="button"
-			tabIndex={0}
+			className={`face-cluster-card ${
+				selectedCluster === cluster.id ? "selected" : ""
+			}`}
 		>
 			<div className="cluster-header">
 				{editingCluster === cluster.id ? (
@@ -93,6 +92,7 @@ export function FaceDetection() {
 								nameCluster(cluster.id);
 							}}
 							className="btn-icon"
+							aria-label="Save name"
 						>
 							<Check className="w-4 h-4" />
 						</button>
@@ -104,15 +104,25 @@ export function FaceDetection() {
 								setNewName("");
 							}}
 							className="btn-icon"
+							aria-label="Cancel editing"
 						>
 							<X className="w-4 h-4" />
 						</button>
 					</div>
 				) : (
 					<>
-						<h3 className="cluster-name">
-							{cluster.name || `Person ${cluster.id.slice(0, 8)}`}
-						</h3>
+						<button
+							type="button"
+							className="face-cluster-button"
+							onClick={() => setSelectedCluster(cluster.id)}
+							aria-label={`Select face cluster ${
+								cluster.name || `Person ${cluster.id.slice(0, 8)}`
+							}`}
+						>
+							<h3 className="cluster-name">
+								{cluster.name || `Person ${cluster.id.slice(0, 8)}`}
+							</h3>
+						</button>
 						<button
 							type="button"
 							onClick={(e) => {
@@ -121,6 +131,7 @@ export function FaceDetection() {
 								setNewName(cluster.name || "");
 							}}
 							className="btn-icon"
+							aria-label="Edit name"
 						>
 							<Edit2 className="w-4 h-4" />
 						</button>
@@ -132,16 +143,25 @@ export function FaceDetection() {
 				<span className="text-sm text-gray-500">{cluster.size} photos</span>
 			</div>
 
-			<div className="face-examples">
-				{cluster.examples.slice(0, 4).map(([path, embIdx], i) => (
-					<div key={`item-${String(path)}`} className="face-thumbnail">
-						<img
-							src={api.getFaceThumbnailUrl(path, embIdx, 96)}
-							alt={`Face ${i + 1}`}
-						/>
-					</div>
-				))}
-			</div>
+			<button
+				type="button"
+				className="face-cluster-button"
+				onClick={() => setSelectedCluster(cluster.id)}
+				aria-label={`Select face cluster ${
+					cluster.name || `Person ${cluster.id.slice(0, 8)}`
+				}`}
+			>
+				<div className="face-examples">
+					{cluster.examples.slice(0, 4).map(([path, embIdx], i) => (
+						<div key={`item-${String(path)}`} className="face-thumbnail">
+							<img
+								src={api.getFaceThumbnailUrl(path, embIdx, 96)}
+								alt={`Face ${i + 1}`}
+							/>
+						</div>
+					))}
+				</div>
+			</button>
 		</div>
 	);
 
@@ -229,7 +249,6 @@ export function FaceDetection() {
           border: 2px solid transparent;
           border-radius: var(--radius-lg);
           padding: 1.5rem;
-          cursor: pointer;
           transition: all 0.3s;
         }
 
@@ -241,6 +260,14 @@ export function FaceDetection() {
         .face-cluster-card.selected {
           border-color: var(--accent-primary);
           box-shadow: 0 0 0 3px var(--accent-light);
+        }
+
+        .face-cluster-button {
+          width: 100%;
+          border: none;
+          background: transparent;
+          padding: 0;
+          cursor: pointer;
         }
 
         .cluster-header {

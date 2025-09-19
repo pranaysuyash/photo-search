@@ -189,7 +189,7 @@
 
 /* Loading Skeleton */
 .skeleton {
-	@apply bg-secondary-200 rounded animate-pulse;
+	@apply bg-muted rounded-lg animate-pulse;
 }
 
 .skeleton-text {
@@ -263,19 +263,19 @@
 /* === Empty States === */
 
 .empty-state {
-	@apply text-center py-12 px-4;
+	@apply flex flex-col items-center justify-center gap-3 rounded-xl border border-border bg-card text-foreground shadow-sm py-12 px-6;
 }
 
 .empty-state-icon {
-	@apply mx-auto h-12 w-12 text-secondary-400 mb-4;
+	@apply flex h-12 w-12 items-center justify-center rounded-full bg-secondary text-secondary-foreground;
 }
 
 .empty-state-title {
-	@apply text-lg font-medium text-text-primary mb-2;
+	@apply text-lg font-semibold text-foreground;
 }
 
 .empty-state-description {
-	@apply text-sm text-text-secondary mb-6 max-w-sm mx-auto;
+	@apply text-sm text-muted-foreground max-w-sm text-center;
 }
 
 /* === Utility Classes === */

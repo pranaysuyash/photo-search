@@ -64,6 +64,11 @@ export function applyFilterPreset(
 		setUseOcr: (value: boolean) => void;
 		setHasText: (value: boolean) => void;
 		setRatingMin: (value: number) => void;
+		// Optional setters used by FilterPanel for additional UI filters
+		setPerson?: (value: string) => void;
+		setCollection?: (value: string) => void;
+		setColor?: (value: string) => void;
+		setOrientation?: (value: string) => void;
 	},
 ): void {
 	const { filters } = preset;

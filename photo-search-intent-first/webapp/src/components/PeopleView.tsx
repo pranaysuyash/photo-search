@@ -7,6 +7,8 @@ import {
 	thumbFaceUrl,
 	thumbUrl,
 } from "../api";
+import { EnhancedEmptyState } from "./EnhancedEmptyState";
+import { Button } from "./ui/shadcn/Button";
 
 interface PeopleViewProps {
 	dir: string;
@@ -53,10 +55,10 @@ export default function PeopleView({
 			setShowClusterPhotos(true);
 			setBusy("");
 			setNote(`Found ${result.photos.length} photos in cluster`);
-    } catch (e: unknown) {
-        setBusy("");
-        setNote(e instanceof Error ? e.message : "Failed to load photos");
-    }
+		} catch (e: unknown) {
+			setBusy("");
+			setNote(e instanceof Error ? e.message : "Failed to load photos");
+		}
 	};
 
 	const _mergeClusters = async (sourceId: string, targetId: string) => {
@@ -66,10 +68,10 @@ export default function PeopleView({
 			setBusy("");
 			setNote("Clusters merged successfully");
 			await onLoadFaces();
-    } catch (e: unknown) {
-        setBusy("");
-        setNote(e instanceof Error ? e.message : "Merge failed");
-    }
+		} catch (e: unknown) {
+			setBusy("");
+			setNote(e instanceof Error ? e.message : "Merge failed");
+		}
 	};
 
 	if (showClusterPhotos && selectedClusterId) {
@@ -95,21 +97,24 @@ export default function PeopleView({
 					</div>
 				</div>
 				<div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-					{clusterPhotos.map((photo, index) => (
-						<img
-							key={`photo-${photo}-${index}`}
-							src={thumbUrl(dir, engine, photo, 196)}
-							alt={`Photo ${index + 1}`}
-							className="w-full h-24 object-cover rounded cursor-pointer hover:ring-2 hover:ring-blue-500"
-							onClick={() => onOpenPhotos?.([photo])}
-							onKeyDown={(e) => {
-								if (e.key === "Enter" || e.key === " ") {
-									e.preventDefault();
-									onOpenPhotos?.([photo]);
-								}
-							}}
-						/>
-					))}
+					{clusterPhotos.map((photo) => {
+						const name = photo.split("/").pop() || photo;
+						return (
+							<img
+								key={`photo-${photo}`}
+								src={thumbUrl(dir, engine, photo, 196)}
+								alt={name}
+								className="w-full h-24 object-cover rounded cursor-pointer hover:ring-2 hover:ring-blue-500"
+								onClick={() => onOpenPhotos?.([photo])}
+								onKeyDown={(e) => {
+									if (e.key === "Enter" || e.key === " ") {
+										e.preventDefault();
+										onOpenPhotos?.([photo]);
+									}
+								}}
+							/>
+						);
+					})}
 				</div>
 			</div>
 		);
@@ -120,8 +125,9 @@ export default function PeopleView({
 			<div className="flex items-center justify-between">
 				<h2 className="font-semibold">People</h2>
 				<div className="flex gap-2">
-					<button
-						type="button"
+					<Button
+						variant="secondary"
+						size="sm"
 						onClick={async () => {
 							try {
 								setBusy("Scanning faces…");
@@ -129,26 +135,48 @@ export default function PeopleView({
 								setBusy("");
 								setNote(`Faces: ${r.faces}, clusters: ${r.clusters}`);
 								await onLoadFaces();
-                        } catch (e: unknown) {
-                            setBusy("");
-                            setNote(e instanceof Error ? e.message : "Face build failed");
-                        }
+							} catch (e: unknown) {
+								setBusy("");
+								setNote(e instanceof Error ? e.message : "Face build failed");
+							}
 						}}
-						className="bg-gray-200 rounded px-3 py-1 text-sm"
 					>
 						Build/Update
-					</button>
-					<button
-						type="button"
-						onClick={onLoadFaces}
-						className="bg-gray-200 rounded px-3 py-1 text-sm"
-					>
+					</Button>
+					<Button variant="secondary" size="sm" onClick={onLoadFaces}>
 						Refresh
-					</button>
+					</Button>
 				</div>
 			</div>
 			{clusters.length === 0 ? (
-				<div className="text-sm text-gray-600 mt-2">No face clusters yet.</div>
+				<div className="mt-4">
+					<EnhancedEmptyState
+						type="no-directory"
+						onAction={async () => {
+							try {
+								setBusy("Scanning faces…");
+								const r = await apiBuildFaces(dir, engine);
+								setBusy("");
+								setNote(`Faces: ${r.faces}, clusters: ${r.clusters}`);
+								await onLoadFaces();
+							} catch (e: unknown) {
+								setBusy("");
+								setNote(e instanceof Error ? e.message : "Face build failed");
+							}
+						}}
+						onOpenHelp={() => {
+							/* TODO: Open help */
+						}}
+						sampleQueries={[
+							"Build face clusters",
+							"Name people",
+							"Organize photos",
+						]}
+						onRunSample={() => {
+							/* TODO: Run sample action */
+						}}
+					/>
+				</div>
 			) : (
 				<div className="mt-2 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 text-sm">
 					{clusters.map((c) => (
@@ -167,14 +195,22 @@ export default function PeopleView({
 									<img
 										key={`item-${String(p)}`}
 										src={thumbFaceUrl(dir, engine, p, emb, 196)}
+										alt={`Face example ${_i + 1}`}
 										className="w-full h-16 object-cover rounded"
 									/>
 								))}
 							</div>
 							<div className="mt-2 flex flex-col gap-2">
 								<div className="flex gap-1">
-									<button
-										type="button"
+									<Button
+										variant={
+											c.name && persons.includes(c.name)
+												? "default"
+												: c.name
+													? "secondary"
+													: "outline"
+										}
+										size="sm"
 										onClick={() => {
 											const nm = c.name || "";
 											if (!nm) return;
@@ -184,12 +220,12 @@ export default function PeopleView({
 											setPersons(next);
 										}}
 										disabled={!c.name}
-										className={`px-2 py-1 rounded text-xs ${c.name && persons.includes(c.name) ? "bg-blue-700 text-white" : c.name ? "bg-blue-600 text-white" : "bg-gray-200"}`}
 									>
 										{c.name && persons.includes(c.name) ? "Remove" : "Add"}
-									</button>
-									<button
-										type="button"
+									</Button>
+									<Button
+										variant="outline"
+										size="sm"
 										onClick={async () => {
 											const n =
 												prompt("Name this person as…", c.name || "") || "";
@@ -199,18 +235,18 @@ export default function PeopleView({
 												await onLoadFaces();
 											} catch {}
 										}}
-										className="px-2 py-1 rounded bg-gray-200 text-xs"
 									>
 										Name
-									</button>
+									</Button>
 								</div>
-								<button
-									type="button"
+								<Button
+									variant="default"
+									size="sm"
 									onClick={() => viewClusterPhotos(c.id)}
-									className="px-2 py-1 rounded bg-green-600 text-white text-xs w-full"
+									className="w-full"
 								>
 									View Photos ({c.size})
-								</button>
+								</Button>
 							</div>
 						</div>
 					))}
@@ -224,22 +260,19 @@ export default function PeopleView({
 							className="px-2 py-1 bg-blue-600 text-white rounded flex items-center gap-2"
 						>
 							{p}{" "}
-							<button
-								type="button"
+							<Button
+								variant="ghost"
+								size="sm"
 								onClick={() => setPersons(persons.filter((x) => x !== p))}
-								className="bg-white/20 rounded px-1"
+								className="bg-white/20 rounded px-1 h-5 w-5"
 							>
 								×
-							</button>
+							</Button>
 						</span>
 					))}
-					<button
-						type="button"
-						onClick={() => setPersons([])}
-						className="px-2 py-1 bg-gray-200 rounded"
-					>
+					<Button variant="outline" size="sm" onClick={() => setPersons([])}>
 						Clear
-					</button>
+					</Button>
 				</div>
 			)}
 		</div>

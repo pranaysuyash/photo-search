@@ -11,8 +11,7 @@ import {
 	Globe,
 	Grid,
 	HardDrive,
-	Heart,
-	Map,
+	Map as MapIcon,
 	Moon,
 	Search,
 	Settings,
@@ -22,6 +21,7 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
+import { thumbUrl } from "../api";
 
 interface SidebarItem {
 	id: string;
@@ -41,6 +41,9 @@ interface ModernSidebarProps {
 		people: number;
 		favorites: number;
 	};
+	collections?: Record<string, string[]>; // Add collections prop
+	onOpenCollection?: (collectionName: string) => void; // Add callback for opening collections
+	dir?: string; // Add dir prop for thumbnails
 	aiStatus?: {
 		indexReady: boolean;
 		fastIndexType: string;
@@ -56,6 +59,9 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 	selectedView,
 	onViewChange,
 	stats = { totalPhotos: 0, collections: 0, people: 0, favorites: 0 },
+	collections = {}, // Add default empty object
+	onOpenCollection, // Add the callback
+	dir = "", // Add dir prop
 	aiStatus = { indexReady: true, fastIndexType: "FAISS", freeSpace: 45.2 },
 	darkMode = false,
 	onDarkModeToggle,
@@ -86,8 +92,8 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 			icon: Grid,
 			count: stats.totalPhotos,
 		},
-    { id: "results", label: "Search Results", icon: Search },
-		{ id: "map", label: "Map View", icon: Map },
+		{ id: "results", label: "Search Results", icon: Search },
+		{ id: "map", label: "Map View", icon: MapIcon },
 		{ id: "people", label: "People", icon: Users, count: stats.people },
 	];
 
@@ -136,25 +142,17 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 				whileTap={{ scale: 0.98 }}
 				onClick={() => onViewChange(item.id)}
 				className={clsx(
-					"w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group relative overflow-hidden",
+					"w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group",
 					{
-						"bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg shadow-blue-500/25":
-							isActive,
-						"text-gray-600 dark:text-gray-400 hover:bg-gray-100/80 dark:hover:bg-gray-800/50":
-							!isActive,
+						"bg-primary text-primary-foreground shadow-sm": isActive,
+						"text-muted-foreground hover:bg-secondary": !isActive,
 					},
 				)}
 			>
-				{/* Background gradient effect on hover */}
-				{!isActive && (
-					<div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-				)}
-
 				<Icon
 					className={clsx("w-5 h-5 flex-shrink-0", {
-						"text-white": isActive,
-						"text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300":
-							!isActive,
+						"text-primary-foreground": isActive,
+						"text-muted-foreground group-hover:text-foreground": !isActive,
 					})}
 				/>
 
@@ -166,15 +164,15 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 							exit={{ opacity: 0 }}
 							className="flex items-center justify-between flex-1"
 						>
-							<span className="font-medium">{item.label}</span>
+							<span className="font-medium text-sm">{item.label}</span>
 							{count && (
 								<span
 									className={clsx(
 										"text-xs px-2 py-1 rounded-full font-medium",
 										{
-											"bg-white/20 text-white": isActive,
-											"bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400":
-												!isActive,
+											"bg-primary-foreground/20 text-primary-foreground":
+												isActive,
+											"bg-secondary text-muted-foreground": !isActive,
 										},
 									)}
 								>
@@ -197,10 +195,10 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 				animate={isCollapsed ? "collapsed" : "expanded"}
 				variants={sidebarVariants}
 				transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-				className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-r border-gray-200/50 dark:border-gray-700/50 flex flex-col shadow-xl"
+				className="relative bg-card border-r border-border flex flex-col shadow-sm"
 			>
 				{/* Header */}
-				<div className="p-6 border-b border-gray-200/50 dark:border-gray-700/50 bg-gradient-to-r from-blue-500/5 to-purple-500/5 dark:from-blue-600/10 dark:to-purple-600/10">
+				<div className="p-6 border-b border-border">
 					<div className="flex items-center gap-4">
 						<motion.div
 							{...(prefersReducedMotion
@@ -209,21 +207,21 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 										whileHover: { rotate: 360 },
 										transition: { duration: 0.5 },
 									})}
-							className="w-12 h-12 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg"
+							className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm bg-primary text-primary-foreground"
 						>
-							<Brain className="w-7 h-7 text-white" />
+							<Brain className="w-7 h-7" />
 						</motion.div>
 						{!isCollapsed && (
 							<motion.div
-                    initial={prefersReducedMotion ? undefined : { opacity: 0 }}
+								initial={prefersReducedMotion ? undefined : { opacity: 0 }}
 								animate={{ opacity: 1 }}
-                    exit={prefersReducedMotion ? undefined : { opacity: 0 }}
+								exit={prefersReducedMotion ? undefined : { opacity: 0 }}
 							>
-								<h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+								<h1 className="text-xl font-semibold text-foreground">
 									PhotoVault
 								</h1>
-								<p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
-									AI-Powered Management
+								<p className="text-sm text-muted-foreground">
+									AI-powered management
 								</p>
 							</motion.div>
 						)}
@@ -235,7 +233,7 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 					{/* Main sections */}
 					<div className="space-y-2">
 						{!isCollapsed && (
-							<h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3 px-2">
+							<h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">
 								Browse
 							</h3>
 						)}
@@ -258,7 +256,7 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 					{(!isCollapsed || isCompact) && (
 						<div className="space-y-2">
 							{!isCollapsed && (
-								<h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3 px-2">
+								<h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">
 									Organization
 								</h3>
 							)}
@@ -278,11 +276,122 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 						</div>
 					)}
 
+					{/* Collections */}
+					{(!isCollapsed || isCompact) &&
+						Object.keys(collections).length > 0 && (
+							<div className="space-y-2">
+								{!isCollapsed && (
+									<h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">
+										Collections
+									</h3>
+								)}
+								<motion.div
+									initial="hidden"
+									animate="visible"
+									variants={{
+										visible: {
+											transition: {
+												staggerChildren: 0.05,
+											},
+										},
+									}}
+									className="space-y-1"
+								>
+									{Object.entries(collections)
+										.slice(0, isCollapsed ? 3 : 5) // Show fewer when collapsed
+										.map(([name, paths]) => (
+											<motion.button
+												key={name}
+												variants={itemVariants}
+												whileHover={{ scale: 1.02, x: 4 }}
+												whileTap={{ scale: 0.98 }}
+												onClick={() => onOpenCollection?.(name)}
+												className={clsx(
+													"w-full flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group",
+													"text-muted-foreground hover:bg-secondary",
+												)}
+											>
+												{/* Collection thumbnail preview */}
+												<div className="relative w-8 h-8 flex-shrink-0">
+													{paths.length > 0 && dir ? (
+														<img
+															src={thumbUrl(dir, "local", paths[0], 64)}
+															alt=""
+															className="w-full h-full object-cover rounded-lg"
+															onError={(e) => {
+																// Fallback to icon if thumbnail fails
+																e.currentTarget.style.display = "none";
+																e.currentTarget.nextElementSibling?.classList.remove(
+																	"hidden",
+																);
+															}}
+														/>
+													) : null}
+													<FolderOpen
+														className={clsx(
+															"w-5 h-5 flex-shrink-0",
+															paths.length > 0 && dir ? "hidden" : "",
+														)}
+													/>
+													{paths.length > 1 && (
+														<div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full flex items-center justify-center">
+															<span className="text-[8px] text-primary-foreground font-medium">
+																{paths.length > 9 ? "9+" : paths.length}
+															</span>
+														</div>
+													)}
+												</div>
+
+												{!isCollapsed && (
+													<AnimatePresence mode="wait">
+														<motion.div
+															initial={{ opacity: 0 }}
+															animate={{ opacity: 1 }}
+															exit={{ opacity: 0 }}
+															className="flex items-center justify-between flex-1"
+														>
+															<span
+																className="font-medium text-sm truncate"
+																title={name}
+															>
+																{name}
+															</span>
+															<span className="text-xs px-2 py-1 rounded-full bg-secondary text-muted-foreground">
+																{paths.length}
+															</span>
+														</motion.div>
+													</AnimatePresence>
+												)}
+											</motion.button>
+										))}
+									{/* Show "View All Collections" link if there are more */}
+									{Object.keys(collections).length > (isCollapsed ? 3 : 5) &&
+										!isCollapsed && (
+											<motion.button
+												variants={itemVariants}
+												whileHover={{ scale: 1.02, x: 4 }}
+												whileTap={{ scale: 0.98 }}
+												onClick={() => onViewChange("collections")}
+												className={clsx(
+													"w-full flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-muted-foreground hover:bg-secondary",
+												)}
+											>
+												<FolderOpen className="w-5 h-5 flex-shrink-0" />
+												<span className="font-medium text-sm">
+													View All Collections (
+													{Object.keys(collections).length})
+												</span>
+											</motion.button>
+										)}
+								</motion.div>
+							</div>
+						)}
+
 					{/* Smart Features */}
 					{(!isCollapsed || isCompact) && (
 						<div className="space-y-2">
 							{!isCollapsed && (
-								<h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3 px-2">
+								<h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">
 									Smart Features
 								</h3>
 							)}
@@ -306,42 +415,36 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 				{/* AI Status Panel */}
 				{!isCollapsed && (
 					<motion.div
-                    initial={prefersReducedMotion ? undefined : { opacity: 0, y: 20 }}
+						initial={prefersReducedMotion ? undefined : { opacity: 0, y: 20 }}
 						animate={{ opacity: 1, y: 0 }}
-						className="p-6 border-t border-gray-200/50 dark:border-gray-700/50"
+						className="p-6 border-t border-border"
 					>
-						<div className="bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50 dark:from-emerald-900/20 dark:via-blue-900/20 dark:to-purple-900/20 rounded-2xl p-4 border border-emerald-200/50 dark:border-emerald-700/50">
+						<div className="rounded-2xl p-4 border border-border bg-secondary text-foreground">
 							<div className="flex items-center gap-3 mb-3">
 								<div className="relative">
-									<div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse" />
-									<div className="absolute inset-0 w-3 h-3 bg-emerald-500 rounded-full animate-ping opacity-75" />
+									<div className="w-3 h-3 bg-success rounded-full animate-pulse" />
+									<div className="absolute inset-0 w-3 h-3 bg-success rounded-full animate-ping opacity-75" />
 								</div>
-								<span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+								<span className="text-sm font-semibold text-success">
 									AI System Ready
 								</span>
 							</div>
-							<div className="grid grid-cols-2 gap-3 text-xs">
+							<div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground">
 								<div className="flex items-center justify-between">
-									<span className="text-gray-600 dark:text-gray-400">
-										Index
-									</span>
-									<Activity className="w-3 h-3 text-emerald-500" />
+									<span>Index</span>
+									<Activity className="w-3 h-3 text-success" />
 								</div>
 								<div className="flex items-center justify-between">
-									<span className="text-gray-600 dark:text-gray-400">
-										{aiStatus.fastIndexType}
-									</span>
-									<Database className="w-3 h-3 text-blue-500" />
+									<span>{aiStatus.fastIndexType}</span>
+									<Database className="w-3 h-3 text-primary" />
 								</div>
 								<div className="flex items-center justify-between">
-									<span className="text-gray-600 dark:text-gray-400">OCR</span>
-									<Globe className="w-3 h-3 text-purple-500" />
+									<span>OCR</span>
+									<Globe className="w-3 h-3 text-primary" />
 								</div>
 								<div className="flex items-center justify-between">
-									<span className="text-gray-600 dark:text-gray-400">
-										{aiStatus.freeSpace}GB
-									</span>
-									<HardDrive className="w-3 h-3 text-gray-500" />
+									<span>{aiStatus.freeSpace}GB</span>
+									<HardDrive className="w-3 h-3 text-muted-foreground" />
 								</div>
 							</div>
 						</div>
@@ -349,7 +452,7 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 				)}
 
 				{/* Bottom Actions */}
-				<div className="p-4 border-t border-gray-200/50 dark:border-gray-700/50 space-y-3">
+				<div className="p-4 border-t border-border space-y-3 bg-card">
 					{!isCollapsed ? (
 						<>
 							<motion.button
@@ -437,10 +540,10 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 
 			{/* Mobile Overlay */}
 			{isCompact && !isCollapsed && (
-                <motion.div
-                    initial={prefersReducedMotion ? undefined : { opacity: 0 }}
+				<motion.div
+					initial={prefersReducedMotion ? undefined : { opacity: 0 }}
 					animate={{ opacity: 1 }}
-                    exit={prefersReducedMotion ? undefined : { opacity: 0 }}
+					exit={prefersReducedMotion ? undefined : { opacity: 0 }}
 					onClick={() => setIsCollapsed(true)}
 					className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
 				/>

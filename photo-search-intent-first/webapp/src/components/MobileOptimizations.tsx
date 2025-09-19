@@ -58,11 +58,12 @@ export function MobileSidebar({
 			{/* Backdrop */}
 			<motion.div
 				initial={{ opacity: 0 }}
-				animate={{ opacity: isOpen ? 0.5 : 0 }}
+				animate={{ opacity: isOpen ? 1 : 0 }}
 				className={clsx(
-					"fixed inset-0 bg-black z-40 md:hidden",
+					"fixed inset-0 z-40 md:hidden",
 					!isOpen && "pointer-events-none",
 				)}
+				style={{ background: "var(--color-surface-overlay)" }}
 				onClick={onClose}
 			/>
 
@@ -79,18 +80,20 @@ export function MobileSidebar({
 				}}
 				dragElastic={0.2}
 				onDragEnd={handleDragEnd}
-				className="fixed top-0 bottom-0 w-80 max-w-[90vw] bg-white dark:bg-gray-800 shadow-2xl z-50 md:hidden overflow-y-auto"
-				style={{ x }}
+				className="fixed top-0 bottom-0 w-[min(20rem,90vw)] bg-card text-foreground shadow-lg border border-border z-50 md:hidden overflow-y-auto"
+				style={{
+					x,
+					paddingTop: "env(safe-area-inset-top)",
+					paddingBottom: "env(safe-area-inset-bottom)",
+				}}
 			>
 				{/* Header */}
-				<div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-					<h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-						Menu
-					</h2>
+				<div className="flex items-center justify-between px-4 py-3 border-b border-border">
+					<h2 className="text-lg font-semibold text-foreground">Menu</h2>
 					<button
 						type="button"
 						onClick={onClose}
-						className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+						className="p-2 text-muted-foreground hover:text-foreground rounded-lg hover:bg-secondary transition-colors"
 						aria-label="Close menu"
 					>
 						<X className="w-5 h-5" />
@@ -119,22 +122,22 @@ export function MobileSearchBar({
 	enableVoiceSearch?: boolean;
 }) {
 	const [isListening, setIsListening] = useState(false);
-    const [recognition, setRecognition] = useState<any>(null);
+	const [recognition, setRecognition] = useState<unknown>(null);
 
 	useEffect(() => {
-        if (enableVoiceSearch && (window as any).webkitSpeechRecognition) {
-            const recognition = new (window as any).webkitSpeechRecognition();
+		if (enableVoiceSearch && (window as unknown).webkitSpeechRecognition) {
+			const recognition = new (window as unknown).webkitSpeechRecognition();
 			recognition.continuous = false;
 			recognition.interimResults = false;
 			recognition.lang = "en-US";
 
 			recognition.onstart = () => setIsListening(true);
 			recognition.onend = () => setIsListening(false);
-            recognition.onresult = (event: any) => {
-                const transcript = event?.results?.[0]?.[0]?.transcript ?? "";
-                onChange(transcript);
-                onSubmit(transcript);
-            };
+			recognition.onresult = (event: React.ChangeEvent<HTMLInputElement>) => {
+				const transcript = event?.results?.[0]?.[0]?.transcript ?? "";
+				onChange(transcript);
+				onSubmit(transcript);
+			};
 
 			setRecognition(recognition);
 		}
@@ -217,24 +220,24 @@ export function MobilePhotoGrid({
 	);
 	const [isSelectionMode, setIsSelectionMode] = useState(false);
 
-    const handleTouchStart = (photo: { id: string }) => {
+	const handleTouchStart = (photo: { id: string }) => {
 		if (onPhotoLongPress) {
 			const timer = setTimeout(() => {
 				setIsSelectionMode(true);
-                onPhotoLongPress?.(photo);
+				onPhotoLongPress?.(photo);
 			}, 500);
 			setLongPressTimer(timer);
 		}
 	};
 
-    const handleTouchEnd = (_photo: { id: string }) => {
+	const handleTouchEnd = (_photo: { id: string }) => {
 		if (longPressTimer) {
 			clearTimeout(longPressTimer);
 			setLongPressTimer(null);
 		}
 	};
 
-    const handlePhotoClick = (photo: { id: string }) => {
+	const handlePhotoClick = (photo: { id: string }) => {
 		if (isSelectionMode && onSelectionChange) {
 			const isSelected = selectedPhotos.includes(photo.id);
 			const newSelected = isSelected
@@ -316,12 +319,12 @@ export function MobileActionSheet({
 				tabIndex={0}
 				className="absolute inset-0 bg-black/50"
 				onClick={onClose}
-            onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    onClose();
-                }
-            }}
+				onKeyDown={(e) => {
+					if (e.key === "Enter" || e.key === " ") {
+						e.preventDefault();
+						onClose();
+					}
+				}}
 			/>
 
 			{/* Sheet */}

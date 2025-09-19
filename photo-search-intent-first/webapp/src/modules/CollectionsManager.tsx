@@ -82,27 +82,31 @@ export function CollectionsManager() {
 	};
 
 	const CollectionCard = ({ collection }: { collection: Collection }) => (
-		<div
-			className="collection-card"
-			onClick={() => setSelectedCollection(collection.name)}
-			role="button"
-			tabIndex={0}
-		>
-			<div className="collection-preview">
-				{collection.preview && (
-					<img
-						src={api.getThumbnailUrl(collection.preview)}
-						alt={collection.name}
-					/>
-				)}
-				<div className="collection-overlay">
-					<Grid className="w-5 h-5" />
+		<div className="collection-card">
+			<button
+				type="button"
+				className="collection-card-button"
+				onClick={() => setSelectedCollection(collection.name)}
+				aria-label={`Select collection ${collection.name}`}
+			>
+				<div className="collection-preview">
+					{collection.preview && (
+						<img
+							src={api.getThumbnailUrl(collection.preview)}
+							alt={collection.name}
+						/>
+					)}
+					<div className="collection-overlay">
+						<Grid className="w-5 h-5" />
+					</div>
 				</div>
-			</div>
-			<div className="collection-info">
-				<h3>{collection.name}</h3>
-				<span className="text-sm text-gray-500">{collection.count} items</span>
-			</div>
+				<div className="collection-info">
+					<h3>{collection.name}</h3>
+					<span className="text-sm text-gray-500">
+						{collection.count} items
+					</span>
+				</div>
+			</button>
 			<div className="collection-actions">
 				<button
 					type="button"
@@ -111,6 +115,7 @@ export function CollectionsManager() {
 						deleteCollection(collection.name);
 					}}
 					className="btn-icon"
+					aria-label={`Delete collection ${collection.name}`}
 				>
 					<Trash2 className="w-4 h-4" />
 				</button>
@@ -119,18 +124,22 @@ export function CollectionsManager() {
 	);
 
 	const CollectionListItem = ({ collection }: { collection: Collection }) => (
-		<div
-			className="collection-list-item"
-			onClick={() => setSelectedCollection(collection.name)}
-			role="button"
-			tabIndex={0}
-		>
-			<ChevronRight className="w-4 h-4 text-gray-400" />
-			<FolderPlus className="w-5 h-5 text-blue-500" />
-			<div className="flex-1">
-				<h3 className="font-medium">{collection.name}</h3>
-				<span className="text-sm text-gray-500">{collection.count} items</span>
-			</div>
+		<div className="collection-list-item">
+			<button
+				type="button"
+				className="collection-list-item-button"
+				onClick={() => setSelectedCollection(collection.name)}
+				aria-label={`Select collection ${collection.name}`}
+			>
+				<ChevronRight className="w-4 h-4 text-gray-400" />
+				<FolderPlus className="w-5 h-5 text-blue-500" />
+				<div className="flex-1">
+					<h3 className="font-medium">{collection.name}</h3>
+					<span className="text-sm text-gray-500">
+						{collection.count} items
+					</span>
+				</div>
+			</button>
 			<button
 				type="button"
 				onClick={(e) => {
@@ -138,6 +147,7 @@ export function CollectionsManager() {
 					deleteCollection(collection.name);
 				}}
 				className="btn-icon"
+				aria-label={`Delete collection ${collection.name}`}
 			>
 				<Trash2 className="w-4 h-4" />
 			</button>
@@ -287,13 +297,21 @@ export function CollectionsManager() {
           background: var(--bg-elevated);
           border-radius: var(--radius-lg);
           overflow: hidden;
-          cursor: pointer;
           transition: all 0.3s;
         }
 
         .collection-card:hover {
           transform: translateY(-4px);
           box-shadow: var(--shadow-lg);
+        }
+
+        .collection-card-button {
+          width: 100%;
+          border: none;
+          background: transparent;
+          padding: 0;
+          cursor: pointer;
+          text-align: left;
         }
 
         .collection-preview {
@@ -349,12 +367,23 @@ export function CollectionsManager() {
           padding: 1rem;
           background: var(--bg-elevated);
           border-radius: var(--radius-md);
-          cursor: pointer;
           transition: all 0.2s;
         }
 
         .collection-list-item:hover {
           background: var(--bg-tertiary);
+        }
+
+        .collection-list-item-button {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          flex: 1;
+          border: none;
+          background: transparent;
+          padding: 0;
+          cursor: pointer;
+          text-align: left;
         }
 
         .btn-icon {

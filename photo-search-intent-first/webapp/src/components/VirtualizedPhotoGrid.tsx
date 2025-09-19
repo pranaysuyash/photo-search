@@ -4,6 +4,7 @@
 
 import { Check, Download, Heart, Info, Play, Share2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ProgressiveImage } from "./ProgressiveImage";
 import { matchAnalyzer, SearchExplainability } from "./SearchExplainability";
 
 interface Photo {
@@ -182,8 +183,9 @@ export function VirtualizedPhotoGrid({
 				: [];
 
 		return (
-			<div
+			<button
 				key={photo.id}
+				type="button"
 				className="photo-item relative group cursor-pointer"
 				style={{
 					position: "absolute",
@@ -202,8 +204,7 @@ export function VirtualizedPhotoGrid({
 						onPhotoClick?.(photo, index);
 					}
 				}}
-				role="button"
-				tabIndex={0}
+				aria-label={`View ${photo.caption || "photo"}`}
 			>
 				<div
 					className={`
@@ -213,22 +214,23 @@ export function VirtualizedPhotoGrid({
           transition-all duration-200
         `}
 				>
-					{/* Loading placeholder */}
-					{!isLoaded && (
-						<div className="absolute inset-0 bg-gray-200 dark:bg-gray-700 animate-pulse" />
-					)}
-
-					{/* Photo image */}
-					<img
+					{/* Progressive image loading */}
+					<ProgressiveImage
 						src={photo.thumbnail || photo.path}
 						alt={photo.caption || "Photo"}
-						className={`
-              w-full h-full object-cover
-              ${isLoaded ? "opacity-100" : "opacity-0"}
-              transition-opacity duration-300
-            `}
-						loading="lazy"
-						onLoad={() => preloadImage(photo.thumbnail || photo.path)}
+						className="w-full h-full"
+						thumbSize={96}
+						mediumSize={256}
+						fullSize={512}
+						enableLazyLoading={true}
+						onLoad={() =>
+							setLoadedImages((prev) =>
+								new Set(prev).add(photo.thumbnail || photo.path),
+							)
+						}
+						loadingComponent={
+							<div className="absolute inset-0 bg-gray-200 dark:bg-gray-700 animate-pulse" />
+						}
 					/>
 
 					{/* Video indicator */}
@@ -244,7 +246,8 @@ export function VirtualizedPhotoGrid({
 					)}
 
 					{/* Selection checkbox */}
-					<div
+					<button
+						type="button"
 						className={`
               absolute top-2 left-2 
               ${isHovered || isSelected ? "opacity-100" : "opacity-0"}
@@ -254,8 +257,14 @@ export function VirtualizedPhotoGrid({
 							e.stopPropagation();
 							onPhotoSelect?.(photo, !isSelected);
 						}}
-						role="button"
-						tabIndex={0}
+						onKeyDown={(e) => {
+							if (e.key === "Enter" || e.key === " ") {
+								e.preventDefault();
+								e.stopPropagation();
+								onPhotoSelect?.(photo, !isSelected);
+							}
+						}}
+						aria-label={isSelected ? "Deselect photo" : "Select photo"}
 					>
 						<div
 							className={`
@@ -269,14 +278,18 @@ export function VirtualizedPhotoGrid({
 						>
 							{isSelected && <Check className="w-4 h-4 text-white" />}
 						</div>
-					</div>
+					</button>
 
 					{/* Favorite button */}
 					<button
 						type="button"
 						className={`
               absolute top-2 right-2
-              ${photo.favorite ? "opacity-100" : "opacity-0 group-hover:opacity-100"}
+              ${
+								photo.favorite
+									? "opacity-100"
+									: "opacity-0 group-hover:opacity-100"
+							}
               transition-opacity duration-200
             `}
 						onClick={(e) => {
@@ -304,18 +317,21 @@ export function VirtualizedPhotoGrid({
 									<button
 										type="button"
 										className="p-1 hover:bg-white/20 rounded transition-colors"
+										aria-label="Download photo"
 									>
 										<Download className="w-3 h-3 text-white" />
 									</button>
 									<button
 										type="button"
 										className="p-1 hover:bg-white/20 rounded transition-colors"
+										aria-label="Share photo"
 									>
 										<Share2 className="w-3 h-3 text-white" />
 									</button>
 									<button
 										type="button"
 										className="p-1 hover:bg-white/20 rounded transition-colors"
+										aria-label="View photo details"
 									>
 										<Info className="w-3 h-3 text-white" />
 									</button>
@@ -335,7 +351,7 @@ export function VirtualizedPhotoGrid({
 						</div>
 					)}
 				</div>
-			</div>
+			</button>
 		);
 	};
 

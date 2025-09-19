@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import List, Optional
 from pathlib import Path
+import os
+import warnings
 
 import numpy as np
 import torch
@@ -22,14 +24,57 @@ def _auto_device():
 class TransformersClipEmbedding:
     def __init__(self, model_name: str = "openai/clip-vit-base-patch32", device: Optional[str] = None) -> None:
         self.device = torch.device(device) if device else _auto_device()
+        
+        # Honor offline mode and local cache directory if provided
+        offline = os.getenv("OFFLINE_MODE", "").lower() in ("1", "true", "yes")
+        local_dir = os.getenv("PHOTOVAULT_MODEL_DIR") or os.getenv("TRANSFORMERS_CACHE")
+        if local_dir:
+            os.environ.setdefault("TRANSFORMERS_CACHE", local_dir)
+        if offline:
+            os.environ.setdefault("HF_HUB_OFFLINE", "1")
+            os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+        
         # Prefer fast processor; fallback to slow if unavailable (e.g., no torchvision)
-        try:
-            self.processor = AutoProcessor.from_pretrained(model_name, use_fast=True)
-            self._fast = True
-        except Exception:
-            self.processor = AutoProcessor.from_pretrained(model_name, use_fast=False)
-            self._fast = False
-        self.model = CLIPModel.from_pretrained(model_name)
+        try_names = [model_name]
+        if local_dir:
+            try_names.insert(0, os.path.join(local_dir, model_name))
+        last_err: Optional[Exception] = None
+        for name in try_names:
+            try:
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", message=".*slow image processor.*")
+                    self.processor = AutoProcessor.from_pretrained(name, use_fast=True)
+                self._fast = True
+                break
+            except Exception as e:
+                last_err = e
+                self.processor = None
+        if self.processor is None:
+            # Fallback to slow processor
+            for name in try_names:
+                try:
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings("ignore", message=".*slow image processor.*")
+                        self.processor = AutoProcessor.from_pretrained(name, use_fast=False)
+                    self._fast = False
+                    break
+                except Exception as e:
+                    last_err = e
+                    self.processor = None
+        if self.processor is None:
+            raise RuntimeError(f"Failed to load CLIP processor for {model_name}. If offline, ensure model is cached locally. Last error: {last_err}")
+        
+        # Load model
+        for name in try_names:
+            try:
+                self.model = CLIPModel.from_pretrained(name)
+                break
+            except Exception as e:
+                last_err = e
+                self.model = None
+        if self.model is None:
+            raise RuntimeError(f"Failed to load CLIP model for {model_name}. If offline, ensure model is cached locally. Last error: {last_err}")
+        
         self.model.to(self.device)
         self.model.eval()
         self._index_id = f"hf-{model_name}{'-fast' if self._fast else ''}"

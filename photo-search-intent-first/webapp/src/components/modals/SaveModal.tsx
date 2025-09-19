@@ -1,6 +1,6 @@
 import type React from "react";
-import { FocusTrap } from "../../utils/accessibility";
 import { apiAddSaved, apiGetSaved } from "../../api";
+import { FocusTrap } from "../../utils/accessibility";
 
 interface SaveModalProps {
 	dir: string;
@@ -10,7 +10,9 @@ interface SaveModalProps {
 	onClose: () => void;
 	setSelectedView: (view: string) => void;
 	photoActions: {
-		setSaved: (saved: Array<{ name: string; query: string; top_k?: number }>) => void;
+		setSaved: (
+			saved: Array<{ name: string; query: string; top_k?: number }>,
+		) => void;
 	};
 	uiActions: {
 		setNote: (message: string) => void;
@@ -33,13 +35,11 @@ export const SaveModal: React.FC<SaveModalProps> = ({
 			onKeyDown={(e) => {
 				if (e.key === "Escape") onClose();
 			}}
+			role="dialog"
+			aria-modal="true"
 		>
 			<FocusTrap onEscape={onClose}>
-				<div
-					className="bg-white rounded-lg p-4 w-full max-w-md"
-					role="dialog"
-					aria-modal="true"
-				>
+				<div className="bg-white rounded-lg p-4 w-full max-w-md">
 					<div className="font-semibold mb-2">Save Search</div>
 					<form
 						onSubmit={async (e) => {

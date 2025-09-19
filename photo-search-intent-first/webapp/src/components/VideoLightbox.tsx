@@ -30,6 +30,9 @@ export function VideoLightbox({
 }: VideoLightboxProps) {
 	const videoRef = useRef<HTMLVideoElement>(null);
 	const progressRef = useRef<HTMLDivElement>(null);
+	const bufferedBarRef = useRef<HTMLDivElement>(null);
+	const progressFillRef = useRef<HTMLDivElement>(null);
+	const progressHandleRef = useRef<HTMLDivElement>(null);
 	const [videoInfo, setVideoInfo] = useState<VideoFile | null>(null);
 	const [isPlaying, setIsPlaying] = useState(false);
 	const [isMuted, setIsMuted] = useState(false);
@@ -101,14 +104,23 @@ export function VideoLightbox({
 		}
 	};
 
-	const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+	const seekFromClientX = (clientX: number) => {
 		if (videoRef.current && progressRef.current) {
 			const rect = progressRef.current.getBoundingClientRect();
-			const percent = (e.clientX - rect.left) / rect.width;
+			const percent = Math.max(
+				0,
+				Math.min(1, (clientX - rect.left) / rect.width),
+			);
 			const newTime = percent * duration;
 			videoRef.current.currentTime = newTime;
 			setCurrentTime(newTime);
 		}
+	};
+
+	const handleProgressClickButton = (
+		e: React.MouseEvent<HTMLButtonElement>,
+	) => {
+		seekFromClientX(e.clientX);
 	};
 
 	const handleTimeUpdate = () => {
@@ -244,6 +256,48 @@ export function VideoLightbox({
 
 	const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
+	// Reflect buffered and progress to DOM without JSX inline styles
+	useEffect(() => {
+		if (bufferedBarRef.current) {
+			bufferedBarRef.current.style.width = `${buffered}%`;
+		}
+	}, [buffered]);
+
+	useEffect(() => {
+		if (progressFillRef.current) {
+			progressFillRef.current.style.width = `${progressPercent}%`;
+		}
+		if (progressHandleRef.current) {
+			progressHandleRef.current.style.left = `${progressPercent}%`;
+		}
+	}, [progressPercent]);
+
+	// Position keyframe thumbnails without JSX inline styles
+	useEffect(() => {
+		if (!progressRef.current) return;
+		const container = progressRef.current.querySelector(
+			".keyframes",
+		) as HTMLDivElement | null;
+		if (!container) return;
+		const imgs = container.querySelectorAll<HTMLImageElement>(".keyframe");
+		const count = imgs.length;
+		imgs.forEach((img, i) => {
+			const percent = (i + 1) * (100 / (count + 1));
+			img.style.left = `${percent}%`;
+		});
+		// Re-run on next tick to catch late-rendered frames
+		const id = requestAnimationFrame(() => {
+			const imgs2 = container.querySelectorAll<HTMLImageElement>(".keyframe");
+			const count2 = imgs2.length;
+			imgs2.forEach((img, i) => {
+				const percent = (i + 1) * (100 / (count2 + 1));
+				img.style.left = `${percent}%`;
+			});
+		});
+		return () => cancelAnimationFrame(id);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
 	return (
 		<div
 			className="video-lightbox"
@@ -270,45 +324,50 @@ export function VideoLightbox({
 							onEnded={() => setIsPlaying(false)}
 							onClick={togglePlayPause}
 							className="video-player"
-						/>
+						>
+							<track kind="captions" src="" label="English captions" default />
+						</video>
 
 						{/* Video Controls */}
 						<div
-							className={`video-controls ${showControls ? "visible" : "hidden"}`}
+							className={`video-controls ${
+								showControls ? "visible" : "hidden"
+							}`}
 						>
 							{/* Timeline with keyframe previews */}
 							<div className="timeline-container">
-								<div
-									ref={progressRef}
-									className="progress-bar"
-									onClick={handleSeek}
-									role="button"
-									tabIndex={0}
-								>
-									<div
-										className="buffered-bar"
-										style={{ width: `${buffered}%` }}
+								<div ref={progressRef} className="progress-bar">
+									<button
+										type="button"
+										className="progress-hitarea"
+										onClick={handleProgressClickButton}
+										onKeyDown={(e) => {
+											if (e.key === "Enter" || e.key === " ") {
+												e.preventDefault();
+												// Treat as click at current handle position
+												if (progressRef.current) {
+													const rect =
+														progressRef.current.getBoundingClientRect();
+													const percent = currentTime / Math.max(1, duration);
+													const clientX = rect.left + rect.width * percent;
+													seekFromClientX(clientX);
+												}
+											}
+										}}
+										aria-label="Seek video"
 									/>
-									<div
-										className="progress-fill"
-										style={{ width: `${progressPercent}%` }}
-									/>
-									<div
-										className="progress-handle"
-										style={{ left: `${progressPercent}%` }}
-									/>
+									<div ref={bufferedBarRef} className="buffered-bar" />
+									<div ref={progressFillRef} className="progress-fill" />
+									<div ref={progressHandleRef} className="progress-handle" />
 
 									{/* Keyframe previews on hover */}
 									{keyframes.length > 0 && (
 										<div className="keyframes">
-											{keyframes.map((frame, i) => (
+											{keyframes.map((frame) => (
 												<img
 													key={`item-${String(frame)}`}
 													src={frame}
 													className="keyframe"
-													style={{
-														left: `${(i + 1) * (100 / (keyframes.length + 1))}%`,
-													}}
 													alt=""
 												/>
 											))}
@@ -329,6 +388,7 @@ export function VideoLightbox({
 										type="button"
 										onClick={togglePlayPause}
 										className="control-btn"
+										aria-label={isPlaying ? "Pause" : "Play"}
 									>
 										{isPlaying ? <Pause /> : <Play />}
 									</button>
@@ -336,6 +396,7 @@ export function VideoLightbox({
 										type="button"
 										onClick={() => skip(-10)}
 										className="control-btn"
+										aria-label="Rewind 10 seconds"
 									>
 										<SkipBack />
 									</button>
@@ -343,6 +404,7 @@ export function VideoLightbox({
 										type="button"
 										onClick={() => skip(10)}
 										className="control-btn"
+										aria-label="Forward 10 seconds"
 									>
 										<SkipForward />
 									</button>
@@ -352,6 +414,7 @@ export function VideoLightbox({
 											type="button"
 											onClick={toggleMute}
 											className="control-btn"
+											aria-label={isMuted || volume === 0 ? "Unmute" : "Mute"}
 										>
 											{isMuted || volume === 0 ? <VolumeX /> : <Volume2 />}
 										</button>
@@ -363,6 +426,7 @@ export function VideoLightbox({
 											value={volume}
 											onChange={handleVolumeChange}
 											className="volume-slider"
+											aria-label="Volume"
 										/>
 									</div>
 								</div>
@@ -372,6 +436,9 @@ export function VideoLightbox({
 										type="button"
 										onClick={() => setShowInfo(!showInfo)}
 										className="control-btn"
+										aria-label={
+											showInfo ? "Hide video info" : "Show video info"
+										}
 									>
 										<Info />
 									</button>
@@ -379,6 +446,7 @@ export function VideoLightbox({
 										type="button"
 										onClick={toggleFullscreen}
 										className="control-btn"
+										aria-label="Toggle fullscreen"
 									>
 										<Maximize />
 									</button>
@@ -386,6 +454,7 @@ export function VideoLightbox({
 										href={videoUrl}
 										download={videoPath.split("/").pop()}
 										className="control-btn"
+										aria-label="Download video"
 									>
 										<Download />
 									</a>
@@ -422,12 +491,24 @@ export function VideoLightbox({
 
 			{/* Navigation buttons */}
 			{onPrevious && (
-				<button type="button" onClick={onPrevious} className="nav-btn nav-prev">
+				<button
+					type="button"
+					onClick={onPrevious}
+					className="nav-btn nav-prev"
+					title="Previous video"
+					aria-label="Previous video"
+				>
 					<SkipBack />
 				</button>
 			)}
 			{onNext && (
-				<button type="button" onClick={onNext} className="nav-btn nav-next">
+				<button
+					type="button"
+					onClick={onNext}
+					className="nav-btn nav-next"
+					title="Next video"
+					aria-label="Next video"
+				>
 					<SkipForward />
 				</button>
 			)}

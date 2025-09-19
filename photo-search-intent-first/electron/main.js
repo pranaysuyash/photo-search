@@ -116,19 +116,19 @@ async function determineUiTarget() {
 
 function loadUI(target) {
   if (!mainWindow) return
+  currentTarget = target
   if (target.type === 'dev' || target.type === 'http') {
     mainWindow.loadURL(target.url)
   } else {
     const fs = require('fs')
     if (fs.existsSync(target.file)) {
       console.log('Loading built UI via app:// from', target.file)
-      // Use custom app:// scheme to avoid file:// module/CORS issues
+      // Use custom app:// scheme to avoid file:// module/CORS issues.
+      // Always prefix with a host segment so path parsing is consistent across platforms.
       const abs = path.resolve(target.file)
       const asPosix = process.platform === 'win32' ? abs.replace(/\\/g, '/') : abs
-      const posixNoLeading = process.platform === 'win32' ? asPosix : asPosix.replace(/^\//, '')
-      const url = (process.platform === 'win32')
-        ? `app://${encodeURI(posixNoLeading)}`
-        : `app:///${encodeURI(posixNoLeading)}`
+      const pathWithLeadingSlash = asPosix.startsWith('/') ? asPosix : `/${asPosix}`
+      const url = `app://local${encodeURI(pathWithLeadingSlash)}`
       console.log('[Loader] Navigating to', url)
       mainWindow.loadURL(url)
     } else {
@@ -279,6 +279,16 @@ app.whenReady().then(async () => {
       }
       filePath = path.normalize(filePath)
       console.log('[Protocol Handler] Resolved file path:', filePath)
+      const fs = require('fs')
+      if (!fs.existsSync(filePath) && currentTarget?.type === 'file') {
+        const rootDir = path.dirname(path.resolve(currentTarget.file))
+        const trimmed = filePath.replace(/^[/\\]+/, '')
+        const candidate = path.join(rootDir, trimmed)
+        if (fs.existsSync(candidate)) {
+          filePath = candidate
+          console.log('[Protocol Handler] Re-mapped relative path to:', filePath)
+        }
+      }
       // Restrict served files to an allowed root in production
       const allowedRoot = process.env.PHOTOVAULT_ALLOWED_ROOT
       if (isProd && allowedRoot) {
@@ -292,7 +302,6 @@ app.whenReady().then(async () => {
       }
 
       // Check if file exists
-      const fs = require('fs')
       if (fs.existsSync(filePath)) {
         console.log('[Protocol Handler] File exists, serving:', filePath)
         callback({ path: filePath })

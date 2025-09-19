@@ -16,7 +16,7 @@ vi.mock("./components/VideoManager", () => ({
   VideoManager: () => <div data-testid="route-videos">Videos Route</div>,
 }));
 
-describe("App route rendering", () => {
+describe("App routing", () => {
   it.each([
     ["/map", "route-map"],
     ["/smart", "route-smart"],

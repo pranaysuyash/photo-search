@@ -1,3 +1,4 @@
+import type { LucideProps } from "lucide-react";
 import {
 	Calendar as IconCalendar,
 	Grid3x3 as IconGrid,
@@ -10,7 +11,6 @@ import {
 	Users as IconUsers,
 	X,
 } from "lucide-react";
-import type { LucideProps } from "lucide-react";
 
 interface NavItem {
 	id: string;

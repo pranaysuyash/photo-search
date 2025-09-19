@@ -19,7 +19,7 @@ export type ModalKey =
 	| "collect"
 	| "removeCollect";
 
-type ModalState = Record<ModalKey, boolean>;
+export type ModalState = Record<ModalKey, boolean>;
 
 type ModalActions = {
 	open: (key: ModalKey) => void;
@@ -54,9 +54,21 @@ const initialState: ModalState = {
 export function ModalProvider({ children }: { children: React.ReactNode }) {
 	const [modals, setModals] = useState<ModalState>(initialState);
 
+	useEffect(() => {
+		if (typeof window !== "undefined") {
+			(window as unknown as { __modalState?: ModalState }).__modalState =
+				modals;
+		}
+	}, [modals]);
+
+	console.log("ModalProvider: Initial state:", modals);
+
 	// Close all modals when a global error is announced
 	useEffect(() => {
-		const onGlobalError = () => setModals(initialState);
+		const onGlobalError = () => {
+			console.log("ModalProvider: Global error - closing all modals");
+			setModals(initialState);
+		};
 		window.addEventListener("global-error", onGlobalError);
 		return () => window.removeEventListener("global-error", onGlobalError);
 	}, []);
@@ -65,10 +77,34 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
 		() => ({
 			state: modals,
 			actions: {
-				open: (k: ModalKey) => setModals((m) => ({ ...m, [k]: true })),
-				close: (k: ModalKey) => setModals((m) => ({ ...m, [k]: false })),
-				toggle: (k: ModalKey) => setModals((m) => ({ ...m, [k]: !m[k] })),
-				closeAll: () => setModals(initialState),
+				open: (k: ModalKey) => {
+					console.log("ModalProvider: Opening modal:", k);
+					setModals((m) => {
+						const newState = { ...m, [k]: true };
+						console.log("ModalProvider: New state after open:", newState);
+						return newState;
+					});
+				},
+				close: (k: ModalKey) => {
+					console.log("ModalProvider: Closing modal:", k);
+					setModals((m) => {
+						const newState = { ...m, [k]: false };
+						console.log("ModalProvider: New state after close:", newState);
+						return newState;
+					});
+				},
+				toggle: (k: ModalKey) => {
+					console.log("ModalProvider: Toggling modal:", k);
+					setModals((m) => {
+						const newState = { ...m, [k]: !m[k] };
+						console.log("ModalProvider: New state after toggle:", newState);
+						return newState;
+					});
+				},
+				closeAll: () => {
+					console.log("ModalProvider: Closing all modals");
+					setModals(initialState);
+				},
 			},
 		}),
 		[modals],

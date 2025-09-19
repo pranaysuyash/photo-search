@@ -25,6 +25,16 @@
       "!node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
       "!**/*.map"
     ],
+    "extraResources": [
+      {
+        "from": "../models/",
+        "to": "models/",
+        "filter": [
+          "**/clip-vit-base-patch32/**",
+          "**/sentence-transformers-clip/**"
+        ]
+      }
+    ],
     "directories": {
       "output": "dist"
     },
@@ -40,7 +50,11 @@
       ]
     },
     "publish": [
-      { "provider": "github", "owner": "yourorg", "repo": "photo-search" }
+      {
+        "provider": "github",
+        "owner": "yourorg",
+        "repo": "photo-search"
+      }
     ]
   }
 }

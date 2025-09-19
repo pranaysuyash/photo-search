@@ -427,4 +427,15 @@ export class UserManagementService {
 	static async deleteShareLink(linkId: string): Promise<void> {
 		UserManagementService.shareLinks.delete(linkId);
 	}
+
+	/**
+	 * Test helper to reset in-memory state.
+	 */
+	static reset(): void {
+		UserManagementService.currentUser = null;
+		UserManagementService.users.clear();
+		UserManagementService.permissions.clear();
+		UserManagementService.shareLinks.clear();
+		UserManagementService.activities = [];
+	}
 }

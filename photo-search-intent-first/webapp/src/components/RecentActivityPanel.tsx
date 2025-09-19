@@ -2,11 +2,14 @@ import { Calendar, Clock, Filter, Search, X } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { List } from "react-window";
+import {
+	type Activity,
+	UserManagementService,
+} from "../services/UserManagementService";
 import { handleError } from "../utils/errors";
-import { UserManagementService, type Activity } from "../services/UserManagementService";
 
 // Mock performanceMonitor for testing environments
-const performanceMonitor = {
+const _performanceMonitor = {
 	start: () => () => {}, // Return a no-op function
 	record: () => {},
 	getRecentMetrics: () => [],
@@ -36,17 +39,17 @@ const ACTION_LABELS = {
 };
 
 // Component for individual activity items in the virtualized list
-const ActivityItem = ({ 
-	data, 
-	index, 
-	style 
-}: { 
-	data: Activity[]; 
-	index: number; 
+const ActivityItem = ({
+	data,
+	index,
+	style,
+}: {
+	data: Activity[];
+	index: number;
 	style: React.CSSProperties;
 }) => {
 	const activity = data[index];
-	
+
 	const formatRelativeTime = (timestamp: Date): string => {
 		const now = Date.now();
 		const time = new Date(timestamp).getTime();
@@ -82,9 +85,9 @@ const ActivityItem = ({
 					<div className="activity-content">
 						<div className="activity-description">
 							<span className="activity-action">
-								{ACTION_LABELS[activity.action as keyof typeof ACTION_LABELS] || activity.action}
-							</span>
-							{" "}
+								{ACTION_LABELS[activity.action as keyof typeof ACTION_LABELS] ||
+									activity.action}
+							</span>{" "}
 							<span className="activity-resource">
 								{activity.resourceType} {activity.resourceId}
 							</span>
@@ -105,15 +108,17 @@ const ActivityItem = ({
 					</div>
 				</div>
 			</div>
-			</div>
+		</div>
 	);
-	};
+};
 
-	export const RecentActivityPanel: React.FC<RecentActivityPanelProps> = ({
+export const RecentActivityPanel: React.FC<RecentActivityPanelProps> = ({
 	onClose,
 }) => {
 	const [activities, setActivities] = useState<Activity[]>([]);
-	const [filterBy, setFilterBy] = useState<"all" | "today" | "week" | "month">("all");
+	const [filterBy, setFilterBy] = useState<"all" | "today" | "week" | "month">(
+		"all",
+	);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [sortBy, setSortBy] = useState<"recent" | "type">("recent");
 
@@ -124,11 +129,11 @@ const ActivityItem = ({
 		} catch (error) {
 			handleError(error, {
 				logToServer: true,
-				context: { 
-					component: "RecentActivityPanel", 
-					action: "load_activities" 
+				context: {
+					component: "RecentActivityPanel",
+					action: "load_activities",
 				},
-				fallbackMessage: "Failed to load recent activity"
+				fallbackMessage: "Failed to load recent activity",
 			});
 			setActivities([]); // Set empty array on error
 		}
@@ -140,41 +145,51 @@ const ActivityItem = ({
 
 	const filteredAndSortedActivities = useMemo(() => {
 		let filtered = [...activities];
-		
+
 		// Apply search filter
 		if (searchQuery) {
 			const query = searchQuery.toLowerCase();
-			filtered = filtered.filter(activity => 
-				activity.action.toLowerCase().includes(query) ||
-				(activity.metadata && JSON.stringify(activity.metadata).toLowerCase().includes(query))
+			filtered = filtered.filter(
+				(activity) =>
+					activity.action.toLowerCase().includes(query) ||
+					(activity.metadata &&
+						JSON.stringify(activity.metadata).toLowerCase().includes(query)),
 			);
 		}
-		
+
 		// Apply time filter
 		const now = Date.now();
 		switch (filterBy) {
 			case "today":
-				filtered = filtered.filter(activity => 
-					now - new Date(activity.timestamp).getTime() < 24 * 60 * 60 * 1000
+				filtered = filtered.filter(
+					(activity) =>
+						now - new Date(activity.timestamp).getTime() < 24 * 60 * 60 * 1000,
 				);
 				break;
 			case "week":
-				filtered = filtered.filter(activity => 
-					now - new Date(activity.timestamp).getTime() < 7 * 24 * 60 * 60 * 1000
+				filtered = filtered.filter(
+					(activity) =>
+						now - new Date(activity.timestamp).getTime() <
+						7 * 24 * 60 * 60 * 1000,
 				);
 				break;
 			case "month":
-				filtered = filtered.filter(activity => 
-					now - new Date(activity.timestamp).getTime() < 30 * 24 * 60 * 60 * 1000
+				filtered = filtered.filter(
+					(activity) =>
+						now - new Date(activity.timestamp).getTime() <
+						30 * 24 * 60 * 60 * 1000,
 				);
 				break;
 		}
-		
+
 		// Sort by recency (default)
-		filtered.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-		
+		filtered.sort(
+			(a, b) =>
+				new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+		);
+
 		return filtered;
-	}, [activities, filterBy, searchQuery, sortBy]);
+	}, [activities, filterBy, searchQuery]);
 
 	return (
 		<div className="recent-activity-panel">
@@ -207,12 +222,12 @@ const ActivityItem = ({
 					/>
 					<Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
 				</div>
-				
+
 				<div className="flex gap-2">
 					<div className="relative flex-1">
 						<select
 							value={filterBy}
-							onChange={(e) => setFilterBy(e.target.value as any)}
+							onChange={(e) => setFilterBy(e.target.value as unknown)}
 							className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none"
 						>
 							<option value="all">All time</option>
@@ -222,11 +237,11 @@ const ActivityItem = ({
 						</select>
 						<Filter className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
 					</div>
-					
+
 					<div className="relative flex-1">
 						<select
 							value={sortBy}
-							onChange={(e) => setSortBy(e.target.value as any)}
+							onChange={(e) => setSortBy(e.target.value as unknown)}
 							className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none"
 						>
 							<option value="recent">Most recent</option>

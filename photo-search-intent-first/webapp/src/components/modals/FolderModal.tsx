@@ -82,12 +82,15 @@ export const FolderModal: React.FC<FolderModalProps> = ({
 	buildMetadata,
 }) => {
 	const [selectedPath, setSelectedPath] = useState(dir);
+	const canUseSystemPicker =
+		typeof (window as unknown).electronAPI?.selectFolder === "function";
 
 	const handleFolderSelect = (path: string) => {
 		setSelectedPath(path);
 	};
 
 	const handleChooseWithOS = async () => {
+		if (!canUseSystemPicker) return;
 		try {
 			const p = await (window as unknown).electronAPI?.selectFolder?.();
 			if (typeof p === "string" && p.trim()) {
@@ -127,13 +130,11 @@ export const FolderModal: React.FC<FolderModalProps> = ({
 			onKeyDown={(e) => {
 				if (e.key === "Escape") onClose();
 			}}
+			role="dialog"
+			aria-modal="true"
 		>
 			<FocusTrap onEscape={onClose}>
-				<div
-					className="bg-white rounded-lg p-4 w-full max-w-2xl"
-					role="dialog"
-					aria-modal="true"
-				>
+				<div className="bg-white rounded-lg p-4 w-full max-w-2xl">
 					<div className="font-semibold mb-4">Set Photo Folder</div>
 
 					<FolderPicker
@@ -141,20 +142,23 @@ export const FolderModal: React.FC<FolderModalProps> = ({
 						currentPath={selectedPath}
 					/>
 
-					{/* OS picker (Electron) */}
-			{typeof (window as unknown).electronAPI?.selectFolder ===
-						"function" && (
-						<div className="mt-3">
-							<button
-								type="button"
-								onClick={handleChooseWithOS}
-								className="px-3 py-1 rounded border"
-								aria-label="Choose folder with system dialog"
-							>
-								Choose with OS…
-							</button>
-						</div>
-					)}
+					<div className="mt-3">
+						<button
+							type="button"
+							onClick={handleChooseWithOS}
+							disabled={!canUseSystemPicker}
+							className="px-3 py-2 rounded-md border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed"
+							aria-label="Choose folder with system dialog"
+						>
+							Choose Folder
+						</button>
+						{!canUseSystemPicker && (
+							<p className="mt-1 text-xs text-gray-500">
+								Enter a path manually above or pick from the quick-select
+								options when running in the browser.
+							</p>
+						)}
+					</div>
 
 					<form onSubmit={handleSubmit}>
 						<div className="mt-3 flex items-center justify-between">
@@ -193,8 +197,11 @@ export const FolderModal: React.FC<FolderModalProps> = ({
 										value={fastKind}
 										onChange={(e) =>
 											settingsActions.setFastKind(
-												(e.target as HTMLSelectElement)
-													.value as "" | "annoy" | "faiss" | "hnsw",
+												(e.target as HTMLSelectElement).value as
+													| ""
+													| "annoy"
+													| "faiss"
+													| "hnsw",
 											)
 										}
 									>

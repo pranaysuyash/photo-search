@@ -1,3 +1,5 @@
+import { EnhancedEmptyState } from "./EnhancedEmptyState";
+
 interface SavedItem {
 	name: string;
 	query: string;
@@ -19,7 +21,29 @@ export default function SavedSearches({
 				<h2 className="font-semibold">Saved Searches</h2>
 			</div>
 			{!saved || saved.length === 0 ? (
-				<div className="text-sm text-gray-600 mt-2">No saved searches yet.</div>
+				<div className="mt-4">
+					<EnhancedEmptyState
+						type="no-directory"
+						onAction={() => {
+							/* TODO: Navigate to search */
+						}}
+						onDemoAction={() => {
+							/* TODO: Show demo searches */
+						}}
+						onOpenHelp={() => {
+							/* TODO: Open help */
+						}}
+						sampleQueries={[
+							"beach sunset",
+							"birthday cake",
+							"mountain hike",
+							"red car",
+						]}
+						onRunSample={() => {
+							/* TODO: Run sample search */
+						}}
+					/>
+				</div>
 			) : (
 				<div className="mt-2 divide-y">
 					{saved.map((s) => (

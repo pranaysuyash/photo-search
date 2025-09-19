@@ -10,6 +10,10 @@ import {
 	X,
 } from "lucide-react";
 import { useState } from "react";
+import {
+	useEnableDemoLibrary,
+	useSettingsActions,
+} from "../stores/settingsStore";
 
 interface PreferencesPanelProps {
 	isOpen: boolean;
@@ -18,6 +22,10 @@ interface PreferencesPanelProps {
 
 export function PreferencesPanel({ isOpen, onClose }: PreferencesPanelProps) {
 	const [activeTab, setActiveTab] = useState("general");
+
+	// Get demo library setting and actions
+	const enableDemoLibrary = useEnableDemoLibrary();
+	const { setEnableDemoLibrary } = useSettingsActions();
 
 	// Preferences state
 	const [preferences, setPreferences] = useState({
@@ -63,7 +71,7 @@ export function PreferencesPanel({ isOpen, onClose }: PreferencesPanelProps) {
 
 		// Apply immediate changes
 		if (key === "theme") {
-			applyTheme(value);
+			applyTheme(value as string);
 		}
 	};
 
@@ -105,6 +113,7 @@ export function PreferencesPanel({ isOpen, onClose }: PreferencesPanelProps) {
 						type="button"
 						onClick={onClose}
 						className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+						title="Close preferences"
 					>
 						<X className="w-5 h-5" />
 					</button>
@@ -155,6 +164,7 @@ export function PreferencesPanel({ isOpen, onClose }: PreferencesPanelProps) {
 																? "border-blue-500 bg-blue-50 dark:bg-blue-900/30"
 																: "border-gray-300 dark:border-gray-600"
 														}`}
+														title={`Switch to ${theme} theme`}
 													>
 														{theme === "light" && <Sun className="w-4 h-4" />}
 														{theme === "dark" && <Moon className="w-4 h-4" />}
@@ -181,6 +191,7 @@ export function PreferencesPanel({ isOpen, onClose }: PreferencesPanelProps) {
 													updatePreference("language", e.target.value)
 												}
 												className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+												title="Select language"
 											>
 												<option value="en">English</option>
 												<option value="es">Español</option>
@@ -200,11 +211,34 @@ export function PreferencesPanel({ isOpen, onClose }: PreferencesPanelProps) {
 													updatePreference("dateFormat", e.target.value)
 												}
 												className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+												title="Select date format"
 											>
 												<option value="MM/DD/YYYY">MM/DD/YYYY</option>
 												<option value="DD/MM/YYYY">DD/MM/YYYY</option>
 												<option value="YYYY-MM-DD">YYYY-MM-DD</option>
 											</select>
+										</div>
+
+										<div>
+											<label className="flex items-center gap-3">
+												<input
+													type="checkbox"
+													checked={enableDemoLibrary}
+													onChange={(e) =>
+														setEnableDemoLibrary?.(e.target.checked)
+													}
+													className="rounded"
+												/>
+												<div>
+													<div className="text-sm font-medium">
+														Enable Demo Library
+													</div>
+													<div className="text-xs text-gray-500">
+														Automatically load demo photos when no directory is
+														selected
+													</div>
+												</div>
+											</label>
 										</div>
 									</div>
 								</div>
@@ -231,6 +265,7 @@ export function PreferencesPanel({ isOpen, onClose }: PreferencesPanelProps) {
 															? "border-blue-500 bg-blue-50 dark:bg-blue-900/30"
 															: "border-gray-300 dark:border-gray-600"
 													}`}
+													title={`Set grid size to ${size}`}
 												>
 													{size}
 												</button>
@@ -274,6 +309,7 @@ export function PreferencesPanel({ isOpen, onClose }: PreferencesPanelProps) {
 												)
 											}
 											className="w-full"
+											title="Adjust slideshow speed"
 										/>
 									</div>
 
@@ -291,6 +327,7 @@ export function PreferencesPanel({ isOpen, onClose }: PreferencesPanelProps) {
 												updatePreference("imageQuality", e.target.value)
 											}
 											className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+											title="Select image quality"
 										>
 											<option value="low">Low (faster loading)</option>
 											<option value="medium">Medium</option>
@@ -360,6 +397,7 @@ export function PreferencesPanel({ isOpen, onClose }: PreferencesPanelProps) {
 									<button
 										type="button"
 										className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+										title="Clear all stored data"
 									>
 										Clear All Data
 									</button>
@@ -477,6 +515,7 @@ export function PreferencesPanel({ isOpen, onClose }: PreferencesPanelProps) {
 									<button
 										type="button"
 										className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
+										title="Clear cached data"
 									>
 										Clear Cache
 									</button>
@@ -549,6 +588,7 @@ export function PreferencesPanel({ isOpen, onClose }: PreferencesPanelProps) {
 									<button
 										type="button"
 										className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+										title="View keyboard shortcuts guide"
 									>
 										View Shortcuts Guide
 									</button>
@@ -563,6 +603,7 @@ export function PreferencesPanel({ isOpen, onClose }: PreferencesPanelProps) {
 					<button
 						type="button"
 						className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+						title="Reset all preferences to defaults"
 					>
 						Reset to Defaults
 					</button>
@@ -571,6 +612,7 @@ export function PreferencesPanel({ isOpen, onClose }: PreferencesPanelProps) {
 							type="button"
 							onClick={onClose}
 							className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+							title="Cancel changes"
 						>
 							Cancel
 						</button>
@@ -578,6 +620,7 @@ export function PreferencesPanel({ isOpen, onClose }: PreferencesPanelProps) {
 							type="button"
 							onClick={onClose}
 							className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+							title="Save preference changes"
 						>
 							Save Changes
 						</button>

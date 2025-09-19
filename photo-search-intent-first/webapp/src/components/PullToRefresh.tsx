@@ -4,7 +4,13 @@
  */
 
 import { RefreshCw } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import {
+	type ReactNode,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 
 interface PullToRefreshProps {
 	onRefresh: () => Promise<void> | void;
@@ -46,7 +52,7 @@ export function PullToRefresh({
 	const isDraggingRef = useRef(false);
 
 	// Check if we can pull (at top of scrollable content)
-	const canPull = () => {
+	const canPull = useCallback((): boolean => {
 		if (disabled) return false;
 
 		// Check if we're at the top of the page or scrollable container
@@ -54,54 +60,60 @@ export function PullToRefresh({
 		const containerScrollTop = containerRef.current?.scrollTop || 0;
 
 		return scrollTop <= 5 && containerScrollTop <= 5;
-	};
+	}, [disabled]);
 
 	// Handle touch start
-	const handleTouchStart = (e: TouchEvent) => {
-		if (disabled || !canPull()) return;
+	const handleTouchStart = useCallback(
+		(e: TouchEvent) => {
+			if (disabled || !canPull()) return;
 
-		const touch = e.touches[0];
-		touchStartRef.current = { x: touch.clientX, y: touch.clientY };
-		startScrollTopRef.current =
-			window.scrollY || document.documentElement.scrollTop;
-		isDraggingRef.current = false;
-	};
+			const touch = e.touches[0];
+			touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+			startScrollTopRef.current =
+				window.scrollY || document.documentElement.scrollTop;
+			isDraggingRef.current = false;
+		},
+		[disabled, canPull],
+	);
 
 	// Handle touch move
-	const handleTouchMove = (e: TouchEvent) => {
-		if (disabled) return;
+	const handleTouchMove = useCallback(
+		(e: TouchEvent) => {
+			if (disabled) return;
 
-		const touch = e.touches[0];
-		const deltaY = touch.clientY - touchStartRef.current.y;
-		const deltaX = touch.clientX - touchStartRef.current.x;
+			const touch = e.touches[0];
+			const deltaY = touch.clientY - touchStartRef.current.y;
+			const deltaX = touch.clientX - touchStartRef.current.x;
 
-		// Check if this is a vertical scroll (ignore horizontal swipes)
-		if (Math.abs(deltaX) > Math.abs(deltaY)) return;
+			// Check if this is a vertical scroll (ignore horizontal swipes)
+			if (Math.abs(deltaX) > Math.abs(deltaY)) return;
 
-		// Check if we're pulling down and at the top
-		if (deltaY > 0 && canPull()) {
-			if (!isDraggingRef.current) {
-				isDraggingRef.current = true;
+			// Check if we're pulling down and at the top
+			if (deltaY > 0 && canPull()) {
+				if (!isDraggingRef.current) {
+					isDraggingRef.current = true;
+				}
+
+				// Prevent default scrolling
+				e.preventDefault();
+
+				// Calculate pull distance with resistance
+				const pullDistance = Math.min(deltaY * 0.5, maxPull);
+				const canRefresh = pullDistance >= threshold;
+
+				setPullState((prev) => ({
+					...prev,
+					isPulling: true,
+					pullDistance,
+					canRefresh,
+				}));
 			}
-
-			// Prevent default scrolling
-			e.preventDefault();
-
-			// Calculate pull distance with resistance
-			const pullDistance = Math.min(deltaY * 0.5, maxPull);
-			const canRefresh = pullDistance >= threshold;
-
-			setPullState((prev) => ({
-				...prev,
-				isPulling: true,
-				pullDistance,
-				canRefresh,
-			}));
-		}
-	};
+		},
+		[disabled, canPull, maxPull, threshold],
+	);
 
 	// Handle touch end
-	const handleTouchEnd = async () => {
+	const handleTouchEnd = useCallback(async () => {
 		if (disabled || !isDraggingRef.current) return;
 
 		isDraggingRef.current = false;
@@ -145,7 +157,14 @@ export function PullToRefresh({
 				canRefresh: false,
 			});
 		}
-	};
+	}, [
+		disabled,
+		onRefresh,
+		refreshTimeout,
+		threshold,
+		pullState.canRefresh,
+		pullState.isRefreshing,
+	]);
 
 	// Add event listeners
 	useEffect(() => {
@@ -188,7 +207,10 @@ export function PullToRefresh({
 			<div
 				className="absolute top-0 left-0 right-0 flex justify-center z-10 pointer-events-none"
 				style={{
-					transform: `translateY(${Math.max(0, pullState.pullDistance - 40)}px)`,
+					transform: `translateY(${Math.max(
+						0,
+						pullState.pullDistance - 40,
+					)}px)`,
 					opacity: indicatorOpacity,
 				}}
 			>

@@ -40,22 +40,22 @@ export interface SearchLogicOptions {
 }
 
 type ExtendedFilters = {
-  favOnly?: boolean;
-  tagFilter?: string;
-  dateFrom?: number | string;
-  dateTo?: number | string;
-  place?: string;
-  hasText?: boolean;
-  camera?: string;
-  isoMin?: number;
-  isoMax?: number;
-  fMin?: number;
-  fMax?: number;
-  persons?: string[];
-  resultView?: "grid" | "film" | "timeline";
-  timelineBucket?: "day" | "week" | "month";
-  person?: string;
-  query?: string;
+	favOnly?: boolean;
+	tagFilter?: string;
+	dateFrom?: number | string;
+	dateTo?: number | string;
+	place?: string;
+	hasText?: boolean;
+	camera?: string;
+	isoMin?: number;
+	isoMax?: number;
+	fMin?: number;
+	fMax?: number;
+	persons?: string[];
+	resultView?: "grid" | "film" | "timeline";
+	timelineBucket?: "day" | "week" | "month";
+	person?: string;
+	query?: string;
 };
 
 export const useSearchLogic = (_options: SearchLogicOptions) => {
@@ -172,7 +172,7 @@ export const useSearchLogic = (_options: SearchLogicOptions) => {
 		);
 
 	const buildSearchUrl = // biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency exclusion
-    useCallback((searchText: string, filters: ExtendedFilters = {}) => {
+		useCallback((searchText: string, filters: ExtendedFilters = {}) => {
 			const sp = new URLSearchParams();
 
 			if (searchText?.trim()) {
@@ -203,9 +203,9 @@ export const useSearchLogic = (_options: SearchLogicOptions) => {
 		}, []);
 
 	const parseSearchParams = // biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency exclusion
-    useCallback((_searchParams: URLSearchParams) => {
+		useCallback((_searchParams: URLSearchParams) => {
 			// Build a sparse filters object (only set keys that exist)
-            const f: ExtendedFilters = {};
+			const f: ExtendedFilters = {};
 			let hasAny = false;
 
 			// Basic filters
@@ -294,22 +294,25 @@ export const useSearchLogic = (_options: SearchLogicOptions) => {
 				hasAny = true;
 			}
 
-            const q = _searchParams.get("q") || "";
+			const q = _searchParams.get("q") || "";
 
 			// For backwards compatibility in tests: when empty params, return {}
-            if (!hasAny && !q) return {} as ExtendedFilters;
+			if (!hasAny && !q) return {} as ExtendedFilters;
 
 			// Return both flattened and nested shapes for convenience and test parity
-            const result: ExtendedFilters & { filters: ExtendedFilters } = { ...f, filters: { ...f } };
-            if (q) result.query = q;
-            return result;
-        }, []);
+			const result: ExtendedFilters & { filters: ExtendedFilters } = {
+				...f,
+				filters: { ...f },
+			};
+			if (q) result.query = q;
+			return result;
+		}, []);
 
 	const applyFiltersFromUrl = // biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency exclusion
 		useCallback(
 			(_searchParams: URLSearchParams) => {
 				try {
-            const filters = parseSearchParams(_searchParams) as ExtendedFilters;
+					const filters = parseSearchParams(_searchParams) as ExtendedFilters;
 
 					// Apply parsed filters to state
 					if (filters.favOnly) photoActions.setFavOnly(true);

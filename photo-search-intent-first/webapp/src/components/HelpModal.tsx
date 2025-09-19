@@ -12,8 +12,7 @@ import {
 	Zap,
 } from "lucide-react";
 import { useState } from "react";
-import { useShortcutsHelp } from "../hooks/useKeyboardShortcuts";
-import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
+import { KeyboardShortcutsPanel } from "./KeyboardShortcutsPanel";
 
 interface HelpModalProps {
 	isOpen: boolean;
@@ -39,7 +38,6 @@ export function HelpModal({
 	const [activeSection, setActiveSection] =
 		useState<HelpSection>(initialSection);
 	const [showShortcuts, setShowShortcuts] = useState(false);
-	const shortcuts = useShortcutsHelp();
 
 	if (!isOpen) return null;
 
@@ -226,29 +224,71 @@ export function HelpModal({
 			icon: <Keyboard className="w-5 h-5" />,
 			content: (
 				<div className="py-6">
-					<h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-						Most Useful
+					<h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+						Keyboard Shortcuts
 					</h3>
-					<div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {shortcuts.slice(0, 12).map((s) => (
-                            <div
-                                key={`shortcut-${s.keys}-${s.description}`}
-                                className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-50 dark:bg-gray-800"
-                            >
-								<span className="text-sm text-gray-800 dark:text-gray-200">
-									{s.description}
-								</span>
-								<kbd className="px-2 py-1 text-xs font-mono bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded border border-gray-300 dark:border-gray-600">
-									{s.keys}
-								</kbd>
+					<p className="text-gray-600 dark:text-gray-300 mb-6">
+						Photo Search has comprehensive keyboard shortcuts to help you work
+						faster. Press the shortcuts below to navigate, search, and manage
+						your photos efficiently.
+					</p>
+
+					<div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+						<div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+							<div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+								?
 							</div>
-						))}
+							<div className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+								Help
+							</div>
+						</div>
+						<div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+							<div className="text-2xl font-bold text-green-600 dark:text-green-400">
+								/
+							</div>
+							<div className="text-sm text-green-700 dark:text-green-300 mt-1">
+								Search
+							</div>
+						</div>
+						<div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+							<div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+								A
+							</div>
+							<div className="text-sm text-purple-700 dark:text-purple-300 mt-1">
+								Advanced
+							</div>
+						</div>
+						<div className="text-center p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+							<div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+								I
+							</div>
+							<div className="text-sm text-orange-700 dark:text-orange-300 mt-1">
+								Info
+							</div>
+						</div>
+						<div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+							<div className="text-2xl font-bold text-red-600 dark:text-red-400">
+								→
+							</div>
+							<div className="text-sm text-red-700 dark:text-red-300 mt-1">
+								Navigate
+							</div>
+						</div>
+						<div className="text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+							<div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+								T
+							</div>
+							<div className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+								Timeline
+							</div>
+						</div>
 					</div>
-					<div className="mt-4 text-right">
+
+					<div className="text-center">
 						<button
 							type="button"
 							onClick={() => setShowShortcuts(true)}
-							className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+							className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
 						>
 							View All Shortcuts
 						</button>
@@ -431,8 +471,8 @@ export function HelpModal({
 				</div>
 			</div>
 
-			{/* Keyboard Shortcuts Modal */}
-			<KeyboardShortcutsModal
+			{/* Keyboard Shortcuts Panel */}
+			<KeyboardShortcutsPanel
 				isOpen={showShortcuts}
 				onClose={() => setShowShortcuts(false)}
 			/>

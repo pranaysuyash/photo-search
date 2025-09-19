@@ -1,4 +1,9 @@
-import { type SearchResult, thumbUrl, apiTripsBuild, apiTripsList } from "../api";
+import {
+	apiTripsBuild,
+	apiTripsList,
+	type SearchResult,
+	thumbUrl,
+} from "../api";
 import LazyImage from "./LazyImage";
 
 interface TripsViewProps {

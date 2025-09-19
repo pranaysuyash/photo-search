@@ -1,5 +1,7 @@
 // Monitoring and Observability Service
 // Handles error tracking, performance monitoring, and analytics
+
+import { API_BASE } from "../api";
 import { getLoggingConfig, shouldLogErrorsToServer } from "../config/logging";
 
 interface ErrorReport {
@@ -40,12 +42,12 @@ class MonitoringService {
 
 	constructor() {
 		this.sessionId = this.generateSessionId();
-    // Respect logging gate: avoid noisy global handlers in test unless explicitly allowed
-    const cfg = getLoggingConfig();
-    const enableGlobalHandlers = cfg.mode !== "test" || cfg.envGate === "all";
-    if (enableGlobalHandlers) {
-      this.setupErrorHandling();
-    }
+		// Respect logging gate: avoid noisy global handlers in test unless explicitly allowed
+		const cfg = getLoggingConfig();
+		const enableGlobalHandlers = cfg.mode !== "test" || cfg.envGate === "all";
+		if (enableGlobalHandlers) {
+			this.setupErrorHandling();
+		}
 		this.setupPerformanceObserver();
 		this.startFlushInterval();
 	}
@@ -98,12 +100,12 @@ class MonitoringService {
 				} else if (entry.entryType === "first-input") {
 					const fid = entry as PerformanceEventTiming;
 					this.trackMetric("fid", fid.processingStart - fid.startTime);
-                } else if (entry.entryType === "layout-shift") {
-                    const cls = entry as any;
-                    if (!cls?.hadRecentInput) {
-                        this.trackMetric("cls", Number(cls?.value) || 0, "count");
-                    }
-                }
+				} else if (entry.entryType === "layout-shift") {
+					const cls = entry as unknown;
+					if (!cls?.hadRecentInput) {
+						this.trackMetric("cls", Number(cls?.value) || 0, "count");
+					}
+				}
 			}
 		});
 
@@ -160,15 +162,15 @@ class MonitoringService {
 			this.flush();
 		}
 
-    // Log to console conditionally:
-    // - in dev normally
-    // - in test only if envGate is set to "all"
-    const cfg = getLoggingConfig();
-    const isDev = Boolean((import.meta as any).env?.DEV);
-    const allowInTest = cfg.mode === "test" && cfg.envGate === "all";
-    if ((isDev && cfg.mode !== "test") || allowInTest) {
-      console.error("[Monitoring]", report);
-    }
+		// Log to console conditionally:
+		// - in dev normally
+		// - in test only if envGate is set to "all"
+		const cfg = getLoggingConfig();
+		const isDev = Boolean((import.meta as unknown).env?.DEV);
+		const allowInTest = cfg.mode === "test" && cfg.envGate === "all";
+		if ((isDev && cfg.mode !== "test") || allowInTest) {
+			console.error("[Monitoring]", report);
+		}
 	}
 
 	public trackMetric(
@@ -191,13 +193,13 @@ class MonitoringService {
 			this.flush();
 		}
 
-    // Log to console conditionally (same gate as errors)
-    const cfg = getLoggingConfig();
-    const isDev = Boolean((import.meta as any).env?.DEV);
-    const allowInTest = cfg.mode === "test" && cfg.envGate === "all";
-    if ((isDev && cfg.mode !== "test") || allowInTest) {
-      console.log("[Metric]", metric);
-    }
+		// Log to console conditionally (same gate as errors)
+		const cfg = getLoggingConfig();
+		const isDev = Boolean((import.meta as unknown).env?.DEV);
+		const allowInTest = cfg.mode === "test" && cfg.envGate === "all";
+		if ((isDev && cfg.mode !== "test") || allowInTest) {
+			console.log("[Metric]", metric);
+		}
 	}
 
 	public trackEvent(
@@ -271,23 +273,23 @@ class MonitoringService {
 	}
 
 	private async flush(immediate = false) {
-    // Short-circuit if nothing is enabled
-    if (
-      !import.meta.env.VITE_ENABLE_ERROR_REPORTING &&
-      !import.meta.env.VITE_ENABLE_PERFORMANCE_MONITORING &&
-      !import.meta.env.VITE_ENABLE_ANALYTICS
-    ) {
-      return;
-    }
+		// Short-circuit if nothing is enabled
+		if (
+			!import.meta.env.VITE_ENABLE_ERROR_REPORTING &&
+			!import.meta.env.VITE_ENABLE_PERFORMANCE_MONITORING &&
+			!import.meta.env.VITE_ENABLE_ANALYTICS
+		) {
+			return;
+		}
 
-    const payload = {
-      sessionId: this.sessionId,
-      userId: this.userId,
-      // Respect server logging gate for error shipment
-      errors: shouldLogErrorsToServer() ? [...this.errorQueue] : [],
-      metrics: [...this.metricsQueue],
-      events: [...this.eventsQueue],
-    };
+		const payload = {
+			sessionId: this.sessionId,
+			userId: this.userId,
+			// Respect server logging gate for error shipment
+			errors: shouldLogErrorsToServer() ? [...this.errorQueue] : [],
+			metrics: [...this.metricsQueue],
+			events: [...this.eventsQueue],
+		};
 
 		// Clear queues
 		this.errorQueue = [];
@@ -304,9 +306,13 @@ class MonitoringService {
 		}
 
 		try {
-			// Send to monitoring endpoint
-			const endpoint =
-				import.meta.env.VITE_MONITORING_ENDPOINT || "/api/monitoring";
+			// Send to monitoring endpoint; default to the local API when unset.
+			const rawEndpoint = import.meta.env.VITE_MONITORING_ENDPOINT;
+			const endpoint = rawEndpoint
+				? rawEndpoint.startsWith("http")
+					? rawEndpoint
+					: `${API_BASE}${rawEndpoint.startsWith("/") ? "" : "/"}${rawEndpoint}`
+				: `${API_BASE}/monitoring`;
 
 			if (immediate) {
 				// Use sendBeacon for page unload
@@ -333,15 +339,25 @@ class MonitoringService {
 	// Web Vitals tracking
 	public trackWebVitals() {
 		// Track Core Web Vitals
-        const webVital = (window as any)["web-vital"];
-        if (webVital?.onCLS) {
-            const { onCLS, onFID, onLCP, onFCP, onTTFB } = webVital;
-            onCLS((metric: any) => this.trackMetric("cls", Number(metric?.value) || 0, "count"));
-            onFID((metric: any) => this.trackMetric("fid", Number(metric?.value) || 0));
-            onLCP((metric: any) => this.trackMetric("lcp", Number(metric?.value) || 0));
-            onFCP((metric: any) => this.trackMetric("fcp", Number(metric?.value) || 0));
-            onTTFB((metric: any) => this.trackMetric("ttfb", Number(metric?.value) || 0));
-        }
+		const webVital = (window as unknown)["web-vital"];
+		if (webVital?.onCLS) {
+			const { onCLS, onFID, onLCP, onFCP, onTTFB } = webVital;
+			onCLS((metric: any) =>
+				this.trackMetric("cls", Number(metric?.value) || 0, "count"),
+			);
+			onFID((metric: any) =>
+				this.trackMetric("fid", Number(metric?.value) || 0),
+			);
+			onLCP((metric: any) =>
+				this.trackMetric("lcp", Number(metric?.value) || 0),
+			);
+			onFCP((metric: any) =>
+				this.trackMetric("fcp", Number(metric?.value) || 0),
+			);
+			onTTFB((metric: any) =>
+				this.trackMetric("ttfb", Number(metric?.value) || 0),
+			);
+		}
 	}
 
 	// Custom business metrics
@@ -387,10 +403,10 @@ export const monitoringService = new MonitoringService();
 
 // React Error Boundary integration
 export function logErrorToService(error: Error, errorInfo: unknown) {
-    monitoringService.logError({
-        message: error.message,
-        stack: error.stack,
-        context: (errorInfo as unknown) as Record<string, unknown>,
-        severity: "high",
-    });
+	monitoringService.logError({
+		message: error.message,
+		stack: error.stack,
+		context: errorInfo as unknown as Record<string, unknown>,
+		severity: "high",
+	});
 }

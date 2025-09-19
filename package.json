@@ -11,7 +11,9 @@
     "coverage:web": "npm run -s coverage:web:classic && npm run -s coverage:web:if",
     "visual:classic": "npm --prefix archive/photo-search-classic/webapp run test:visual",
     "visual:if": "npm --prefix photo-search-intent-first/webapp run test:visual",
+    "visual:if:update": "npm --prefix photo-search-intent-first/webapp run test:visual:update",
     "visual": "npm run -s visual:classic && npm run -s visual:if",
+    "visual:update": "npm run -s visual:classic && npm run -s visual:if:update",
     "visual:ci:classic": "npm --prefix archive/photo-search-classic/webapp run test:visual:ci",
     "visual:ci:if": "npm --prefix photo-search-intent-first/webapp run test:visual:ci",
     "visual:ci": "npm run -s visual:ci:classic && npm run -s visual:ci:if"

@@ -1,9 +1,9 @@
 import { motion } from "framer-motion";
 import type React from "react";
 import type { View } from "../App";
+import type { IndexStatusDetails } from "../contexts/LibraryContext";
 import type { PhotoActions, UIActions, WorkspaceState } from "../stores/types";
 import { TopBar, type ViewType } from "./TopBar";
-import type { IndexStatusDetails } from "../contexts/LibraryContext";
 
 // Define the modal types
 type ModalKind =
@@ -46,6 +46,7 @@ interface AppHeaderProps {
 	ratingMin: number;
 	setRatingMin: (rating: number) => void;
 	setModal: (modal: { kind: string } | null) => void;
+	onOpenFolder?: () => void;
 	setIsMobileMenuOpen: (open: boolean) => void;
 	setShowFilters: (show: boolean | ((prev: boolean) => boolean)) => void;
 	selected: Set<string>;
@@ -62,14 +63,6 @@ interface AppHeaderProps {
 	onChangeTimelineBucket: (bucket: string) => void;
 	photoActions: PhotoActions;
 	uiActions: UIActions;
-	toastTimerRef: React.MutableRefObject<number | null>;
-	setToast: (
-		toast: {
-			message: string;
-			actionLabel?: string;
-			onAction?: () => void;
-		} | null,
-	) => void;
 	isIndexing: boolean;
 	onIndex: () => void;
 	activeJobs: number;
@@ -79,10 +72,12 @@ interface AppHeaderProps {
 	paused: boolean;
 	tooltip: string;
 	ocrReady: boolean;
+	ocrTextCount?: number;
 	onPause: () => void;
 	onResume: () => void;
 	onOpenThemeModal: () => void;
 	onOpenSettingsModal?: () => void;
+	onBuildOCR?: () => void;
 
 	// Accessibility and onboarding
 	setShowAccessibilityPanel: (
@@ -109,6 +104,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 	ratingMin,
 	setRatingMin,
 	setModal,
+	onOpenFolder,
 	setIsMobileMenuOpen,
 	setShowFilters,
 	selected,
@@ -125,8 +121,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 	onChangeTimelineBucket,
 	photoActions,
 	uiActions,
-	toastTimerRef,
-	setToast,
 	indexedCount,
 	indexedTotal,
 	coveragePct,
@@ -140,12 +134,14 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 	paused,
 	tooltip,
 	ocrReady,
+	ocrTextCount,
 	onPause,
 	onResume,
 	onOpenThemeModal,
 	onOpenSettingsModal,
 	setShowAccessibilityPanel,
 	setShowOnboardingTour,
+	onBuildOCR,
 }) => {
 	return (
 		<header
@@ -170,6 +166,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 				ratingMin={ratingMin}
 				setRatingMin={setRatingMin}
 				setModal={setModal}
+				onOpenFolder={onOpenFolder}
 				setIsMobileMenuOpen={setIsMobileMenuOpen}
 				setShowFilters={setShowFilters}
 				selected={selected}
@@ -186,8 +183,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 				onChangeTimelineBucket={onChangeTimelineBucket}
 				photoActions={photoActions}
 				uiActions={uiActions}
-				toastTimerRef={toastTimerRef}
-				setToast={setToast}
 				indexedCount={indexedCount}
 				indexedTotal={indexedTotal}
 				coveragePct={coveragePct}
@@ -201,6 +196,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 				paused={paused}
 				tooltip={tooltip}
 				ocrReady={ocrReady}
+				ocrTextCount={ocrTextCount}
+				onBuildOCR={onBuildOCR}
 				onPause={onPause}
 				onResume={onResume}
 				onOpenThemeModal={onOpenThemeModal}

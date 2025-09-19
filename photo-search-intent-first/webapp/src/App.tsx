@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { motion, useReducedMotion } from "framer-motion";
+import { useReducedMotion } from "framer-motion";
 import type React from "react";
 import {
   lazy,
@@ -11,14 +11,14 @@ import {
   useState,
 } from "react";
 import {
-  Routes,
-  Route,
   Navigate,
+  Route,
+  Routes,
   useLocation,
   useNavigate,
 } from "react-router-dom";
 import {
-  API_BASE,
+  apiAnalytics,
   apiAuthCheck,
   apiAuthStatus,
   apiBuildFast,
@@ -28,27 +28,21 @@ import {
   apiDiagnostics,
   apiExport,
   apiFacesClusters,
-  apiGetPresets,
   apiGetFavorites,
   apiGetMetadata,
+  apiGetPresets,
   apiGetSaved,
   apiGetTags,
-  apiMetadataBatch,
-  apiIndex,
   apiLibrary,
   apiMap,
-  apiPing,
+  apiMetadataBatch,
   apiOcrStatus,
-  apiSearch,
-  apiSearchCached,
-  apiSearchWorkspace,
-  apiAnalytics,
-  apiSetTags,
   apiOpen,
+  apiOperationStatus,
+  apiPing,
   apiSetFavorite,
+  apiSetTags,
   apiWorkspaceAdd,
-  type SearchResult,
-  thumbUrl,
 } from "./api";
 import type { AccessibilitySettings } from "./components/AccessibilityPanel";
 // Modern UX Components Integration
@@ -57,46 +51,32 @@ import { BottomNavigation } from "./components/BottomNavigation";
 import Collections from "./components/Collections";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { FilterPanel } from "./components/FilterPanel";
-import {
-  HintManager,
-  HintProvider,
-  useHintTriggers,
-} from "./components/HintSystem";
-import { JobsCenter } from "./components/JobsCenter";
+import { HintManager, useHintTriggers } from "./components/HintSystem";
+import { type Job, JobsCenter } from "./components/JobsCenter";
 import { RecentActivityPanel } from "./components/RecentActivityPanel";
 import { SearchHistoryPanel } from "./components/SearchHistoryPanel";
 import { useJobsContext } from "./contexts/JobsContext";
-import { useModalContext } from "./contexts/ModalContext";
-
 // Drawers handled via ModalManager
 
 // Reuse existing feature components
 import JustifiedResults from "./components/JustifiedResults";
 import { Lightbox } from "./components/Lightbox";
 import { LoadingSpinner } from "./components/LoadingSpinner";
+
 const MapView = lazy(() => import("./components/MapView"));
+
+import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
+import { AppShell } from "./components/AppShell";
 import {
   MobileOptimizations,
   useHapticFeedback,
   useMobileDetection,
 } from "./components/MobileOptimizations";
 import MobilePWATest from "./components/MobilePWATest";
+import { ModalDebug } from "./components/ModalDebug";
+import { ModalManager } from "./components/ModalManager";
 import ModernSidebar from "./components/ModernSidebar"; // kept for now, but replaced by AppShell usage
-import { AppShell } from "./components/AppShell";
-import { ResultsView } from "./views/ResultsView";
-import { LibraryView as LibraryContainer } from "./views/LibraryView";
-import { PeopleViewContainer } from "./views/PeopleViewContainer";
-import { CollectionsViewContainer } from "./views/CollectionsViewContainer";
-import { ResultsUIProvider } from "./contexts/ResultsUIContext";
-import { ResultsConfigProvider } from "./contexts/ResultsConfigContext";
-import {
-  viewToPath,
-  pathToView,
-  isSharePath,
-  isMobileTestPath,
-} from "./utils/router";
-import { SavedViewContainer } from "./views/SavedViewContainer";
-import { useOnboardingActions } from "./hooks/useOnboardingActions";
 // Modals: still referenced below; keep named imports to satisfy JSX usage
 import {
   CollectionModal,
@@ -107,6 +87,35 @@ import {
   SaveModal,
   TagModal,
 } from "./components/modals";
+import { OverlayLayer } from "./components/OverlayLayer";
+import {
+  ResultsConfigProvider,
+  type ResultView,
+} from "./contexts/ResultsConfigContext";
+import {
+  type FilterPresetSetters,
+  useFilterPresets,
+} from "./hooks/useFilterPresets";
+import { useDemoLibraryHandlers } from "./hooks/useDemoLibraryHandlers";
+import { useModalControls } from "./hooks/useModalControls";
+import { useSearchOperations } from "./hooks/useSearchOperations";
+import { useModalStatus } from "./hooks/useModalStatus";
+import { useOnboardingActions } from "./hooks/useOnboardingActions";
+import { useOnboardingFlows } from "./hooks/useOnboardingFlows";
+import { usePageViewTracking } from "./hooks/usePageViewTracking";
+import { useQueryParamFilters } from "./hooks/useQueryParamFilters";
+import { useThemeBootstrap } from "./hooks/useThemeBootstrap";
+import {
+  isMobileTestPath,
+  isSharePath,
+  pathToView,
+  viewToPath,
+} from "./utils/router";
+import { CollectionsViewContainer } from "./views/CollectionsViewContainer";
+import { LibraryView as LibraryContainer } from "./views/LibraryView";
+import { PeopleViewContainer } from "./views/PeopleViewContainer";
+import { ResultsView } from "./views/ResultsView";
+import { SavedViewContainer } from "./views/SavedViewContainer";
 
 // AdvancedSearchModal and EnhancedSharingModal handled via ModalManager
 
@@ -121,14 +130,14 @@ import {
 } from "./components/ProgressiveOnboarding";
 import SavedSearches from "./components/SavedSearches";
 import ShareViewer from "./components/ShareViewer";
-const SmartCollections = lazy(() => import("./components/SmartCollections"));
-import { StatsBar } from "./components/StatsBar";
-import { _setToastHandler } from "./utils";
-import { SuspenseFallback } from "./components/SuspenseFallback";
-import { StatusBar } from "./components/StatusBar";
-// TasksView removed (developer-only)
-import { ThemeProvider } from "./components/ThemeProvider";
 
+const SmartCollections = lazy(() => import("./components/SmartCollections"));
+
+import { StatsBar } from "./components/StatsBar";
+import { StatusBar } from "./components/StatusBar";
+import { SuspenseFallback } from "./components/SuspenseFallback";
+import { AppProviders } from "./AppProviders";
+// TasksView removed (developer-only)
 // ThemeSettingsModal handled via ModalManager
 
 import TimelineResults from "./components/TimelineResults";
@@ -136,25 +145,26 @@ import { TopBar } from "./components/TopBar";
 
 // SearchOverlay handled via ModalManager
 
-import ToastPortal from "./components/ToastPortal";
-import { ModalManager } from "./components/ModalManager";
-import { OverlayLayer } from "./components/OverlayLayer";
 const TripsView = lazy(() => import("./components/TripsView"));
+
 import { VideoLightbox } from "./components/VideoLightbox";
+
 const VideoManager = lazy(() =>
-  import("./components/VideoManager").then((m) => ({ default: m.VideoManager }))
+  import("./components/VideoManager").then((m) => ({
+    default: m.VideoManager,
+  }))
 );
+
 import { Welcome } from "./components/Welcome";
+import { AppChrome } from "./components/AppChrome";
 import { useLibraryContext } from "./contexts/LibraryContext";
 import { useConnectivityAndAuth } from "./hooks/useConnectivityAndAuth";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
 import { useResultsShortcuts } from "./hooks/useResultsShortcuts";
-import { ShareManager } from "./modules/ShareManager";
 import { VideoService } from "./services/VideoService";
-import { SearchCache } from "./services/SearchCache";
-import { monitoringService } from "./services/MonitoringService";
 import { useAltSearch } from "./stores";
 import {
+  useEnableDemoLibrary,
   useHighContrast,
   useSearchCommandCenter,
   useThemeStore,
@@ -260,9 +270,6 @@ export default function App() {
 
   // Modern UX Integration - New state for enhanced features
   const [showAccessibilityPanel, setShowAccessibilityPanel] = useState(false);
-  const [showOnboardingTour, setShowOnboardingTour] = useState(
-    !hasCompletedTour
-  );
   const [showModernSidebar, setShowModernSidebar] = useState(false);
   const [_useAnimatedGrid, _setUseAnimatedGrid] = useState(true);
   const [accessibilitySettings, setAccessibilitySettings] =
@@ -347,16 +354,50 @@ export default function App() {
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [gridSize, setGridSize] = useState<GridSize>("medium");
-  const [resultView, _setResultView] = useState<"grid" | "timeline">("grid");
+  const [resultView, _setResultView] = useState<ResultView>("grid");
   const [timelineBucket, _setTimelineBucket] = useState<
     "day" | "week" | "month"
   >("day");
+  const handleSetResultView = useCallback(
+    (view: ResultView) => {
+      _setResultView(view);
+      settingsActions.setResultView?.(
+        view as "grid" | "film" | "timeline" | "map"
+      );
+    },
+    [settingsActions, _setResultView]
+  );
+  const handleSetTimelineBucket = useCallback(
+    (bucket: "day" | "week" | "month") => {
+      _setTimelineBucket(bucket);
+      settingsActions.setTimelineBucket?.(bucket);
+    },
+    [settingsActions, _setTimelineBucket]
+  );
   const [currentFilter, setCurrentFilter] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showShortcuts, setShowShortcuts] = useState(false);
-  const { state: modalState, actions: modal } = useModalContext();
+  const { anyOpen: anyModalOpen } = useModalStatus();
+  const modalControls = useModalControls();
+  const enableDemoLibrary = useEnableDemoLibrary();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const {
+    handleWelcomeStartDemo,
+    handleFirstRunQuickStart,
+    handleFirstRunCustom,
+    handleFirstRunDemo,
+  } = useDemoLibraryHandlers({
+    enableDemoLibrary,
+    modalControls,
+    engine,
+    needsHf,
+    hfToken,
+    needsOAI,
+    openaiKey,
+    setShowOnboarding,
+  });
   const [detailIdx, setDetailIdx] = useState<number | null>(null);
   const [focusIdx, setFocusIdx] = useState<number | null>(null);
   const [layoutRows, setLayoutRows] = useState<number[][]>([]);
@@ -372,6 +413,26 @@ export default function App() {
   useEffect(() => {
     layoutRowsRef.current = layoutRows;
   }, [layoutRows]);
+
+  const {
+    showOnboardingTour,
+    setShowOnboardingTour,
+    showHelpHint,
+    dismissHelpHint,
+    userActions,
+    onboardingSteps,
+    completeOnboardingStep,
+    showContextualHelp,
+    setShowContextualHelp,
+    showOnboardingChecklist,
+    setShowOnboardingChecklist,
+  } = useOnboardingFlows({
+    hasCompletedTour,
+    currentView,
+    dir,
+    library,
+    searchText,
+  });
 
   // Modern UX Integration - Enhanced handlers
   const handleAccessibilitySettingsChange = useCallback(
@@ -395,104 +456,256 @@ export default function App() {
     cameras: [],
     places: [],
   });
-
-  const [showOnboarding, setShowOnboarding] = useState(false);
   const { state: jobsState, actions: jobsActions } = useJobsContext();
   const jobs = jobsState.jobs;
   // Library state and actions (indexing, etc.)
   const { state: libState, actions: lib } = useLibraryContext();
   // Indexing state moved to LibraryProvider
   const [ocrReady, setOcrReady] = useState<boolean>(false);
+  const [ocrTextCount, setOcrTextCount] = useState<number | undefined>(
+    undefined
+  );
   const [ratingMin, setRatingMin] = useState(0);
-  const [toast, setToast] = useState<null | {
-    message: string;
-    actionLabel?: string;
-    onAction?: () => void;
-  }>(null);
-  const [showHelpHint, setShowHelpHint] = useState(() => {
-    try {
-      const seen = localStorage.getItem("ps_hint_help_seen");
-      return !seen;
-    } catch {
-      return true;
-    }
-  });
+  const { toast: pushToast } = useToast();
+  const toastTimerRef = useRef<number | null>(null);
+  const activeToastRef = useRef<{ id: string; dismiss: () => void } | null>(
+    null
+  );
+  const setToast = useCallback(
+    (
+      toast: {
+        message: string;
+        actionLabel?: string;
+        onAction?: () => void;
+      } | null
+    ) => {
+      if (!toast) {
+        if (activeToastRef.current) {
+          activeToastRef.current.dismiss();
+          activeToastRef.current = null;
+        }
+        return;
+      }
+
+      if (activeToastRef.current) {
+        activeToastRef.current.dismiss();
+        activeToastRef.current = null;
+      }
+
+      const { message, actionLabel, onAction } = toast;
+
+      const nextToast = pushToast({
+        description: message,
+        action:
+          actionLabel && onAction ? (
+            <ToastAction
+              altText={actionLabel}
+              onClick={() => {
+                try {
+                  onAction();
+                } finally {
+                  if (activeToastRef.current) {
+                    activeToastRef.current.dismiss();
+                    activeToastRef.current = null;
+                  }
+                }
+              }}
+            >
+              {actionLabel}
+            </ToastAction>
+          ) : undefined,
+      });
+
+      activeToastRef.current = {
+        id: nextToast.id,
+        dismiss: nextToast.dismiss,
+      };
+    },
+    [pushToast]
+  );
   const [presets, setPresets] = useState<{ name: string; query: string }[]>([]);
   const altSearch = useAltSearch();
 
+  // Filter Presets State Management
+  const filterPresetSetters = useMemo<FilterPresetSetters>(
+    () => ({
+      setFavOnly: photoActions.setFavOnly,
+      setTagFilter: photoActions.setTagFilter,
+      setPlace: settingsActions.setPlace,
+      setCamera: settingsActions.setCamera,
+      setIsoMin: (value: string) =>
+        settingsActions.setIsoMin(parseFloat(value) || 0),
+      setIsoMax: (value: string) =>
+        settingsActions.setIsoMax(parseFloat(value) || 0),
+      setFMin: (value: string) =>
+        settingsActions.setFMin(parseFloat(value) || 0),
+      setFMax: (value: string) =>
+        settingsActions.setFMax(parseFloat(value) || 0),
+      setDateFrom: (value: string) => setDateFrom(value),
+      setDateTo: (value: string) => setDateTo(value),
+      setUseCaps: settingsActions.setUseCaps,
+      setUseOcr: settingsActions.setUseOcr,
+      setHasText: settingsActions.setHasText,
+      setRatingMin: (value: number) => setRatingMin(value),
+    }),
+    [
+      photoActions.setFavOnly,
+      photoActions.setTagFilter,
+      settingsActions.setPlace,
+      settingsActions.setCamera,
+      settingsActions.setIsoMin,
+      settingsActions.setIsoMax,
+      settingsActions.setFMin,
+      settingsActions.setFMax,
+      setDateFrom,
+      setDateTo,
+      settingsActions.setUseCaps,
+      settingsActions.setUseOcr,
+      settingsActions.setHasText,
+      setRatingMin,
+    ]
+  );
+
+  const { filterPresets, savePreset, loadPreset, deletePreset } =
+    useFilterPresets(filterPresetSetters);
+
   // Search Command Center
   const searchCommandCenter = useSearchCommandCenter();
-  const toastTimerRef = useRef<number | null>(null);
 
-  // Wire global toast handler so showToast() can surface app toasts
-  useEffect(() => {
-    _setToastHandler((opts) => {
-      try {
-        setToast({
-          message: opts.message,
-          actionLabel: opts.actionLabel,
-          onAction: opts.onAction,
-        });
-        if (toastTimerRef.current) {
-          window.clearTimeout(toastTimerRef.current);
-          toastTimerRef.current = null;
-        }
-        const dur = Math.max(1500, Math.min(15000, Number(opts.duration || 4000)));
-        toastTimerRef.current = window.setTimeout(() => {
-          setToast(null);
-          toastTimerRef.current = null;
-        }, dur);
-      } catch {}
-    });
-  }, []);
+  const monitorOperation = useCallback(
+    (jobId: string, operation: "ocr" | "metadata" | "fast_index") => {
+      if (!dir) return () => {};
+      let cancelled = false;
+      let timeout: number | undefined;
+      const startedAt = Date.now();
 
-  // Onboarding and user action tracking
-  const [userActions, setUserActions] = useState<string[]>(() => {
-    try {
-      const stored = localStorage.getItem("userActions");
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
-  const [onboardingSteps, setOnboardingSteps] = useState<string[]>(() => {
-    try {
-      const stored = localStorage.getItem("onboardingSteps");
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
-  // Event-based onboarding completion helper with prerequisites
-  const completeOnboardingStep = useCallback(
-    (
-      step:
-        | "select_directory"
-        | "index_photos"
-        | "first_search"
-        | "explore_features"
-    ) => {
-      const prereq: Record<string, string[]> = {
-        select_directory: [],
-        index_photos: ["select_directory"],
-        first_search: ["index_photos"],
-        explore_features: ["first_search"],
-      };
-      setOnboardingSteps((prev) => {
-        if (prev.includes(step)) return prev;
-        const req = prereq[step] || [];
-        if (!req.every((s) => prev.includes(s))) return prev; // don't skip ahead
-        const next = [...prev, step];
+      const poll = async () => {
         try {
-          localStorage.setItem("onboardingSteps", JSON.stringify(next));
-        } catch {}
-        return next;
-      });
+          const status = await apiOperationStatus(dir, operation);
+          if (cancelled) return;
+          const state = String(status?.state ?? "").toLowerCase();
+          if (state === "error") {
+            jobsActions.update(jobId, {
+              status: "failed",
+              error:
+                typeof status?.error === "string" ? status.error : "Job failed",
+              endTime: new Date(),
+            } as Partial<Job>);
+            return;
+          }
+          if (state === "complete" || state === "completed") {
+            const total =
+              typeof status?.total === "number"
+                ? status.total
+                : typeof status?.done === "number"
+                ? status.done
+                : typeof status?.updated === "number"
+                ? status.updated
+                : undefined;
+            jobsActions.update(jobId, {
+              status: "completed",
+              progress: total,
+              total,
+              estimatedTimeRemaining: 0,
+              speed: undefined,
+              endTime: new Date(),
+            } as Partial<Job>);
+            return;
+          }
+          if (state === "failed") {
+            jobsActions.update(jobId, {
+              status: "failed",
+              error:
+                typeof status?.error === "string" ? status.error : "Job failed",
+              endTime: new Date(),
+            } as Partial<Job>);
+            return;
+          }
+
+          const isRunning =
+            state === "running" ||
+            state === "processing" ||
+            state === "scanning";
+          if (isRunning) {
+            const totalRaw =
+              typeof status?.total === "number"
+                ? status.total
+                : typeof status?.target === "number"
+                ? status.target
+                : undefined;
+            const doneRaw =
+              typeof status?.done === "number" ? status.done : undefined;
+            const patch: Partial<Job> = { status: "running" };
+            if (typeof status?.note === "string")
+              patch.description = status.note;
+            else if (typeof status?.state_detail === "string")
+              patch.description = status.state_detail;
+            else if (
+              typeof status?.kind === "string" &&
+              operation === "fast_index"
+            )
+              patch.description = `${status.kind}`;
+
+            if (typeof totalRaw === "number" && totalRaw >= 0)
+              patch.total = totalRaw;
+            if (typeof doneRaw === "number" && doneRaw >= 0)
+              patch.progress = doneRaw;
+
+            if (
+              typeof patch.total === "number" &&
+              patch.total > 0 &&
+              typeof patch.progress === "number" &&
+              patch.progress >= 0
+            ) {
+              const elapsedSeconds = Math.max(
+                1,
+                (Date.now() - startedAt) / 1000
+              );
+              if (patch.progress > 0) {
+                const rate = patch.progress / elapsedSeconds;
+                if (rate > 0) {
+                  const remaining = Math.max(0, patch.total - patch.progress);
+                  patch.estimatedTimeRemaining = Math.round(remaining / rate);
+                  const perMinute = rate * 60;
+                  patch.speed = `${
+                    perMinute >= 10
+                      ? perMinute.toFixed(0)
+                      : perMinute.toFixed(1)
+                  } items/min`;
+                }
+              }
+            } else {
+              patch.estimatedTimeRemaining = undefined;
+              patch.speed = undefined;
+            }
+
+            jobsActions.update(jobId, patch);
+          }
+        } catch (err) {
+          if (!cancelled) {
+            jobsActions.update(jobId, {
+              status: "failed",
+              error:
+                err instanceof Error ? err.message : "Failed to fetch status",
+              endTime: new Date(),
+            } as Partial<Job>);
+          }
+          return;
+        }
+
+        if (!cancelled) timeout = window.setTimeout(poll, 1200) as number;
+      };
+
+      poll();
+
+      return () => {
+        cancelled = true;
+        if (timeout) window.clearTimeout(timeout);
+      };
     },
-    []
+    [dir, jobsActions]
   );
-  const [showContextualHelp, setShowContextualHelp] = useState(false);
-  const [showOnboardingChecklist, setShowOnboardingChecklist] = useState(false);
+
   const [isConnected, setIsConnected] = useState(true);
   const [authRequired, setAuthRequired] = useState(false);
   const [authTokenInput, setAuthTokenInput] = useState("");
@@ -515,17 +728,14 @@ export default function App() {
   }, []);
 
   // MonitoringService is automatically initialized via singleton instance
-  // Track initial page view
-  useEffect(() => {
-    monitoringService.trackPageView(window.location.pathname, document.title);
-  }, []);
+  usePageViewTracking();
 
   const highContrast = useHighContrast();
   const showInfoOverlay = useShowInfoOverlay();
 
   // Onboarding tour action listeners ("Do it for me")
   useOnboardingActions({
-    openModal: modal.open,
+    openModal: modalControls.openModal,
     openFilters: () => setShowFilters(true),
   });
 
@@ -534,9 +744,9 @@ export default function App() {
 
   // Global keyboard shortcuts
   useGlobalShortcuts({
-    anyModalOpen: Boolean(Object.values(modalState || {}).some(Boolean)),
-    openModal: modal.open,
-    toggleModal: modal.toggle,
+    anyModalOpen,
+    openModal: modalControls.openModal,
+    openFilters: () => setShowFilters(true),
     searchCommandCenter: Boolean(searchCommandCenter),
     showInfoOverlay,
     setShowInfoOverlay: settingsActions.setShowInfoOverlay,
@@ -576,171 +786,41 @@ export default function App() {
 
   // Route-driven views: derive from location when needed; navigation uses navigate()
 
-  // Read search query + filters from URL for deep linking
-  useEffect(() => {
-    if (!isMounted) return;
-    const sp = new URLSearchParams(location.search);
-    const q = sp.get("q") || "";
-    if (q && q !== searchText) setSearchText(q);
-    // Parse optional filters from URL
-    try {
-      const fav = sp.get("fav");
-      if (fav === "1") photoActions.setFavOnly(true);
-      const tagsCSV = sp.get("tags") || "";
-      if (tagsCSV) photoActions.setTagFilter(tagsCSV);
-      const df = sp.get("date_from");
-      const dt = sp.get("date_to");
-      if (df) setDateFrom(df);
-      if (dt) setDateTo(dt);
-      const plc = sp.get("place");
-      if (plc) settingsActions.setPlace(plc);
-      const ht = sp.get("has_text");
-      if (ht === "1") settingsActions.setHasText(true);
-      const cam = sp.get("camera");
-      if (cam) settingsActions.setCamera(cam);
-      const isoMinP = sp.get("iso_min");
-      if (isoMinP) settingsActions.setIsoMin(parseFloat(isoMinP));
-      const isoMaxP = sp.get("iso_max");
-      if (isoMaxP) settingsActions.setIsoMax(parseFloat(isoMaxP));
-      const fmin = sp.get("f_min");
-      if (fmin) settingsActions.setFMin(parseFloat(fmin));
-      const fmax = sp.get("f_max");
-      if (fmax) settingsActions.setFMax(parseFloat(fmax));
-      // Rating filter
-      const rmin = sp.get("rating_min");
-      if (rmin) setRatingMin(Math.max(0, Math.min(5, parseInt(rmin, 10) || 0)));
-      const person = sp.get("person");
-      const personsCSV = sp.get("persons");
-      if (personsCSV)
-        workspaceActions.setPersons(
-          personsCSV
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean)
-        );
-      else if (person) workspaceActions.setPersons([person]);
-      // Engine/search behavior flags
-      const fast = sp.get("fast");
-      if (fast === "1") settingsActions.setUseFast(true);
-      const fastk = sp.get("fast_kind");
-      if (fastk) settingsActions.setFastKind(fastk);
-      const caps = sp.get("caps");
-      if (caps === "1") settingsActions.setUseCaps(true);
-      const ocrq = sp.get("ocr");
-      if (ocrq === "1") settingsActions.setUseOcr(true);
-      const rv = sp.get("rv") as "grid" | "timeline" | "map" | null;
-      if (rv && settingsActions.setResultView) {
-        settingsActions.setResultView(rv);
-        if (rv === "grid" || rv === "timeline") _setResultView(rv);
-      }
-      const tb = sp.get("tb") as "day" | "week" | "month" | "year" | null;
-      if (tb && settingsActions.setTimelineBucket) {
-        settingsActions.setTimelineBucket(tb);
-        if (tb === "day" || tb === "week" || tb === "month")
-          _setTimelineBucket(tb);
-      }
-    } catch {}
-  }, [
-    location.search,
+  useQueryParamFilters({
+    location,
     isMounted,
     searchText,
-    photoActions,
-    settingsActions,
-    workspaceActions,
-  ]);
+    setSearchText,
+    setDateFrom,
+    setDateTo,
+    setRatingMin,
+    setResultViewLocal: _setResultView,
+    setTimelineBucketLocal: _setTimelineBucket,
+    photoActions: {
+      setFavOnly: photoActions.setFavOnly,
+      setTagFilter: photoActions.setTagFilter,
+    },
+    settingsActions: {
+      setPlace: settingsActions.setPlace,
+      setHasText: settingsActions.setHasText,
+      setCamera: settingsActions.setCamera,
+      setIsoMin: settingsActions.setIsoMin,
+      setIsoMax: settingsActions.setIsoMax,
+      setFMin: settingsActions.setFMin,
+      setFMax: settingsActions.setFMax,
+      setUseFast: settingsActions.setUseFast,
+      setFastKind: settingsActions.setFastKind,
+      setUseCaps: settingsActions.setUseCaps,
+      setUseOcr: settingsActions.setUseOcr,
+      setResultView: settingsActions.setResultView,
+      setTimelineBucket: settingsActions.setTimelineBucket,
+    },
+    workspaceActions: {
+      setPersons: workspaceActions.setPersons,
+    },
+  });
 
-  // Track user actions for contextual help
-  useEffect(() => {
-    if (searchText?.trim()) {
-      setUserActions((prev) => {
-        if (!prev.includes("searched")) {
-          const newActions = [...prev, "searched"];
-          try {
-            localStorage.setItem("userActions", JSON.stringify(newActions));
-          } catch {}
-          return newActions;
-        }
-        return prev;
-      });
-    }
-  }, [searchText]);
-
-  useEffect(() => {
-    if (dir) {
-      setUserActions((prev) => {
-        if (!prev.includes("selected_directory")) {
-          const newActions = [...prev, "selected_directory"];
-          try {
-            localStorage.setItem("userActions", JSON.stringify(newActions));
-          } catch {}
-          return newActions;
-        }
-        return prev;
-      });
-      // Complete onboarding step when a real directory is set
-      completeOnboardingStep("select_directory");
-    }
-  }, [dir, completeOnboardingStep]);
-
-  useEffect(() => {
-    if (library && library.length > 0) {
-      setUserActions((prev) => {
-        if (!prev.includes("indexed")) {
-          const newActions = [...prev, "indexed"];
-          try {
-            localStorage.setItem("userActions", JSON.stringify(newActions));
-          } catch {}
-          return newActions;
-        }
-        return prev;
-      });
-    }
-  }, [library]);
-
-  // Complete "Explore Features" once user navigates to Collections or other feature areas (after prior steps)
-  useEffect(() => {
-    const exploringViews: Array<View> = [
-      "collections",
-      "saved",
-      "smart",
-      "trips",
-      "videos",
-      "people",
-      "map",
-    ];
-    if (exploringViews.includes(currentView as View)) {
-      completeOnboardingStep("explore_features");
-    }
-  }, [currentView, completeOnboardingStep]);
-
-  // Show contextual help based on context and user actions
-  useEffect(() => {
-    const shouldShowHelp = () => {
-      // Show help for first-time users
-      if (userActions.length === 0) return true;
-
-      // Show help when user hasn't searched yet but is on search view
-      if (currentView === "results" && !userActions.includes("searched"))
-        return true;
-
-      // Show help when user has photos but hasn't searched
-      if (currentView === "library" && dir && !userActions.includes("searched"))
-        return true;
-
-      return false;
-    };
-
-    setShowContextualHelp(shouldShowHelp());
-  }, [currentView, userActions, dir]);
-
-  // Show onboarding checklist for new users
-  useEffect(() => {
-    const hasCompletedOnboarding = localStorage.getItem("onboardingComplete");
-    const shouldShowChecklist =
-      !hasCompletedOnboarding && dir && library && library.length > 0;
-
-    setShowOnboardingChecklist(shouldShowChecklist || false);
-  }, [dir, library]);
+  // Onboarding flows handled by useOnboardingFlows
   const [_libOffset, _setLibOffset] = useState(0);
   const libLimit = 120;
 
@@ -891,13 +971,22 @@ export default function App() {
     const run = async () => {
       if (!dir) {
         setOcrReady(false);
+        setOcrTextCount(undefined);
         return;
       }
       try {
         const r = await apiOcrStatus(dir);
-        if (!cancelled) setOcrReady(!!r.ready);
+        if (!cancelled) {
+          setOcrReady(!!r.ready);
+          setOcrTextCount(
+            typeof r.count === "number" ? Math.max(0, r.count) : undefined
+          );
+        }
       } catch {
-        if (!cancelled) setOcrReady(false);
+        if (!cancelled) {
+          setOcrReady(false);
+          setOcrTextCount(undefined);
+        }
       }
     };
     run();
@@ -908,250 +997,51 @@ export default function App() {
 
   // Actions migrated: indexing managed by LibraryProvider
 
-  const doSearchImmediate = useCallback(
-    async (text?: string) => {
-      const q = (text ?? searchText ?? "").trim();
-      if (!q) return;
-      // If no directory is selected, automatically load the demo library
-      if (!dir) {
-        try {
-          const demoPath = await apiDemoDir();
-          if (!demoPath) {
-            uiActions.setNote("Demo library not available.");
-            return;
-          }
-          settingsActions.setDir(demoPath);
-          uiActions.setNote("Loading demo library… indexing will run once.");
-          try {
-            await apiWorkspaceAdd(demoPath);
-          } catch {}
-          await lib.index({ dir: demoPath, provider: engine });
-          await loadLibrary(120, 0);
-        } catch {}
-      }
-      photoActions.setQuery(q);
-      // Push URL state for deep linking including filters
-      try {
-        const sp = new URLSearchParams();
-        sp.set("q", q);
-        if (favOnly) sp.set("fav", "1");
-        if (tagFilter?.trim()) sp.set("tags", tagFilter);
-        if (dateFrom && dateTo) {
-          sp.set("date_from", dateFrom);
-          sp.set("date_to", dateTo);
-        }
-        if (place?.trim()) sp.set("place", place);
-        if (hasText) sp.set("has_text", "1");
-        if (camera?.trim()) sp.set("camera", camera);
-        if (isoMin) sp.set("iso_min", String(isoMin));
-        if (isoMax) sp.set("iso_max", String(isoMax));
-        if (fMin) sp.set("f_min", String(fMin));
-        if (fMax) sp.set("f_max", String(fMax));
-        if (ratingMin > 0) sp.set("rating_min", String(ratingMin));
-        const ppl = persons.filter(Boolean);
-        if (ppl.length === 1) sp.set("person", ppl[0]);
-        if (ppl.length > 1) sp.set("persons", ppl.join(","));
-        // Engine/search behavior flags
-        if (useFast) sp.set("fast", "1");
-        if (fastKind) sp.set("fast_kind", fastKind);
-        if (useCaps) sp.set("caps", "1");
-        if (useOcr) sp.set("ocr", "1");
-        // UI state for result presentation
-        try {
-          if (resultView) sp.set("rv", resultView);
-          if (timelineBucket) sp.set("tb", timelineBucket);
-        } catch {}
-        navigate(
-          { pathname: "/search", search: `?${sp.toString()}` },
-          { replace: false }
-        );
-      } catch {}
-      uiActions.setBusy("Searching…");
-      uiActions.setNote("");
-      try {
-        const tagList = tagFilter
-          .split(",")
-          .map((s: string) => s.trim())
-          .filter(Boolean);
-        const ppl = persons.filter(Boolean);
-
-        // Create comprehensive cache key including all search parameters
-        const cacheKey = JSON.stringify({
-          dir,
-          q,
-          engine,
-          topK,
-          favOnly,
-          tagList,
-          dateFrom,
-          dateTo,
-          place,
-          hasText,
-          camera,
-          isoMin,
-          isoMax,
-          fMin,
-          fMax,
-          persons: ppl,
-          useFast,
-          fastKind,
-          useCaps,
-          useOcr,
-          wsToggle,
-        });
-
-        // Use SearchCache for client-side caching
-        const searchFn = async (): Promise<{
-          results?: SearchResult[];
-          search_id?: string;
-        }> => {
-          if (wsToggle) {
-            return await apiSearchWorkspace(dir, q, engine, topK, {
-              favoritesOnly: favOnly,
-              tags: tagList,
-              dateFrom: dateFrom
-                ? Math.floor(new Date(dateFrom).getTime() / 1000)
-                : undefined,
-              dateTo: dateTo
-                ? Math.floor(new Date(dateTo).getTime() / 1000)
-                : undefined,
-              place: place || undefined,
-              hasText,
-              ...(ppl.length === 1
-                ? { person: ppl[0] }
-                : ppl.length > 1
-                ? { persons: ppl }
-                : {}),
-            });
-          } else {
-            try {
-              return await apiSearchCached(dir, q, engine, topK, undefined, {
-                hfToken: needsHf ? hfToken : undefined,
-                openaiKey: needsOAI ? openaiKey : undefined,
-                useFast: useFast,
-                fastKind: fastKind || undefined,
-                useCaptions: useCaps,
-                useOcr,
-              });
-            } catch (_cachedError) {
-              // Fallback to regular search if cached search fails
-              return await apiSearch(dir, q, engine, topK, {
-                hfToken: needsHf ? hfToken : undefined,
-                openaiKey: needsOAI ? openaiKey : undefined,
-                favoritesOnly: favOnly,
-                tags: tagList,
-                dateFrom: dateFrom
-                  ? Math.floor(new Date(dateFrom).getTime() / 1000)
-                  : undefined,
-                dateTo: dateTo
-                  ? Math.floor(new Date(dateTo).getTime() / 1000)
-                  : undefined,
-                ...(useFast
-                  ? { useFast: true, fastKind: fastKind || undefined }
-                  : {}),
-                useCaptions: useCaps,
-                useOcr,
-                camera: camera || undefined,
-                isoMin: isoMin || undefined,
-                isoMax: isoMax || undefined,
-                fMin: fMin || undefined,
-                fMax: fMax || undefined,
-                place: place || undefined,
-                hasText: hasText || undefined,
-                ...(ppl.length === 1
-                  ? { person: ppl[0] }
-                  : ppl.length > 1
-                  ? { persons: ppl }
-                  : {}),
-              });
-            }
-          }
-        };
-
-        // Use SearchCache.cachedSearch for performance optimization
-        const {
-          data: r,
-          cached,
-          responseTime,
-        } = await SearchCache.cachedSearch(cacheKey, searchFn);
-
-        // Track search performance with monitoring service
-        monitoringService.trackSearch(q, r.results?.length || 0, responseTime);
-
-        let res = r.results || [];
-        if (ratingMin > 0) {
-          res = res.filter((it) => (ratingMap[it.path] || 0) >= ratingMin);
-        }
-        photoActions.setResults(res);
-        photoActions.setSearchId(r.search_id || "");
-
-        // Update UI note with cache status
-        const cacheStatus = cached ? " (cached)" : "";
-        uiActions.setNote(
-          `Found ${r.results?.length || 0} results${cacheStatus}.`
-        );
-
-        await Promise.all([loadFav(), loadSaved(), loadTags(), loadDiag()]);
-        // Mark onboarding: first search completed
-        completeOnboardingStep("first_search");
-      } catch (e) {
-        uiActions.setNote(e instanceof Error ? e.message : "Search failed");
-        handleError(e, {
-          logToConsole: true,
-          logToServer: true,
-          context: {
-            action: "search",
-            component: "App.doSearchImmediate",
-            dir,
-          },
-        });
-      } finally {
-        uiActions.setBusy("");
-      }
-    },
-    [
-      searchText,
-      photoActions,
-      navigate,
-      uiActions,
-      persons,
-      dateFrom,
-      dateTo,
-      wsToggle,
-      dir,
-      engine,
-      topK,
-      favOnly,
-      place,
-      hasText,
-      needsHf,
-      hfToken,
-      needsOAI,
-      openaiKey,
-      useFast,
-      fastKind,
-      useCaps,
-      useOcr,
-      camera,
-      isoMin,
-      isoMax,
-      fMin,
-      fMax,
-      ratingMin,
-      ratingMap,
-      loadFav,
-      loadSaved,
-      loadTags,
-      loadDiag,
-      completeOnboardingStep,
-      loadLibrary,
-      settingsActions.setDir,
-      tagFilter,
-      lib.index,
-      resultView,
-      timelineBucket,
-    ]
-  );
+  const { doSearchImmediate } = useSearchOperations({
+    searchText,
+    enableDemoLibrary,
+    dir,
+    engine,
+    topK,
+    favOnly,
+    tagFilter,
+    dateFrom,
+    dateTo,
+    place,
+    hasText,
+    camera,
+    isoMin,
+    isoMax,
+    fMin,
+    fMax,
+    ratingMin,
+    persons,
+    useFast,
+    fastKind,
+    useCaps,
+    useOcr,
+    wsToggle,
+    needsHf,
+    hfToken,
+    needsOAI,
+    openaiKey,
+    resultView,
+    timelineBucket,
+    ratingMap,
+    loadLibrary,
+    loadFav,
+    loadSaved,
+    loadTags,
+    loadDiag,
+    libIndex: lib.index,
+    setDir: settingsActions.setDir,
+    setQuery: photoActions.setQuery,
+    setResults: photoActions.setResults,
+    setSearchId: photoActions.setSearchId,
+    setBusy: uiActions.setBusy,
+    setNote: uiActions.setNote,
+    completeOnboardingStep,
+  });
 
   // Hook up advanced search apply events from ModalManager
   useEffect(() => {
@@ -1173,7 +1063,23 @@ export default function App() {
 
   const prepareFast = useCallback(
     async (kind: "annoy" | "faiss" | "hnsw") => {
-      uiActions.setBusy(`Preparing ${kind.toUpperCase()}…`);
+      if (!dir) {
+        pushToast({
+          description: "Select a library before preparing a fast index.",
+        });
+        return;
+      }
+      const jobId = `fast-${Date.now()}`;
+      jobsActions.add({
+        id: jobId,
+        type: "index",
+        title: `Building ${kind.toUpperCase()} index`,
+        description: "Optimizing search speed",
+        status: "running",
+        startTime: new Date(),
+      });
+      const stop = monitorOperation(jobId, "fast_index");
+      pushToast({ description: `Preparing ${kind.toUpperCase()} index…` });
       try {
         await apiBuildFast(
           dir,
@@ -1183,23 +1089,66 @@ export default function App() {
           needsOAI ? openaiKey : undefined
         );
         uiActions.setNote(`${kind.toUpperCase()} ready`);
+        let finalStatus: Awaited<ReturnType<typeof apiOperationStatus>> | null =
+          null;
+        try {
+          finalStatus = await apiOperationStatus(dir, "fast_index");
+        } catch {}
+        jobsActions.update(jobId, {
+          status: "completed",
+          endTime: new Date(),
+          description:
+            finalStatus && typeof finalStatus.kind === "string"
+              ? `${String(finalStatus.kind).toUpperCase()} index ready`
+              : `${kind.toUpperCase()} index ready`,
+        } as Partial<Job>);
       } catch (e) {
         uiActions.setNote(
           e instanceof Error ? e.message : "Failed to build index"
         );
+        jobsActions.update(jobId, {
+          status: "failed",
+          endTime: new Date(),
+          error: e instanceof Error ? e.message : "Failed to build index",
+        } as Partial<Job>);
         handleError(e, {
           logToServer: true,
           context: { action: "build_fast", component: "App.buildFast", dir },
         });
       } finally {
-        uiActions.setBusy("");
+        stop();
       }
     },
-    [dir, engine, needsHf, hfToken, needsOAI, openaiKey, uiActions]
+    [
+      dir,
+      engine,
+      needsHf,
+      hfToken,
+      needsOAI,
+      openaiKey,
+      uiActions,
+      jobsActions,
+      monitorOperation,
+      pushToast,
+    ]
   );
 
   const buildOCR = useCallback(async () => {
-    uiActions.setBusy("Extracting text (OCR)…");
+    if (!dir) {
+      pushToast({ description: "Select a library before running OCR." });
+      return;
+    }
+    const jobId = `ocr-${Date.now()}`;
+    jobsActions.add({
+      id: jobId,
+      type: "analyze",
+      title: "Extracting text (OCR)",
+      description: "Scanning photos for text",
+      status: "running",
+      startTime: new Date(),
+    });
+    const stop = monitorOperation(jobId, "ocr");
+    pushToast({ description: "Extracting text (OCR)…" });
     try {
       const r = await apiBuildOCR(
         dir,
@@ -1209,20 +1158,83 @@ export default function App() {
         needsOAI ? openaiKey : undefined
       );
       uiActions.setNote(`OCR updated ${r.updated} images`);
+      let finalStatus: Awaited<ReturnType<typeof apiOperationStatus>> | null =
+        null;
+      try {
+        finalStatus = await apiOperationStatus(dir, "ocr");
+      } catch {}
+      const finalTotal =
+        typeof finalStatus?.total === "number"
+          ? finalStatus.total
+          : typeof finalStatus?.done === "number"
+          ? finalStatus.done
+          : r.updated;
+      const finalDone =
+        typeof finalStatus?.done === "number" ? finalStatus.done : r.updated;
+      jobsActions.update(jobId, {
+        status: "completed",
+        progress: finalDone,
+        total: finalTotal,
+        estimatedTimeRemaining: 0,
+        endTime: new Date(),
+        description: "OCR complete",
+      } as Partial<Job>);
       await loadTags();
+      try {
+        const status = await apiOcrStatus(dir);
+        setOcrReady(!!status.ready);
+        setOcrTextCount(
+          typeof status.count === "number"
+            ? Math.max(0, status.count)
+            : undefined
+        );
+      } catch (refreshError) {
+        console.warn("Failed to refresh OCR status", refreshError);
+      }
     } catch (e) {
       uiActions.setNote(e instanceof Error ? e.message : "OCR failed");
+      jobsActions.update(jobId, {
+        status: "failed",
+        error: e instanceof Error ? e.message : "OCR failed",
+        endTime: new Date(),
+      } as Partial<Job>);
       handleError(e, {
         logToServer: true,
         context: { action: "build_ocr", component: "App.buildOCR", dir },
       });
     } finally {
-      uiActions.setBusy("");
+      stop();
     }
-  }, [dir, engine, needsHf, hfToken, needsOAI, openaiKey, loadTags, uiActions]);
+  }, [
+    dir,
+    engine,
+    needsHf,
+    hfToken,
+    needsOAI,
+    openaiKey,
+    loadTags,
+    uiActions,
+    jobsActions,
+    monitorOperation,
+    pushToast,
+  ]);
 
   const buildMetadata = useCallback(async () => {
-    uiActions.setBusy("Building metadata…");
+    if (!dir) {
+      pushToast({ description: "Select a library before building metadata." });
+      return;
+    }
+    const jobId = `metadata-${Date.now()}`;
+    jobsActions.add({
+      id: jobId,
+      type: "analyze",
+      title: "Building metadata",
+      description: "Extracting EXIF and quality metrics",
+      status: "running",
+      startTime: new Date(),
+    });
+    const stop = monitorOperation(jobId, "metadata");
+    pushToast({ description: "Building metadata…" });
     try {
       const r = await apiBuildMetadata(
         dir,
@@ -1231,10 +1243,36 @@ export default function App() {
         needsOAI ? openaiKey : undefined
       );
       uiActions.setNote(`Metadata ready (${r.updated})`);
+      let finalStatus: Awaited<ReturnType<typeof apiOperationStatus>> | null =
+        null;
+      try {
+        finalStatus = await apiOperationStatus(dir, "metadata");
+      } catch {}
+      const finalTotal =
+        typeof finalStatus?.total === "number"
+          ? finalStatus.total
+          : typeof finalStatus?.done === "number"
+          ? finalStatus.done
+          : r.updated;
+      const finalDone =
+        typeof finalStatus?.done === "number" ? finalStatus.done : r.updated;
+      jobsActions.update(jobId, {
+        status: "completed",
+        progress: finalDone,
+        total: finalTotal,
+        estimatedTimeRemaining: 0,
+        endTime: new Date(),
+        description: "Metadata build complete",
+      } as Partial<Job>);
     } catch (e) {
       uiActions.setNote(
         e instanceof Error ? e.message : "Metadata build failed"
       );
+      jobsActions.update(jobId, {
+        status: "failed",
+        error: e instanceof Error ? e.message : "Metadata build failed",
+        endTime: new Date(),
+      } as Partial<Job>);
       handleError(e, {
         logToServer: true,
         context: {
@@ -1244,9 +1282,20 @@ export default function App() {
         },
       });
     } finally {
-      uiActions.setBusy("");
+      stop();
     }
-  }, [dir, engine, needsHf, hfToken, needsOAI, openaiKey, uiActions]);
+  }, [
+    dir,
+    engine,
+    needsHf,
+    hfToken,
+    needsOAI,
+    openaiKey,
+    uiActions,
+    jobsActions,
+    monitorOperation,
+    pushToast,
+  ]);
 
   // Poll analytics when busy to surface progress notes
   useEffect(() => {
@@ -1329,6 +1378,14 @@ export default function App() {
       return n;
     });
   }, []);
+
+  const handlePhotoOpen = useCallback(
+    (path: string) => {
+      const idx = (library || []).findIndex((p) => p === path);
+      if (idx >= 0) setDetailIdx(idx);
+    },
+    [library]
+  );
 
   const _exportSelected = useCallback(
     async (dest: string) => {
@@ -1551,9 +1608,7 @@ export default function App() {
   useResultsShortcuts({
     enabled: currentView === "results",
     anyOverlayOpen:
-      Boolean(showShortcuts) ||
-      Boolean(showFilters) ||
-      Boolean(Object.values(modalState || {}).some(Boolean)),
+      Boolean(showShortcuts) || Boolean(showFilters) || anyModalOpen,
     results: (results || []).map((r) => ({ path: r.path })),
     dir,
     fav,
@@ -1577,1129 +1632,202 @@ export default function App() {
     if (el) el.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [focusIdx]);
 
-  interface AppWithHintsProps {
-    searchText: string;
-    selected: Set<string>;
-    showAccessibilityPanel: boolean;
-    setShowAccessibilityPanel: (v: boolean) => void;
-    handleAccessibilitySettingsChange: (
-      settings: AccessibilitySettings
-    ) => void;
-    showOnboardingTour: boolean;
-    handleOnboardingComplete: () => void;
-    setShowOnboardingTour: (v: boolean) => void;
-  }
+  const layoutProps = {
+    isMobile,
+    showModernSidebar,
+    setShowModernSidebar,
+    handleSwipeLeft,
+    handleSwipeRight,
+    handlePullToRefresh,
+    accessibilitySettings,
+    showAccessibilityPanel,
+    setShowAccessibilityPanel,
+    prefersReducedMotion: Boolean(prefersReducedMotion),
+    themeMode,
+    setThemeMode,
+    highContrast,
+  };
 
-  function AppWithHints(props: AppWithHintsProps) {
-    const {
-      searchText,
-      selected,
-      showAccessibilityPanel,
-      setShowAccessibilityPanel,
-      handleAccessibilitySettingsChange,
-      showOnboardingTour: _showOnboardingTour,
-      handleOnboardingComplete: _handleOnboardingComplete,
-      setShowOnboardingTour: _setShowOnboardingTour,
-    } = props;
-    const { triggerHint } = useHintTriggers();
+  const onboardingProps = {
+    showWelcome,
+    enableDemoLibrary,
+    handleWelcomeStartDemo,
+    showOnboarding,
+    setShowOnboarding,
+    handleFirstRunQuickStart,
+    handleFirstRunCustom,
+    handleFirstRunDemo,
+    handleOnboardingComplete,
+    showOnboardingTour,
+    setShowOnboardingTour,
+    showHelpHint,
+    dismissHelpHint,
+    userActions,
+    onboardingSteps,
+    completeOnboardingStep,
+    showContextualHelp,
+    setShowContextualHelp,
+    showOnboardingChecklist,
+    setShowOnboardingChecklist,
+  };
 
-    useEffect(() => {
-      if (searchText?.trim()) {
-        triggerHint("search-success");
-      }
-    }, [searchText, triggerHint]);
+  const viewStateProps = {
+    searchText,
+    setSearchText,
+    selected,
+    setSelected,
+    toggleSelect,
+    gridSize,
+    setGridSize,
+    resultView,
+    setResultView: handleSetResultView,
+    timelineBucket,
+    setTimelineBucket: handleSetTimelineBucket,
+    currentFilter,
+    setCurrentFilter,
+    showFilters,
+    setShowFilters,
+    dateFrom,
+    setDateFrom,
+    dateTo,
+    setDateTo,
+    ratingMin,
+    setRatingMin,
+    detailIdx,
+    setDetailIdx,
+    focusIdx,
+    setFocusIdx,
+    layoutRows,
+    setLayoutRows,
+    setIsMobileMenuOpen,
+    showRecentActivity,
+    setShowRecentActivity,
+    showSearchHistory,
+    setShowSearchHistory,
+    bottomNavTab,
+    setBottomNavTab,
+    authRequired,
+    setAuthRequired,
+    authTokenInput,
+    setAuthTokenInput,
+    currentView,
+  };
 
-    useEffect(() => {
-      if (selected.size > 1) {
-        triggerHint("multiple-photos-selected");
-      } else if (selected.size === 1) {
-        triggerHint("photo-selected");
-      }
-    }, [selected.size, triggerHint]);
+  const dataProps = {
+    dir,
+    engine,
+    hfToken,
+    openaiKey,
+    useFast,
+    fastKind,
+    useCaps,
+    useOcr,
+    hasText,
+    place,
+    camera,
+    isoMin,
+    isoMax,
+    fMin,
+    fMax,
+    tagFilter,
+    allTags,
+    needsHf,
+    needsOAI,
+    results,
+    query,
+    fav,
+    favOnly,
+    topK,
+    saved,
+    collections,
+    smart,
+    library,
+    libHasMore: _libHasMore,
+    tagsMap,
+    persons,
+    clusters,
+    points,
+    diag,
+    meta,
+    busy,
+    note,
+    ocrReady,
+    ocrTextCount,
+    presets,
+    altSearch,
+    ratingMap,
+    jobs,
+    libState,
+    showInfoOverlay,
+    highContrast,
+    isConnected,
+    items,
+    hasAnyFilters,
+    indexCoverage: _indexCoverage,
+  };
 
-    return (
-      <>
-        {/* Modern UX Integration - Accessibility Panel */}
-        {showAccessibilityPanel && (
-          <AccessibilityPanel
-            isOpen={showAccessibilityPanel}
-            onClose={() => setShowAccessibilityPanel(false)}
-            onSettingsChange={handleAccessibilitySettingsChange}
-          />
-        )}
+  const actionProps = {
+    handleAccessibilitySettingsChange,
+    doSearchImmediate,
+    loadFav,
+    loadSaved,
+    loadTags,
+    loadDiag,
+    loadFaces,
+    loadMap,
+    loadLibrary,
+    loadMetadata,
+    loadPresets,
+    prepareFast,
+    buildOCR,
+    buildMetadata,
+    monitorOperation,
+    openDetailByPath,
+    navDetail,
+    tagSelected,
+    exportSelected: _exportSelected,
+    handlePhotoOpen,
+    handlePhotoAction: _handlePhotoAction,
+    setRatingSelected: _setRatingSelected,
+    rowsEqual,
+  };
 
-        {/* Hint System is already provided by HintProvider in the main tree */}
-      </>
-    );
-  }
+  const contextProps = {
+    settingsActions,
+    photoActions,
+    uiActions,
+    workspaceActions,
+    modalControls,
+    lib,
+    jobsActions,
+    pushToast,
+    setToast,
+    filterPresets,
+    savePreset,
+    loadPreset,
+    deletePreset,
+  };
 
-  // Component that uses hint triggers within provider context
+  const refProps = {
+    scrollContainerRef,
+    layoutRowsRef,
+    toastTimerRef,
+    activeToastRef,
+  };
 
   return (
-    <ErrorBoundary>
-      <ThemeProvider>
-        {/* Modern UX Integration - Wrap with modern providers */}
-        <HintProvider>
-          {!Object.values(modalState || {}).some(Boolean) ? (
-            <HintManager>
-              <MobileOptimizations
-                onSwipeLeft={handleSwipeLeft}
-                onSwipeRight={handleSwipeRight}
-                onSwipeUp={() => setShowModernSidebar(!showModernSidebar)}
-                enableSwipeGestures={isMobile}
-                enablePullToRefresh={true}
-                onPullToRefresh={handlePullToRefresh}
-              >
-                {/* Dedicated share viewer route (full screen, minimal chrome) */}
-                {isSharePath(location.pathname) && <ShareViewer />}
-                {isMobileTestPath(location.pathname) && <MobilePWATest />}
-                <div
-                  className={clsx(
-                    "flex h-screen bg-white dark:bg-gray-950 dark:text-gray-100",
-                    {
-                      "high-contrast": accessibilitySettings?.highContrast,
-                      "large-text": accessibilitySettings?.largeText,
-                      hidden:
-                        isSharePath(location.pathname) ||
-                        isMobileTestPath(location.pathname),
-                    }
-                  )}
-                >
-                  <a
-                    href="#main-content"
-                    className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 bg-blue-600 text-white px-4 py-2 rounded-md"
-                  >
-                    Skip to main content
-                  </a>
-                  <OfflineIndicator />
-                  {showWelcome && (
-                    <Welcome
-                      onStartDemo={async () => {
-                        // Set demo photos directory and close welcome
-                        const demoPath = await apiDemoDir();
-                        if (!demoPath) {
-                          uiActions.setNote(
-                            "Demo data is not available on this system."
-                          );
-                          return;
-                        }
-                        settingsActions.setDir(demoPath);
-                        uiActions.setShowWelcome(false);
-
-                        // Add demo path to workspace and index it
-                        try {
-                          await apiWorkspaceAdd(demoPath);
-                          await lib.index();
-                        } catch (error) {
-                          console.error(
-                            "Failed to add demo path or index:",
-                            error
-                          );
-                          uiActions.setNote(
-                            error instanceof Error
-                              ? error.message
-                              : "Failed to setup demo"
-                          );
-                        }
-                      }}
-                      onSelectFolder={() => {
-                        modal.open("folder");
-                        uiActions.setShowWelcome(false);
-                      }}
-                      onClose={() => uiActions.setShowWelcome(false)}
-                    />
-                  )}
-
-                  {/* First-run setup */}
-                  <FirstRunSetup
-                    open={!dir && showOnboarding}
-                    onClose={() => {
-                      setShowOnboarding(false);
-                      localStorage.setItem("hasSeenOnboarding", "true");
-                    }}
-                    onQuickStart={async (paths) => {
-                      try {
-                        // Add each path to workspace; set first as current dir; index each
-                        const existing: string[] = [];
-                        for (const p of paths) {
-                          try {
-                            const st = await fetch(`${API_BASE}/scan_count`, {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify([p]),
-                            });
-                            if (st.ok) {
-                              const js = await st.json();
-                              if (js.items?.[0]?.exists) existing.push(p);
-                            }
-                          } catch {}
-                        }
-                        if (existing.length === 0) {
-                          setShowOnboarding(false);
-                          localStorage.setItem("hasSeenOnboarding", "true");
-                          return;
-                        }
-                        settingsActions.setDir(existing[0]);
-                        // Kick off background indexing without blocking
-                        for (const p of existing) {
-                          try {
-                            await apiWorkspaceAdd(p);
-                          } catch {}
-                          (async () => {
-                            try {
-                              await apiIndex(
-                                p,
-                                engine,
-                                24,
-                                needsHf ? hfToken : undefined,
-                                needsOAI ? openaiKey : undefined
-                              );
-                            } catch {}
-                          })();
-                        }
-                        setShowOnboarding(false);
-                        localStorage.setItem("hasSeenOnboarding", "true");
-                      } catch (e) {
-                        uiActions.setNote(
-                          e instanceof Error ? e.message : "Quick start failed"
-                        );
-                      }
-                    }}
-                    onCustom={() => {
-                      modal.open("folder");
-                      setShowOnboarding(false);
-                      localStorage.setItem("hasSeenOnboarding", "true");
-                    }}
-                    onDemo={async () => {
-                      try {
-                        const demoPath = await apiDemoDir();
-                        if (!demoPath) {
-                          uiActions.setNote(
-                            "Demo data is not available on this system."
-                          );
-                          setShowOnboarding(false);
-                          localStorage.setItem("hasSeenOnboarding", "true");
-                          return;
-                        }
-                        settingsActions.setDir(demoPath);
-                        await apiWorkspaceAdd(demoPath);
-                        await lib.index();
-                      } catch (e) {
-                        uiActions.setNote(
-                          e instanceof Error ? e.message : "Demo setup failed"
-                        );
-                      }
-                      setShowOnboarding(false);
-                      localStorage.setItem("hasSeenOnboarding", "true");
-                    }}
-                    onTour={() => {
-                      modal.open("help");
-                    }}
-                  />
-
-                  {/* App shell with sidebar + header */}
-                  <ResultsConfigProvider
-                    value={{
-                      resultView: resultView as "grid" | "timeline",
-                      setResultView: (v) => {
-                        _setResultView(v);
-                        settingsActions.setResultView?.(v);
-                      },
-                      timelineBucket,
-                      setTimelineBucket: (b) => {
-                        _setTimelineBucket(b);
-                        settingsActions.setTimelineBucket?.(b);
-                      },
-                    }}
-                  >
-                    <AppShell
-                      showModernSidebar={true}
-                      isMobile={isMobile}
-                      sidebarStats={{
-                        totalPhotos: library?.length || 0,
-                        collections: Object.keys(collections || {}).length,
-                        people: (clusters || []).length,
-                        favorites: fav.length,
-                      }}
-                      darkMode={themeMode === "dark"}
-                      onDarkModeToggle={() =>
-                        setThemeMode(themeMode === "dark" ? "light" : "dark")
-                      }
-                      onSettingsClick={() => setShowAccessibilityPanel(true)}
-                      selectedView={currentView}
-                      onViewChange={(view: string) => {
-                        switch (view) {
-                          case "results":
-                            navigate(viewToPath("results"));
-                            break;
-                          case "library":
-                            navigate(viewToPath("library"));
-                            break;
-                          case "people":
-                            navigate(viewToPath("people"));
-                            break;
-                          case "collections":
-                            navigate(viewToPath("collections"));
-                            break;
-                          case "saved":
-                            navigate(viewToPath("saved"));
-                            break;
-                          case "map":
-                            navigate(viewToPath("map"));
-                            break;
-                          case "smart":
-                            navigate(viewToPath("smart"));
-                            break;
-                          case "trips":
-                            navigate(viewToPath("trips"));
-                            break;
-                          case "videos":
-                            navigate(viewToPath("videos"));
-                            break;
-                          default:
-                            navigate(viewToPath("library"));
-                        }
-                      }}
-                      onSelectLibrary={() => modal.open("folder")}
-                      topBarProps={{
-                        searchText,
-                        setSearchText,
-                        onSearch: doSearchImmediate,
-                        clusters: clusters || [],
-                        allTags: allTags || [],
-                        meta: meta || { cameras: [], places: [] },
-                        busy: !!busy,
-                        gridSize,
-                        setGridSize,
-                        selectedView: currentView as ViewType,
-                        setSelectedView: (v) => navigate(viewToPath(String(v))),
-                        currentFilter,
-                        setCurrentFilter,
-                        ratingMin,
-                        setRatingMin,
-                        setModal: (m: { kind: string } | null) =>
-                          m ? modal.open(m.kind as ModalKey) : undefined,
-                        setIsMobileMenuOpen,
-                        setShowFilters,
-                        selected,
-                        setSelected,
-                        dir,
-                        engine,
-                        topK,
-                        useOsTrash,
-                        showInfoOverlay,
-                        onToggleInfoOverlay: () =>
-                          settingsActions.setShowInfoOverlay
-                            ? settingsActions.setShowInfoOverlay(
-                                !showInfoOverlay
-                              )
-                            : undefined,
-                        // Results view mode comes from ResultsConfig context
-                        photoActions,
-                        uiActions,
-                        toastTimerRef,
-                        setToast,
-                        indexedCount: diag?.engines?.[0]?.count,
-                        indexedTotal: library?.length,
-                        coveragePct: _indexCoverage,
-                        indexStatus: libState.indexStatus,
-                        isIndexing: libState.isIndexing,
-                        onIndex: () => lib.index(),
-                        activeJobs: jobs.filter((j) => j.status === "running")
-                          .length,
-                        onOpenJobs: () => modal.open("jobs"),
-                        progressPct: libState.progressPct,
-                        etaSeconds: libState.etaSeconds,
-                        paused: libState.paused,
-                        tooltip: libState.tip,
-                        ocrReady,
-                        onOpenSearchOverlay: () => modal.open("search"),
-                        onPause: async () => {
-                          try {
-                            await lib.pause?.(dir);
-                          } catch {}
-                        },
-                        onResume: async () => {
-                          try {
-                            await lib.resume?.(dir);
-                          } catch {}
-                        },
-                        onOpenThemeModal: () => modal.open("theme"),
-                        onOpenDiagnostics: () => modal.open("diagnostics"),
-                      }}
-                    >
-                      {/* Modern UX Integration - Accessibility Button */}
-                      <div className="px-4 pt-2 flex items-center gap-2">
-                        <motion.button
-                          {...(prefersReducedMotion
-                            ? {}
-                            : {
-                                whileHover: { scale: 1.05 },
-                                whileTap: { scale: 0.95 },
-                              })}
-                          onClick={() => setShowAccessibilityPanel(true)}
-                          className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                          aria-label="Accessibility settings"
-                        >
-                          <span className="text-sm">♿</span>
-                        </motion.button>
-
-                        <motion.button
-                          {...(prefersReducedMotion
-                            ? {}
-                            : {
-                                whileHover: { scale: 1.05 },
-                                whileTap: { scale: 0.95 },
-                              })}
-                          onClick={() => setShowOnboardingTour(true)}
-                          className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                          aria-label="Help and onboarding"
-                        >
-                          <span className="text-sm">?</span>
-                        </motion.button>
-
-                        {showHelpHint && (
-                          <div className="flex-1 bg-yellow-50 text-yellow-800 border border-yellow-200 rounded px-3 py-1 text-xs flex items-center justify-between">
-                            <span>
-                              Press <span className="font-mono">?</span> for
-                              help and shortcuts
-                            </span>
-                            <button
-                              type="button"
-                              className="text-yellow-800 hover:text-yellow-900"
-                              aria-label="Dismiss help hint"
-                              onClick={() => {
-                                setShowHelpHint(false);
-                                try {
-                                  localStorage.setItem(
-                                    "ps_hint_help_seen",
-                                    "1"
-                                  );
-                                } catch {}
-                              }}
-                            >
-                              ×
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      <main
-                        id="main-content"
-                        className="flex-1 overflow-auto"
-                        ref={scrollContainerRef}
-                        aria-label="Main content"
-                      >
-                        <ResultsUIProvider
-                          value={{
-                            selected,
-                            setSelected,
-                            toggleSelect,
-                            focusIdx,
-                            setFocusIdx,
-                            detailIdx,
-                            setDetailIdx,
-                            layoutRowsRef,
-                            setLayoutRows,
-                          }}
-                        >
-                          {/* Route-mounted feature containers */}
-                          <Suspense
-                            fallback={<SuspenseFallback label="Loading…" />}
-                          >
-                            <Routes>
-                              <Route
-                                path="/people"
-                                element={<PeopleViewContainer />}
-                              />
-                              <Route
-                                path="/collections"
-                                element={<CollectionsViewContainer />}
-                              />
-                              <Route
-                                path="/library"
-                                element={
-                                  <LibraryContainer
-                                    dir={dir}
-                                    library={library}
-                                    isIndexing={libState.isIndexing}
-                                    progressPct={libState.progressPct}
-                                    etaSeconds={libState.etaSeconds}
-                                    onSelectLibrary={() => modal.open("folder")}
-                                    onRunDemo={async () => {
-                                      try {
-                                        const demoPath = await apiDemoDir();
-                                        if (!demoPath) {
-                                          uiActions.setNote(
-                                            "Demo library not available on this install."
-                                          );
-                                          return;
-                                        }
-                                        settingsActions.setDir(demoPath);
-                                        await lib.index();
-                                        uiActions.setNote(
-                                          "Demo library loaded! Try 'beach sunset' or 'family photos'"
-                                        );
-                                      } catch (error) {
-                                        console.error(
-                                          "Failed to setup demo:",
-                                          error
-                                        );
-                                        uiActions.setNote(
-                                          error instanceof Error
-                                            ? error.message
-                                            : "Failed to setup demo"
-                                        );
-                                        handleError(error, {
-                                          logToServer: true,
-                                          context: {
-                                            action: "demo_setup",
-                                            component:
-                                              "App.LibraryView.onRunDemo",
-                                            dir,
-                                          },
-                                        });
-                                      }
-                                    }}
-                                    onOpenHelp={() => modal.open("help")}
-                                    onLoadLibrary={loadLibrary}
-                                    hasMore={_libHasMore}
-                                    isLoading={!!busy}
-                                    selected={selected}
-                                    onToggleSelect={toggleSelect}
-                                    onOpen={(path) => {
-                                      const idx = (library || []).findIndex(
-                                        (p) => p === path
-                                      );
-                                      if (idx >= 0) setDetailIdx(idx);
-                                    }}
-                                    tagsMap={tagsMap}
-                                  />
-                                }
-                              />
-                              <Route
-                                path="/search"
-                                element={
-                                  <ResultsView
-                                    dir={dir}
-                                    engine={engine}
-                                    results={(results || []).map((r) => ({
-                                      path: r.path,
-                                      score: r.score,
-                                    }))}
-                                    searchText={searchText}
-                                    altSearch={altSearch}
-                                    ratingMap={ratingMap}
-                                    showInfoOverlay={showInfoOverlay}
-                                    isLoading={!!busy}
-                                    openDetailByPath={openDetailByPath}
-                                    scrollContainerRef={scrollContainerRef}
-                                    setSearchText={setSearchText}
-                                    onSearchNow={doSearchImmediate}
-                                    onLayout={(rows) =>
-                                      setLayoutRows((prev) =>
-                                        rowsEqual(prev, rows) ? prev : rows
-                                      )
-                                    }
-                                  />
-                                }
-                              />
-                              <Route
-                                path="/map"
-                                element={
-                                  <div className="p-4">
-                                    <MapView
-                                      points={points || []}
-                                      onLoadMap={loadMap}
-                                    />
-                                  </div>
-                                }
-                              />
-                              <Route
-                                path="/smart"
-                                element={
-                                  <div className="p-4">
-                                    <SmartCollections
-                                      dir={dir}
-                                      engine={engine}
-                                      topK={topK}
-                                      smart={smart}
-                                      setSmart={photoActions.setSmart}
-                                      setResults={photoActions.setResults}
-                                      setSearchId={photoActions.setSearchId}
-                                      setNote={uiActions.setNote}
-                                      query={query}
-                                      favOnly={favOnly}
-                                      tagFilter={tagFilter}
-                                      useCaps={useCaps}
-                                      useOcr={useOcr}
-                                      hasText={hasText}
-                                      camera={camera}
-                                      isoMin={String(isoMin || "")}
-                                      isoMax={String(isoMax || "")}
-                                      fMin={String(fMin || "")}
-                                      fMax={String(fMax || "")}
-                                      place={place}
-                                      persons={persons}
-                                    />
-                                  </div>
-                                }
-                              />
-                              <Route
-                                path="/trips"
-                                element={
-                                  <div className="p-4">
-                                    <TripsView
-                                      dir={dir}
-                                      engine={engine}
-                                      setBusy={uiActions.setBusy}
-                                      setNote={uiActions.setNote}
-                                      setResults={photoActions.setResults}
-                                    />
-                                  </div>
-                                }
-                              />
-                              <Route
-                                path="/videos"
-                                element={
-                                  <div className="p-4">
-                                    <VideoManager
-                                      currentDir={dir}
-                                      provider={engine}
-                                    />
-                                  </div>
-                                }
-                              />
-                              <Route
-                                path="/saved"
-                                element={
-                                  <SavedViewContainer
-                                    onRun={(_name, q, k) => {
-                                      if (q) setSearchText(q);
-                                      if (k) photoActions.setTopK(k);
-                                      doSearchImmediate(q);
-                                    }}
-                                  />
-                                }
-                              />
-                              <Route
-                                path="/"
-                                element={<Navigate to="/library" replace />}
-                              />
-                            </Routes>
-                          </Suspense>
-                          <StatsBar
-                            items={items}
-                            note={note}
-                            diag={diag}
-                            engine={engine}
-                          />
-
-                          {/* Filters panel */}
-                          <FilterPanel
-                            show={showFilters}
-                            onClose={() => setShowFilters(false)}
-                            onApply={() => {
-                              setShowFilters(false);
-                              doSearchImmediate(searchText);
-                            }}
-                            favOnly={favOnly}
-                            setFavOnly={photoActions.setFavOnly}
-                            tagFilter={tagFilter}
-                            setTagFilter={photoActions.setTagFilter}
-                            camera={camera}
-                            setCamera={settingsActions.setCamera}
-                            isoMin={String(isoMin || "")}
-                            setIsoMin={(value: string) =>
-                              settingsActions.setIsoMin(parseFloat(value) || 0)
-                            }
-                            isoMax={String(isoMax || "")}
-                            setIsoMax={(value: string) =>
-                              settingsActions.setIsoMax(parseFloat(value) || 0)
-                            }
-                            dateFrom={dateFrom}
-                            setDateFrom={setDateFrom}
-                            dateTo={dateTo}
-                            setDateTo={setDateTo}
-                            fMin={String(fMin || "")}
-                            setFMin={(value: string) =>
-                              settingsActions.setFMin(parseFloat(value) || 0)
-                            }
-                            fMax={String(fMax || "")}
-                            setFMax={(value: string) =>
-                              settingsActions.setFMax(parseFloat(value) || 0)
-                            }
-                            place={place}
-                            setPlace={settingsActions.setPlace}
-                            useCaps={useCaps}
-                            setUseCaps={settingsActions.setUseCaps}
-                            useOcr={useOcr}
-                            setUseOcr={settingsActions.setUseOcr}
-                            hasText={hasText}
-                            setHasText={settingsActions.setHasText}
-                            ratingMin={ratingMin}
-                            setRatingMin={setRatingMin}
-                            availableCameras={meta?.cameras || []}
-                            yearRange={[2020, new Date().getFullYear()]}
-                            filterPresets={[]}
-                            onSavePreset={(preset) => {
-                              // TODO: Implement preset saving
-                              console.log("Save preset:", preset);
-                            }}
-                            onLoadPreset={(preset) => {
-                              // TODO: Implement preset loading
-                              console.log("Load preset:", preset);
-                            }}
-                            onDeletePreset={(presetId) => {
-                              // TODO: Implement preset deletion
-                              console.log("Delete preset:", presetId);
-                            }}
-                          />
-                          {modalState.shareManage && (
-                            <div
-                              role="button"
-                              tabIndex={0}
-                              className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
-                              onKeyDown={(e) => {
-                                if (e.key === "Escape")
-                                  modal.close("shareManage");
-                              }}
-                            >
-                              <FocusTrap
-                                onEscape={() => modal.close("shareManage")}
-                              >
-                                <div
-                                  className="bg-white rounded-lg p-4 w-full max-w-2xl"
-                                  role="dialog"
-                                  aria-modal="true"
-                                >
-                                  <div className="flex items-center justify-between mb-3">
-                                    <div className="font-semibold">
-                                      Manage Shares
-                                    </div>
-                                    <button
-                                      type="button"
-                                      className="px-2 py-1 border rounded"
-                                      onClick={() => modal.close("shareManage")}
-                                    >
-                                      Close
-                                    </button>
-                                  </div>
-                                  <ShareManager dir={dir} />
-                                </div>
-                              </FocusTrap>
-                            </div>
-                          )}
-
-                          {/* Centralized modal rendering */}
-                          <ModalManager
-                            selected={selected}
-                            dir={dir}
-                            engine={engine}
-                            topK={topK}
-                            highContrast={highContrast}
-                            useFast={useFast}
-                            fastKind={fastKind}
-                            useCaps={useCaps}
-                            useOcr={useOcr}
-                            hasText={hasText}
-                            useOsTrash={useOsTrash}
-                            settingsActions={
-                              settingsActions as unknown as SettingsActions
-                            }
-                            uiActions={uiActions}
-                            photoActions={photoActions}
-                            libIndex={() => lib.index()}
-                            prepareFast={prepareFast}
-                            buildOCR={buildOCR}
-                            buildMetadata={buildMetadata}
-                            setSelectedView={(v: string) =>
-                              navigate(viewToPath(v))
-                            }
-                            searchText={searchText}
-                            query={query}
-                            collections={collections}
-                            tagSelected={tagSelected}
-                            setToast={setToast}
-                            clusters={clusters}
-                            allTags={allTags || []}
-                            meta={meta}
-                          />
-
-                          {/* Lightbox */}
-                          {detailIdx !== null &&
-                            results &&
-                            results[detailIdx] &&
-                            (VideoService.isVideoFile(
-                              results[detailIdx].path
-                            ) ? (
-                              <VideoLightbox
-                                videoPath={results[detailIdx].path}
-                                videoUrl={`/api/media/${encodeURIComponent(
-                                  results[detailIdx].path
-                                )}`}
-                                onPrevious={() => navDetail(-1)}
-                                onNext={() => navDetail(1)}
-                                onClose={() => setDetailIdx(null)}
-                              />
-                            ) : (
-                              <Lightbox
-                                dir={dir}
-                                engine={engine}
-                                path={results[detailIdx].path}
-                                onPrev={() => navDetail(-1)}
-                                onNext={() => navDetail(1)}
-                                onClose={() => setDetailIdx(null)}
-                                onReveal={async () => {
-                                  try {
-                                    const p =
-                                      results && detailIdx !== null
-                                        ? results[detailIdx]?.path
-                                        : undefined;
-                                    if (p) await apiOpen(dir, p);
-                                  } catch {}
-                                }}
-                                onFavorite={async () => {
-                                  try {
-                                    const p =
-                                      results && detailIdx !== null
-                                        ? results[detailIdx]?.path
-                                        : undefined;
-                                    if (p) {
-                                      await apiSetFavorite(
-                                        dir,
-                                        p,
-                                        !fav.includes(p)
-                                      );
-                                      await loadFav();
-                                    }
-                                  } catch {}
-                                }}
-                                onMoreLikeThis={async () => {
-                                  try {
-                                    const p =
-                                      results && detailIdx !== null
-                                        ? results[detailIdx]?.path
-                                        : undefined;
-                                    if (!p) return;
-                                    uiActions.setBusy("Searching similar…");
-                                    const r = await apiSearchLike(
-                                      dir,
-                                      p,
-                                      engine,
-                                      topK
-                                    );
-                                    photoActions.setResults(r.results || []);
-                                    navigate("/search");
-                                  } catch (e) {
-                                    uiActions.setNote(
-                                      e instanceof Error
-                                        ? e.message
-                                        : "Search failed"
-                                    );
-                                  } finally {
-                                    uiActions.setBusy("");
-                                  }
-                                }}
-                              />
-                            ))}
-
-                          {/* Floating Jobs button + drawer */}
-                          <button
-                            type="button"
-                            onClick={() => modal.open("jobs")}
-                            className="fixed bottom-4 right-4 bg-blue-600 text-white rounded-full shadow px-4 py-2"
-                            title="Open Jobs"
-                            aria-label="Open the jobs panel"
-                          >
-                            Jobs
-                          </button>
-
-                          {/* Centralized busy + toast overlays */}
-                          <OverlayLayer
-                            busy={busy}
-                            note={note}
-                            toast={toast}
-                            setToast={setToast}
-                            toastTimerRef={toastTimerRef}
-                          />
-
-                          {/* Status Bar */}
-                          {/* Auth required banner */}
-                          {authRequired && (
-                            <div className="bg-amber-50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 px-4 py-2 flex items-center gap-2 border-b border-amber-200 dark:border-amber-800">
-                              <span className="text-sm">
-                                API requires token
-                              </span>
-                              <input
-                                type="password"
-                                className="px-2 py-1 text-sm rounded border border-amber-300 dark:border-amber-700 bg-white dark:bg-gray-900"
-                                placeholder="Enter token"
-                                value={authTokenInput}
-                                onChange={(e) =>
-                                  setAuthTokenInput(e.target.value)
-                                }
-                              />
-                              <button
-                                type="button"
-                                className="text-sm px-2 py-1 bg-amber-600 text-white rounded"
-                                onClick={async () => {
-                                  const tok = authTokenInput.trim();
-                                  if (!tok) return;
-                                  try {
-                                    localStorage.setItem("api_token", tok);
-                                  } catch {}
-                                  const ok = await apiAuthCheck(tok);
-                                  if (ok) {
-                                    setAuthRequired(false);
-                                    setAuthTokenInput("");
-                                    uiActions.setNote("Token accepted.");
-                                  } else {
-                                    uiActions.setNote(
-                                      "Token rejected — check API_TOKEN."
-                                    );
-                                  }
-                                }}
-                              >
-                                Save
-                              </button>
-                            </div>
-                          )}
-
-                          <StatusBar
-                            photoCount={library?.length || 0}
-                            indexedCount={library?.length || 0}
-                            searchProvider={engine}
-                            isIndexing={libState.isIndexing}
-                            isConnected={isConnected}
-                            currentDirectory={dir}
-                            activeJobs={
-                              jobs.filter((j) => j.status === "running").length
-                            }
-                          />
-
-                          {/* Jobs Center */}
-                          <JobsCenter
-                            jobs={jobs}
-                            onPause={(jobId) =>
-                              jobsActions.setStatus(jobId, "paused")
-                            }
-                            onResume={(jobId) =>
-                              jobsActions.setStatus(jobId, "running")
-                            }
-                            onCancel={(jobId) =>
-                              jobsActions.setStatus(jobId, "cancelled")
-                            }
-                            onRetry={(jobId) =>
-                              jobsActions.setStatus(jobId, "queued")
-                            }
-                            onClear={(jobId) => jobsActions.remove(jobId)}
-                            onClearAll={() => jobsActions.clearStopped()}
-                          />
-
-                          {/* Bottom Navigation */}
-                          <BottomNavigation
-                            activeTab={bottomNavTab}
-                            onTabChange={(tab) => {
-                              setBottomNavTab(tab);
-                              // Map bottom nav tabs to main views
-                              switch (tab) {
-                                case "home":
-                                  navigate("/library");
-                                  break;
-                                case "search":
-                                  navigate("/search");
-                                  break;
-                                case "favorites":
-                                  navigate("/search");
-                                  photoActions.setFavOnly(true);
-                                  break;
-                                case "settings":
-                                  navigate("/library");
-                                  break;
-                              }
-                            }}
-                            onShowFilters={() => setShowFilters(true)}
-                            onShowUpload={() => modal.open("folder")}
-                            onShowLibrary={() => modal.open("folder")}
-                            showSecondaryActions={true}
-                          />
-
-                          {/* Progressive Onboarding Components */}
-                          <ContextualHelp
-                            isVisible={showContextualHelp}
-                            onDismiss={() => setShowContextualHelp(false)}
-                            context={
-                              (currentView === "results"
-                                ? "results"
-                                : currentView === "library"
-                                ? "library"
-                                : currentView === "collections"
-                                ? "collections"
-                                : "search") as
-                                | "search"
-                                | "library"
-                                | "results"
-                                | "settings"
-                                | "collections"
-                            }
-                            userActions={userActions}
-                          />
-
-                          <OnboardingChecklist
-                            isVisible={
-                              showOnboardingChecklist && !showOnboardingTour
-                            }
-                            onComplete={() => {
-                              setShowOnboardingChecklist(false);
-                              // Mark onboarding as complete
-                              try {
-                                localStorage.setItem(
-                                  "onboardingComplete",
-                                  "true"
-                                );
-                              } catch {}
-                            }}
-                            completedSteps={onboardingSteps}
-                            inProgressStepId={
-                              libState.isIndexing ? "index_photos" : undefined
-                            }
-                            onStepComplete={() => {
-                              /* no-op: completion is event-based */
-                            }}
-                            onStepAction={(step) => {
-                              // Navigate to the appropriate task/page and keep current completion behavior
-                              switch (step) {
-                                case "select_directory": {
-                                  // Open the folder picker and ensure we're on Library
-                                  navigate("/library");
-                                  modal.open("folder");
-                                  break;
-                                }
-                                case "index_photos": {
-                                  // Kick off indexing and surface progress UI
-                                  navigate("/library");
-                                  if (!dir) {
-                                    // If no directory yet, prompt to select one first
-                                    modal.open("folder");
-                                  } else {
-                                    lib.index();
-                                  }
-                                  break;
-                                }
-                                case "first_search": {
-                                  // Jump to search view; hint with a helpful toast
-                                  navigate("/search");
-                                  setToast({
-                                    message:
-                                      "Try searching: beach sunset, birthday cake, mountain hike",
-                                  });
-                                  break;
-                                }
-                                case "explore_features": {
-                                  // Take users to Collections to explore features
-                                  navigate("/collections");
-                                  setToast({
-                                    message:
-                                      "Explore collections, favorites, and sharing",
-                                  });
-                                  break;
-                                }
-                              }
-                            }}
-                          />
-
-                          {/* Removed blocking GuidedIndexingFlow - indexing now runs in background */}
-
-                          {/* Performance Monitor for development */}
-                          <PerformanceMonitor />
-
-                          {/* Error Boundary for new components */}
-                          <ErrorBoundary componentName="RecentActivityPanel">
-                            {showRecentActivity && (
-                              <RecentActivityPanel
-                                onClose={() => setShowRecentActivity(false)}
-                              />
-                            )}
-                          </ErrorBoundary>
-
-                          <ErrorBoundary componentName="SearchHistoryPanel">
-                            {showSearchHistory && (
-                              <SearchHistoryPanel
-                                onSearch={(query) => {
-                                  setSearchText(query);
-                                  doSearchImmediate(query);
-                                }}
-                                onClose={() => setShowSearchHistory(false)}
-                              />
-                            )}
-                          </ErrorBoundary>
-                        </ResultsUIProvider>
-                      </main>
-                    </AppShell>
-                  </ResultsConfigProvider>
-
-                  {/* Close main containers returned by the content layout */}
-                </div>
-
-                {/* Modern UX Integration - Accessibility Panel */}
-                {showAccessibilityPanel && (
-                  <AccessibilityPanel
-                    isOpen={showAccessibilityPanel}
-                    onClose={() => setShowAccessibilityPanel(false)}
-                    onSettingsChange={handleAccessibilitySettingsChange}
-                  />
-                )}
-
-                {/* Modern UX Integration - Onboarding Tour */}
-                {showOnboardingTour && (
-                  <OnboardingTour
-                    isActive={showOnboardingTour}
-                    onComplete={handleOnboardingComplete}
-                    onSkip={() => setShowOnboardingTour(false)}
-                  />
-                )}
-
-                {/* Modern UX Integration - Hint System is already provided by HintProvider above */}
-                <AppWithHints
-                  searchText={searchText}
-                  selected={selected}
-                  showAccessibilityPanel={showAccessibilityPanel}
-                  setShowAccessibilityPanel={setShowAccessibilityPanel}
-                  handleAccessibilitySettingsChange={
-                    handleAccessibilitySettingsChange
-                  }
-                  showOnboardingTour={showOnboardingTour}
-                  handleOnboardingComplete={handleOnboardingComplete}
-                  setShowOnboardingTour={setShowOnboardingTour}
-                />
-              </MobileOptimizations>
-            </HintManager>
-          ) : (
-            <MobileOptimizations
-              onSwipeLeft={handleSwipeLeft}
-              onSwipeRight={handleSwipeRight}
-              onSwipeUp={() => setShowModernSidebar(!showModernSidebar)}
-              enableSwipeGestures={isMobile}
-              enablePullToRefresh={true}
-              onPullToRefresh={handlePullToRefresh}
-            >
-              {/* Render the same main content without HintManager wrapper */}
-              <AppWithHints
-                searchText={searchText}
-                selected={selected}
-                showAccessibilityPanel={showAccessibilityPanel}
-                setShowAccessibilityPanel={setShowAccessibilityPanel}
-                handleAccessibilitySettingsChange={
-                  handleAccessibilitySettingsChange
-                }
-                showOnboardingTour={showOnboardingTour}
-                handleOnboardingComplete={handleOnboardingComplete}
-                setShowOnboardingTour={setShowOnboardingTour}
-              />
-            </MobileOptimizations>
-          )}
-        </HintProvider>
-      </ThemeProvider>
-    </ErrorBoundary>
+    <AppProviders>
+      <AppChrome
+        location={location}
+        navigate={navigate}
+        layout={layoutProps}
+        onboarding={onboardingProps}
+        viewState={viewStateProps}
+        data={dataProps}
+        actions={actionProps}
+        context={contextProps}
+        refs={refProps}
+      />
+    </AppProviders>
   );
 }

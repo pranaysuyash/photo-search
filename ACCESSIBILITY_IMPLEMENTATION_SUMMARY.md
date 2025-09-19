@@ -106,3 +106,11 @@ import "./high-contrast.css";
 3. **Improve Reduced Motion Support**: Add more comprehensive motion reduction options
 4. **Add Language Attributes**: Add proper lang attributes to the HTML element
 5. **Enhance Form Labels**: Add more descriptive labels and error messaging
+
+## Newly Introduced Features Requiring Follow-up
+
+| Feature | Accessibility Considerations |
+|---------|------------------------------|
+| Keyboard Shortcuts Panel (`KeyboardShortcutsPanel.tsx`) | Add `role="dialog"`, `aria-modal`, and focus trapping so the overlay behaves like a true modal. |
+| Search History Suggestions (`SearchBar.tsx`) | Provide combobox/listbox semantics, announce selection changes, and ensure keyboard navigation is fully supported. |
+| OCR Status Chip (`TopBar.tsx`) | Announce status changes via `aria-live` and ensure the action button is reachable when the chip appears. |

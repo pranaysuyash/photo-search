@@ -55,8 +55,8 @@ export default function LookAlikesView({
 								<div>{g.resolved ? "✅" : ""}</div>
 							</div>
 							<div className="grid grid-cols-3 gap-2">
-								{g.paths.map((p, pi) => (
-									<div key={pi} className="border rounded p-1">
+								{g.paths.map((p) => (
+									<div key={`path-${p}`} className="border rounded p-1">
 										<div className="truncate" title={p}>
 											{basename(p)}
 										</div>

@@ -137,8 +137,11 @@ export default function AdvancedSearchModal({
 				<div className="text-lg font-semibold mb-2">Advanced Search</div>
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
 					<div>
-						<label className="text-sm">Base Text</label>
+						<label className="text-sm" htmlFor="base-text">
+							Base Text
+						</label>
 						<input
+							id="base-text"
 							className="input"
 							value={base}
 							onChange={(e) => setBase(e.target.value)}
@@ -146,8 +149,11 @@ export default function AdvancedSearchModal({
 						/>
 					</div>
 					<div>
-						<label className="text-sm">Camera</label>
+						<label className="text-sm" htmlFor="camera-input">
+							Camera
+						</label>
 						<input
+							id="camera-input"
 							list="cam-list"
 							className="input"
 							value={camera}
@@ -161,8 +167,11 @@ export default function AdvancedSearchModal({
 						</datalist>
 					</div>
 					<div>
-						<label className="text-sm">Place</label>
+						<label className="text-sm" htmlFor="place-input">
+							Place
+						</label>
 						<input
+							id="place-input"
 							className="input"
 							value={place}
 							onChange={(e) => setPlace(e.target.value)}
@@ -170,8 +179,11 @@ export default function AdvancedSearchModal({
 						/>
 					</div>
 					<div>
-						<label className="text-sm">Tag</label>
+						<label className="text-sm" htmlFor="tag-input">
+							Tag
+						</label>
 						<input
+							id="tag-input"
 							list="tag-list"
 							className="input"
 							value={tag}
@@ -185,8 +197,11 @@ export default function AdvancedSearchModal({
 						</datalist>
 					</div>
 					<div>
-						<label className="text-sm">Person</label>
+						<label className="text-sm" htmlFor="person-input">
+							Person
+						</label>
 						<input
+							id="person-input"
 							list="person-list"
 							className="input"
 							value={person}
@@ -200,11 +215,16 @@ export default function AdvancedSearchModal({
 						</datalist>
 					</div>
 					<div>
-						<label className="text-sm">Has Text</label>
+						<label className="text-sm" htmlFor="has-text">
+							Has Text
+						</label>
 						<select
+							id="has-text"
 							className="input"
 							value={hasText}
-                        onChange={(e) => setHasText(e.target.value as "true" | "false" | "unknown")}
+							onChange={(e) =>
+								setHasText(e.target.value as "true" | "false" | "unknown")
+							}
 						>
 							<option value="unknown">Any</option>
 							<option value="true">True</option>
@@ -212,8 +232,11 @@ export default function AdvancedSearchModal({
 						</select>
 					</div>
 					<div>
-						<label className="text-sm">ISO ≥</label>
+						<label className="text-sm" htmlFor="iso-min">
+							ISO ≥
+						</label>
 						<input
+							id="iso-min"
 							className="input"
 							value={isoMin}
 							onChange={(e) => setIsoMin(e.target.value)}
@@ -221,8 +244,11 @@ export default function AdvancedSearchModal({
 						/>
 					</div>
 					<div>
-						<label className="text-sm">f-number &lt;</label>
+						<label className="text-sm" htmlFor="f-max">
+							f-number &lt;
+						</label>
 						<input
+							id="f-max"
 							className="input"
 							value={fMax}
 							onChange={(e) => setFMax(e.target.value)}
@@ -230,8 +256,11 @@ export default function AdvancedSearchModal({
 						/>
 					</div>
 					<div>
-						<label className="text-sm">Width ≥</label>
+						<label className="text-sm" htmlFor="w-min">
+							Width ≥
+						</label>
 						<input
+							id="w-min"
 							className="input"
 							value={wMin}
 							onChange={(e) => setWMin(e.target.value)}
@@ -239,8 +268,11 @@ export default function AdvancedSearchModal({
 						/>
 					</div>
 					<div>
-						<label className="text-sm">Height ≥</label>
+						<label className="text-sm" htmlFor="h-min">
+							Height ≥
+						</label>
 						<input
+							id="h-min"
 							className="input"
 							value={hMin}
 							onChange={(e) => setHMin(e.target.value)}
@@ -248,8 +280,11 @@ export default function AdvancedSearchModal({
 						/>
 					</div>
 					<div>
-						<label className="text-sm">Filetype</label>
+						<label className="text-sm" htmlFor="filetype">
+							Filetype
+						</label>
 						<input
+							id="filetype"
 							className="input"
 							value={filetype}
 							onChange={(e) => setFiletype(e.target.value)}
@@ -257,8 +292,11 @@ export default function AdvancedSearchModal({
 						/>
 					</div>
 					<div>
-						<label className="text-sm">Duration &gt; (s)</label>
+						<label className="text-sm" htmlFor="dur-min">
+							Duration &gt; (s)
+						</label>
 						<input
+							id="dur-min"
 							className="input"
 							value={durationMin}
 							onChange={(e) => setDurationMin(e.target.value)}
@@ -268,10 +306,7 @@ export default function AdvancedSearchModal({
 				</div>
 				<div className="mt-3">
 					<div className="text-xs text-gray-600 mb-1">Preview</div>
-					<div
-						className="text-sm font-mono bg-gray-100 dark:bg-gray-800 rounded p-2 break-words"
-						style={{ minHeight: "2.2rem" }}
-					>
+					<div className="text-sm font-mono bg-gray-100 dark:bg-gray-800 rounded p-2 break-words min-h-[2.2rem]">
 						{query || "—"}
 					</div>
 					{warnings.length > 0 && (

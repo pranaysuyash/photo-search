@@ -10,8 +10,10 @@ Legend: [x] done • [>] in progress • [ ] planned • (opt) optional
 - [x] Index chip: show indexed count + coverage inline under count (use diagnostics + library totals)
 - [x] Index chip hover: multi‑line card (processed N/D • indexed X • target T • coverage P% • drift D • ETA • last index time)
 - [x] Humanized ETA in tooltip (e.g., 2m 30s) + show rate (items/s)
+- [x] Stabilize integration test suite mocks so `App.*.test.tsx` and store-dependent specs pass locally and in CI
+- [ ] Finalize CLIP model bundling plan (package with Electron installer vs first-run import) and document default model directories
 - [ ] OCR pill hover: show OCR text count and CTA to build/update OCR when not ready
-- [ ] One‑click “Extract text (OCR)” from OCR hover (calls /ocr/build and updates status)
+- [ ] One-click “Extract text (OCR)” from OCR hover (calls /ocr/build and updates status)
 - [x] OCR pill hover: show OCR text count and CTA to build/update OCR when not ready
 - [x] One‑click “Extract text (OCR)” from OCR hover (calls /ocr/build and updates status)
 - [ ] Quick video filters: preset dropdown (e.g., Videos > 30s, slow‑mo, timelapse)
@@ -21,9 +23,14 @@ Legend: [x] done • [>] in progress • [ ] planned • (opt) optional
 - [x] Keyboard shortcut help overlay (cheat sheet)
 - [x] Timeline view (date clusters + quick scrubbing)
  - [>] API/Client contract alignment (JSON body for POST endpoints)
+- [ ] UI modernization (shadcn-driven refresh; see dedicated section)
 
 ## Recently Delivered
-- [x] Modern UI shell + sidebar + multi‑views (Library/Results/People/Map/Collections/Smart/Trips/Saved/Memories/Tasks)
+- [x] Diagnostics drawer restored and covered by ModalManager regression test
+- [x] Undo toast action preserved with TopBar delete flow test
+- [x] Monitoring endpoint allowlist verified via FastAPI test
+- [x] `/search` API endpoint restored with filtering + logging parity
+- [x] Modern UI shell + sidebar + multi-views (Library/Results/People/Map/Collections/Smart/Trips/Saved/Memories/Tasks)
 - [x] Semantic search + EXIF/date filters (local engines)
 - [x] Suggestions (People/Tags/Cameras/Places)
 - [x] Saved searches (save/run/delete)
@@ -35,14 +42,30 @@ Legend: [x] done • [>] in progress • [ ] planned • (opt) optional
 - [x] Dark mode toggle (persisted)
 - [x] Busy indicator in top bar
 - [x] Tasks view (renders this file)
+- [ ] Offline verification checklist (web PWA, Electron, Python CLI, thumbnails). Document results and file follow-ups for any gaps found
+- [ ] Add API integration smoke tests for search/favorites flows (frontend ↔ backend)
+- [x] Enable structured request logging when `API_LOG_LEVEL=debug`
+
+- UI Modernization
+- [x] Establish design tokens (typography, spacing, color ramps) and update Tailwind/shadcn defaults
+- [x] Remove glass/backdrop effects and normalize shell surfaces (AppShell, ModernSidebar, overlays)
+- [x] Refactor buttons/chips/status pills onto shared shadcn primitives
+- [x] Rebuild feedback/overlay components (modals, busy overlay, toast) with accessible shadcn patterns
+- [x] Refresh cards/empty states/skeletons using new surface tokens
+- [x] Audit mobile responsiveness (MobileSidebar, top bar wrap, dialogs) post-refresh
+- [x] Update visual regression harness + document new guidelines
+- [x] Long-ops progress UI parity (OCR, Metadata, Fast) – determinate progress & notes
+- [ ] Quick video filters UX polish (preset chips, consistent styling)
+- [ ] OCR hover card polish (show indexed text count, shadcn tooltip)
 
 ## Search & Discovery
 - [x] Text/semantic search (content/OCR/captions toggles)
-- [x] People filtering (named clusters, multi‑select)
+- [x] People filtering (named clusters, multi-select)
 - [x] Date range (From/To)
 - [x] Search history (recent)
+- [x] Arrow-key navigation + ARIA combobox parity for search suggestions
 - [ ] Boolean operators (AND/OR/NOT)
-- [ ] Color‑based search (dominant colors)
+- [ ] Color-based search (dominant colors)
 - [ ] Fuzzy search (typo tolerance)
 - [ ] Search within results (refine)
 - [ ] Related searches (local suggestions)
@@ -54,6 +77,8 @@ Legend: [x] done • [>] in progress • [ ] planned • (opt) optional
 - [ ] Filter presets (save/apply)
 - [ ] Negative filters (exclude tags/people)
 - [ ] Geofencing (lat/lon box) — local only
+- [ ] Accessibility announcements audit: extend live-region coverage to batch operations, background job completions, and modal outcomes
+- [x] Search completion announcements surfaced via live region helper
 
 ## Grid & Views
 - [x] Justified rows + virtualization
@@ -115,6 +140,7 @@ Legend: [x] done • [>] in progress • [ ] planned • (opt) optional
 - [x] Fast index engines (Annoy/FAISS/HNSW)
 - [ ] Progressive image loading tiers (thumb/med/full)
 - [ ] Cache controls (limits, clear)
+- [ ] Introduce API versioning and publish automated OpenAPI documentation bundle
 
 ## Navigation & Routing
 - [x] HashRouter deep links (#/library, #/search, #/people, #/collections, #/settings)
@@ -276,3 +302,9 @@ Legend: [x] done • [>] in progress • [ ] planned • (opt) optional
   - Acceptance: Errors posted to /analytics/log; queued via Service Worker when offline; no user regressions.
 - [ ] Electron Packaging (Local)
   - Acceptance: macOS/Windows builds run offline with local API; protocol+token handoff to UI works; CI artifacts produced.
+- [ ] App Shell Modularization Follow-Up
+  - Acceptance: Onboarding, accessibility, toast, and persistence state move out of `App.tsx` into dedicated providers to keep the shell focused on routing/providers.
+- [ ] Feature Containers Own Their Business Logic
+  - Acceptance: Library/Results/People containers manage their data loading and modal triggers internally; `App.tsx` only supplies navigation/context wiring.
+- [ ] Promote Legacy Feature Screens to `/views`
+  - Acceptance: Map, Smart Collections, Trips, and Videos each expose a view container under `src/views` with their own hooks/contexts; redundant state trimmed from `App.tsx`.

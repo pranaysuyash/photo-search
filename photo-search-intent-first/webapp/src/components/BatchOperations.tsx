@@ -6,9 +6,9 @@ import {
 	apiExport,
 	apiGetCollections,
 } from "../api";
-import { LoadingSpinner } from "./LoadingSpinner";
 import { handleError } from "../utils/errors";
 import { BatchActionsToolbar } from "./BatchActionsToolbar";
+import { LoadingSpinner } from "./LoadingSpinner";
 
 interface BatchOperationsProps {
 	selectedPaths: string[];
@@ -92,12 +92,19 @@ export function BatchOperations({
 			);
 			onSelectionClear();
 			onOperationComplete();
-    } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to delete items");
-        handleError(err, { logToServer: true, context: { action: "batch_delete", component: "BatchOperations", dir: currentDir } });
-    } finally {
-        setLoading(false);
-    }
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to delete items");
+			handleError(err, {
+				logToServer: true,
+				context: {
+					action: "batch_delete",
+					component: "BatchOperations",
+					dir: currentDir,
+				},
+			});
+		} finally {
+			setLoading(false);
+		}
 	};
 
 	const handleBatchTag = async () => {
@@ -135,12 +142,19 @@ export function BatchOperations({
 			);
 			setNewTags("");
 			onOperationComplete();
-    } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to update tags");
-        handleError(err, { logToServer: true, context: { action: "batch_tag", component: "BatchOperations", dir: currentDir } });
-    } finally {
-        setLoading(false);
-    }
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to update tags");
+			handleError(err, {
+				logToServer: true,
+				context: {
+					action: "batch_tag",
+					component: "BatchOperations",
+					dir: currentDir,
+				},
+			});
+		} finally {
+			setLoading(false);
+		}
 	};
 
 	const handleAddToCollection = async (collectionName: string) => {
@@ -156,14 +170,21 @@ export function BatchOperations({
 				`Added ${result.added} new items to collection "${collectionName}"`,
 			);
 			onOperationComplete();
-    } catch (err) {
-        setError(
-            err instanceof Error ? err.message : "Failed to add to collection",
-        );
-        handleError(err, { logToServer: true, context: { action: "batch_add_to_collection", component: "BatchOperations", dir: currentDir } });
-    } finally {
-        setLoading(false);
-    }
+		} catch (err) {
+			setError(
+				err instanceof Error ? err.message : "Failed to add to collection",
+			);
+			handleError(err, {
+				logToServer: true,
+				context: {
+					action: "batch_add_to_collection",
+					component: "BatchOperations",
+					dir: currentDir,
+				},
+			});
+		} finally {
+			setLoading(false);
+		}
 	};
 
 	const handleExport = async () => {
@@ -189,12 +210,19 @@ export function BatchOperations({
 			setSuccess(`Exported ${result.copied} files to ${result.dest}`);
 			setExportDest("");
 			onOperationComplete();
-    } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to export files");
-        handleError(err, { logToServer: true, context: { action: "batch_export", component: "BatchOperations", dir: currentDir } });
-    } finally {
-        setLoading(false);
-    }
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to export files");
+			handleError(err, {
+				logToServer: true,
+				context: {
+					action: "batch_export",
+					component: "BatchOperations",
+					dir: currentDir,
+				},
+			});
+		} finally {
+			setLoading(false);
+		}
 	};
 
 	const handleBatchEdit = async () => {
@@ -212,11 +240,16 @@ export function BatchOperations({
 	};
 
 	// Handle batch actions from the toolbar
-	const handleBatchAction = async (action: string, options?: Record<string, unknown>) => {
+	const handleBatchAction = async (
+		action: string,
+		options?: Record<string, unknown>,
+	) => {
 		switch (action) {
 			case "favorite":
 				// In a full implementation, this would call the appropriate API endpoint
-				alert(`In a full implementation, this would favorite ${selectedPaths.length} selected photos.`);
+				alert(
+					`In a full implementation, this would favorite ${selectedPaths.length} selected photos.`,
+				);
 				break;
 			case "tag":
 				if (options?.tags && Array.isArray(options.tags)) {
@@ -229,13 +262,20 @@ export function BatchOperations({
 							options.tags as string[],
 							"add",
 						);
-						setSuccess(
-							`Successfully added tags to ${result.updated} items`,
-						);
+						setSuccess(`Successfully added tags to ${result.updated} items`);
 						onOperationComplete();
 					} catch (err) {
-						setError(err instanceof Error ? err.message : "Failed to update tags");
-						handleError(err, { logToServer: true, context: { action: "batch_tag", component: "BatchOperations", dir: currentDir } });
+						setError(
+							err instanceof Error ? err.message : "Failed to update tags",
+						);
+						handleError(err, {
+							logToServer: true,
+							context: {
+								action: "batch_tag",
+								component: "BatchOperations",
+								dir: currentDir,
+							},
+						});
 					} finally {
 						setLoading(false);
 					}
@@ -243,7 +283,9 @@ export function BatchOperations({
 				break;
 			case "rate":
 				// In a full implementation, this would call the appropriate API endpoint
-				alert(`In a full implementation, this would rate ${selectedPaths.length} selected photos with ${options?.rating} stars.`);
+				alert(
+					`In a full implementation, this would rate ${selectedPaths.length} selected photos with ${options?.rating} stars.`,
+				);
 				break;
 			case "addToCollection":
 				if (options?.collection && typeof options.collection === "string") {
@@ -252,29 +294,39 @@ export function BatchOperations({
 				break;
 			case "share":
 				// In a full implementation, this would call the appropriate API endpoint
-				alert(`In a full implementation, this would share ${selectedPaths.length} selected photos.`);
+				alert(
+					`In a full implementation, this would share ${selectedPaths.length} selected photos.`,
+				);
 				break;
 			case "download":
 				// In a full implementation, this would call the appropriate API endpoint
-				alert(`In a full implementation, this would download ${selectedPaths.length} selected photos.`);
+				alert(
+					`In a full implementation, this would download ${selectedPaths.length} selected photos.`,
+				);
 				break;
 			case "copy":
 				setShowExport(true);
 				break;
 			case "move":
 				// In a full implementation, this would call the appropriate API endpoint
-				alert(`In a full implementation, this would move ${selectedPaths.length} selected photos.`);
+				alert(
+					`In a full implementation, this would move ${selectedPaths.length} selected photos.`,
+				);
 				break;
 			case "edit":
 				setShowEdit(true);
 				break;
 			case "view":
 				// In a full implementation, this would call the appropriate API endpoint
-				alert(`In a full implementation, this would show details for ${selectedPaths.length} selected photos.`);
+				alert(
+					`In a full implementation, this would show details for ${selectedPaths.length} selected photos.`,
+				);
 				break;
 			case "restore":
 				// In a full implementation, this would call the appropriate API endpoint
-				alert(`In a full implementation, this would restore ${selectedPaths.length} selected photos.`);
+				alert(
+					`In a full implementation, this would restore ${selectedPaths.length} selected photos.`,
+				);
 				break;
 			case "delete":
 				handleBatchDelete();
@@ -367,7 +419,9 @@ export function BatchOperations({
 							<select
 								value={tagOperation}
 								onChange={(e) =>
-									setTagOperation(e.target.value as "add" | "remove" | "replace")
+									setTagOperation(
+										e.target.value as "add" | "remove" | "replace",
+									)
 								}
 								className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
 							>

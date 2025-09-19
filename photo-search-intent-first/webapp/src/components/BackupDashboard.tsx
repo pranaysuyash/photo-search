@@ -17,9 +17,9 @@ import {
 import { useEffect, useState } from "react";
 import {
 	type BackupConfig,
+	type BackupFrequency,
 	type BackupJob,
 	type BackupProvider,
-	type BackupFrequency,
 	backupService,
 } from "../services/BackupService";
 

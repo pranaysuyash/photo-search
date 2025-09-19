@@ -6,11 +6,11 @@ import {
 	Share2,
 	Trash2,
 } from "lucide-react";
-import type React from "react";
 import { useCallback, useRef, useState } from "react";
 import { apiCreateShare, apiExport, apiSetCollection, thumbUrl } from "../api";
 import { announce } from "../utils/accessibility";
 import { handleError } from "../utils/errors";
+import { EnhancedEmptyState } from "./EnhancedEmptyState";
 
 interface CollectionsProps {
 	dir: string;
@@ -167,13 +167,20 @@ export default function Collections({
 						onCollectionUpdate(updated);
 					}
 				}
-            } catch (error) {
-                console.error("Failed to update collection:", error);
-                alert("Failed to update collection");
-                handleError(error, { logToServer: true, context: { action: "collection_update", component: "Collections.handleDrop", dir } });
-            } finally {
-                setDraggedItem(null);
-            }
+			} catch (error) {
+				console.error("Failed to update collection:", error);
+				alert("Failed to update collection");
+				handleError(error, {
+					logToServer: true,
+					context: {
+						action: "collection_update",
+						component: "Collections.handleDrop",
+						dir,
+					},
+				});
+			} finally {
+				setDraggedItem(null);
+			}
 		},
 		[collections, dir, onLoadCollections, onCollectionUpdate, draggedItem],
 	);
@@ -202,15 +209,22 @@ export default function Collections({
 					);
 					alert("Share link copied to clipboard!");
 					announce("Share link copied to clipboard", "polite");
-            } catch (error) {
-                console.error("Failed to share collection:", error);
-                alert(
-                    error instanceof Error
-                        ? error.message
-                        : "Failed to share collection",
-                );
-                handleError(error, { logToServer: true, context: { action: "share_collection", component: "Collections.handleShare", dir } });
-            }
+				} catch (error) {
+					console.error("Failed to share collection:", error);
+					alert(
+						error instanceof Error
+							? error.message
+							: "Failed to share collection",
+					);
+					handleError(error, {
+						logToServer: true,
+						context: {
+							action: "share_collection",
+							component: "Collections.handleShare",
+							dir,
+						},
+					});
+				}
 			}
 		},
 		[onShare, collections, dir, engine],
@@ -239,15 +253,22 @@ export default function Collections({
 					await apiExport(dir, paths, folderName, "copy", false, false);
 					alert(`Exported ${paths.length} photos to ${folderName}`);
 					announce(`Exported ${paths.length} photos`, "polite");
-            } catch (error) {
-                console.error("Failed to export collection:", error);
-                alert(
-                    error instanceof Error
-                        ? error.message
-                        : "Failed to export collection",
-                );
-                handleError(error, { logToServer: true, context: { action: "export_collection", component: "Collections.handleExport", dir } });
-            }
+				} catch (error) {
+					console.error("Failed to export collection:", error);
+					alert(
+						error instanceof Error
+							? error.message
+							: "Failed to export collection",
+					);
+					handleError(error, {
+						logToServer: true,
+						context: {
+							action: "export_collection",
+							component: "Collections.handleExport",
+							dir,
+						},
+					});
+				}
 			}
 		},
 		[onExport, collections, dir],
@@ -328,32 +349,33 @@ export default function Collections({
 
 			{/* Collections list */}
 			{Object.keys(collections || {}).length === 0 ? (
-				<div className="text-center py-8">
-					<FolderPlus className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-					<div className="text-sm text-gray-600 mb-2">No collections yet</div>
-					{selectedPhotos.length > 0 ? (
-						<button
-							type="button"
-							onClick={() => setShowCreateForm(true)}
-							className="text-sm text-blue-600 hover:text-blue-800"
-						>
-							Create your first collection with {selectedPhotos.length} selected
-							photo{selectedPhotos.length !== 1 ? "s" : ""}
-						</button>
-					) : (
-						<div className="text-xs text-gray-500">
-							Select photos and create collections to organize them
-						</div>
-					)}
+				<div className="mt-4">
+					<EnhancedEmptyState
+						type="no-directory"
+						onAction={() => setShowCreateForm(true)}
+						onOpenHelp={() => {
+							/* TODO: Open help */
+						}}
+						sampleQueries={[
+							"Vacation photos",
+							"Family portraits",
+							"Work events",
+							"Nature shots",
+						]}
+						onRunSample={(name) => {
+							setNewCollectionName(name);
+							setShowCreateForm(true);
+						}}
+					/>
 				</div>
 			) : (
-				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+				<ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
 					{Object.keys(collections).map((name) => {
 						const isDropTarget = dragOverCollection === name;
 						const collectionPaths = collections[name] || [];
 
 						return (
-							<div
+							<li
 								key={name}
 								draggable
 								onDragStart={(e) => handleCollectionDragStart(e, name)}
@@ -364,11 +386,10 @@ export default function Collections({
 								onKeyDown={(e) => {
 									if (e.key === "Enter" || e.key === " ") {
 										e.preventDefault();
-                                _setExpandedActions(expandedActions === name ? null : name);
+										_setExpandedActions(expandedActions === name ? null : name);
 									}
 								}}
-								role="listitem"
-                                aria-label={`Collection ${name} with ${collectionPaths.length} photos`}
+								aria-label={`Collection ${name} with ${collectionPaths.length} photos`}
 								className={`border rounded-lg p-3 transition-all cursor-move ${
 									isDropTarget
 										? "border-blue-500 bg-blue-50 shadow-md"
@@ -463,10 +484,10 @@ export default function Collections({
 										)}
 									</div>
 								</div>
-							</div>
+							</li>
 						);
 					})}
-				</div>
+				</ul>
 			)}
 
 			{/* Drop zone hint */}

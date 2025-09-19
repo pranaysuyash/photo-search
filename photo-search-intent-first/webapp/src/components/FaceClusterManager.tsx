@@ -9,11 +9,10 @@ import {
 import { LoadingSpinner } from "./LoadingSpinner";
 
 interface FaceCluster {
-    id: string;
-    name?: string;
-    size: number;
-    examples: [string, number][]; // [path, embedding_index]
-    photos?: string[];
+	id: string;
+	name?: string;
+	size: number;
+	examples: [string, number][]; // [path, embedding_index]
 }
 
 interface FaceClusterManagerProps {
@@ -62,7 +61,6 @@ export function FaceClusterManager({
 	const selectCluster = async (cluster: FaceCluster) => {
 		setSelectedCluster(cluster);
 		setSelectedPhotos(new Set());
-
 		try {
 			const result = await apiGetFacePhotos(currentDir, cluster.id);
 			setClusterPhotos(result.photos);
@@ -73,23 +71,17 @@ export function FaceClusterManager({
 	};
 
 	const togglePhotoSelection = (photoPath: string) => {
-		const newSelection = new Set(selectedPhotos);
-		if (newSelection.has(photoPath)) {
-			newSelection.delete(photoPath);
-		} else {
-			newSelection.add(photoPath);
-		}
-		setSelectedPhotos(newSelection);
+		const next = new Set(selectedPhotos);
+		if (next.has(photoPath)) next.delete(photoPath);
+		else next.add(photoPath);
+		setSelectedPhotos(next);
 	};
 
 	const toggleMergeSelection = (clusterId: string) => {
-		const newSelection = new Set(selectedForMerge);
-		if (newSelection.has(clusterId)) {
-			newSelection.delete(clusterId);
-		} else {
-			newSelection.add(clusterId);
-		}
-		setSelectedForMerge(newSelection);
+		const next = new Set(selectedForMerge);
+		if (next.has(clusterId)) next.delete(clusterId);
+		else next.add(clusterId);
+		setSelectedForMerge(next);
 	};
 
 	const mergeClusters = async () => {
@@ -98,16 +90,13 @@ export function FaceClusterManager({
 			setError("Please select at least 2 clusters to merge");
 			return;
 		}
-
 		try {
 			setLoading(true);
-			const sourceIds = clusterIds.slice(1);
 			const targetId = clusterIds[0];
-
+			const sourceIds = clusterIds.slice(1);
 			for (const sourceId of sourceIds) {
 				await apiMergeFaceClusters(currentDir, sourceId, targetId);
 			}
-
 			setMergeMode(false);
 			setSelectedForMerge(new Set());
 			await loadClusters();
@@ -124,12 +113,10 @@ export function FaceClusterManager({
 			setError("Please select photos to split");
 			return;
 		}
-
 		try {
 			setLoading(true);
 			const photoPaths = Array.from(selectedPhotos);
 			await apiSplitFaceCluster(currentDir, selectedCluster.id, photoPaths);
-
 			setSelectedPhotos(new Set());
 			await loadClusters();
 			alert(
@@ -166,7 +153,6 @@ export function FaceClusterManager({
 					>
 						{mergeMode ? "Cancel Merge" : "Merge Clusters"}
 					</button>
-
 					{mergeMode && selectedForMerge.size >= 2 && (
 						<button
 							type="button"
@@ -177,7 +163,6 @@ export function FaceClusterManager({
 							Merge Selected ({selectedForMerge.size})
 						</button>
 					)}
-
 					<button
 						type="button"
 						onClick={loadClusters}
@@ -206,90 +191,78 @@ export function FaceClusterManager({
 							</span>
 						)}
 					</h3>
-
 					{clusters.length === 0 ? (
 						<div className="text-center text-gray-500 py-8">
 							No face clusters found. Run face detection first.
 						</div>
 					) : (
-						<div
+						<ul
 							className="space-y-3 max-h-96 overflow-y-auto"
-							role="listbox"
-							aria-label="Face clusters list"
+							aria-label="Face clusters"
 						>
-							{clusters.map((cluster) => (
-								<div
-									key={cluster.id}
-									className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-										selectedCluster?.id === cluster.id
-											? "border-blue-500 bg-blue-50"
-											: mergeMode && selectedForMerge.has(cluster.id)
-												? "border-green-500 bg-green-50"
-												: "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-									}`}
-									onClick={() => {
-										if (mergeMode) {
-											toggleMergeSelection(cluster.id);
-										} else {
-											selectCluster(cluster);
-										}
-									}}
-									onKeyDown={(e) => {
-										if (e.key === "Enter" || e.key === " ") {
-											e.preventDefault();
-											if (mergeMode) {
-												toggleMergeSelection(cluster.id);
-											} else {
-												selectCluster(cluster);
-											}
-										}
-									}}
-									role="option"
-									tabIndex={0}
-									aria-selected={selectedCluster?.id === cluster.id}
-									aria-label={`Face cluster ${cluster.name || "Unnamed"} with ${cluster.photos.length} photos`}
-								>
-									<div className="flex items-center gap-3">
-										{/* Example faces */}
-										<div className="flex -space-x-2">
-											{cluster.examples.slice(0, 3).map(([path, embIndex]) => (
-												<img
-													key={`face-${path}-${embIndex}`}
-													src={thumbFaceUrl(
-														currentDir,
-														provider,
-														path,
-														embIndex,
-														48,
-													)}
-													alt="Face example"
-													className="w-12 h-12 rounded-full border-2 border-white object-cover"
-													onError={(e) => {
-														(e.target as HTMLImageElement).style.display =
-															"none";
-													}}
-												/>
-											))}
-										</div>
-
-										<div className="flex-1">
-											<div className="font-medium">
-												{cluster.name || `Cluster ${cluster.id}`}
-											</div>
-											<div className="text-sm text-gray-500">
-												{cluster.size} faces
-											</div>
-										</div>
-
-										{mergeMode && selectedForMerge.has(cluster.id) && (
-											<div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-												<span className="text-white text-xs">✓</span>
-											</div>
-										)}
-									</div>
-								</div>
-							))}
-						</div>
+							{clusters.map((cluster) => {
+								const isSelected = selectedCluster?.id === cluster.id;
+								const isMarkedForMerge =
+									mergeMode && selectedForMerge.has(cluster.id);
+								return (
+									<li key={cluster.id} className="list-none">
+										<button
+											type="button"
+											className={`w-full text-left p-4 border rounded-lg transition-colors ${
+												isSelected
+													? "border-blue-500 bg-blue-50"
+													: isMarkedForMerge
+														? "border-green-500 bg-green-50"
+														: "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+											}`}
+											onClick={() => {
+												if (mergeMode) toggleMergeSelection(cluster.id);
+												else selectCluster(cluster);
+											}}
+											aria-label={`Face cluster ${cluster.name || "Unnamed"}`}
+										>
+											<span className="flex items-center gap-3">
+												<span className="flex -space-x-2">
+													{cluster.examples
+														.slice(0, 3)
+														.map(([path, embIndex]) => (
+															<img
+																key={`face-${path}-${embIndex}`}
+																src={thumbFaceUrl(
+																	currentDir,
+																	provider,
+																	path,
+																	embIndex,
+																	48,
+																)}
+																alt="Face example"
+																className="w-12 h-12 rounded-full border-2 border-white object-cover"
+																onError={(e) => {
+																	(e.target as HTMLImageElement).style.display =
+																		"none";
+																}}
+															/>
+														))}
+												</span>
+												<span className="flex-1">
+													<span className="font-medium block">
+														{cluster.name || `Cluster ${cluster.id}`}
+													</span>
+													<span className="text-sm text-gray-500">
+														{cluster.size} faces
+													</span>
+												</span>
+												{isMarkedForMerge && (
+													<span className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+														<span className="text-white text-xs">✓</span>
+													</span>
+												)}
+											</span>
+										</button>
+									</li>
+								);
+							})}
+						</ul>
 					)}
 				</div>
 
@@ -333,7 +306,6 @@ export function FaceClusterManager({
 											type="button"
 											key={`photo-${photoPath}`}
 											onClick={() => togglePhotoSelection(photoPath)}
-											aria-pressed={selectedPhotos.has(photoPath)}
 											aria-label={`Select photo ${photoPath.split("/").pop()}`}
 											className={`relative aspect-square cursor-pointer rounded overflow-hidden ${
 												selectedPhotos.has(photoPath)
@@ -342,7 +314,11 @@ export function FaceClusterManager({
 											}`}
 										>
 											<img
-												src={`/api/thumb?dir=${encodeURIComponent(currentDir)}&provider=${provider}&path=${encodeURIComponent(photoPath)}&size=128`}
+												src={`/api/thumb?dir=${encodeURIComponent(
+													currentDir,
+												)}&provider=${provider}&path=${encodeURIComponent(
+													photoPath,
+												)}&size=128`}
 												alt={`Face from ${photoPath.split("/").pop()}`}
 												className="w-full h-full object-cover"
 												onError={(e) => {

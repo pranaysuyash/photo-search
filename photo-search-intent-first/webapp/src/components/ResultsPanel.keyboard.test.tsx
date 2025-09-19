@@ -39,12 +39,16 @@ vi.mock("../stores/settingsStore", () => {
 	};
 });
 
-vi.mock("../api", () => ({
-	thumbUrl: (_d: string, _e: string, p: string, _s: number) =>
-		`mock://thumb${p}`,
-	apiOpen: vi.fn(async () => ({ ok: true })),
-	apiSetFavorite: vi.fn(async () => ({ ok: true })),
-}));
+vi.mock("../api", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../api")>();
+	return {
+		...actual,
+		thumbUrl: (_d: string, _e: string, p: string, _s: number) =>
+			`mock://thumb${p}`,
+		apiOpen: vi.fn(async () => ({ ok: true })),
+		apiSetFavorite: vi.fn(async () => ({ ok: true })),
+	};
+});
 
 function press(key: string) {
 	window.dispatchEvent(new KeyboardEvent("keydown", { key }));
@@ -62,7 +66,9 @@ describe("ResultsPanel keyboard + lightbox", () => {
 			query: "q",
 			fav: [],
 		} as unknown);
+		const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
 		render(<ResultsPanel />);
+		await screen.findByText(/2 found/i);
 		// Open first detail with Enter
 		press("Enter");
 		await waitFor(() => expect(screen.getByText("Close")).toBeInTheDocument());
@@ -81,30 +87,23 @@ describe("ResultsPanel keyboard + lightbox", () => {
 		await waitFor(() => expect(screen.queryByText("Close")).toBeNull());
 		// Select toggles via space, then clear with 'c', select all with 'a'
 		press(" ");
-		// Expect at least one selected gridcell
+		const checkedCount = () =>
+			document.querySelectorAll('input[type="checkbox"]:checked').length;
 		await waitFor(() => {
-			const cells = document.querySelectorAll(
-				'[role="gridcell"][aria-selected="true"]',
-			);
-			expect(cells.length).toBeGreaterThan(0);
+			expect(checkedCount()).toBeGreaterThan(0);
 		});
 		press("c");
 		await waitFor(() => {
-			const cells = document.querySelectorAll(
-				'[role="gridcell"][aria-selected="true"]',
-			);
-			expect(cells.length).toBe(0);
+			expect(checkedCount()).toBe(0);
 		});
 		press("a");
 		await waitFor(() => {
-			const cells = document.querySelectorAll(
-				'[role="gridcell"][aria-selected="true"]',
-			);
-			expect(cells.length).toBeGreaterThan(0);
+			expect(checkedCount()).toBeGreaterThan(0);
 		});
 		// Navigate right, then close with Escape
 		press("ArrowRight");
 		press("Escape");
 		await waitFor(() => expect(screen.queryByText("Close")).toBeNull());
+		alertSpy.mockRestore();
 	});
 });

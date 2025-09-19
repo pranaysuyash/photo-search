@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { API_BASE, thumbUrl } from "../api";
 import { shareTokenFromPath } from "../utils/router";
@@ -19,13 +19,16 @@ type ShareDetail = {
 export default function ShareViewer() {
 	const location = useLocation();
 	const navigate = useNavigate();
-    const token = useMemo(() => shareTokenFromPath(location.pathname) || "", [location.pathname]);
+	const token = useMemo(
+		() => shareTokenFromPath(location.pathname) || "",
+		[location.pathname],
+	);
 	const [detail, setDetail] = useState<ShareDetail | null>(null);
 	const [password, setPassword] = useState("");
 	const [error, setError] = useState("");
 	const [loading, setLoading] = useState(false);
 
-	async function load() {
+	const load = useCallback(async () => {
 		setLoading(true);
 		setError("");
 		try {
@@ -45,7 +48,7 @@ export default function ShareViewer() {
 		} finally {
 			setLoading(false);
 		}
-	}
+	}, [password, token]);
 
 	useEffect(() => {
 		if (token) load();
@@ -93,8 +96,11 @@ export default function ShareViewer() {
 				{(!detail || (!detail.ok && detail.error === "password_required")) && (
 					<div className="max-w-md mx-auto">
 						{error && <div className="mb-2 text-red-400 text-sm">{error}</div>}
-						<label className="block text-sm mb-1">Password</label>
+						<label className="block text-sm mb-1" htmlFor="share-password">
+							Password
+						</label>
 						<input
+							id="share-password"
 							className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded"
 							value={password}
 							onChange={(e) => setPassword(e.target.value)}
@@ -119,12 +125,7 @@ export default function ShareViewer() {
 					</div>
 				)}
 				{canRender && (
-					<div
-						className="grid gap-2"
-						style={{
-							gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-						}}
-					>
+					<div className="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
 						{detail?.paths?.map((p) => (
 							<div
 								key={p}
@@ -132,12 +133,12 @@ export default function ShareViewer() {
 							>
 								<img
 									src={thumbUrl(
-										detail?.dir!,
-										detail?.provider || "local",
+										detail.dir as string,
+										detail.provider || "local",
 										p,
 										256,
 									)}
-									alt="photo"
+									alt={p.split("/").pop() || p}
 									className="w-full h-[140px] object-cover"
 								/>
 							</div>

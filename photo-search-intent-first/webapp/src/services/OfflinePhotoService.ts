@@ -4,9 +4,9 @@
  */
 
 import React from "react";
-import { handleError } from "../utils/errors";
-import { serviceEnabled } from "../config/logging";
 import { API_BASE } from "../api";
+import { serviceEnabled } from "../config/logging";
+import { handleError } from "../utils/errors";
 
 export interface PhotoCacheEntry {
 	path: string;
@@ -131,15 +131,23 @@ export class OfflinePhotoService {
 			await this.storeCacheEntry(entry);
 
 			console.log(`[OfflinePhotoService] Cached photo: ${path}`);
-        } catch (error) {
-            console.error(
-                `[OfflinePhotoService] Failed to cache photo: ${path}`,
-                error,
-            );
-            if (serviceEnabled("offlinePhoto")) {
-                handleError(error, { logToServer: true, logToConsole: false, context: { action: "offline_cache_photo", component: "OfflinePhotoService.cachePhoto", metadata: { path } } });
-            }
-        }
+		} catch (error) {
+			console.error(
+				`[OfflinePhotoService] Failed to cache photo: ${path}`,
+				error,
+			);
+			if (serviceEnabled("offlinePhoto")) {
+				handleError(error, {
+					logToServer: true,
+					logToConsole: false,
+					context: {
+						action: "offline_cache_photo",
+						component: "OfflinePhotoService.cachePhoto",
+						metadata: { path },
+					},
+				});
+			}
+		}
 	}
 
 	// Cache multiple photos efficiently
@@ -178,15 +186,23 @@ export class OfflinePhotoService {
 				const blob = await response.blob();
 				return URL.createObjectURL(blob);
 			}
-        } catch (error) {
-            console.error(
-                `[OfflinePhotoService] Failed to get cached photo: ${path}`,
-                error,
-            );
-            if (serviceEnabled("offlinePhoto")) {
-                handleError(error, { logToServer: true, logToConsole: false, context: { action: "offline_get_cached_photo", component: "OfflinePhotoService.getCachedPhotoUrl", metadata: { path, size } } });
-            }
-        }
+		} catch (error) {
+			console.error(
+				`[OfflinePhotoService] Failed to get cached photo: ${path}`,
+				error,
+			);
+			if (serviceEnabled("offlinePhoto")) {
+				handleError(error, {
+					logToServer: true,
+					logToConsole: false,
+					context: {
+						action: "offline_get_cached_photo",
+						component: "OfflinePhotoService.getCachedPhotoUrl",
+						metadata: { path, size },
+					},
+				});
+			}
+		}
 		return null;
 	}
 
@@ -283,12 +299,19 @@ export class OfflinePhotoService {
 				};
 				request.onerror = () => resolve();
 			});
-        } catch (error) {
-            console.error("[OfflinePhotoService] Cache cleanup failed:", error);
-            if (serviceEnabled("offlinePhoto")) {
-                handleError(error, { logToServer: true, logToConsole: false, context: { action: "offline_cache_cleanup", component: "OfflinePhotoService.cleanupCache" } });
-            }
-        }
+		} catch (error) {
+			console.error("[OfflinePhotoService] Cache cleanup failed:", error);
+			if (serviceEnabled("offlinePhoto")) {
+				handleError(error, {
+					logToServer: true,
+					logToConsole: false,
+					context: {
+						action: "offline_cache_cleanup",
+						component: "OfflinePhotoService.cleanupCache",
+					},
+				});
+			}
+		}
 	}
 
 	// Get offline photo metadata
@@ -314,14 +337,14 @@ export class OfflinePhotoService {
 	}
 
 	// Store offline action for sync when online
-    async queueOfflineAction(action: Record<string, unknown>) {
+	async queueOfflineAction(action: Record<string, unknown>) {
 		try {
 			const db = this.db;
 			if (!db) return;
 
 			const transaction = db.transaction(["offlineActions"], "readwrite");
 			const store = transaction.objectStore("offlineActions");
-            store.put(Object.assign({}, action, { timestamp: Date.now() }));
+			store.put(Object.assign({}, action, { timestamp: Date.now() }));
 		} catch (error) {
 			console.error(
 				"[OfflinePhotoService] Failed to queue offline action:",
@@ -359,15 +382,22 @@ export class OfflinePhotoService {
 							const deleteStore =
 								deleteTransaction.objectStore("offlineActions");
 							deleteStore.delete(action.id);
-                        } catch (error) {
-                            console.error(
-                                "[OfflinePhotoService] Failed to sync action:",
-                                error,
-                            );
-                            if (serviceEnabled("offlinePhoto")) {
-                                handleError(error, { logToServer: true, logToConsole: false, context: { action: "offline_sync_action", component: "OfflinePhotoService.syncOfflineActions" } });
-                            }
-                        }
+						} catch (error) {
+							console.error(
+								"[OfflinePhotoService] Failed to sync action:",
+								error,
+							);
+							if (serviceEnabled("offlinePhoto")) {
+								handleError(error, {
+									logToServer: true,
+									logToConsole: false,
+									context: {
+										action: "offline_sync_action",
+										component: "OfflinePhotoService.syncOfflineActions",
+									},
+								});
+							}
+						}
 					}
 
 					resolve(syncedCount);
@@ -379,7 +409,7 @@ export class OfflinePhotoService {
 		}
 	}
 
-    private async processOfflineAction(action: any) {
+	private async processOfflineAction(action: any) {
 		// Process different types of offline actions
 		switch (action.type) {
 			case "favorite":
@@ -391,11 +421,11 @@ export class OfflinePhotoService {
 			case "rating":
 				// Handle offline rating action
 				break;
-            default:
-                console.warn(
-                    "[OfflinePhotoService] Unknown offline action type:",
-                    action?.type,
-                );
+			default:
+				console.warn(
+					"[OfflinePhotoService] Unknown offline action type:",
+					action?.type,
+				);
 		}
 	}
 

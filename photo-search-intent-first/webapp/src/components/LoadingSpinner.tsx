@@ -24,14 +24,14 @@ export function LoadingSpinner({
 		return (
 			<span
 				className={`inline-flex items-center gap-2 ${className}`}
-				role="status"
 				aria-live="polite"
+				aria-busy="true"
 			>
 				<Loader2
 					className={`${sizeClasses[size]} animate-spin text-blue-600`}
 				/>
 				{message ? (
-					<span className="text-sm text-gray-600">{message}</span>
+					<output className="text-sm text-gray-600">{message}</output>
 				) : (
 					<span className="sr-only">Loading…</span>
 				)}
@@ -42,12 +42,12 @@ export function LoadingSpinner({
 	return (
 		<div
 			className={`flex flex-col items-center justify-center ${className}`}
-			role="status"
 			aria-live="polite"
+			aria-busy="true"
 		>
 			<Loader2 className={`${sizeClasses[size]} animate-spin text-blue-600`} />
 			{message ? (
-				<p className="mt-2 text-sm text-gray-600">{message}</p>
+				<output className="mt-2 text-sm text-gray-600">{message}</output>
 			) : (
 				<span className="sr-only">Loading…</span>
 			)}
@@ -65,15 +65,16 @@ export function SkeletonLoader({
 }) {
 	return (
 		<div className={`animate-pulse ${className}`}>
-			{Array.from({ length: lines }).map((_, _i) => (
-				<div
-					key={`item-${String(_)}`}
-					className="h-4 bg-gray-200 rounded mb-2"
-					style={{
-						width: `${Math.random() * 40 + 60}%`,
-					}}
-				/>
-			))}
+			{Array.from({ length: lines }).map((_, i) => {
+				const widthClass = ["w-3/4", "w-4/5", "w-2/3"][i % 3];
+				const key = `skel-${lines}-${widthClass}-${i.toString(36)}`;
+				return (
+					<div
+						key={key}
+						className={`h-4 bg-gray-200 rounded mb-2 ${widthClass}`}
+					/>
+				);
+			})}
 		</div>
 	);
 }

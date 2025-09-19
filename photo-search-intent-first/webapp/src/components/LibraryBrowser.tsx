@@ -1,6 +1,8 @@
+import { motion } from "framer-motion";
 import { ArrowUpDown, BarChart3, Check, Play } from "lucide-react";
-import { memo, useCallback, useMemo, useState, useEffect, useRef } from "react";
-import { thumbUrl, apiThumbBatch } from "../api";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { apiThumbBatch, thumbUrl } from "../api";
 import { VideoService } from "../services/VideoService";
 import { ScrollLoader } from "../utils/loading";
 
@@ -8,434 +10,484 @@ type SortOption = "name" | "date" | "size" | "rating" | "camera";
 type SortDirection = "asc" | "desc";
 
 interface LibraryBrowserProps {
-  dir: string;
-  engine: string;
-  library: string[];
-  onLoadLibrary: (limit?: number, offset?: number) => void;
-  selected?: Set<string>;
-  onToggleSelect?: (path: string) => void;
-  onOpen?: (path: string) => void;
-  tagsMap?: Record<string, string[]>;
-  hasMore?: boolean;
-  isLoading?: boolean;
+	dir: string;
+	engine: string;
+	library: string[];
+	onLoadLibrary: (limit?: number, offset?: number) => void;
+	selected?: Set<string>;
+	onToggleSelect?: (path: string) => void;
+	onOpen?: (path: string) => void;
+	tagsMap?: Record<string, string[]>;
+	hasMore?: boolean;
+	isLoading?: boolean;
 }
 
 const LibraryBrowser = memo(function LibraryBrowser({
-  dir,
-  engine,
-  library,
-  onLoadLibrary,
-  selected = new Set(),
-  onToggleSelect,
-  onOpen,
-  tagsMap = {},
-  hasMore = false,
-  isLoading = false,
+	dir,
+	engine,
+	library,
+	onLoadLibrary,
+	selected = new Set(),
+	onToggleSelect,
+	onOpen,
+	tagsMap = {},
+	hasMore = false,
+	isLoading = false,
 }: LibraryBrowserProps) {
-  const [sortBy, setSortBy] = useState<SortOption>("name");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
-  const [showStats, setShowStats] = useState(false);
-  const [preloadedThumbs, setPreloadedThumbs] = useState<Set<string>>(
-    new Set()
-  );
-  const preloadInProgress = useRef(false);
+	const [sortBy, setSortBy] = useState<SortOption>("name");
+	const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+	const [showStats, setShowStats] = useState(false);
+	const [preloadedThumbs, setPreloadedThumbs] = useState<Set<string>>(
+		new Set(),
+	);
+	const preloadInProgress = useRef(false);
 
-  // Batch preload thumbnails for better performance
-  const preloadThumbnailsBatch = useCallback(
-    async (paths: string[], batchSize = 20) => {
-      if (!dir || preloadInProgress.current || paths.length === 0) return;
+	// Animation variants for micro-interactions
+	const photoVariants = {
+		initial: { opacity: 0, scale: 0.9 },
+		animate: { opacity: 1, scale: 1 },
+		hover: { scale: 1.05, y: -2 },
+		tap: { scale: 0.95 },
+	};
 
-      preloadInProgress.current = true;
-      const batches = [];
-      for (let i = 0; i < paths.length; i += batchSize) {
-        batches.push(paths.slice(i, i + batchSize));
-      }
+	const overlayVariants = {
+		initial: { opacity: 0 },
+		animate: { opacity: 1 },
+		exit: { opacity: 0 },
+	};
 
-      try {
-        for (const batch of batches) {
-          // Filter out already preloaded thumbnails
-          const toPreload = batch.filter((path) => !preloadedThumbs.has(path));
-          if (toPreload.length === 0) continue;
+	// Batch preload thumbnails for better performance
+	const preloadThumbnailsBatch = useCallback(
+		async (paths: string[], batchSize = 20) => {
+			if (!dir || preloadInProgress.current || paths.length === 0) return;
 
-          try {
-            await apiThumbBatch(dir, toPreload, 196);
-            // Mark these paths as preloaded
-            setPreloadedThumbs((prev) => new Set([...prev, ...toPreload]));
-          } catch (error) {
-            console.warn("Failed to preload thumbnail batch:", error);
-            // Continue with next batch even if one fails
-          }
-        }
-      } finally {
-        preloadInProgress.current = false;
-      }
-    },
-    [dir, preloadedThumbs]
-  );
+			preloadInProgress.current = true;
+			const batches = [];
+			for (let i = 0; i < paths.length; i += batchSize) {
+				batches.push(paths.slice(i, i + batchSize));
+			}
 
-  // Preload thumbnails when library changes
-  useEffect(() => {
-    if (library.length > 0) {
-      // Preload first batch immediately
-      const firstBatch = library.slice(0, 40);
-      preloadThumbnailsBatch(firstBatch);
+			try {
+				for (const batch of batches) {
+					// Filter out already preloaded thumbnails
+					const toPreload = batch.filter((path) => !preloadedThumbs.has(path));
+					if (toPreload.length === 0) continue;
 
-      // Preload remaining thumbnails with delay to avoid blocking UI
-      if (library.length > 40) {
-        const remainingBatch = library.slice(40, 120);
-        setTimeout(() => preloadThumbnailsBatch(remainingBatch), 1000);
-      }
-    }
-  }, [library, preloadThumbnailsBatch]);
+					try {
+						await apiThumbBatch(dir, toPreload, 196);
+						// Mark these paths as preloaded
+						setPreloadedThumbs((prev) => new Set([...prev, ...toPreload]));
+					} catch (error) {
+						console.warn("Failed to preload thumbnail batch:", error);
+						// Continue with next batch even if one fails
+					}
+				}
+			} finally {
+				preloadInProgress.current = false;
+			}
+		},
+		[dir, preloadedThumbs],
+	);
 
-  // Extract file info for sorting - memoized per path
-  const getFileInfo = useCallback(
-    (path: string) => {
-      const name = path.split("/").pop() || path;
-      const ext = name.split(".").pop()?.toLowerCase() || "";
+	// Preload thumbnails when library changes
+	useEffect(() => {
+		if (library.length > 0) {
+			// Preload first batch immediately
+			const firstBatch = library.slice(0, 40);
+			preloadThumbnailsBatch(firstBatch);
 
-      // Extract rating from tags if available
-      const tags = tagsMap[path] || [];
-      const ratingTag = tags.find((t) => t.startsWith("rating:"));
-      const rating = ratingTag ? parseInt(ratingTag.split(":")[1]) : 0;
+			// Preload remaining thumbnails with delay to avoid blocking UI
+			if (library.length > 40) {
+				const remainingBatch = library.slice(40, 120);
+				setTimeout(() => preloadThumbnailsBatch(remainingBatch), 1000);
+			}
+		}
+	}, [library, preloadThumbnailsBatch]);
 
-      return {
-        name,
-        ext,
-        rating,
-        isVideo: VideoService.isVideoFile(path),
-      };
-    },
-    [tagsMap]
-  );
+	// Extract file info for sorting - memoized per path
+	const getFileInfo = useCallback(
+		(path: string) => {
+			const name = path.split("/").pop() || path;
+			const ext = name.split(".").pop()?.toLowerCase() || "";
 
-  // Memoized file info cache to avoid recalculating
-  const fileInfoCache = useMemo(() => {
-    const cache: Record<string, ReturnType<typeof getFileInfo>> = {};
-    library.forEach((path) => {
-      cache[path] = getFileInfo(path);
-    });
-    return cache;
-  }, [library, getFileInfo]);
+			// Extract rating from tags if available
+			const tags = tagsMap[path] || [];
+			const ratingTag = tags.find((t) => t.startsWith("rating:"));
+			const rating = ratingTag ? parseInt(ratingTag.split(":")[1]) : 0;
 
-  // Sorted library items - optimized with cached file info
-  const sortedLibrary = useMemo(() => {
-    if (!library.length) return [];
+			return {
+				name,
+				ext,
+				rating,
+				isVideo: VideoService.isVideoFile(path),
+			};
+		},
+		[tagsMap],
+	);
 
-    return [...library].sort((a, b) => {
-      const aInfo = fileInfoCache[a];
-      const bInfo = fileInfoCache[b];
+	// Memoized file info cache to avoid recalculating
+	const fileInfoCache = useMemo(() => {
+		const cache: Record<string, ReturnType<typeof getFileInfo>> = {};
+		library.forEach((path) => {
+			cache[path] = getFileInfo(path);
+		});
+		return cache;
+	}, [library, getFileInfo]);
 
-      let compareValue = 0;
+	// Sorted library items - optimized with cached file info
+	const sortedLibrary = useMemo(() => {
+		if (!library.length) return [];
 
-      switch (sortBy) {
-        case "name":
-          compareValue = aInfo.name.localeCompare(bInfo.name);
-          break;
-        case "rating":
-          compareValue = bInfo.rating - aInfo.rating; // Higher ratings first
-          break;
-        case "date":
-          // For now, use filename for date sorting (could be enhanced with EXIF data)
-          compareValue = a.localeCompare(b);
-          break;
-        case "size":
-          // Would need size info from API - for now sort by name
-          compareValue = aInfo.name.localeCompare(bInfo.name);
-          break;
-        case "camera":
-          // Would need EXIF data - for now sort by name
-          compareValue = aInfo.name.localeCompare(bInfo.name);
-          break;
-        default:
-          compareValue = 0;
-      }
+		return [...library].sort((a, b) => {
+			const aInfo = fileInfoCache[a];
+			const bInfo = fileInfoCache[b];
 
-      return sortDirection === "desc" ? -compareValue : compareValue;
-    });
-  }, [library, sortBy, sortDirection, fileInfoCache]);
+			let compareValue = 0;
 
-  // Library statistics - optimized with cached file info
-  const stats = useMemo(() => {
-    const total = library.length;
-    const videos = library.filter((p) => fileInfoCache[p]?.isVideo).length;
-    const photos = total - videos;
-    const selected_count = selected.size;
+			switch (sortBy) {
+				case "name":
+					compareValue = aInfo.name.localeCompare(bInfo.name);
+					break;
+				case "rating":
+					compareValue = bInfo.rating - aInfo.rating; // Higher ratings first
+					break;
+				case "date":
+					// For now, use filename for date sorting (could be enhanced with EXIF data)
+					compareValue = a.localeCompare(b);
+					break;
+				case "size":
+					// Would need size info from API - for now sort by name
+					compareValue = aInfo.name.localeCompare(bInfo.name);
+					break;
+				case "camera":
+					// Would need EXIF data - for now sort by name
+					compareValue = aInfo.name.localeCompare(bInfo.name);
+					break;
+				default:
+					compareValue = 0;
+			}
 
-    // Rating distribution
-    const ratings = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-    library.forEach((path) => {
-      const rating = fileInfoCache[path]?.rating || 0;
-      if (rating >= 1 && rating <= 5) {
-        ratings[rating as keyof typeof ratings]++;
-      }
-    });
+			return sortDirection === "desc" ? -compareValue : compareValue;
+		});
+	}, [library, sortBy, sortDirection, fileInfoCache]);
 
-    return { total, photos, videos, selected: selected_count, ratings };
-  }, [library, selected, fileInfoCache]);
+	// Library statistics - optimized with cached file info
+	const stats = useMemo(() => {
+		const total = library.length;
+		const videos = library.filter((p) => fileInfoCache[p]?.isVideo).length;
+		const photos = total - videos;
+		const selected_count = selected.size;
 
-  const handleSort = useCallback(
-    (newSortBy: SortOption) => {
-      if (sortBy === newSortBy) {
-        setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
-      } else {
-        setSortBy(newSortBy);
-        setSortDirection("asc");
-      }
-    },
-    [sortBy]
-  );
+		// Rating distribution
+		const ratings = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+		library.forEach((path) => {
+			const rating = fileInfoCache[path]?.rating || 0;
+			if (rating >= 1 && rating <= 5) {
+				ratings[rating as keyof typeof ratings]++;
+			}
+		});
 
-  const selectAll = useCallback(() => {
-    if (onToggleSelect) {
-      library.forEach((path) => {
-        if (!selected.has(path)) {
-          onToggleSelect(path);
-        }
-      });
-    }
-  }, [onToggleSelect, library, selected]);
+		return { total, photos, videos, selected: selected_count, ratings };
+	}, [library, selected, fileInfoCache]);
 
-  const selectNone = useCallback(() => {
-    if (onToggleSelect) {
-      Array.from(selected).forEach((path) => {
-        onToggleSelect(path);
-      });
-    }
-  }, [onToggleSelect, selected]);
+	const handleSort = useCallback(
+		(newSortBy: SortOption) => {
+			if (sortBy === newSortBy) {
+				setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+			} else {
+				setSortBy(newSortBy);
+				setSortDirection("asc");
+			}
+		},
+		[sortBy],
+	);
 
-  const handleLoadLibrary = useCallback(() => {
-    onLoadLibrary(120, 0);
-  }, [onLoadLibrary]);
+	const selectAll = useCallback(() => {
+		if (onToggleSelect) {
+			library.forEach((path) => {
+				if (!selected.has(path)) {
+					onToggleSelect(path);
+				}
+			});
+		}
+	}, [onToggleSelect, library, selected]);
 
-  const _selectRange = (startIndex: number, endIndex: number) => {
-    if (onToggleSelect) {
-      const start = Math.min(startIndex, endIndex);
-      const end = Math.max(startIndex, endIndex);
+	const selectNone = useCallback(() => {
+		if (onToggleSelect) {
+			Array.from(selected).forEach((path) => {
+				onToggleSelect(path);
+			});
+		}
+	}, [onToggleSelect, selected]);
 
-      for (let i = start; i <= end; i++) {
-        const path = sortedLibrary[i];
-        if (path && !selected.has(path)) {
-          onToggleSelect(path);
-        }
-      }
-    }
-  };
-  return (
-    <div className="bg-white border rounded p-3">
-      {/* Header with controls */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-3">
-          <h2 className="font-semibold">Library</h2>
-          <button
-            type="button"
-            onClick={() => setShowStats(!showStats)}
-            className={`p-1 rounded ${
-              showStats
-                ? "bg-blue-100 text-blue-600"
-                : "text-gray-500 hover:bg-gray-100"
-            }`}
-            title="Toggle statistics"
-          >
-            <BarChart3 className="w-4 h-4" />
-          </button>
-        </div>
+	const handleLoadLibrary = useCallback(() => {
+		onLoadLibrary(120, 0);
+	}, [onLoadLibrary]);
 
-        <div className="flex items-center gap-2">
-          {/* Sort controls */}
-          <div className="flex items-center gap-1">
-            <ArrowUpDown className="w-3 h-3 text-gray-400" />
-            <select
-              value={sortBy}
-              onChange={(e) => handleSort(e.target.value as SortOption)}
-              className="text-xs border rounded px-1 py-0.5"
-            >
-              <option value="name">Name</option>
-              <option value="date">Date</option>
-              <option value="rating">Rating</option>
-              <option value="size">Size</option>
-              <option value="camera">Camera</option>
-            </select>
-            <button
-              type="button"
-              onClick={() =>
-                setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"))
-              }
-              className="text-xs text-gray-500 hover:text-gray-700"
-              title={`Sort ${
-                sortDirection === "asc" ? "descending" : "ascending"
-              }`}
-            >
-              {sortDirection === "asc" ? "↑" : "↓"}
-            </button>
-          </div>
+	const _selectRange = (startIndex: number, endIndex: number) => {
+		if (onToggleSelect) {
+			const start = Math.min(startIndex, endIndex);
+			const end = Math.max(startIndex, endIndex);
 
-          {/* Selection controls */}
-          {onToggleSelect && (
-            <div className="flex items-center gap-1 text-xs">
-              <button
-                type="button"
-                onClick={selectAll}
-                className="bg-gray-200 rounded px-2 py-0.5 hover:bg-gray-300"
-              >
-                All
-              </button>
-              <button
-                type="button"
-                onClick={selectNone}
-                className="bg-gray-200 rounded px-2 py-0.5 hover:bg-gray-300"
-              >
-                None
-              </button>
-            </div>
-          )}
+			for (let i = start; i <= end; i++) {
+				const path = sortedLibrary[i];
+				if (path && !selected.has(path)) {
+					onToggleSelect(path);
+				}
+			}
+		}
+	};
+	return (
+		<div className="bg-white border rounded p-3">
+			{/* Header with controls */}
+			<div className="flex items-center justify-between mb-3">
+				<div className="flex items-center gap-3">
+					<h2 className="font-semibold">Library</h2>
+					<button
+						type="button"
+						onClick={() => setShowStats(!showStats)}
+						className={`p-1 rounded ${
+							showStats
+								? "bg-blue-100 text-blue-600"
+								: "text-gray-500 hover:bg-gray-100"
+						}`}
+						title="Toggle statistics"
+					>
+						<BarChart3 className="w-4 h-4" />
+					</button>
+				</div>
 
-          <button
-            type="button"
-            onClick={handleLoadLibrary}
-            className="bg-gray-200 rounded px-3 py-1 text-sm hover:bg-gray-300"
-          >
-            Reload
-          </button>
-        </div>
-      </div>
+				<div className="flex items-center gap-2">
+					{/* Sort controls */}
+					<div className="flex items-center gap-1">
+						<ArrowUpDown className="w-3 h-3 text-gray-400" />
+						<select
+							value={sortBy}
+							onChange={(e) => handleSort(e.target.value as SortOption)}
+							className="text-xs border rounded px-1 py-0.5"
+						>
+							<option value="name">Name</option>
+							<option value="date">Date</option>
+							<option value="rating">Rating</option>
+							<option value="size">Size</option>
+							<option value="camera">Camera</option>
+						</select>
+						<button
+							type="button"
+							onClick={() =>
+								setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"))
+							}
+							className="text-xs text-gray-500 hover:text-gray-700"
+							title={`Sort ${
+								sortDirection === "asc" ? "descending" : "ascending"
+							}`}
+						>
+							{sortDirection === "asc" ? "↑" : "↓"}
+						</button>
+					</div>
 
-      {/* Statistics panel */}
-      {showStats && library.length > 0 && (
-        <div className="mb-3 p-2 bg-gray-50 rounded text-xs">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            <div>
-              <div className="font-medium">Total: {stats.total}</div>
-              <div className="text-gray-600">Photos: {stats.photos}</div>
-              <div className="text-gray-600">Videos: {stats.videos}</div>
-            </div>
-            <div>
-              <div className="font-medium">Selected: {stats.selected}</div>
-              <div className="text-gray-600">
-                {stats.selected > 0 &&
-                  `${((stats.selected / stats.total) * 100).toFixed(1)}%`}
-              </div>
-            </div>
-            <div>
-              <div className="font-medium">Ratings:</div>
-              <div className="flex gap-1">
-                {Object.entries(stats.ratings).map(([rating, count]) => (
-                  <span
-                    key={rating}
-                    className="text-gray-600"
-                    title={`${rating} stars: ${count} photos`}
-                  >
-                    {rating}★:{count}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+					{/* Selection controls */}
+					{onToggleSelect && (
+						<div className="flex items-center gap-1 text-xs">
+							<button
+								type="button"
+								onClick={selectAll}
+								className="bg-gray-200 rounded px-2 py-0.5 hover:bg-gray-300"
+							>
+								All
+							</button>
+							<button
+								type="button"
+								onClick={selectNone}
+								className="bg-gray-200 rounded px-2 py-0.5 hover:bg-gray-300"
+							>
+								None
+							</button>
+						</div>
+					)}
 
-      {/* Selection status */}
-      {selected.size > 0 && (
-        <div className="mb-2 p-2 bg-blue-50 rounded text-sm text-blue-800">
-          {selected.size} item{selected.size !== 1 ? "s" : ""} selected
-        </div>
-      )}
+					<button
+						type="button"
+						onClick={handleLoadLibrary}
+						className="bg-gray-200 rounded px-3 py-1 text-sm hover:bg-gray-300"
+					>
+						Reload
+					</button>
+				</div>
+			</div>
 
-      {/* Content */}
-      {library.length === 0 ? (
-        <div className="text-sm text-gray-600 mt-2">
-          No items yet. Build the index, then click Reload.
-        </div>
-      ) : (
-        <>
-          <div className="mt-2 grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-2">
-            {sortedLibrary.slice(0, 120).map((p, _i) => {
-              const isSelected = selected.has(p);
-              const fileInfo = fileInfoCache[p];
+			{/* Statistics panel */}
+			{showStats && library.length > 0 && (
+				<div className="mb-3 p-2 bg-gray-50 rounded text-xs">
+					<div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+						<div>
+							<div className="font-medium">Total: {stats.total}</div>
+							<div className="text-gray-600">Photos: {stats.photos}</div>
+							<div className="text-gray-600">Videos: {stats.videos}</div>
+						</div>
+						<div>
+							<div className="font-medium">Selected: {stats.selected}</div>
+							<div className="text-gray-600">
+								{stats.selected > 0 &&
+									`${((stats.selected / stats.total) * 100).toFixed(1)}%`}
+							</div>
+						</div>
+						<div>
+							<div className="font-medium">Ratings:</div>
+							<div className="flex gap-1">
+								{Object.entries(stats.ratings).map(([rating, count]) => (
+									<span
+										key={rating}
+										className="text-gray-600"
+										title={`${rating} stars: ${count} photos`}
+									>
+										{rating}★:{count}
+									</span>
+								))}
+							</div>
+						</div>
+					</div>
+				</div>
+			)}
 
-              return (
-                <div
-                  role="button"
-                  tabIndex={0}
-                  key={p}
-                  className={`relative group cursor-pointer rounded overflow-hidden ${
-                    isSelected ? "ring-2 ring-blue-500" : ""
-                  }`}
-                  onClick={() => (onOpen ? onOpen(p) : undefined)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      if (onOpen) onOpen(p);
-                    }
-                  }}
-                >
-                  {/* Selection checkbox */}
-                  {onToggleSelect && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleSelect(p);
-                      }}
-                      className={`absolute top-1 left-1 z-10 w-5 h-5 rounded border-2 flex items-center justify-center
-                        ${
-                          isSelected
-                            ? "bg-blue-600 border-blue-600"
-                            : "bg-white/80 border-gray-300 opacity-0 group-hover:opacity-100"
-                        } transition-opacity`}
-                    >
-                      {isSelected && <Check className="w-3 h-3 text-white" />}
-                    </button>
-                  )}
+			{/* Selection status */}
+			{selected.size > 0 && (
+				<motion.div
+					initial={{ opacity: 0, y: -10 }}
+					animate={{ opacity: 1, y: 0 }}
+					exit={{ opacity: 0, y: -10 }}
+					className="mb-2 p-2 bg-blue-50 rounded text-sm text-blue-800"
+				>
+					{selected.size} item{selected.size !== 1 ? "s" : ""} selected
+				</motion.div>
+			)}
 
-                  {/* Main image */}
-                  <img
-                    src={thumbUrl(dir, engine, p, 196)}
-                    alt={fileInfo.name}
-                    title={`${fileInfo.name}${
-                      fileInfo.rating > 0
-                        ? ` - ${"★".repeat(fileInfo.rating)}`
-                        : ""
-                    }`}
-                    className="w-full h-24 object-cover"
-                  />
+			{/* Content */}
+			{library.length === 0 ? (
+				<div className="text-sm text-gray-600 mt-2">
+					No items yet. Build the index, then click Reload.
+				</div>
+			) : (
+				<>
+					<div className="mt-2 grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-2">
+						{sortedLibrary.slice(0, 120).map((p, i) => {
+							const isSelected = selected.has(p);
+							const fileInfo = fileInfoCache[p];
 
-                  {/* Video indicator */}
-                  {fileInfo.isVideo && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-colors">
-                      <div className="w-8 h-8 bg-black/60 rounded-full flex items-center justify-center">
-                        <Play className="w-4 h-4 text-white ml-0.5" />
-                      </div>
-                    </div>
-                  )}
+							return (
+								<motion.button
+									type="button"
+									key={p}
+									variants={photoVariants}
+									initial="initial"
+									animate="animate"
+									whileHover="hover"
+									whileTap="tap"
+									transition={{ duration: 0.3, delay: i * 0.01 }}
+									className={`relative group cursor-pointer rounded overflow-hidden text-left transition-all duration-200 hover:shadow-lg ${
+										isSelected ? "ring-2 ring-blue-500 ring-offset-2" : ""
+									}`}
+									onClick={() => (onOpen ? onOpen(p) : undefined)}
+									onKeyDown={(e) => {
+										if (e.key === "Enter" || e.key === " ") {
+											e.preventDefault();
+											if (onOpen) onOpen(p);
+										}
+									}}
+								>
+									{/* Selection checkbox */}
+									{onToggleSelect && (
+										<motion.button
+											type="button"
+											variants={overlayVariants}
+											initial="initial"
+											animate="animate"
+											onClick={(e) => {
+												e.stopPropagation();
+												onToggleSelect(p);
+											}}
+											className={`absolute top-1 left-1 z-10 w-5 h-5 rounded border-2 flex items-center justify-center transition-all duration-200 ${
+												isSelected
+													? "bg-blue-600 border-blue-600"
+													: "bg-white/80 border-gray-300 opacity-0 group-hover:opacity-100"
+											}`}
+											whileHover={{ scale: 1.1 }}
+											whileTap={{ scale: 0.9 }}
+										>
+											{isSelected && <Check className="w-3 h-3 text-white" />}
+										</motion.button>
+									)}
 
-                  {/* Rating indicator */}
-                  {fileInfo.rating > 0 && (
-                    <div className="absolute top-1 right-1 bg-black/60 text-white text-xs px-1 rounded">
-                      {"★".repeat(fileInfo.rating)}
-                    </div>
-                  )}
+									{/* Main image */}
+									<motion.img
+										src={thumbUrl(dir, engine, p, 196)}
+										alt={fileInfo.name}
+										title={`${fileInfo.name}${
+											fileInfo.rating > 0
+												? ` - ${"★".repeat(fileInfo.rating)}`
+												: ""
+										}`}
+										className="w-full h-24 object-cover transition-transform duration-300"
+										whileHover={{ scale: 1.1 }}
+										transition={{ duration: 0.3 }}
+									/>
 
-                  {/* Filename overlay on hover */}
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="p-1 text-white text-xs truncate">
-                      {fileInfo.name}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <ScrollLoader
-            onLoadMore={() => onLoadLibrary(120, library.length)}
-            isLoading={isLoading}
-            hasMore={hasMore}
-            loadingText="Loading more photos..."
-          />
-        </>
-      )}
-    </div>
-  );
+									{/* Video indicator */}
+									{fileInfo.isVideo && (
+										<motion.div
+											variants={overlayVariants}
+											initial="initial"
+											animate="animate"
+											className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-colors duration-300"
+										>
+											<motion.div
+												className="w-8 h-8 bg-black/60 rounded-full flex items-center justify-center"
+												whileHover={{ scale: 1.1 }}
+												whileTap={{ scale: 0.9 }}
+											>
+												<Play className="w-4 h-4 text-white ml-0.5" />
+											</motion.div>
+										</motion.div>
+									)}
+
+									{/* Rating indicator */}
+									{fileInfo.rating > 0 && (
+										<motion.div
+											variants={overlayVariants}
+											initial="initial"
+											animate="animate"
+											className="absolute top-1 right-1 bg-black/60 text-white text-xs px-1 rounded"
+											whileHover={{ scale: 1.1 }}
+										>
+											{"★".repeat(fileInfo.rating)}
+										</motion.div>
+									)}
+
+									{/* Filename overlay on hover */}
+									<motion.div
+										variants={overlayVariants}
+										initial="initial"
+										animate="animate"
+										className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+									>
+										<div className="p-1 text-white text-xs truncate">
+											{fileInfo.name}
+										</div>
+									</motion.div>
+								</motion.button>
+							);
+						})}
+					</div>
+					<ScrollLoader
+						onLoadMore={() => onLoadLibrary(120, library.length)}
+						isLoading={isLoading}
+						hasMore={hasMore}
+						loadingText="Loading more photos..."
+					/>
+				</>
+			)}
+		</div>
+	);
 });
 
 LibraryBrowser.displayName = "LibraryBrowser";

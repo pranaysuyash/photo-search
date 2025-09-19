@@ -6,7 +6,29 @@ interface PaginatedSearchProps {
 	currentDir: string;
 	provider: string;
 	query: string;
-	searchOptions: unknown;
+	searchOptions: Partial<{
+		hfToken?: string;
+		openaiKey?: string;
+		favoritesOnly?: boolean;
+		tags?: string[];
+		dateFrom?: number;
+		dateTo?: number;
+		cameras?: string[];
+		lenses?: string[];
+		isVideo?: boolean;
+		minIso?: number;
+		maxIso?: number;
+		minF?: number;
+		maxF?: number;
+		minRating?: number;
+		people?: string[];
+		collections?: string[];
+		colors?: string[];
+		orientation?: "landscape" | "portrait" | "square";
+		searchIn?: "captions" | "tags" | "all";
+		excludeUnder?: boolean;
+		excludeOver?: boolean;
+	}>;
 	onResultsChange: (results: SearchResult[], pagination: unknown) => void;
 }
 
@@ -35,14 +57,14 @@ export function PaginatedSearch({
 				setLoading(true);
 				setError(null);
 
-                    const result = await apiSearchPaginated(
-                        currentDir,
-                        query,
-                        provider,
-                        limit,
-                        offset,
-                        searchOptions as any,
-                    );
+				const result = await apiSearchPaginated(
+					currentDir,
+					query,
+					provider,
+					limit,
+					offset,
+					searchOptions,
+				);
 
 				const newResults =
 					offset === 0 ? result.results : [...results, ...result.results];
@@ -112,8 +134,9 @@ export function PaginatedSearch({
 				<div className="flex items-center gap-4">
 					{/* Page Size Selector */}
 					<div className="flex items-center gap-2 text-sm">
-						<label>Results per page:</label>
+						<label htmlFor="results-per-page">Results per page:</label>
 						<select
+							id="results-per-page"
 							value={pagination.limit}
 							onChange={(e) => changePageSize(Number(e.target.value))}
 							disabled={loading}

@@ -10,6 +10,9 @@ This project uses Playwright for comprehensive visual testing across both the cl
 # Run visual tests and update snapshots
 npm run visual
 
+# Force-update snapshots for both webapps
+npm run visual:update
+
 # Run visual tests in CI mode (fail on changes)
 npm run visual:ci
 
@@ -25,6 +28,9 @@ cd photo-search-intent-first/webapp
 
 # Run all visual tests and update snapshots
 npm run test:visual
+
+# Force refresh all snapshots (use after intentional UI overhauls)
+npm run test:visual:update
 
 # Run visual tests in CI mode
 npm run test:visual:ci

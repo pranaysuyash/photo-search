@@ -36,6 +36,20 @@ export interface MatchReason {
 	highlight?: string; // specific text that matched
 }
 
+interface AnalyzedPhoto {
+	caption?: string;
+	tags?: string[];
+	location?: string;
+	people?: string[];
+	date?: string | Date;
+	dominantColors?: unknown;
+	objects?: Array<{ label: string; confidence?: number }>;
+	scene?: string;
+	emotions?: unknown;
+	activities?: unknown;
+	similarity_score?: number;
+}
+
 interface SearchExplainabilityProps {
 	reasons: MatchReason[];
 	query: string;
@@ -105,7 +119,9 @@ export function SearchExplainability({
 				{topReasons.map((reason, _idx) => (
 					<div
 						key={`item-${String(reason)}`}
-						className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border ${getConfidenceColor(reason.confidence)}`}
+						className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border ${getConfidenceColor(
+							reason.confidence,
+						)}`}
 						title={reason.detail}
 					>
 						{getReasonIcon(reason.type)}
@@ -138,7 +154,9 @@ export function SearchExplainability({
 						className="flex items-start gap-2 text-sm"
 					>
 						<div
-							className={`mt-0.5 p-1 rounded ${getConfidenceColor(reason.confidence)}`}
+							className={`mt-0.5 p-1 rounded ${getConfidenceColor(
+								reason.confidence,
+							)}`}
 						>
 							{getReasonIcon(reason.type)}
 						</div>
@@ -199,7 +217,7 @@ function HighlightedText({
 
 // Match analyzer to generate reasons from search results
 export class MatchAnalyzer {
-    analyzeMatch(photo: any, query: string): MatchReason[] {
+	analyzeMatch(photo: AnalyzedPhoto, query: string): MatchReason[] {
 		const reasons: MatchReason[] = [];
 		const queryLower = query.toLowerCase();
 		const queryWords = queryLower.split(/\s+/);
@@ -236,15 +254,15 @@ export class MatchAnalyzer {
 		}
 
 		// Check location
-		if (
-			photo.location &&
-			queryWords.some((word) => photo.location.toLowerCase().includes(word))
-		) {
-			reasons.push({
-				type: "location",
-				confidence: 0.85,
-				detail: photo.location,
-			});
+		if (photo.location) {
+			const location = photo.location;
+			if (queryWords.some((word) => location.toLowerCase().includes(word))) {
+				reasons.push({
+					type: "location",
+					confidence: 0.85,
+					detail: location,
+				});
+			}
 		}
 
 		// Check people
@@ -299,29 +317,31 @@ export class MatchAnalyzer {
 		}
 
 		// Check for objects
-        if (photo.objects && photo.objects.length > 0) {
-            const matchedObjects = (photo.objects as Array<{ label: string; confidence?: number }>).filter((obj) =>
-                queryWords.some((word) => obj.label.toLowerCase().includes(word)),
-            );
-            if (matchedObjects.length > 0) {
-                reasons.push({
-                    type: "object",
-                    confidence: matchedObjects[0].confidence || 0.75,
-                    detail: matchedObjects.map((o) => o.label).join(", "),
-                });
-            }
-        }
+		if (photo.objects && photo.objects.length > 0) {
+			const matchedObjects = (
+				photo.objects as Array<{ label: string; confidence?: number }>
+			).filter((obj) =>
+				queryWords.some((word) => obj.label.toLowerCase().includes(word)),
+			);
+			if (matchedObjects.length > 0) {
+				reasons.push({
+					type: "object",
+					confidence: matchedObjects[0].confidence || 0.75,
+					detail: matchedObjects.map((o) => o.label).join(", "),
+				});
+			}
+		}
 
 		// Check for scene understanding
-		if (
-			photo.scene &&
-			queryWords.some((word) => photo.scene.toLowerCase().includes(word))
-		) {
-			reasons.push({
-				type: "scene",
-				confidence: 0.7,
-				detail: photo.scene,
-			});
+		if (photo.scene) {
+			const scene = photo.scene;
+			if (queryWords.some((word) => scene.toLowerCase().includes(word))) {
+				reasons.push({
+					type: "scene",
+					confidence: 0.7,
+					detail: scene,
+				});
+			}
 		}
 
 		// Check for emotions/activities

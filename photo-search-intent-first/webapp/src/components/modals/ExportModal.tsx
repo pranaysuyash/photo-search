@@ -25,13 +25,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 			onKeyDown={(e) => {
 				if (e.key === "Escape") onClose();
 			}}
+			role="dialog"
+			aria-modal="true"
 		>
 			<FocusTrap onEscape={onClose}>
-				<div
-					className="bg-white rounded-lg p-4 w-full max-w-md"
-					role="dialog"
-					aria-modal="true"
-				>
+				<div className="bg-white rounded-lg p-4 w-full max-w-md">
 					<div className="font-semibold mb-2">Export Selected</div>
 					<form
 						onSubmit={(e) => {

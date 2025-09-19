@@ -39,12 +39,16 @@ vi.mock("../stores/settingsStore", () => {
 	};
 });
 
-vi.mock("../api", () => ({
-	thumbUrl: (_d: string, _e: string, p: string, _s: number) =>
-		`mock://thumb${p}`,
-	apiOpen: async () => ({ ok: true }),
-	apiSetFavorite: vi.fn(async () => ({ ok: true })),
-}));
+vi.mock("../api", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../api")>();
+	return {
+		...actual,
+		thumbUrl: (_d: string, _e: string, p: string, _s: number) =>
+			`mock://thumb${p}`,
+		apiOpen: async () => ({ ok: true }),
+		apiSetFavorite: vi.fn(async () => ({ ok: true })),
+	};
+});
 
 describe("ResultsPanel", () => {
 	it("shows empty states and renders grid when results exist", () => {

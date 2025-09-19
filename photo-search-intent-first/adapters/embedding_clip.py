@@ -1,6 +1,7 @@
 from typing import List, Optional
 
 import numpy as np
+import os
 from sentence_transformers import SentenceTransformer
 
 from adapters.fs_scanner import safe_open_image
@@ -9,7 +10,29 @@ from pathlib import Path
 
 class ClipEmbedding:
     def __init__(self, model_name: str = "clip-ViT-B-32", device: Optional[str] = None) -> None:
-        self.model = SentenceTransformer(model_name, device=device)
+        # Honor offline mode and local cache directory if provided
+        offline = os.getenv("OFFLINE_MODE", "").lower() in ("1", "true", "yes")
+        local_dir = os.getenv("PHOTOVAULT_MODEL_DIR") or os.getenv("SENTENCE_TRANSFORMERS_HOME")
+        if local_dir:
+            os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", local_dir)
+        if offline:
+            os.environ.setdefault("HF_HUB_OFFLINE", "1")
+            os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+        # Load model; if a local_dir exists, try that path first
+        try_names = [model_name]
+        if local_dir:
+            try_names.insert(0, os.path.join(local_dir, model_name))
+        last_err: Optional[Exception] = None
+        for name in try_names:
+            try:
+                self.model = SentenceTransformer(name, device=device)
+                break
+            except Exception as e:  # keep trying
+                last_err = e
+                self.model = None  # type: ignore
+        if self.model is None:  # type: ignore
+            # Re-raise the last error for visibility
+            raise last_err  # type: ignore
         self._index_id = f"st-{model_name}"
 
     @property

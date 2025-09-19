@@ -2,10 +2,14 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import Workspace from "./Workspace";
 
-vi.mock("../api", () => ({
-	apiWorkspaceAdd: vi.fn(async (path: string) => ({ folders: [path] })),
-	apiWorkspaceRemove: vi.fn(async (_path: string) => ({ folders: [] })),
-}));
+vi.mock("../api", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../api")>();
+	return {
+		...actual,
+		apiWorkspaceAdd: vi.fn(async (path: string) => ({ folders: [path] })),
+		apiWorkspaceRemove: vi.fn(async (_path: string) => ({ folders: [] })),
+	};
+});
 
 describe("Workspace", () => {
 	it("lists folders, removes, and adds", async () => {

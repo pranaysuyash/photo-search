@@ -1,6 +1,6 @@
 import type React from "react";
-import { FocusTrap } from "../../utils/accessibility";
 import { apiSearchLikePlus } from "../../api";
+import { FocusTrap } from "../../utils/accessibility";
 
 interface LikePlusModalProps {
 	selected: Set<string>;
@@ -34,13 +34,11 @@ export const LikePlusModal: React.FC<LikePlusModalProps> = ({
 			onKeyDown={(e) => {
 				if (e.key === "Escape") onClose();
 			}}
+			role="dialog"
+			aria-modal="true"
 		>
 			<FocusTrap onEscape={onClose}>
-				<div
-					className="bg-white rounded-lg p-4 w-full max-w-md"
-					role="dialog"
-					aria-modal="true"
-				>
+				<div className="bg-white rounded-lg p-4 w-full max-w-md">
 					<div className="font-semibold mb-2">Similar + Text</div>
 					<form
 						onSubmit={async (e) => {
@@ -53,13 +51,13 @@ export const LikePlusModal: React.FC<LikePlusModalProps> = ({
 								(form.elements.namedItem("weight") as HTMLInputElement).value,
 							);
 							if (selected.size === 1) {
-                            try {
-                                const p = Array.from(selected)[0];
-                                uiActions.setBusy("Searching…");
-                                const r = await apiSearchLikePlus(
-                                    dir,
-                                    p,
-                                    engine,
+								try {
+									const p = Array.from(selected)[0];
+									uiActions.setBusy("Searching…");
+									const r = await apiSearchLikePlus(
+										dir,
+										p,
+										engine,
 										topK,
 										text || undefined,
 										Number.isNaN(weight) ? 0.5 : weight,

@@ -15,8 +15,8 @@ import {
 	X,
 } from "lucide-react";
 import { useRef, useState } from "react";
-import { getAPI } from "../services/PhotoVaultAPI";
 import { LazyImage } from "../components/LazyImage";
+import { getAPI } from "../services/PhotoVaultAPI";
 
 interface ImageEditorProps {
 	imagePath: string;

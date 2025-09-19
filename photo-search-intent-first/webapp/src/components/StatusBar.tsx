@@ -178,21 +178,21 @@ export function MiniStatus({
 	activeJobs = 0,
 }: MiniStatusProps) {
 	return (
-		<div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
+		<div className="flex items-center gap-3 text-xs text-gray-700 dark:text-gray-200">
 			<div className="flex items-center gap-1">
 				<Image className="w-3 h-3" />
 				<span>{photoCount.toLocaleString()}</span>
 			</div>
 
 			{isIndexing && (
-				<div className="flex items-center gap-1 text-blue-500">
-					<div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+				<div className="flex items-center gap-1 text-blue-700 dark:text-blue-300">
+					<div className="w-3 h-3 border-2 border-blue-700 dark:border-blue-300 border-t-transparent rounded-full animate-spin" />
 					<span>Indexing</span>
 				</div>
 			)}
 
 			{activeJobs > 0 && (
-				<div className="flex items-center gap-1 text-orange-500">
+				<div className="flex items-center gap-1 text-orange-600 dark:text-orange-300">
 					<Zap className="w-3 h-3" />
 					<span>{activeJobs}</span>
 				</div>
@@ -209,24 +209,24 @@ interface StatusIndicatorProps {
 export function StatusIndicator({ status, message }: StatusIndicatorProps) {
 	const statusConfig = {
 		idle: {
-			color: "text-gray-400",
+			color: "text-gray-600 dark:text-gray-300",
 			icon: <CheckCircle className="w-4 h-4" />,
 			defaultMessage: "Ready",
 		},
 		processing: {
-			color: "text-blue-500",
+			color: "text-blue-700 dark:text-blue-300",
 			icon: (
-				<div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+				<div className="w-4 h-4 border-2 border-blue-700 dark:border-blue-300 border-t-transparent rounded-full animate-spin" />
 			),
 			defaultMessage: "Processing...",
 		},
 		success: {
-			color: "text-green-500",
+			color: "text-green-700 dark:text-green-300",
 			icon: <CheckCircle className="w-4 h-4" />,
 			defaultMessage: "Success",
 		},
 		error: {
-			color: "text-red-500",
+			color: "text-red-700 dark:text-red-300",
 			icon: <AlertCircle className="w-4 h-4" />,
 			defaultMessage: "Error",
 		},

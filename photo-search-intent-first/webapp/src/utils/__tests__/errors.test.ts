@@ -1,14 +1,21 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { handleError, logServerError, createAppError, ErrorType } from "../../utils/errors";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  createAppError,
+  ErrorType,
+  handleError,
+  logServerError,
+} from "../../utils/errors";
 
-// Mock the API analytics logger used by errors.ts dynamic import
-const apiAnalyticsLog = vi.fn(async () => ({}));
 vi.mock("../../api", () => ({
-  apiAnalyticsLog,
+  apiAnalyticsLog: vi.fn(async () => ({})),
 }));
 
+const mockedApiAnalyticsLog = vi.mocked(
+  (await import("../../api")).apiAnalyticsLog
+);
+
 beforeEach(() => {
-  apiAnalyticsLog.mockClear();
+  mockedApiAnalyticsLog.mockClear();
   localStorage.clear();
   // Ensure server logging is enabled in tests regardless of env defaults
   process.env.VITE_LOG_ERRORS_TO_SERVER = "1";
@@ -33,17 +40,20 @@ describe("errors logging", () => {
     });
     // Wait for async logging IIFE
     await new Promise((r) => setTimeout(r, 0));
-    expect(apiAnalyticsLog).toHaveBeenCalledTimes(1);
-    const [dir, kind, payload] = apiAnalyticsLog.mock.calls[0];
+    expect(mockedApiAnalyticsLog).toHaveBeenCalledTimes(1);
+    const [dir, kind, payload] = mockedApiAnalyticsLog.mock.calls[0];
     expect(dir).toBe("/test/dir");
     expect(kind).toBe("error");
-    expect(payload).toMatchObject({ action: "index", component: "IndexManager" });
+    expect(payload).toMatchObject({
+      action: "index",
+      component: "IndexManager",
+    });
   });
 
   it("falls back to persisted dir when context.dir is missing", async () => {
     localStorage.setItem(
       "photo-search-settings",
-      JSON.stringify({ state: { dir: "/persisted/dir" }, version: 1 }),
+      JSON.stringify({ state: { dir: "/persisted/dir" }, version: 1 })
     );
     handleError(createAppError("Network fail", ErrorType.NETWORK), {
       showToast: false,
@@ -51,8 +61,8 @@ describe("errors logging", () => {
       logToServer: true,
     });
     await new Promise((r) => setTimeout(r, 0));
-    expect(apiAnalyticsLog).toHaveBeenCalledTimes(1);
-    expect(apiAnalyticsLog.mock.calls[0][0]).toBe("/persisted/dir");
+    expect(mockedApiAnalyticsLog).toHaveBeenCalledTimes(1);
+    expect(mockedApiAnalyticsLog.mock.calls[0][0]).toBe("/persisted/dir");
   });
 
   it("logServerError returns boolean and calls analytics when dir present", async () => {
@@ -63,7 +73,7 @@ describe("errors logging", () => {
       metadata: { items: 2 },
     });
     expect(ok).toBe(true);
-    expect(apiAnalyticsLog).toHaveBeenCalledTimes(1);
+    expect(mockedApiAnalyticsLog).toHaveBeenCalledTimes(1);
   });
 
   it("logServerError returns false without dir", async () => {

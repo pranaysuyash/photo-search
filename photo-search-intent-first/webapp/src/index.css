@@ -3,58 +3,124 @@
 @tailwind utilities;
 
 @layer base {
-    :root {
-        --background: 0 0% 100%;
-        --foreground: 222.2 84% 4.9%;
-        --card: 0 0% 100%;
-        --card-foreground: 222.2 84% 4.9%;
-        --popover: 0 0% 100%;
-        --popover-foreground: 222.2 84% 4.9%;
-        --primary: 221.2 83.2% 53.3%;
-        --primary-foreground: 210 40% 98%;
-        --secondary: 210 40% 96%;
-        --secondary-foreground: 222.2 84% 4.9%;
-        --muted: 210 40% 96%;
-        --muted-foreground: 215.4 16.3% 46.9%;
-        --accent: 210 40% 96%;
-        --accent-foreground: 222.2 84% 4.9%;
-        --destructive: 0 84.2% 60.2%;
-        --destructive-foreground: 210 40% 98%;
-        --border: 214.3 31.8% 91.4%;
-        --input: 214.3 31.8% 91.4%;
-        --ring: 221.2 83.2% 53.3%;
-        --radius: 0.5rem;
-    }
 
-    .dark {
-        --background: 222.2 84% 4.9%;
-        --foreground: 210 40% 98%;
-        --card: 222.2 84% 4.9%;
-        --card-foreground: 210 40% 98%;
-        --popover: 222.2 84% 4.9%;
-        --popover-foreground: 210 40% 98%;
-        --primary: 217.2 91.2% 59.8%;
-        --primary-foreground: 222.2 84% 4.9%;
-        --secondary: 217.2 32.6% 17.5%;
-        --secondary-foreground: 210 40% 98%;
-        --muted: 217.2 32.6% 17.5%;
-        --muted-foreground: 215 20.2% 65.1%;
-        --accent: 217.2 32.6% 17.5%;
-        --accent-foreground: 210 40% 98%;
-        --destructive: 0 62.8% 30.6%;
-        --destructive-foreground: 210 40% 98%;
-        --border: 217.2 32.6% 17.5%;
-        --input: 217.2 32.6% 17.5%;
-        --ring: 224.3 76.3% 94.1%;
-    }
+	html,
+	body,
+	#root {
+		height: 100%;
+		min-height: 100vh;
+		margin: 0;
+		padding: 0;
+	}
+
+	body {
+		background-color: hsl(var(--background));
+		color: hsl(var(--foreground));
+		font-family:
+			ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
+		overflow-x: hidden;
+		overscroll-behavior: none;
+	}
+
+	#root {
+		display: flex;
+		flex-direction: column;
+		min-height: 100vh;
+	}
+
+	:root {
+		/* Core surfaces & text (light) */
+		--background: 220 40% 97%;
+		/* slate-100 */
+		--foreground: 222 47% 11%;
+		/* slate-900 */
+		--card: 0 0% 100%;
+		--card-foreground: 222 47% 11%;
+		--popover: 0 0% 100%;
+		--popover-foreground: 222 47% 11%;
+
+		/* Brand & semantic colors */
+		--primary: 221 83% 53%;
+		--primary-foreground: 210 100% 98%;
+		--secondary: 220 16% 94%;
+		--secondary-foreground: 222 47% 11%;
+		--muted: 220 14% 92%;
+		--muted-foreground: 220 15% 55%;
+		--accent: 199 84% 55%;
+		--accent-foreground: 222 47% 13%;
+		--destructive: 0 72% 51%;
+		--destructive-foreground: 210 40% 98%;
+
+		/* Borders, inputs, rings */
+		--border: 220 14% 90%;
+		--input: 220 14% 90%;
+		--ring: 221 83% 53%;
+
+		/* Radii & spacing tokens used by Tailwind extend */
+		--radius: 0.75rem;
+		--radius-sm: 0.35rem;
+		--radius-base: 0.5rem;
+		--radius-md: 0.65rem;
+		--radius-lg: 0.85rem;
+		--radius-xl: 1.15rem;
+		--radius-2xl: 1.5rem;
+
+		--spacing-18: 4.5rem;
+		--spacing-22: 5.5rem;
+
+		/* Shadow tokens */
+		--shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.06);
+		--shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.08);
+		--shadow-base: 0 6px 12px rgba(15, 23, 42, 0.08);
+		--shadow-md: 0 12px 24px rgba(15, 23, 42, 0.12);
+		--shadow-lg: 0 18px 32px rgba(15, 23, 42, 0.16);
+		--shadow-xl: 0 28px 48px rgba(15, 23, 42, 0.2);
+	}
+
+	.dark {
+		--background: 222 47% 11%;
+		--foreground: 210 40% 96%;
+		--card: 222 45% 15%;
+		--card-foreground: 210 40% 96%;
+		--popover: 222 45% 18%;
+		--popover-foreground: 210 40% 96%;
+
+		--primary: 217 92% 60%;
+		--primary-foreground: 222 47% 11%;
+		--secondary: 217 19% 24%;
+		--secondary-foreground: 210 40% 96%;
+		--muted: 217 19% 26%;
+		--muted-foreground: 215 20% 72%;
+		--accent: 199 84% 63%;
+		--accent-foreground: 222 47% 11%;
+		--destructive: 0 62% 42%;
+		--destructive-foreground: 210 40% 96%;
+
+		--border: 217 19% 28%;
+		--input: 217 19% 28%;
+		--ring: 222 70% 84%;
+
+		--shadow-xs: 0 1px 2px rgba(8, 13, 26, 0.35);
+		--shadow-sm: 0 1px 3px rgba(8, 13, 26, 0.4);
+		--shadow-base: 0 6px 14px rgba(8, 13, 26, 0.42);
+		--shadow-md: 0 12px 26px rgba(8, 13, 26, 0.45);
+		--shadow-lg: 0 18px 36px rgba(8, 13, 26, 0.5);
+		--shadow-xl: 0 28px 50px rgba(8, 13, 26, 0.55);
+	}
+
+	* {
+		border-color: hsl(var(--border));
+	}
 }
 
-@layer base {
-    * {
-        @apply border-border;
-    }
+@layer utilities {
+	.scrollbar-hide {
+		-ms-overflow-style: none;
+	}
 
-    body {
-        @apply bg-background text-foreground;
-    }
+	.scrollbar-hide::-webkit-scrollbar {
+		display: none;
+	}
 }

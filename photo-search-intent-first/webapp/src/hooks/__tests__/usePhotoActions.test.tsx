@@ -3,6 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "../../api";
 import { usePhotoActions } from "../usePhotoActions";
 
+// Mock toast functionality
+const mockToast = vi.fn();
+vi.mock("@/hooks/use-toast", () => ({
+	useToast: () => ({
+		toast: mockToast,
+	}),
+}));
+
 // Mock the API module
 vi.mock("../../api", () => ({
 	apiSetTags: vi.fn(),
@@ -300,7 +308,9 @@ describe("usePhotoActions", () => {
 				Array.from(selected),
 				true,
 			);
-			expect(mockUiActions.setNote).toHaveBeenCalledWith("Moved 2 to OS Trash");
+			expect(mockToast).toHaveBeenCalledWith({
+				description: "Moved 2 to OS Trash",
+			});
 		});
 
 		it("should not delete when user cancels", async () => {
@@ -335,7 +345,12 @@ describe("usePhotoActions", () => {
 				Array.from(selected),
 				false,
 			);
-			expect(mockUiActions.setNote).toHaveBeenCalledWith("Moved 1 to Trash");
+			expect(mockToast).toHaveBeenCalledWith(
+				expect.objectContaining({
+					description: "Moved 1 to Trash",
+					action: expect.any(Object),
+				}),
+			);
 		});
 
 		it("should handle delete errors", async () => {

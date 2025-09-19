@@ -2,18 +2,22 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import TripsView from "./TripsView";
 
-vi.mock("../api", () => ({
-	apiTripsBuild: vi.fn(async () => ({
-		trips: [
-			{ id: "t1", count: 2, place: "Paris", paths: ["/a.jpg", "/b.jpg"] },
-		],
-	})),
-	apiTripsList: vi.fn(async () => ({
-		trips: [{ id: "t2", count: 1, place: "SF", paths: ["/c.jpg"] }],
-	})),
-	thumbUrl: (_d: string, _e: string, p: string, _s: number) =>
-		`mock://thumb${p}`,
-}));
+vi.mock("../api", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../api")>();
+	return {
+		...actual,
+		apiTripsBuild: vi.fn(async () => ({
+			trips: [
+				{ id: "t1", count: 2, place: "Paris", paths: ["/a.jpg", "/b.jpg"] },
+			],
+		})),
+		apiTripsList: vi.fn(async () => ({
+			trips: [{ id: "t2", count: 1, place: "SF", paths: ["/c.jpg"] }],
+		})),
+		thumbUrl: (_d: string, _e: string, p: string, _s: number) =>
+			`mock://thumb${p}`,
+	};
+});
 
 describe("TripsView", () => {
 	it("builds, refreshes and opens trip", async () => {

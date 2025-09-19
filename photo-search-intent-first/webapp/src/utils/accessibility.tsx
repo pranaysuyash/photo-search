@@ -33,7 +33,6 @@ export const FocusTrap: React.FC<FocusTrapProps> = ({
 	const containerRef = useRef<HTMLDivElement>(null);
 	const previousFocusRef = useRef<HTMLElement | null>(null);
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency exclusion
 	useEffect(() => {
 		const container = containerRef.current;
 		if (!container) return;
@@ -102,6 +101,8 @@ export const FocusTrap: React.FC<FocusTrapProps> = ({
 				previousFocusRef.current.focus();
 			}
 		};
+		// Intentionally excluding dependencies that would cause focus to jump on every render
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [onEscape, autoFocus, restoreFocus]);
 
 	return <div ref={containerRef}>{children}</div>;
@@ -172,7 +173,6 @@ export const AriaLiveRegion: React.FC<AriaLiveRegionProps> = ({
 }) => {
 	const [currentMessage, setCurrentMessage] = useState(message);
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency exclusion
 	useEffect(() => {
 		setCurrentMessage(message);
 
@@ -183,16 +183,17 @@ export const AriaLiveRegion: React.FC<AriaLiveRegionProps> = ({
 
 			return () => clearTimeout(timer);
 		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [message, clearAfter]);
 
-	return (
-		<div
-			aria-live={priority as "polite" | "assertive"}
-			aria-atomic="true"
-			className="sr-only"
-		>
+	return priority === "assertive" ? (
+		<div role="alert" aria-atomic="true" className="sr-only">
 			{currentMessage}
 		</div>
+	) : (
+		<output aria-live="polite" aria-atomic="true" className="sr-only">
+			{currentMessage}
+		</output>
 	);
 };
 
@@ -232,11 +233,13 @@ export function announce(
 	message: string,
 	priority: "polite" | "assertive" = "polite",
 ) {
-    try {
-        window.dispatchEvent(
-            new CustomEvent("announce", { detail: { message, priority } }) as unknown as Event,
-        );
-    } catch {}
+	try {
+		window.dispatchEvent(
+			new CustomEvent("announce", {
+				detail: { message, priority },
+			}) as unknown as Event,
+		);
+	} catch {}
 }
 
 /**
@@ -279,7 +282,6 @@ export const useKeyboardShortcut = (
 	_description?: string,
 	disabled = false,
 ) => {
-	// biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency exclusion
 	useEffect(() => {
 		if (disabled) return;
 
@@ -327,5 +329,6 @@ export const useKeyboardShortcut = (
 
 		window.addEventListener("keydown", handleKeyDown);
 		return () => window.removeEventListener("keydown", handleKeyDown);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [keyCombo, callback, disabled]);
 };

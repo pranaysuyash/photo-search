@@ -16,18 +16,19 @@ import {
 	Trash2,
 } from "lucide-react";
 import type React from "react";
-import type { SearchResult } from "../api";
 import { useMemo, useState } from "react";
-import { humanizeSeconds } from "../utils/time";
-import { apiDelete, apiUndoDelete } from "../api";
+import type { SearchResult } from "../api";
+import { apiDelete, apiSearchLike, apiUndoDelete } from "../api";
+import { FOLDER_MODAL_EVENT } from "../constants/events";
+import type { IndexStatusDetails } from "../contexts/LibraryContext";
+import { useModalContext } from "../contexts/ModalContext";
+import { useResultsConfig } from "../contexts/ResultsConfigContext";
 import { useSearchContext } from "../contexts/SearchContext";
 import { useUIContext } from "../contexts/UIContext";
 import { useSearchCommandCenter } from "../stores/settingsStore";
-import { SearchBar } from "./SearchBar";
-import { apiSearchLike } from "../api";
 import type { PhotoActions, UIActions } from "../stores/types";
-import { useResultsConfig } from "../contexts/ResultsConfigContext";
-import type { IndexStatusDetails } from "../contexts/LibraryContext";
+import { humanizeSeconds } from "../utils/time";
+import { SearchBar } from "./SearchBar";
 
 export type GridSize = "small" | "medium" | "large";
 export type ViewType =
@@ -62,7 +63,6 @@ export interface TopBarProps {
 	setRatingMin: (rating: number) => void;
 
 	// Modal and menu controls
-	setModal: (modal: { kind: string } | null) => void;
 	setIsMobileMenuOpen: (open: boolean) => void;
 	setShowFilters: (show: boolean | ((prev: boolean) => boolean)) => void;
 
@@ -77,7 +77,7 @@ export interface TopBarProps {
 	useOsTrash: boolean;
 	showInfoOverlay: boolean;
 	onToggleInfoOverlay: () => void;
-    // Results view mode provided via ResultsConfig context
+	// Results view mode provided via ResultsConfig context
 	// Index progress
 	diag?: {
 		engines?: Array<{ key: string; index_dir: string; count: number }>;
@@ -100,9 +100,9 @@ export interface TopBarProps {
 	tooltip?: string;
 	ocrReady?: boolean;
 
-    // Actions
-    photoActions: Pick<PhotoActions, "setFavOnly" | "setResults">;
-    uiActions: Pick<UIActions, "setBusy" | "setNote">;
+	// Actions
+	photoActions: Pick<PhotoActions, "setFavOnly" | "setResults">;
+	uiActions: Pick<UIActions, "setBusy" | "setNote">;
 
 	// Toast system
 	toastTimerRef: React.MutableRefObject<number | null>;
@@ -137,7 +137,6 @@ export function TopBar({
 	setCurrentFilter,
 	ratingMin,
 	setRatingMin,
-	setModal,
 	setIsMobileMenuOpen,
 	setShowFilters,
 	selected,
@@ -148,13 +147,13 @@ export function TopBar({
 	useOsTrash,
 	showInfoOverlay,
 	onToggleInfoOverlay,
-    diag,
-    indexedCount,
-    indexedTotal,
-    coveragePct,
-    indexStatus,
-    isIndexing,
-    onIndex,
+	diag,
+	indexedCount,
+	indexedTotal,
+	coveragePct,
+	indexStatus,
+	isIndexing,
+	onIndex,
 	activeJobs,
 	onOpenJobs,
 	progressPct,
@@ -171,20 +170,18 @@ export function TopBar({
 	onOpenThemeModal,
 	onOpenSearchOverlay,
 }: TopBarProps) {
-	const { resultView, setResultView, timelineBucket, setTimelineBucket } = useResultsConfig();
+	const { resultView, setResultView, timelineBucket, setTimelineBucket } =
+		useResultsConfig();
 	const { state: uiState } = useUIContext();
 	const searchCommandCenter = useSearchCommandCenter();
 	const searchCtx = useSearchContext();
 	const [showMore, setShowMore] = useState(false);
+	const { actions: modal } = useModalContext();
 	const numberFormatter = useMemo(() => new Intl.NumberFormat(), []);
 	const rawIndexedCount =
-		typeof indexedCount === "number"
-			? indexedCount
-			: diag?.engines?.[0]?.count;
+		typeof indexedCount === "number" ? indexedCount : diag?.engines?.[0]?.count;
 	const totalForDisplay =
-		typeof indexedTotal === "number"
-			? indexedTotal
-			: indexStatus?.target;
+		typeof indexedTotal === "number" ? indexedTotal : indexStatus?.target;
 	const formattedIndexedCount =
 		typeof rawIndexedCount === "number"
 			? numberFormatter.format(rawIndexedCount)
@@ -217,8 +214,8 @@ export function TopBar({
 		indexStatus?.etaSeconds && Number.isFinite(indexStatus.etaSeconds)
 			? indexStatus.etaSeconds
 			: typeof etaSeconds === "number" && etaSeconds > 0
-			? etaSeconds
-			: undefined;
+				? etaSeconds
+				: undefined;
 	const ratePerSecond =
 		indexStatus?.ratePerSecond && Number.isFinite(indexStatus.ratePerSecond)
 			? indexStatus.ratePerSecond
@@ -233,7 +230,7 @@ export function TopBar({
 					ratePerSecond * 60 >= 10
 						? (ratePerSecond * 60).toFixed(0)
 						: (ratePerSecond * 60).toFixed(1)
-				 } items/min`
+				} items/min`
 			: undefined;
 	const lastIndexedText = indexStatus?.lastIndexedAt
 		? new Date(indexStatus.lastIndexedAt).toLocaleString()
@@ -249,17 +246,12 @@ export function TopBar({
 			)}/${numberFormatter.format(indexStatus.processed.total)}`;
 			lines.push(
 				Number.isFinite(processedPctRaw)
-					? `${baseProcessed} (${Math.max(
-						0,
-						Math.min(100, processedPctRaw),
-					)}%)`
+					? `${baseProcessed} (${Math.max(0, Math.min(100, processedPctRaw))}%)`
 					: baseProcessed,
 			);
 		}
 		const targetForHover =
-			indexStatus?.target !== undefined
-				? indexStatus.target
-				: totalForDisplay;
+			indexStatus?.target !== undefined ? indexStatus.target : totalForDisplay;
 		const indexedForHover =
 			indexStatus?.indexed !== undefined
 				? indexStatus.indexed
@@ -281,9 +273,7 @@ export function TopBar({
 			lines.push(`${driftLabel}: ${numberFormatter.format(driftAbs)}`);
 		}
 		if (effectiveEtaSeconds) {
-			lines.push(
-				`ETA: ${humanizeSeconds(Math.round(effectiveEtaSeconds))}`,
-			);
+			lines.push(`ETA: ${humanizeSeconds(Math.round(effectiveEtaSeconds))}`);
 		}
 		if (ratePerSecond && ratePerSecond > 0) {
 			const perMinute = ratePerSecond * 60;
@@ -317,8 +307,15 @@ export function TopBar({
 		else await searchCtx.actions.performSearch(t);
 	};
 
+	const handleOpenFolderModal = () => {
+		modal.open("folder");
+		if (typeof window !== "undefined") {
+			window.dispatchEvent(new CustomEvent(FOLDER_MODAL_EVENT));
+		}
+	};
+
 	return (
-		<div className="top-bar top-bar-mobile bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-700/50">
+		<div className="top-bar bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-700/50">
 			{/* Busy progress bar */}
 			{busy && (
 				<div className="progress-bar">
@@ -471,7 +468,7 @@ export function TopBar({
 					<motion.button
 						type="button"
 						className="ml-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
-						onClick={() => setModal({ kind: "folder" as unknown })}
+						onClick={handleOpenFolderModal}
 						aria-label="Select photo folder"
 						data-tour="select-library"
 						whileHover={{ scale: 1.05 }}
@@ -511,7 +508,7 @@ export function TopBar({
 					<motion.button
 						type="button"
 						className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
-						onClick={() => setModal({ kind: "save" })}
+						onClick={() => modal.open("save")}
 						title="Save this search for later"
 						aria-label="Save current search"
 						whileHover={{ scale: 1.05 }}
@@ -539,7 +536,9 @@ export function TopBar({
 									)}
 								</div>
 								{coverageText && (
-									<span className="indexed-coverage">{coverageText} coverage</span>
+									<span className="indexed-coverage">
+										{coverageText} coverage
+									</span>
 								)}
 								{isIndexing && (etaInline || rateInline) && (
 									<span className="indexed-meta">
@@ -547,7 +546,9 @@ export function TopBar({
 									</span>
 								)}
 								{!isIndexing && lastIndexedText && (
-									<span className="indexed-meta">Last index {lastIndexedText}</span>
+									<span className="indexed-meta">
+										Last index {lastIndexedText}
+									</span>
 								)}
 								{searchCommandCenter &&
 									typeof activeJobs === "number" &&
@@ -565,22 +566,22 @@ export function TopBar({
 										isIndexing
 											? "Indexing photos (running)"
 											: rawIndexedCount && rawIndexedCount > 0
-											? "Reindex your library"
-											: "Start indexing your library"
+												? "Reindex your library"
+												: "Start indexing your library"
 									}
 									title={
 										isIndexing
 											? "Indexing runs in the background. You can keep working."
 											: rawIndexedCount && rawIndexedCount > 0
-											? "Reindex photos"
-											: "Start indexing"
+												? "Reindex photos"
+												: "Start indexing"
 									}
 								>
 									{isIndexing
 										? "Indexing…"
 										: rawIndexedCount && rawIndexedCount > 0
-										? "Reindex"
-										: "Index"}
+											? "Reindex"
+											: "Index"}
 								</button>
 								{isIndexing && (
 									<button
@@ -604,12 +605,12 @@ export function TopBar({
 												progressPct >= 0 &&
 												progressPct <= 1
 													? {
-														width: `${Math.max(
-															4,
-															Math.round(progressPct * 100),
-														)}%`,
-													}
-												: undefined
+															width: `${Math.max(
+																4,
+																Math.round(progressPct * 100),
+															)}%`,
+														}
+													: undefined
 											}
 										/>
 									</div>
@@ -687,7 +688,7 @@ export function TopBar({
 						type="button"
 						className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
 						title="Settings & Indexing"
-						onClick={() => setModal({ kind: "folder" })}
+						onClick={() => modal.open("folder")}
 						aria-label="Open settings and indexing options"
 						whileHover={{ scale: 1.05 }}
 						whileTap={{ scale: 0.95 }}
@@ -721,21 +722,21 @@ export function TopBar({
 							<button
 								type="button"
 								className="menu-item"
-								onClick={() => setModal({ kind: "advanced" as unknown })}
+								onClick={() => modal.open("advanced")}
 							>
 								<IconSearch className="w-4 h-4 mr-2" /> Advanced Search
 							</button>
 							<button
 								type="button"
 								className="menu-item"
-								onClick={() => setModal({ kind: "tag" })}
+								onClick={() => modal.open("tag")}
 							>
 								<IconTag className="w-4 h-4 mr-2" /> Tag Selected
 							</button>
 							<button
 								type="button"
 								className="menu-item"
-								onClick={() => setModal({ kind: "export" })}
+								onClick={() => modal.open("export")}
 							>
 								<Download className="w-4 h-4 mr-2" /> Export
 							</button>
@@ -800,23 +801,23 @@ export function TopBar({
 			{/* View mode toggle remains visible */}
 			<div className="view-toggle">
 				<span>View:</span>
-                <button
-                    type="button"
-                    className={`view-button ${resultView === "grid" ? "active" : ""}`}
-                    onClick={() => setResultView("grid")}
-                    aria-pressed={resultView === "grid"}
-                >
-                    Grid
-                </button>
-                <button
-                    type="button"
-                    className={`view-button ${resultView === "timeline" ? "active" : ""}`}
-                    onClick={() => setResultView("timeline")}
-                    aria-pressed={resultView === "timeline"}
-                >
-                    Timeline
-                </button>
-            </div>
+				<button
+					type="button"
+					className={`view-button ${resultView === "grid" ? "active" : ""}`}
+					onClick={() => setResultView("grid")}
+					aria-pressed={resultView === "grid"}
+				>
+					Grid
+				</button>
+				<button
+					type="button"
+					className={`view-button ${resultView === "timeline" ? "active" : ""}`}
+					onClick={() => setResultView("timeline")}
+					aria-pressed={resultView === "timeline"}
+				>
+					Timeline
+				</button>
+			</div>
 			{/* Boolean query hints */}
 			{/* Boolean query hints (hidden when Search Command Center is enabled) */}
 			{!searchCommandCenter && (
@@ -881,22 +882,22 @@ export function TopBar({
 					))}
 				</div>
 			)}
-            {resultView === "timeline" && (
-                <div className="view-toggle">
-                    <span>Bucket:</span>
-                    {(["day", "week", "month"] as const).map((b) => (
-                        <button
-                            key={b}
-                            type="button"
-                            className={`view-button ${timelineBucket === b ? "active" : ""}`}
-                            onClick={() => setTimelineBucket(b)}
-                            aria-pressed={timelineBucket === b}
-                        >
-                            {b[0].toUpperCase() + b.slice(1)}
-                        </button>
-                    ))}
-                </div>
-            )}
+			{resultView === "timeline" && (
+				<div className="view-toggle">
+					<span>Bucket:</span>
+					{(["day", "week", "month"] as const).map((b) => (
+						<button
+							key={b}
+							type="button"
+							className={`view-button ${timelineBucket === b ? "active" : ""}`}
+							onClick={() => setTimelineBucket(b)}
+							aria-pressed={timelineBucket === b}
+						>
+							{b[0].toUpperCase() + b.slice(1)}
+						</button>
+					))}
+				</div>
+			)}
 
 			{selected.size > 0 && (
 				<div className="selected-actions">
@@ -907,7 +908,7 @@ export function TopBar({
 						<button
 							type="button"
 							className="action-button"
-							onClick={() => setModal({ kind: "export" })}
+							onClick={() => modal.open("export")}
 							aria-label="Export selected photos"
 						>
 							<Download className="w-4 h-4" />
@@ -916,28 +917,28 @@ export function TopBar({
 						<button
 							type="button"
 							className="action-button"
-							onClick={() => setModal({ kind: "enhanced-share" })}
+							onClick={() => modal.open("enhanced-share")}
 							aria-label="Share selected photos"
 						>
 							<IconSearch className="w-4 h-4" />
 							Share
 						</button>
 						{/* Feature-flagged: Sharing v1 (stubbed UI) */}
-						{(import.meta as unknown).env?.VITE_FF_SHARING_V1 === "1" && (
+						{(import.meta.env?.VITE_FF_SHARING_V1 as string) === "1" && (
 							<button
 								type="button"
 								className="action-button"
-								onClick={() => setModal({ kind: "share" as unknown })}
+								onClick={() => modal.open("share")}
 								aria-label="Share selected photos"
 							>
 								<IconSearch className="w-4 h-4" /> Share
 							</button>
 						)}
-						{(import.meta as unknown).env?.VITE_FF_SHARING_V1 === "1" && (
+						{(import.meta.env?.VITE_FF_SHARING_V1 as string) === "1" && (
 							<button
 								type="button"
 								className="action-button"
-								onClick={() => setModal({ kind: "shareManage" as unknown })}
+								onClick={() => modal.open("shareManage")}
 								aria-label="Manage shared links"
 							>
 								Manage Shares
@@ -955,7 +956,7 @@ export function TopBar({
 						<button
 							type="button"
 							className="action-button"
-							onClick={() => setModal({ kind: "advanced" as unknown })}
+							onClick={() => modal.open("advanced")}
 							aria-label="Open advanced search"
 							data-tour="advanced-button"
 						>
@@ -964,33 +965,33 @@ export function TopBar({
 						<button
 							type="button"
 							className="action-button"
-							onClick={() => setModal({ kind: "tag" })}
+							onClick={() => modal.open("tag")}
 							aria-label="Tag selected photos"
 						>
 							<IconTag className="w-4 h-4" />
 							Tag
 						</button>
 						{selected.size === 1 && (
-                            <button
-                                type="button"
-                                className="action-button"
-                                onClick={async () => {
-                                    const p = Array.from(selected)[0];
-                                    uiActions.setBusy("Searching similar…");
-                                    try {
-                                        const r = await apiSearchLike(dir, p, engine, topK);
-                                        photoActions.setResults(r.results || []);
-                                        setSelectedView("results");
-                                    } catch (e) {
-                                        uiActions.setNote(
-                                            e instanceof Error ? e.message : "Search failed",
-                                        );
-                                    } finally {
-                                        uiActions.setBusy("");
-                                    }
-                                }}
-                                aria-label="Find similar photos to the selected photo"
-                            >
+							<button
+								type="button"
+								className="action-button"
+								onClick={async () => {
+									const p = Array.from(selected)[0];
+									uiActions.setBusy("Searching similar…");
+									try {
+										const r = await apiSearchLike(dir, p, engine, topK);
+										photoActions.setResults(r.results || []);
+										setSelectedView("results");
+									} catch (e) {
+										uiActions.setNote(
+											e instanceof Error ? e.message : "Search failed",
+										);
+									} finally {
+										uiActions.setBusy("");
+									}
+								}}
+								aria-label="Find similar photos to the selected photo"
+							>
 								<IconSearch className="w-4 h-4" /> Similar
 							</button>
 						)}
@@ -998,7 +999,7 @@ export function TopBar({
 							<button
 								type="button"
 								className="action-button"
-								onClick={() => setModal({ kind: "likeplus" })}
+								onClick={() => modal.open("likeplus")}
 								aria-label="Find similar photos with additional text query"
 							>
 								<IconSearch className="w-4 h-4" /> Similar + Text
@@ -1007,7 +1008,7 @@ export function TopBar({
 						<button
 							type="button"
 							className="action-button"
-							onClick={() => setModal({ kind: "collect" })}
+							onClick={() => modal.open("collect")}
 							aria-label="Add selected photos to a collection"
 						>
 							<FolderOpen className="w-4 h-4" /> Add to Collection
@@ -1015,7 +1016,7 @@ export function TopBar({
 						<button
 							type="button"
 							className="action-button"
-							onClick={() => setModal({ kind: "removeCollect" as unknown })}
+							onClick={() => modal.open("removeCollect")}
 							aria-label="Remove selected photos from a collection"
 						>
 							<FolderOpen className="w-4 h-4 rotate-180" /> Remove from
