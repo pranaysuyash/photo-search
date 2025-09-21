@@ -7,6 +7,8 @@ const { autoUpdater } = require('electron-updater')
 const { loadLicense, licenseAllowsMajor } = require('./license')
 const http = require('http')
 const crypto = require('crypto')
+const fs = require('fs')
+const fsp = fs.promises
 
 // In some environments, GPU acceleration can cause a blank window. Disable in dev.
 if (isDev) {
@@ -18,6 +20,200 @@ let viteProc = null
 let mainWindow = null
 let apiToken = null
 let currentTarget = null
+let modelStatus = {
+  ensured: false,
+  copied: false,
+  errors: [],
+  source: null,
+  destination: null,
+  lastChecked: null,
+}
+
+function updateModelStatus(partial) {
+  modelStatus = {
+    ...modelStatus,
+    ...partial,
+    lastChecked: new Date().toISOString(),
+  }
+  return modelStatus
+}
+
+function getResourcesModelsPath() {
+  const packagedPath = path.join(process.resourcesPath || '', 'models')
+  if (packagedPath && fs.existsSync(packagedPath)) {
+    return packagedPath
+  }
+  const devPath = path.resolve(__dirname, 'models')
+  if (fs.existsSync(devPath)) {
+    return devPath
+  }
+  return null
+}
+
+async function computeDirectoryDigest(directory) {
+  const hash = crypto.createHash('sha256')
+  let totalBytes = 0
+
+  async function walk(current, relative) {
+    const entries = await fsp.readdir(current, { withFileTypes: true })
+    entries.sort((a, b) => a.name.localeCompare(b.name))
+    for (const entry of entries) {
+      const entryPath = path.join(current, entry.name)
+      const relPath = relative ? `${relative}/${entry.name}` : entry.name
+      if (entry.isDirectory()) {
+        await walk(entryPath, relPath)
+      } else if (entry.isFile()) {
+        hash.update(relPath)
+        const stream = fs.createReadStream(entryPath)
+        for await (const chunk of stream) {
+          hash.update(chunk)
+        }
+        const stat = await fsp.stat(entryPath)
+        totalBytes += stat.size
+      }
+    }
+  }
+
+  await walk(directory, '')
+  return { digest: hash.digest('hex'), totalBytes }
+}
+
+async function verifyModelDirectory(directory, expectedHash) {
+  if (!expectedHash) return false
+  try {
+    const { digest } = await computeDirectoryDigest(directory)
+    return digest === expectedHash
+  } catch (error) {
+    if (error && error.code === 'ENOENT') return false
+    console.warn('[Models] Verification failure:', error?.message || error)
+    return false
+  }
+}
+
+async function copyModelDirectory(source, destination) {
+  await fsp.rm(destination, { recursive: true, force: true })
+  await fsp.mkdir(path.dirname(destination), { recursive: true })
+  await fsp.cp(source, destination, { recursive: true })
+}
+
+async function ensureBundledModels({ force = false, interactive = false } = {}) {
+  const modelsRoot = getResourcesModelsPath()
+  const errors = []
+  let copied = false
+
+  if (!modelsRoot) {
+    const message = 'Bundled models were not found. Run "npm --prefix photo-search-intent-first/electron run prepare:models" before packaging.'
+    errors.push(message)
+    updateModelStatus({ ensured: false, copied: false, errors, source: null, destination: null })
+    if (interactive) {
+      dialog.showErrorBox('Models Missing', message)
+    }
+    return false
+  }
+
+  const manifestPath = path.join(modelsRoot, 'manifest.json')
+  if (!fs.existsSync(manifestPath)) {
+    const templatePath = path.join(modelsRoot, 'manifest.template.json')
+    const message = fs.existsSync(templatePath)
+      ? 'Bundled models are not prepared. Run "npm --prefix photo-search-intent-first/electron run prepare:models" to download assets before building Electron packages.'
+      : 'Bundled model manifest missing. Ensure prepare_models script has been executed.'
+    errors.push(message)
+    updateModelStatus({ ensured: false, copied: false, errors, source: modelsRoot, destination: null })
+    if (interactive) {
+      dialog.showErrorBox('Models Not Prepared', message)
+    }
+    return false
+  }
+
+  let manifest
+  try {
+    const raw = fs.readFileSync(manifestPath, 'utf-8')
+    const parsed = JSON.parse(raw)
+    manifest = Array.isArray(parsed) ? parsed : parsed?.models
+  } catch (error) {
+    const message = `Failed to parse manifest: ${error?.message || error}`
+    errors.push(message)
+    updateModelStatus({ ensured: false, copied: false, errors, source: modelsRoot, destination: null })
+    if (interactive) {
+      dialog.showErrorBox('Model Manifest Error', message)
+    }
+    return false
+  }
+
+  if (!Array.isArray(manifest) || manifest.length === 0) {
+    const message = 'Model manifest is empty. Re-run the prepare_models script.'
+    errors.push(message)
+    updateModelStatus({ ensured: false, copied: false, errors, source: modelsRoot, destination: null })
+    if (interactive) {
+      dialog.showErrorBox('Model Manifest Error', message)
+    }
+    return false
+  }
+
+  const destinationRoot = path.join(app.getPath('userData'), 'models')
+  await fsp.mkdir(destinationRoot, { recursive: true })
+
+  for (const entry of manifest) {
+    const localName = entry.local_name || entry.localName || entry.name
+    if (!localName) {
+      errors.push('Manifest entry missing local_name field.')
+      continue
+    }
+    const sourceDir = path.join(modelsRoot, localName)
+    const destDir = path.join(destinationRoot, localName)
+
+    if (!fs.existsSync(sourceDir)) {
+      errors.push(`Bundled model directory missing: ${sourceDir}`)
+      continue
+    }
+
+    let needsCopy = force
+    if (!needsCopy) {
+      needsCopy = !(await verifyModelDirectory(destDir, entry.sha256))
+    }
+
+    if (needsCopy) {
+      try {
+        console.log(`[Models] Staging ${localName} → ${destDir}`)
+        await copyModelDirectory(sourceDir, destDir)
+        copied = true
+        if (entry.sha256) {
+          const verified = await verifyModelDirectory(destDir, entry.sha256)
+          if (!verified) {
+            errors.push(`Hash verification failed after copying ${localName}.`)
+          }
+        }
+      } catch (error) {
+        errors.push(`Failed to stage ${localName}: ${error?.message || error}`)
+      }
+    }
+  }
+
+  const ensured = errors.length === 0
+  updateModelStatus({ ensured, copied, errors, source: modelsRoot, destination: destinationRoot })
+
+  if (ensured) {
+    process.env.PHOTOVAULT_MODEL_DIR = destinationRoot
+    process.env.SENTENCE_TRANSFORMERS_HOME = destinationRoot
+    process.env.TRANSFORMERS_CACHE = destinationRoot
+    process.env.TRANSFORMERS_OFFLINE = '1'
+    process.env.HF_HUB_OFFLINE = '1'
+    process.env.OFFLINE_MODE = '1'
+  }
+
+  if (interactive) {
+    if (ensured) {
+      dialog.showMessageBox({
+        type: 'info',
+        message: copied ? 'Bundled models refreshed successfully.' : 'Bundled models are already up to date.',
+      })
+    } else {
+      dialog.showErrorBox('Bundled Models Issue', errors.join('\n'))
+    }
+  }
+
+  return ensured
+}
 
 function checkAPIRunning(port = 5001) {
   return new Promise((resolve) => {
@@ -187,6 +383,10 @@ function setupMenu() {
       submenu: [
         { label: 'Check for Updates…', click: () => checkForUpdates(true) },
         { label: 'Manage License…', click: manageLicense },
+        {
+          label: 'Refresh Bundled Models…',
+          click: () => ensureBundledModels({ force: true, interactive: true }),
+        },
         { type: 'separator' },
         { role: 'quit' }
       ]
@@ -246,6 +446,13 @@ ipcMain.handle('set-allowed-root', async (_e, p) => {
     }
   } catch {}
   return false
+})
+
+ipcMain.handle('models:get-status', async () => modelStatus)
+
+ipcMain.handle('models:refresh', async () => {
+  const ok = await ensureBundledModels({ force: true })
+  return { ok, status: modelStatus }
 })
 
 async function checkForUpdates(userTriggered = false) {
@@ -315,6 +522,11 @@ app.whenReady().then(async () => {
     }
   })
   
+  const modelsReady = await ensureBundledModels()
+  if (!modelsReady) {
+    console.warn('[Models] Bundled models are unavailable; local provider may be limited until assets are prepared.')
+  }
+
   const isApiRunning = await checkAPIRunning(8000)
   if (!isApiRunning) {
     console.log('Starting API server...')

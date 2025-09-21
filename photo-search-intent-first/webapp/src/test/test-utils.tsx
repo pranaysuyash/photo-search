@@ -48,10 +48,6 @@ vi.mock("../components/AccessibilityPanel", () => ({
 	}),
 }));
 
-// Silence ModalDebug console output during tests
-vi.mock("../components/ModalDebug", () => ({
-	ModalDebug: () => null,
-}));
 
 // Mock the theme store (simulate Zustand selector behavior)
 vi.mock("../stores/settingsStore", async (importOriginal) => {

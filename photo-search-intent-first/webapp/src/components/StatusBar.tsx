@@ -13,6 +13,7 @@ import {
 	Zap,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { OfflineStatusIndicator } from "./OfflineStatusIndicator";
 
 interface StatusBarProps {
 	photoCount?: number;
@@ -148,17 +149,7 @@ export function StatusBar({
 
 					{/* Connection status */}
 					<div className="status-item">
-						{isConnected ? (
-							<>
-								<Wifi className="status-icon" />
-								<span className="status-text success">Connected</span>
-							</>
-						) : (
-							<>
-								<WifiOff className="status-icon" />
-								<span className="status-text error">Offline</span>
-							</>
-						)}
+						<OfflineStatusIndicator />
 					</div>
 				</div>
 			</div>

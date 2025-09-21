@@ -12,6 +12,17 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      (function () {
+        const ua = navigator.userAgent.toLowerCase();
+        const hasElectronApi = typeof window.electronAPI !== "undefined";
+        const isElectron = ua.includes("electron") || hasElectronApi;
+        if (isElectron) {
+          document.documentElement.dataset.runtime = "electron";
+          window.__ELECTRON_RUNTIME__ = true;
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
   </html>

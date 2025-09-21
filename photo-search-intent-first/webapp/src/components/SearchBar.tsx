@@ -67,12 +67,14 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
       }
     }, [searchText]);
 
-    // Debounce search suggestions loading
+    // Debounce search suggestions loading using configurable delay from service
     const debouncedSearchText = useMemo(() => {
       let timer: NodeJS.Timeout;
+      const debounceDelay = searchHistoryService.getConfig().DEBOUNCE_DELAY;
+
       return (_text: string, cb: () => void) => {
         clearTimeout(timer);
-        timer = setTimeout(cb, 150);
+        timer = setTimeout(cb, debounceDelay);
         return () => clearTimeout(timer);
       };
     }, []);

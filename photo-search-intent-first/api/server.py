@@ -53,17 +53,43 @@ from domain.models import SUPPORTED_EXTS
 app = FastAPI(title="Photo Search – Intent-First API")
 _START_TIME = time.time()
 
-# CORS / Origin policy – prefer explicit local origins when possible
-_allowed_origins = [
-    "http://127.0.0.1:5173",
-    "http://localhost:5173",
-    "http://127.0.0.1:5174",
-    "http://localhost:5174",
-    "http://127.0.0.1:8000",
-    "http://localhost:8000",
-    "http://0.0.0.0:8000",  # Add this for when backend runs on 0.0.0.0
-    "app://local",  # Electron packaged build origin when using the custom protocol
-]
+# CORS / Origin policy – configurable via environment variables
+def _get_cors_origins() -> List[str]:
+    """Get CORS origins from environment variables or defaults."""
+    import os
+
+    # Default origins for local development
+    default_origins = [
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+        "http://127.0.0.1:5174",
+        "http://localhost:5174",
+        "http://127.0.0.1:8000",
+        "http://localhost:8000",
+        "http://0.0.0.0:8000",
+        "app://local",  # Electron packaged build origin when using the custom protocol
+    ]
+
+    # Allow override via environment variable (comma-separated)
+    cors_origins_env = os.getenv("CORS_ORIGINS")
+    if cors_origins_env:
+        origins = [origin.strip() for origin in cors_origins_env.split(",")]
+        # Filter out empty strings
+        origins = [origin for origin in origins if origin]
+        if origins:
+            return origins
+
+    # Allow additional origins via environment variable
+    additional_origins_env = os.getenv("ADDITIONAL_CORS_ORIGINS")
+    if additional_origins_env:
+        additional_origins = [origin.strip() for origin in additional_origins_env.split(",")]
+        additional_origins = [origin for origin in additional_origins if origin]
+        if additional_origins:
+            return default_origins + additional_origins
+
+    return default_origins
+
+_allowed_origins = _get_cors_origins()
 
 app.add_middleware(
     CORSMiddleware,

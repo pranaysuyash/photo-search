@@ -4,15 +4,15 @@
 
 Photo Search supports multiple strategies for model management to ensure offline functionality:
 
-1. **First-Run Import UX** (Recommended) - User selects model directory during setup
-2. **Pre-packaged Models** (Optional) - Models bundled with Electron installer
-3. **Environment-based Configuration** - Automatic model directory detection
+1. **Electron Bundled Models** (Default) – Installer ships CLIP weights and stages them on first launch
+2. **First-Run Import UX** (Override) – Users can import alternate weights or point to removable storage
+3. **Environment-based Configuration** – Automatic model directory detection for CLI/API deployments
 
 ## Decision Summary
 
-- **Primary path**: rely on the interactive first-run import flow so users can point the app at pre-downloaded CLIP weights on demand.
-- **Fallback**: keep the Electron post-install hook documented, but treat it as an opt-in for OEM/enterprise builds because of the 500MB+ footprint.
-- **Documentation**: surface default lookup order and offline env vars in the First Run modal help text and in `OFFLINE_SETUP_GUIDE.md` (done).
+- **Primary path**: ship bundled CLIP weights with Electron installers (via `npm --prefix photo-search-intent-first/electron run prepare:models`).
+- **Override**: keep the interactive first-run import flow so operators can swap in custom weights without rebuilding the installer.
+- **Documentation**: surface default lookup order and offline env vars in the First Run modal help text and in `OFFLINE_SETUP_GUIDE.md`.
 - **Testing**: cover both providers with `offline_provider_test.py` using a temporary cache dir to confirm env overrides before shipping Electron updates.
 
 ## Current Implementation
@@ -115,54 +115,21 @@ def __init__(self, model_name: str = "clip-ViT-B-32", device: Optional[str] = No
         pass
 ```
 
-## Optional: Electron Model Packaging
+## Electron Bundled Models
 
-### Strategy Decision
+- **Preparation script**: `npm --prefix photo-search-intent-first/electron run prepare:models`
+  - Reads `electron/models/manifest.template.json`
+  - Downloads the Hugging Face repositories (`sentence-transformers/clip-ViT-B-32`, `openai/clip-vit-base-patch32`)
+  - Computes deterministic SHA-256 digests for each staged model directory
+  - Writes `electron/models/manifest.json` with hashes, sizes, and metadata
+- **Packaging**: `electron/package.json` runs `prepare:models` before `electron-builder`, shipping `electron/models/**` as `extraResources` inside the installer.
+- **Runtime**: `ensureBundledModels()` (Electron `main.js`) verifies the manifest, copies models into `{appData}/photo-search/models`, and exports offline environment variables (`PHOTOVAULT_MODEL_DIR`, `SENTENCE_TRANSFORMERS_HOME`, `TRANSFORMERS_OFFLINE`, `HF_HUB_OFFLINE`).
+- **Refresh**: menu action **Photo Search ▸ Refresh Bundled Models…** re-stages assets; renderer processes can read status via `ipcMain.handle('models:get-status')`.
 
-**Recommendation**: Do NOT pre-package models with Electron installer due to:
-
-- Large model sizes (500MB+ for CLIP models)
-- Platform-specific optimizations
-- User preference for model versions
-- Storage and bandwidth costs
-
-### Alternative Approach (If Needed)
-
-If model packaging is required, use a post-install script:
-
-```json
-// electron/package.json
-{
-  "scripts": {
-    "postinstall": "node scripts/download-models.js"
-  }
-}
-```
-
-```javascript
-// scripts/download-models.js
-const { execSync } = require("child_process");
-const path = require("path");
-const fs = require("fs");
-
-const modelDir = path.join(
-  process.env.APPDATA || process.env.HOME,
-  "photo-search",
-  "models"
-);
-
-// Download minimal CLIP model
-execSync(
-  `python -c "
-from transformers import AutoProcessor, CLIPModel
-processor = AutoProcessor.from_pretrained('openai/clip-vit-base-patch32')
-model = CLIPModel.from_pretrained('openai/clip-vit-base-patch32')
-"`,
-  {
-    cwd: modelDir,
-    env: { ...process.env, TRANSFORMERS_CACHE: modelDir },
-  }
-);
+```bash
+npm --prefix photo-search-intent-first/electron run build:ui
+npm --prefix photo-search-intent-first/electron run prepare:models
+npm --prefix photo-search-intent-first/electron run dist
 ```
 
 ## User Experience Flow

@@ -20,6 +20,7 @@ import { SuspenseFallback } from "./SuspenseFallback";
 import { StatsBar } from "./StatsBar";
 import { FilterPanel } from "./FilterPanel";
 import { ModalManager } from "./ModalManager";
+import { ModalDataProvider } from "../contexts/ModalDataContext";
 import { VideoLightbox } from "./VideoLightbox";
 import { Lightbox } from "./Lightbox";
 import { OverlayLayer } from "./OverlayLayer";
@@ -30,7 +31,6 @@ import { RecentActivityPanel } from "./RecentActivityPanel";
 import { SearchHistoryPanel } from "./SearchHistoryPanel";
 import { JobsCenter, type Job } from "./JobsCenter";
 import { OfflineIndicator } from "./OfflineIndicator";
-import { ModalDebug } from "./ModalDebug";
 import {
   AccessibilityPanel,
   type AccessibilitySettings,
@@ -654,6 +654,8 @@ export function AppChrome({
               onOpenDiagnostics: modalControls.openDiagnostics,
               toastTimerRef,
               setToast,
+              enableDemoLibrary,
+              onLibraryChange: settingsActions.setDir,
             }}
             quickActions={{
               prefersReducedMotion,
@@ -684,10 +686,21 @@ export function AppChrome({
               >
                 <Suspense fallback={<SuspenseFallback label="Loading…" />}>
                   <Routes>
-                    <Route path="/people" element={<PeopleViewContainer />} />
+                    <Route
+                      path="/people"
+                      element={
+                        <PeopleViewContainer
+                          onOpenHelp={modalControls.openHelp}
+                        />
+                      }
+                    />
                     <Route
                       path="/collections"
-                      element={<CollectionsViewContainer />}
+                      element={
+                        <CollectionsViewContainer
+                          onOpenHelp={modalControls.openHelp}
+                        />
+                      }
                     />
                     <Route
                       path="/library"
@@ -740,6 +753,11 @@ export function AppChrome({
                               rowsEqual(prev, rows) ? prev : rows
                             )
                           }
+                          onOpenHelp={modalControls.openHelp}
+                          onOpenFilters={() => setShowFilters(true)}
+                          onOpenAdvanced={() => {
+                            /* TODO: Open advanced search modal */
+                          }}
                         />
                       }
                     />
@@ -820,6 +838,7 @@ export function AppChrome({
                             if (k) photoActions.setTopK(k);
                             doSearchImmediate(q);
                           }}
+                          onOpenHelp={modalControls.openHelp}
                         />
                       }
                     />
@@ -895,36 +914,46 @@ export function AppChrome({
                   onDeletePreset={deletePreset}
                 />
 
-                <ModalManager
-                  selected={selected}
-                  dir={dir}
-                  engine={engine}
-                  topK={topK}
-                  highContrast={highContrast}
-                  useFast={useFast}
-                  fastKind={fastKind}
-                  useCaps={useCaps}
-                  useOcr={useOcr}
-                  hasText={hasText}
-                  useOsTrash={Boolean(settingsActions.setUseOsTrash)}
-                  settingsActions={settingsActions}
-                  setBusy={uiActions.setBusy}
-                  setNote={uiActions.setNote}
-                  setResults={photoActions.setResults}
-                  setSaved={photoActions.setSaved}
-                  setCollections={photoActions.setCollections}
-                  libIndex={() => lib.index()}
-                  prepareFast={prepareFast}
-                  buildOCR={buildOCR}
-                  buildMetadata={buildMetadata}
-                  searchText={searchText}
-                  query={query}
-                  collections={collections}
-                  tagSelected={tagSelected}
-                  clusters={clusters}
-                  allTags={allTags}
-                  meta={meta}
-                />
+                <ModalDataProvider
+                  data={{
+                    selected,
+                    dir,
+                    engine,
+                    topK,
+                    highContrast,
+                    useFast,
+                    fastKind,
+                    useCaps,
+                    useOcr,
+                    hasText,
+                    useOsTrash: Boolean(settingsActions.setUseOsTrash),
+                    searchText,
+                    query,
+                    collections,
+                    clusters,
+                    allTags,
+                    meta,
+                  }}
+                  actions={{
+                    settingsActions,
+                    uiActions: {
+                      setBusy: uiActions.setBusy,
+                      setNote: uiActions.setNote,
+                    },
+                    photoActions: {
+                      setResults: photoActions.setResults,
+                      setSaved: photoActions.setSaved,
+                      setCollections: photoActions.setCollections,
+                    },
+                    libIndex: () => lib.index(),
+                    prepareFast,
+                    buildOCR,
+                    buildMetadata,
+                    tagSelected,
+                  }}
+                >
+                  <ModalManager />
+                </ModalDataProvider>
 
                 {detailIdx !== null &&
                   results &&
@@ -1210,8 +1239,7 @@ export function AppChrome({
           setShowOnboardingTour={setShowOnboardingTour}
         />
 
-        <ModalDebug />
-      </div>
+              </div>
     </MobileOptimizations>
   );
 

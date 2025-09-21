@@ -60,6 +60,18 @@ Offline Capabilities (Intent-First)
 - **PWA Offline**: Service worker caches shell, thumbnails, and read-only JSON for offline browsing
 - **Air-gapped Support**: Works without network connectivity after initial installation
 
+Electron Packaging (Intent-First)
+
+1. Install Python deps (`pip install -r photo-search-intent-first/requirements.txt`) so the bundling script can talk to Hugging Face.
+2. Prepare the UI bundle: `npm --prefix photo-search-intent-first/electron run build:ui` (runs Vite build in the webapp).
+3. Stage bundled models (downloads, verifies hashes, and writes `manifest.json`):
+   ```bash
+   npm --prefix photo-search-intent-first/electron run prepare:models
+   ```
+4. Create installers: `npm --prefix photo-search-intent-first/electron run dist` (`pack` builds unpacked directories).
+
+The `prepare:models` step downloads the CLIP weights specified in `electron/models/manifest.template.json`, records a deterministic hash per model, and ships them via Electron `extraResources`. On application launch the runtime verifies hashes, copies the models into `{appData}/photo-search/models`, and exports environment variables (`PHOTOVAULT_MODEL_DIR`, `TRANSFORMERS_OFFLINE=1`, `SENTENCE_TRANSFORMERS_HOME`, etc.) so the local provider never reaches out to the network. Use **Photo Search ▸ Refresh Bundled Models…** from the app menu to force a re-stage if assets become corrupted.
+
 FAISS vs others
 
 - We support multiple ANN options in both apps (optional installs on Classic):

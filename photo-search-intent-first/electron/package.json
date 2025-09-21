@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "node run-electron.js",
     "build:ui": "cd ../webapp && npm install && npm run build",
-    "pack": "npm run build:ui && electron-builder --dir",
-    "dist": "npm run build:ui && electron-builder -mwl"
+    "prepare:models": "python ../scripts/prepare_models.py",
+    "pack": "npm run build:ui && npm run prepare:models && electron-builder --dir",
+    "dist": "npm run build:ui && npm run prepare:models && electron-builder -mwl"
   },
   "devDependencies": {
     "electron": "^29.0.0",
@@ -27,12 +28,9 @@
     ],
     "extraResources": [
       {
-        "from": "../models/",
-        "to": "models/",
-        "filter": [
-          "**/clip-vit-base-patch32/**",
-          "**/sentence-transformers-clip/**"
-        ]
+        "from": "models",
+        "to": "models",
+        "filter": ["**/*"]
       }
     ],
     "directories": {

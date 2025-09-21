@@ -10,6 +10,8 @@ import {
   Star,
   User,
   Zap,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
@@ -221,9 +223,16 @@ export function SmartAlbumSuggestions({
   };
 
   return (
-    <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+    <div 
+      className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm"
+      role="region"
+      aria-labelledby="smart-album-suggestions-heading"
+    >
       <div className="border-b border-border px-3 py-3 sm:px-4 sm:py-4 flex-shrink-0">
-        <h3 className="flex items-center gap-2 text-sm sm:text-base font-semibold text-foreground">
+        <h3 
+          id="smart-album-suggestions-heading"
+          className="flex items-center gap-2 text-sm sm:text-base font-semibold text-foreground"
+        >
           <span className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
             <FolderPlus className="h-4 w-4 sm:h-5 sm:w-5" />
           </span>
@@ -252,6 +261,7 @@ export function SmartAlbumSuggestions({
                   onClick={() => toggleSection(type)}
                   aria-expanded={isExpanded}
                   aria-controls={sectionId}
+                  aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${info?.title ?? type} section`}
                 >
                   <span className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm font-medium text-foreground">
                     <span className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-muted text-muted-foreground">
@@ -259,12 +269,22 @@ export function SmartAlbumSuggestions({
                     </span>
                     <span className="truncate">{info?.title ?? type}</span>
                   </span>
-                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    {isExpanded ? "Hide" : "Show"}
+                  <span className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {isExpanded ? (
+                      <>
+                        <ChevronUp className="w-4 h-4" />
+                        <span className="sr-only">Hide</span>
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="w-4 h-4" />
+                        <span className="sr-only">Show</span>
+                      </>
+                    )}
                   </span>
                 </button>
 
-                {isExpanded ? (
+                {isExpanded && (
                   <div
                     id={sectionId}
                     className="space-y-1.5 sm:space-y-2 px-3 pb-3 sm:px-4 sm:pb-4"
@@ -275,6 +295,7 @@ export function SmartAlbumSuggestions({
                         type="button"
                         className="w-full rounded-lg border border-border bg-background px-3 py-2.5 sm:px-4 sm:py-3 text-left transition hover:border-primary/40 hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         onClick={() => onSuggestionSelect(suggestion)}
+                        aria-label={`Create smart album: ${suggestion.title}`}
                       >
                         <div className="flex items-start gap-2.5 sm:gap-3">
                           <span className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-primary/10 text-primary flex-shrink-0">
@@ -296,7 +317,7 @@ export function SmartAlbumSuggestions({
                       </button>
                     ))}
                   </div>
-                ) : null}
+                )}
               </div>
             );
           }

@@ -3,6 +3,7 @@
 
 import { API_BASE } from "../api";
 import { getLoggingConfig, shouldLogErrorsToServer } from "../config/logging";
+import { offlineService } from "./OfflineService";
 
 interface ErrorReport {
 	message: string;
@@ -29,6 +30,28 @@ interface UserEvent {
 	value?: number;
 	metadata?: Record<string, unknown>;
 	timestamp: number;
+}
+
+export interface SystemHealth {
+	cpu: number;
+	memory: number;
+	disk: number;
+	uptime: number;
+}
+
+export interface ServiceHealth {
+	name: string;
+	status: 'healthy' | 'degraded' | 'unhealthy';
+	responseTime: number;
+	lastCheck: Date;
+	message?: string;
+}
+
+export interface PerformanceMetrics {
+	pageLoad: number;
+	firstContentfulPaint: number;
+	largestContentfulPaint: number;
+	cumulativeLayoutShift: number;
 }
 
 class MonitoringService {
@@ -395,6 +418,254 @@ class MonitoringService {
 			averageSize: size / count,
 		});
 		this.trackMetric("export_size", size, "bytes");
+	}
+
+	// System Health Monitoring
+	public async getSystemHealth(): Promise<SystemHealth> {
+		try {
+			// Get actual system metrics if available
+			if ('memory' in performance && (performance as any).memory) {
+				const memory = (performance as any).memory;
+				const memoryUsage = (memory.usedJSHeapSize / memory.totalJSHeapSize) * 100;
+
+				return {
+					cpu: Math.random() * 30 + 20, // Simulated CPU usage
+					memory: memoryUsage,
+					disk: Math.random() * 40 + 30, // Simulated disk usage
+					uptime: performance.now() / 1000
+				};
+			}
+
+			// Fallback to simulated data
+			return {
+				cpu: Math.random() * 30 + 20,
+				memory: Math.random() * 40 + 30,
+				disk: Math.random() * 40 + 30,
+				uptime: performance.now() / 1000
+			};
+		} catch (error) {
+			console.error('[MonitoringService] Failed to get system health:', error);
+			throw error;
+		}
+	}
+
+	public async getServiceHealth(): Promise<ServiceHealth[]> {
+		try {
+			const healthChecks = [
+				this.checkSearchService(),
+				this.checkStorageService(),
+				this.checkNetworkConnectivity(),
+				this.checkBrowserPerformance()
+			];
+
+			const results = await Promise.allSettled(healthChecks);
+
+			return results
+				.filter((result): result is PromiseFulfilledResult<ServiceHealth> =>
+					result.status === 'fulfilled'
+				)
+				.map(result => result.value);
+		} catch (error) {
+			console.error('[MonitoringService] Failed to get service health:', error);
+			throw error;
+		}
+	}
+
+	public async getPerformanceMetrics(): Promise<PerformanceMetrics> {
+		try {
+			// Get performance metrics from Performance API
+			const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
+			const paintEntries = performance.getEntriesByType('paint');
+			const lcpEntries = performance.getEntriesByType('largest-contentful-paint');
+			const clsEntries = performance.getEntriesByType('layout-shift');
+
+			// Calculate CLS
+			const clsValue = clsEntries.reduce((sum, entry) => {
+				return sum + (entry as any).value;
+			}, 0);
+
+			// Get first contentful paint
+			const fcpEntry = paintEntries.find(entry => entry.name === 'first-contentful-paint');
+			const fcpValue = fcpEntry ? fcpEntry.startTime : 0;
+
+			// Get largest contentful paint
+			const lcpValue = lcpEntries.length > 0 ? lcpEntries[lcpEntries.length - 1].startTime : 0;
+
+			// Get page load time
+			const pageLoadTime = navigation ? navigation.loadEventEnd - navigation.navigationStart : 0;
+
+			return {
+				pageLoad: pageLoadTime,
+				firstContentfulPaint: fcpValue,
+				largestContentfulPaint: lcpValue,
+				cumulativeLayoutShift: clsValue
+			};
+		} catch (error) {
+			console.error('[MonitoringService] Failed to get performance metrics:', error);
+			// Return default values on error
+			return {
+				pageLoad: 0,
+				firstContentfulPaint: 0,
+				largestContentfulPaint: 0,
+				cumulativeLayoutShift: 0
+			};
+		}
+	}
+
+	public async getOfflineStatus(): Promise<any> {
+		try {
+			const isOnline = offlineService.getStatus();
+			const queueStats = await offlineService.getQueueStatistics();
+			const networkQuality = offlineService.getNetworkQuality();
+
+			return {
+				isOnline,
+				queueStats,
+				networkQuality
+			};
+		} catch (error) {
+			console.error('[MonitoringService] Failed to get offline status:', error);
+			throw error;
+		}
+	}
+
+	private async checkSearchService(): Promise<ServiceHealth> {
+		const startTime = performance.now();
+
+		try {
+			// Simulate search service health check
+			await new Promise(resolve => setTimeout(resolve, 100)); // Simulate API call
+
+			const responseTime = performance.now() - startTime;
+
+			return {
+				name: 'Search Service',
+				status: responseTime < 1000 ? 'healthy' : 'degraded',
+				responseTime: Math.round(responseTime),
+				lastCheck: new Date()
+			};
+		} catch (error) {
+			return {
+				name: 'Search Service',
+				status: 'unhealthy',
+				responseTime: Math.round(performance.now() - startTime),
+				lastCheck: new Date(),
+				message: error instanceof Error ? error.message : 'Unknown error'
+			};
+		}
+	}
+
+	private async checkStorageService(): Promise<ServiceHealth> {
+		const startTime = performance.now();
+
+		try {
+			// Check storage availability
+			if ('storage' in navigator && 'estimate' in navigator.storage) {
+				await navigator.storage.estimate();
+			}
+
+			const responseTime = performance.now() - startTime;
+
+			return {
+				name: 'Storage Service',
+				status: 'healthy',
+				responseTime: Math.round(responseTime),
+				lastCheck: new Date()
+			};
+		} catch (error) {
+			return {
+				name: 'Storage Service',
+				status: 'degraded',
+				responseTime: Math.round(performance.now() - startTime),
+				lastCheck: new Date(),
+				message: error instanceof Error ? error.message : 'Unknown error'
+			};
+		}
+	}
+
+	private async checkNetworkConnectivity(): Promise<ServiceHealth> {
+		const startTime = performance.now();
+
+		try {
+			// Check network connectivity
+			const isOnline = navigator.onLine;
+
+			const responseTime = performance.now() - startTime;
+
+			return {
+				name: 'Network Service',
+				status: isOnline ? 'healthy' : 'unhealthy',
+				responseTime: Math.round(responseTime),
+				lastCheck: new Date()
+			};
+		} catch (error) {
+			return {
+				name: 'Network Service',
+				status: 'unhealthy',
+				responseTime: Math.round(performance.now() - startTime),
+				lastCheck: new Date(),
+				message: error instanceof Error ? error.message : 'Unknown error'
+			};
+		}
+	}
+
+	private async checkBrowserPerformance(): Promise<ServiceHealth> {
+		const startTime = performance.now();
+
+		try {
+			// Check browser performance capabilities
+			const hasPerformanceObserver = 'PerformanceObserver' in window;
+			const hasNavigationTiming = 'performance' in window && 'timing' in performance;
+
+			const responseTime = performance.now() - startTime;
+
+			return {
+				name: 'Browser Performance',
+				status: hasPerformanceObserver && hasNavigationTiming ? 'healthy' : 'degraded',
+				responseTime: Math.round(responseTime),
+				lastCheck: new Date()
+			};
+		} catch (error) {
+			return {
+				name: 'Browser Performance',
+				status: 'degraded',
+				responseTime: Math.round(performance.now() - startTime),
+				lastCheck: new Date(),
+				message: error instanceof Error ? error.message : 'Unknown error'
+			};
+		}
+	}
+
+	public async getMonitoringReport(): Promise<any> {
+		try {
+			const [systemHealth, serviceHealth, performanceMetrics, offlineStatus] = await Promise.all([
+				this.getSystemHealth(),
+				this.getServiceHealth(),
+				this.getPerformanceMetrics(),
+				this.getOfflineStatus()
+			]);
+
+			return {
+				timestamp: new Date().toISOString(),
+				systemHealth,
+				serviceHealth,
+				performanceMetrics,
+				offlineStatus,
+				userAgent: navigator.userAgent,
+				viewport: {
+					width: window.innerWidth,
+					height: window.innerHeight
+				},
+				connectivity: {
+					effectiveType: (navigator as any).connection?.effectiveType || 'unknown',
+					downlink: (navigator as any).connection?.downlink || 0,
+					rtt: (navigator as any).connection?.rtt || 0
+				}
+			};
+		} catch (error) {
+			console.error('[MonitoringService] Failed to generate monitoring report:', error);
+			throw error;
+		}
 	}
 }
 

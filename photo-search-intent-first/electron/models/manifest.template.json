@@ -1,0 +1,12 @@
+[
+  {
+    "repo_id": "sentence-transformers/clip-ViT-B-32",
+    "local_name": "clip-vit-b-32",
+    "description": "SentenceTransformers CLIP embeddings for local similarity search"
+  },
+  {
+    "repo_id": "openai/clip-vit-base-patch32",
+    "local_name": "clip-vit-base-patch32",
+    "description": "Transformers CLIP weights for image/text embedding parity"
+  }
+]

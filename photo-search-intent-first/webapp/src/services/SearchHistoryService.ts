@@ -22,25 +22,49 @@ export interface SearchSuggestion {
 	};
 }
 
+export interface SearchHistoryConfig {
+	STORAGE_KEY?: string;
+	MAX_HISTORY_ENTRIES?: number;
+	MAX_SUGGESTIONS?: number;
+	DEBOUNCE_DELAY?: number;
+	MAX_AGE_DAYS?: number;
+	ENABLED?: boolean;
+}
+
 class SearchHistoryService {
-	private readonly STORAGE_KEY = "photo_search_history";
-	private readonly MAX_HISTORY_ENTRIES = 100;
-	private readonly MAX_SUGGESTIONS = 20;
+	private readonly config: Required<SearchHistoryConfig>;
+	private readonly defaultConfig: Required<SearchHistoryConfig> = {
+		STORAGE_KEY: "photo_search_history",
+		MAX_HISTORY_ENTRIES: 100,
+		MAX_SUGGESTIONS: 20,
+		DEBOUNCE_DELAY: 250,
+		MAX_AGE_DAYS: 30,
+		ENABLED: true,
+	};
+
+	constructor(config: SearchHistoryConfig = {}) {
+		this.config = { ...this.defaultConfig, ...config };
+	}
 
 	// Get search history from localStorage
 	getHistory(): SearchHistoryEntry[] {
+		if (!this.config.ENABLED) return [];
+
 		try {
-			const stored = localStorage.getItem(this.STORAGE_KEY);
+			const stored = localStorage.getItem(this.config.STORAGE_KEY);
 			if (!stored) return [];
 			const parsed = JSON.parse(stored);
 			return Array.isArray(parsed) ? parsed : [];
-		} catch {
+		} catch (error) {
+			this.handleError("Failed to retrieve search history", error);
 			return [];
 		}
 	}
 
 	// Add a search to history
 	addToHistory(entry: SearchHistoryEntry): void {
+		if (!this.config.ENABLED) return;
+
 		try {
 			const history = this.getHistory();
 
@@ -53,16 +77,18 @@ class SearchHistoryService {
 			filtered.unshift(entry);
 
 			// Keep only recent entries
-			const trimmed = filtered.slice(0, this.MAX_HISTORY_ENTRIES);
+			const trimmed = filtered.slice(0, this.config.MAX_HISTORY_ENTRIES);
 
-			localStorage.setItem(this.STORAGE_KEY, JSON.stringify(trimmed));
+			localStorage.setItem(this.config.STORAGE_KEY, JSON.stringify(trimmed));
 		} catch (error) {
-			console.warn("Failed to save search history:", error);
+			this.handleError("Failed to save search history", error);
 		}
 	}
 
 	// Get search suggestions based on input
 	getSuggestions(input: string): SearchSuggestion[] {
+		if (!this.config.ENABLED) return [];
+
 		const query = input.toLowerCase().trim();
 		if (!query) return this.getRecentSuggestions();
 
@@ -97,7 +123,7 @@ class SearchHistoryService {
 		// Sort by score and limit results
 		return suggestions
 			.sort((a, b) => b.score - a.score)
-			.slice(0, this.MAX_SUGGESTIONS);
+			.slice(0, this.config.MAX_SUGGESTIONS);
 	}
 
 	// Get recent searches when no input
@@ -129,7 +155,7 @@ class SearchHistoryService {
 	private calculateRecencyScore(entry: SearchHistoryEntry): number {
 		const now = Date.now();
 		const age = now - entry.timestamp;
-		const maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days in ms
+		const maxAge = this.config.MAX_AGE_DAYS * 24 * 60 * 60 * 1000; // Configurable max age in ms
 
 		return Math.max(0, 1 - age / maxAge);
 	}
@@ -189,15 +215,19 @@ class SearchHistoryService {
 
 	// Clear search history
 	clearHistory(): void {
+		if (!this.config.ENABLED) return;
+
 		try {
-			localStorage.removeItem(this.STORAGE_KEY);
+			localStorage.removeItem(this.config.STORAGE_KEY);
 		} catch (error) {
-			console.warn("Failed to clear search history:", error);
+			this.handleError("Failed to clear search history", error);
 		}
 	}
 
 	// Get popular search terms
 	getPopularSearches(limit: number = 10): string[] {
+		if (!this.config.ENABLED) return [];
+
 		const history = this.getHistory();
 		const queryCount = new Map<string, number>();
 
@@ -213,6 +243,47 @@ class SearchHistoryService {
 			.slice(0, limit)
 			.map(([query]) => query);
 	}
+
+	// Improved error handling with centralized logging
+	private handleError(message: string, error: unknown): void {
+		// For now, use console.warn but this could be extended to use a logging service
+		console.warn(`${message}:`, error);
+
+		// Could be extended to send errors to a logging service
+		// this.loggingService?.logError(message, error);
+	}
+
+	// Get service configuration (useful for debugging and privacy features)
+	getConfig(): Readonly<Required<SearchHistoryConfig>> {
+		return { ...this.config };
+	}
+
+	// Check if search history is enabled
+	isEnabled(): boolean {
+		return this.config.ENABLED;
+	}
+
+	// Get storage statistics for privacy awareness
+	getStorageStats(): { totalEntries: number; totalSize: number } {
+		if (!this.config.ENABLED) return { totalEntries: 0, totalSize: 0 };
+
+		try {
+			const history = this.getHistory();
+			const data = JSON.stringify(history);
+			return {
+				totalEntries: history.length,
+				totalSize: new Blob([data]).size,
+			};
+		} catch {
+			return { totalEntries: 0, totalSize: 0 };
+		}
+	}
 }
 
+// Default instance with standard configuration
 export const searchHistoryService = new SearchHistoryService();
+
+// Factory function for creating configured instances
+export function createSearchHistoryService(config: SearchHistoryConfig): SearchHistoryService {
+	return new SearchHistoryService(config);
+}

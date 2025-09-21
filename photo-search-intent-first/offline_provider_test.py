@@ -87,14 +87,14 @@ def test_transformers_provider_offline(model_dir=None, verbose=False):
         for p in test_images:
             p.unlink(missing_ok=True)
 
-        return True
+        return
 
     except Exception as e:
         print(f"✗ Transformers provider offline test FAILED: {e}")
         if verbose:
             import traceback
             traceback.print_exc()
-        return False
+        raise AssertionError(f"Transformers provider offline test failed: {e}") from e
     finally:
         # Clean up environment
         for key in ['OFFLINE_MODE', 'TRANSFORMERS_OFFLINE', 'HF_HUB_OFFLINE', 'PHOTOVAULT_MODEL_DIR', 'TRANSFORMERS_CACHE']:
@@ -149,14 +149,16 @@ def test_sentence_transformers_provider_offline(model_dir=None, verbose=False):
         for p in test_images:
             p.unlink(missing_ok=True)
 
-        return True
+        return
 
     except Exception as e:
         print(f"✗ SentenceTransformers provider offline test FAILED: {e}")
         if verbose:
             import traceback
             traceback.print_exc()
-        return False
+        raise AssertionError(
+            f"SentenceTransformers provider offline test failed: {e}"
+        ) from e
     finally:
         # Clean up environment
         for key in ['OFFLINE_MODE', 'SENTENCE_TRANSFORMERS_HOME', 'PHOTOVAULT_MODEL_DIR']:
@@ -180,12 +182,23 @@ def main():
 
     results = []
 
+    def _run(check_fn, *fn_args):
+        try:
+            check_fn(*fn_args)
+        except AssertionError as err:
+            print(f"Assertion failed in {check_fn.__name__}: {err}")
+            return False
+        except Exception as err:
+            print(f"Unexpected error in {check_fn.__name__}: {err}")
+            return False
+        return True
+
     if args.provider in ['transformers', 'all']:
-        results.append(test_transformers_provider_offline(args.model_dir, args.verbose))
+        results.append(_run(test_transformers_provider_offline, args.model_dir, args.verbose))
         print()
 
     if args.provider in ['sentence-transformers', 'all']:
-        results.append(test_sentence_transformers_provider_offline(args.model_dir, args.verbose))
+        results.append(_run(test_sentence_transformers_provider_offline, args.model_dir, args.verbose))
         print()
 
     # Summary

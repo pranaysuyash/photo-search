@@ -4,8 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { FOLDER_MODAL_EVENT } from "@/constants/events";
 import { useToast } from "@/hooks/use-toast";
 import { useModalContext } from "../contexts/ModalContext";
+import { useModalDataContext, useModalDataActions } from "../contexts/ModalDataContext";
 import { useModalStatus } from "../hooks/useModalStatus";
-import type { PhotoActions, SettingsActions, UIActions } from "../stores/types";
 import { FocusTrap } from "../utils/accessibility";
 import { viewToPath } from "../utils/router";
 // Modals
@@ -36,93 +36,14 @@ const ThemeSettingsModal = lazy(() =>
 );
 const SearchOverlay = lazy(() => import("./SearchOverlay"));
 
-import { apiAddPreset, apiCreateShare } from "../api";
-import { handleError } from "../utils/errors";
+import { ModalActionsService } from "../services/ModalActionsService";
 import { HelpModal } from "./HelpModal";
 
-type FolderSettingsActions = Pick<
-  SettingsActions,
-  | "setDir"
-  | "setUseOsTrash"
-  | "setUseFast"
-  | "setFastKind"
-  | "setUseCaps"
-  | "setUseOcr"
-  | "setHasText"
-  | "setHighContrast"
->;
 
-export interface ModalManagerProps {
-  // Core
-  selected: Set<string>;
-  dir: string;
-  engine: string;
-  topK: number;
-
-  // Settings flags
-  highContrast: boolean;
-  useFast: boolean;
-  fastKind: "" | "annoy" | "faiss" | "hnsw";
-  useCaps: boolean;
-  useOcr: boolean;
-  hasText: boolean;
-  useOsTrash: boolean;
-
-  // Actions
-  settingsActions: FolderSettingsActions;
-  setBusy: UIActions["setBusy"];
-  setNote: UIActions["setNote"];
-  setResults: PhotoActions["setResults"];
-  setSaved: PhotoActions["setSaved"];
-  setCollections: PhotoActions["setCollections"];
-  libIndex: () => Promise<void> | void;
-  prepareFast: (kind: "annoy" | "faiss" | "hnsw") => void;
-  buildOCR: () => Promise<void> | void;
-  buildMetadata: () => Promise<void> | void;
-  // Search context
-  searchText: string;
-  query: string;
-
-  // Collections & tags
-  collections: Record<string, string[]>;
-  tagSelected: (tag: string) => void;
-
-  // Search overlay support
-  clusters: Array<{ name?: string }>;
-  allTags: string[];
-  meta: { cameras?: string[]; places?: (string | number)[] } | null;
-}
-
-export const ModalManager: React.FC<ModalManagerProps> = ({
-  selected,
-  dir,
-  engine,
-  topK,
-  highContrast,
-  useFast,
-  fastKind,
-  useCaps,
-  useOcr,
-  hasText,
-  useOsTrash,
-  settingsActions,
-  setBusy,
-  setNote,
-  setResults,
-  setSaved,
-  setCollections,
-  libIndex,
-  prepareFast,
-  buildOCR,
-  buildMetadata,
-  searchText,
-  query,
-  collections,
-  tagSelected,
-  clusters,
-  allTags,
-  meta,
-}) => {
+export const ModalManager: React.FC = () => {
+  // Get data and actions from context
+  const data = useModalDataContext();
+  const actions = useModalDataActions();
   const { actions: modal } = useModalContext();
   const modalStatus = useModalStatus();
   useEffect(() => {
@@ -139,26 +60,10 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
     [navigate]
   );
   const { toast } = useToast();
-  const uiActionsForModals = useMemo(
-    () => ({ setBusy, setNote }),
-    [setBusy, setNote]
-  );
-  const likePlusPhotoActions = useMemo(() => ({ setResults }), [setResults]);
-  const savePhotoActions = useMemo(() => ({ setSaved }), [setSaved]);
-  const collectionPhotoActions = useMemo(
-    () => ({ setCollections }),
-    [setCollections]
-  );
 
   // Basic v1 share modal submit handler
   async function createBasicShare(e: React.FormEvent) {
     e.preventDefault();
-    if (!dir) return;
-    const sel = Array.from(selected);
-    if (sel.length === 0) {
-      alert("Select photos to share");
-      return;
-    }
     const form = e.target as HTMLFormElement;
     const expiryStr =
       (form.elements.namedItem("expiry") as HTMLInputElement)?.value || "24";
@@ -169,26 +74,22 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
     const viewOnly =
       (form.elements.namedItem("viewonly") as HTMLInputElement)?.checked ??
       true;
+
     try {
-      const r = await apiCreateShare(dir, engine, sel, {
-        expiryHours: Number.isNaN(expiry) ? 24 : expiry,
-        password: pw || undefined,
-        viewOnly,
-      });
-      await navigator.clipboard.writeText(window.location.origin + r.url);
-      setNote("Share link copied to clipboard");
-    } catch (err) {
-      setNote(err instanceof Error ? err.message : "Share failed");
-      handleError(err, {
-        logToServer: true,
-        context: {
-          action: "create_share_basic",
-          component: "ModalManager.createBasicShare",
-          dir,
+      await ModalActionsService.createShare(
+        data,
+        {
+          expiryHours: Number.isNaN(expiry) ? 24 : expiry,
+          password: pw || undefined,
+          viewOnly,
         },
-      });
+        actions.uiActions.setNote
+      );
+      modal.close("share");
+    } catch (err) {
+      // Error is already handled by the service, no need to show it again
+      console.error("Share creation failed:", err);
     }
-    modal.close("share");
   }
 
   return (
@@ -211,7 +112,7 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
         <ShareManageOverlay
           isOpen={modalStatus.isOpen("shareManage")}
           onClose={() => modal.close("shareManage")}
-          dir={dir}
+          dir={data.dir}
         />
       )}
 
@@ -231,23 +132,16 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
             }}
             onSave={async (name, q) => {
               try {
-                await apiAddPreset(dir, name, q);
+                await ModalActionsService.saveSearchPreset(data, name, q, actions.uiActions.setNote);
                 toast({ description: `Saved preset ${name}` });
               } catch (e) {
-                setNote(e instanceof Error ? e.message : "Save failed");
-                handleError(e, {
-                  logToServer: true,
-                  context: {
-                    action: "save_preset",
-                    component: "ModalManager.AdvancedSearch.onSave",
-                    dir,
-                  },
-                });
+                // Error is already handled by the service
+                console.error("Preset save failed:", e);
               }
             }}
-            allTags={allTags || []}
-            cameras={meta?.cameras || []}
-            people={(clusters || [])
+            allTags={data.allTags || []}
+            cameras={data.meta?.cameras || []}
+            people={(data.clusters || [])
               .filter((c) => c.name)
               .map((c) => String(c.name))}
           />
@@ -277,9 +171,9 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
           <SearchOverlay
             open={modalStatus.isOpen("search")}
             onClose={() => modal.close("search")}
-            clusters={clusters}
-            allTags={allTags}
-            meta={meta || undefined}
+            clusters={data.clusters}
+            allTags={data.allTags}
+            meta={data.meta || undefined}
           />
         </Suspense>
       )}
@@ -287,19 +181,19 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
       {/* Export / Enhanced Share */}
       {modalStatus.isOpen("export") && (
         <ExportModal
-          selected={selected}
-          dir={dir}
+          selected={data.selected}
+          dir={data.dir}
           onClose={() => modal.close("export")}
-          uiActions={uiActionsForModals}
+          uiActions={actions.uiActions}
         />
       )}
       {modalStatus.isOpen("enhanced-share") && (
         <Suspense fallback={<SuspenseFallback label="Loading sharing…" />}>
           <EnhancedSharingModal
-            selected={selected}
-            dir={dir}
+            selected={data.selected}
+            dir={data.dir}
             onClose={() => modal.close("enhanced-share")}
-            uiActions={uiActionsForModals}
+            uiActions={actions.uiActions}
           />
         </Suspense>
       )}
@@ -388,74 +282,74 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
       {modalStatus.isOpen("tag") && (
         <TagModal
           onClose={() => modal.close("tag")}
-          onTagSelected={tagSelected}
+          onTagSelected={(tag) => ModalActionsService.handleTagSelection(tag, navigateToView, () => modal.close("tag"))}
         />
       )}
       {modalStatus.isOpen("folder") && (
         <FolderModal
-          dir={dir}
-          useOsTrash={useOsTrash}
-          useFast={useFast}
-          fastKind={fastKind}
-          useCaps={useCaps}
-          useOcr={useOcr}
-          hasText={hasText}
-          highContrast={highContrast}
+          dir={data.dir}
+          useOsTrash={data.useOsTrash}
+          useFast={data.useFast}
+          fastKind={data.fastKind}
+          useCaps={data.useCaps}
+          useOcr={data.useOcr}
+          hasText={data.hasText}
+          highContrast={data.highContrast}
           onClose={() => modal.close("folder")}
-          settingsActions={settingsActions}
-          uiActions={uiActionsForModals}
-          doIndex={() => libIndex()}
+          settingsActions={actions.settingsActions}
+          uiActions={actions.uiActions}
+          doIndex={() => actions.libIndex()}
           prepareFast={(k: string) =>
-            prepareFast(k as "annoy" | "faiss" | "hnsw")
+            actions.prepareFast(k as "annoy" | "faiss" | "hnsw")
           }
-          buildOCR={buildOCR}
-          buildMetadata={buildMetadata}
+          buildOCR={actions.buildOCR}
+          buildMetadata={actions.buildMetadata}
         />
       )}
 
       {/* Like+, Save, Collections */}
       {modalStatus.isOpen("likeplus") && (
         <LikePlusModal
-          selected={selected}
-          dir={dir}
-          engine={engine}
-          topK={topK}
+          selected={data.selected}
+          dir={data.dir}
+          engine={data.engine}
+          topK={data.topK}
           onClose={() => modal.close("likeplus")}
           setSelectedView={navigateToView}
-          photoActions={likePlusPhotoActions}
-          uiActions={uiActionsForModals}
+          photoActions={{ setResults: actions.photoActions.setResults }}
+          uiActions={actions.uiActions}
         />
       )}
       {modalStatus.isOpen("save") && (
         <SaveModal
-          dir={dir}
-          searchText={searchText}
-          query={query}
-          topK={topK}
+          dir={data.dir}
+          searchText={data.searchText}
+          query={data.query}
+          topK={data.topK}
           onClose={() => modal.close("save")}
           setSelectedView={navigateToView}
-          photoActions={savePhotoActions}
-          uiActions={uiActionsForModals}
+          photoActions={{ setSaved: actions.photoActions.setSaved }}
+          uiActions={actions.uiActions}
         />
       )}
       {modalStatus.isOpen("collect") && (
         <CollectionModal
-          selected={selected}
-          dir={dir}
-          collections={collections}
+          selected={data.selected}
+          dir={data.dir}
+          collections={data.collections}
           onClose={() => modal.close("collect")}
-          photoActions={collectionPhotoActions}
-          uiActions={uiActionsForModals}
+          photoActions={{ setCollections: actions.photoActions.setCollections }}
+          uiActions={actions.uiActions}
         />
       )}
       {modalStatus.isOpen("removeCollect") && (
         <RemoveCollectionModal
-          selected={selected}
-          dir={dir}
-          collections={collections}
+          selected={data.selected}
+          dir={data.dir}
+          collections={data.collections}
           onClose={() => modal.close("removeCollect")}
-          photoActions={collectionPhotoActions}
-          uiActions={uiActionsForModals}
+          photoActions={{ setCollections: actions.photoActions.setCollections }}
+          uiActions={actions.uiActions}
         />
       )}
     </>

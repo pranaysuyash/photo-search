@@ -9,11 +9,11 @@ The following roadmap captures the long-term, intent-first initiatives required 
 ### 1) Model Bundling & Distribution (Electron + Web)
 - **Scope:** Ship CLIP weights with Electron installers while retaining the import UX as an override for advanced users.
 - **Deliverables:**
-  1. Add CLIP weights (`clip-vit-base-patch32`) to Electron builder `extraResources`; stage into `{appData}/photo-search/models/` on first launch.
-  2. Implement integrity verification (hash manifest) before first use and surface failure in Diagnostics drawer.
-  3. Auto-set `PHOTOVAULT_MODEL_DIR`, `TRANSFORMERS_OFFLINE=1`, `SENTENCE_TRANSFORMERS_HOME` on Electron boot; document override path in settings.
-  4. Provide “Refresh Bundled Models” command (CLI + Electron menu) that pulls updated weights without full reinstall; reuse import flow for custom dirs.
-  5. Update docs (`MODEL_BUNDLING_STRATEGY.md`, `OFFLINE_SETUP_GUIDE.md`, README) with default storage paths, footprint estimates, and override instructions.
+  - [x] Add CLIP weights (`clip-vit-base-patch32`) to Electron builder `extraResources`; stage into `{appData}/photo-search/models/` on first launch.
+  - [x] Implement integrity verification (hash manifest) before first use and surface failure in Diagnostics drawer.
+  - [x] Auto-set `PHOTOVAULT_MODEL_DIR`, `TRANSFORMERS_OFFLINE=1`, `SENTENCE_TRANSFORMERS_HOME` on Electron boot; document override path in settings.
+  - [x] Provide “Refresh Bundled Models” command (CLI + Electron menu) that pulls updated weights without full reinstall; reuse import flow for custom dirs.
+  - [x] Update docs (`MODEL_BUNDLING_STRATEGY.md`, `OFFLINE_SETUP_GUIDE.md`, README) with default storage paths, footprint estimates, and override instructions.
 - **Verification:**
   - Fresh offline install indexes & searches without prompts (CI smoke + manual).
   - Integrity check failure reproduces recoverable error and guidance.
@@ -74,4 +74,3 @@ The following roadmap captures the long-term, intent-first initiatives required 
 - Maintain `agents.md` status entries per task/milestone.
 - Update documentation alongside each deliverable to comply with the intent-first “document what developers actually need” principle.
 - Gate releases on completion of Phase 1 items; begin Phase 2 once offline foundation is stable.
-

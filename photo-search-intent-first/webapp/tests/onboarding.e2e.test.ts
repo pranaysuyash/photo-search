@@ -448,44 +448,7 @@ test.describe("Add Photos Button Functionality", () => {
       .evaluate((el) => el.tagName)
       .catch(() => "unknown");
 
-    // Try clicking the ModalDebug test button first to verify modal system works
-    const testModalBtn = page
-      .locator("button:has-text(\"Test actions.open('folder')\")")
-      .first();
-    const testModalBtnExists = await testModalBtn
-      .isVisible()
-      .catch(() => false);
-
-    if (testModalBtnExists) {
-      await testModalBtn.click({ timeout: 5000 });
-
-      // Wait a moment for modal to appear
-      await page.waitForTimeout(1000);
-
-      // Check if modal opened
-      const folderModalAfterTest = page.locator('[role="dialog"]').filter({
-        hasText: "Set Photo Folder",
-      });
-      const modalOpened = await folderModalAfterTest
-        .isVisible()
-        .catch(() => false);
-      console.log(
-        "Modal opened after clicking ModalDebug button:",
-        modalOpened
-      );
-
-      if (modalOpened) {
-        console.log(
-          "Modal system works! The issue is with the Add Photos button click."
-        );
-        // Close the modal
-        await page.click('button:has-text("Close")').catch(() => {});
-        await page.waitForTimeout(500);
-      } else {
-      }
-    } else {
-    }
-
+    
     // Now try the Add Photos button
 
     // Try clicking with different methods

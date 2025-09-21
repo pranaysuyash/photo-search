@@ -1,355 +1,298 @@
-import { useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+/**
+ * Custom hook for managing search operations and related state
+ * Encapsulates search logic and related actions
+ */
+import { useCallback, useMemo } from "react";
+import { usePhotoActions } from "@/stores/usePhotoStore";
+import { useSettings } from "@/stores/useSettingsStore";
+import { useUIActions } from "@/stores/useUIStore";
+import { useWorkspace } from "@/stores/useWorkspaceStore";
+import { useToast } from "@/hooks/useToast";
 import {
-	apiDemoDir,
-	apiSearch,
-	apiSearchCached,
-	apiSearchWorkspace,
-	apiWorkspaceAdd,
-	type SearchResult,
-} from "../api";
-import { announce } from "../utils/accessibility";
-import { handleError } from "../utils/errors";
-import { monitoringService } from "../services/MonitoringService";
-import { SearchCache } from "../services/SearchCache";
+  apiSearch,
+  apiSearchLike,
+  apiSearchSimilar,
+  apiBuildFast,
+} from "@/api";
 
-export interface SearchOperationsOptions {
-	searchText: string;
-	enableDemoLibrary: boolean;
-	dir: string | null;
-	engine: string;
-	topK: number;
-	favOnly: boolean;
-	tagFilter: string;
-	dateFrom: string;
-	dateTo: string;
-	place: string;
-	hasText: boolean;
-	camera: string;
-	isoMin: number;
-	isoMax: number;
-	fMin: number;
-	fMax: number;
-	ratingMin: number;
-	persons: string[];
-	useFast: boolean;
-	fastKind: string;
-	useCaps: boolean;
-	useOcr: boolean;
-	wsToggle: boolean;
-	needsHf: boolean;
-	hfToken: string;
-	needsOAI: boolean;
-	openaiKey: string;
-	resultView: string;
-	timelineBucket: string;
-	ratingMap: Record<string, number>;
-	loadLibrary: (limit?: number, offset?: number, append?: boolean) => Promise<void>;
-	loadFav: () => Promise<void>;
-	loadSaved: () => Promise<void>;
-	loadTags: () => Promise<void>;
-	loadDiag: () => Promise<void>;
-	libIndex: (opts?: { dir?: string; provider?: string }) => Promise<void>;
-	setDir: (dir: string) => void;
-	setQuery: (query: string) => void;
-	setResults: (results: SearchResult[]) => void;
-	setSearchId: (id: string) => void;
-	setBusy: (value: string) => void;
-	setNote: (value: string) => void;
-	completeOnboardingStep: (id: string) => void;
+interface UseSearchOperationsProps {
+  dir: string | null;
+  engine: string;
+  needsHf: boolean;
+  hfToken?: string;
+  needsOAI: boolean;
+  openaiKey?: string;
+  selectedView: string;
+  useFast: boolean;
+  fastKind: string;
 }
 
-export function useSearchOperations(options: SearchOperationsOptions) {
-	const navigate = useNavigate();
+export function useSearchOperations({
+  dir,
+  engine,
+  needsHf,
+  hfToken,
+  needsOAI,
+  openaiKey,
+  selectedView,
+  useFast,
+  fastKind,
+}: UseSearchOperationsProps) {
+  const { photoActions } = usePhotoActions();
+  const { settingsActions } = useSettings();
+  const { uiActions } = useUIActions();
+  const { workspaceActions } = useWorkspace();
+  const { pushToast } = useToast();
 
-	const {
-		searchText,
-		enableDemoLibrary,
-		dir,
-		engine,
-		topK,
-		favOnly,
-		tagFilter,
-		dateFrom,
-		dateTo,
-		place,
-		hasText,
-		camera,
-		isoMin,
-		isoMax,
-		fMin,
-		fMax,
-		ratingMin,
-		persons,
-		useFast,
-		fastKind,
-		useCaps,
-		useOcr,
-		wsToggle,
-		needsHf,
-		hfToken,
-		needsOAI,
-		openaiKey,
-		resultView,
-		timelineBucket,
-		ratingMap,
-		loadLibrary,
-		loadFav,
-		loadSaved,
-		loadTags,
-		loadDiag,
-		libIndex,
-		setDir,
-		setQuery,
-		setResults,
-		setSearchId,
-		setBusy,
-		setNote,
-		completeOnboardingStep,
-	} = options;
+  // Perform a text search
+  const performSearch = useCallback(
+    async (query: string, topK: number = 24) => {
+      if (!dir) return;
 
-	const doSearchImmediate = useCallback(
-		async (text?: string) => {
+      try {
+        uiActions.setBusy("Searching...");
 
-			const q = (text ?? searchText ?? "").trim();
-			if (!q) return;
+        const searchOpts = {
+          favOnly: settingsActions.favOnly,
+          tags: settingsActions.tagFilter
+            ? settingsActions.tagFilter.split(",").map((s) => s.trim())
+            : undefined,
+          dateFrom: settingsActions.dateFrom
+            ? Math.floor(new Date(settingsActions.dateFrom).getTime() / 1000)
+            : undefined,
+          dateTo: settingsActions.dateTo
+            ? Math.floor(new Date(settingsActions.dateTo).getTime() / 1000)
+            : undefined,
+          place: settingsActions.place || undefined,
+          hasText: settingsActions.hasText,
+          camera: settingsActions.camera || undefined,
+          isoMin: settingsActions.isoMin || undefined,
+          isoMax: settingsActions.isoMax || undefined,
+          fMin: settingsActions.fMin || undefined,
+          fMax: settingsActions.fMax || undefined,
+          useFast,
+          fastKind: useFast ? fastKind : undefined,
+          useCaps: settingsActions.useCaps,
+          useOcr: settingsActions.useOcr,
+        };
 
-			if (!dir && enableDemoLibrary) {
-				try {
-					const demoPath = await apiDemoDir();
-					if (!demoPath) {
-						setNote("Demo library not available.");
-						return;
-					}
-					setDir(demoPath);
-					setNote("Loading demo library… indexing will run once.");
-					try {
-						await apiWorkspaceAdd(demoPath);
-					} catch {}
-					await libIndex({ dir: demoPath, provider: engine });
-					await loadLibrary(120, 0);
-				} catch {}
-			}
+        const r = await apiSearch(dir, query, engine, topK, {
+          hfToken: needsHf ? hfToken : undefined,
+          openaiKey: needsOAI ? openaiKey : undefined,
+          ...searchOpts,
+        });
 
-			setQuery(q);
+        photoActions.setResults(r.results || []);
+        photoActions.setSearchId(r.search_id || "");
+        uiActions.setNote(`Found ${r.results?.length || 0} results`);
 
-			try {
-				const sp = new URLSearchParams();
-				sp.set("q", q);
-				if (favOnly) sp.set("fav", "1");
-				if (tagFilter?.trim()) sp.set("tags", tagFilter);
-				if (dateFrom && dateTo) {
-					sp.set("date_from", dateFrom);
-					sp.set("date_to", dateTo);
-				}
-				if (place?.trim()) sp.set("place", place);
-				if (hasText) sp.set("has_text", "1");
-				if (camera?.trim()) sp.set("camera", camera);
-				if (isoMin) sp.set("iso_min", String(isoMin));
-				if (isoMax) sp.set("iso_max", String(isoMax));
-				if (fMin) sp.set("f_min", String(fMin));
-				if (fMax) sp.set("f_max", String(fMax));
-				if (ratingMin > 0) sp.set("rating_min", String(ratingMin));
-				const ppl = persons.filter(Boolean);
-				if (ppl.length === 1) sp.set("person", ppl[0]);
-				if (ppl.length > 1) sp.set("persons", ppl.join(","));
-				if (useFast) sp.set("fast", "1");
-				if (fastKind) sp.set("fast_kind", fastKind);
-				if (useCaps) sp.set("caps", "1");
-				if (useOcr) sp.set("ocr", "1");
-				if (resultView) sp.set("rv", resultView);
-				if (timelineBucket) sp.set("tb", timelineBucket);
-				navigate(
-					{ pathname: "/search", search: `?${sp.toString()}` },
-					{ replace: false },
-				);
-			} catch {}
+        return r;
+      } catch (error) {
+        uiActions.setNote(
+          error instanceof Error ? error.message : "Search failed"
+        );
+        throw error;
+      } finally {
+        uiActions.setBusy("");
+      }
+    },
+    [
+      dir,
+      engine,
+      needsHf,
+      hfToken,
+      needsOAI,
+      openaiKey,
+      useFast,
+      fastKind,
+      settingsActions,
+      photoActions,
+      uiActions,
+    ]
+  );
 
-			setBusy("Searching…");
-			setNote("");
+  // Search similar to a selected photo
+  const searchSimilar = useCallback(
+    async (path: string, topK: number = 24) => {
+      if (!dir) return;
 
-			try {
-				const tagList = tagFilter
-					.split(",")
-					.map((s: string) => s.trim())
-					.filter(Boolean);
-				const ppl = persons.filter(Boolean);
+      try {
+        uiActions.setBusy("Finding similar...");
 
-				const cacheKey = JSON.stringify({
-					dir,
-					q,
-					engine,
-					topK,
-					favOnly,
-					tagList,
-					dateFrom,
-					dateTo,
-					place,
-					hasText,
-					camera,
-					isoMin,
-					isoMax,
-					fMin,
-					fMax,
-					persons: ppl,
-					useFast,
-					fastKind,
-					useCaps,
-					useOcr,
-					wsToggle,
-				});
+        const r = await apiSearchSimilar(dir, path, engine, topK, {
+          hfToken: needsHf ? hfToken : undefined,
+          openaiKey: needsOAI ? openaiKey : undefined,
+          useFast,
+          fastKind: useFast ? fastKind : undefined,
+        });
 
-				const searchFn = async (): Promise<{
-					results?: SearchResult[];
-					search_id?: string;
-				}> => {
-					if (wsToggle) {
-						return await apiSearchWorkspace(dir, q, engine, topK, {
-							favoritesOnly: favOnly,
-							tags: tagList,
-							dateFrom: dateFrom
-								? Math.floor(new Date(dateFrom).getTime() / 1000)
-								: undefined,
-							dateTo: dateTo
-								? Math.floor(new Date(dateTo).getTime() / 1000)
-								: undefined,
-							place: place || undefined,
-							hasText,
-							...(ppl.length === 1
-								? { person: ppl[0] }
-								: ppl.length > 1
-									? { persons: ppl }
-									: {}),
-						});
-					}
+        photoActions.setResults(r.results || []);
+        photoActions.setSearchId(r.search_id || "");
+        uiActions.setNote(`Found ${r.results?.length || 0} similar photos`);
 
-					try {
-						return await apiSearchCached(dir, q, engine, topK, undefined, {
-							hfToken: needsHf ? hfToken : undefined,
-							openaiKey: needsOAI ? openaiKey : undefined,
-							useFast,
-							fastKind: fastKind || undefined,
-							useCaptions: useCaps,
-							useOcr,
-						});
-					} catch (_cachedError) {
-						return await apiSearch(dir, q, engine, topK, {
-							hfToken: needsHf ? hfToken : undefined,
-							openaiKey: needsOAI ? openaiKey : undefined,
-							favoritesOnly: favOnly,
-							tags: tagList,
-							dateFrom: dateFrom
-								? Math.floor(new Date(dateFrom).getTime() / 1000)
-								: undefined,
-							dateTo: dateTo
-								? Math.floor(new Date(dateTo).getTime() / 1000)
-								: undefined,
-							...(useFast
-								? { useFast: true, fastKind: fastKind || undefined }
-								: {}),
-							useCaptions: useCaps,
-							useOcr,
-							camera: camera || undefined,
-							isoMin: isoMin || undefined,
-							isoMax: isoMax || undefined,
-							fMin: fMin || undefined,
-							fMax: fMax || undefined,
-							place: place || undefined,
-							hasText: hasText || undefined,
-							...(ppl.length === 1
-								? { person: ppl[0] }
-								: ppl.length > 1
-									? { persons: ppl }
-									: {}),
-						});
-					}
-				};
+        return r;
+      } catch (error) {
+        uiActions.setNote(
+          error instanceof Error ? error.message : "Similar search failed"
+        );
+        throw error;
+      } finally {
+        uiActions.setBusy("");
+      }
+    },
+    [
+      dir,
+      engine,
+      needsHf,
+      hfToken,
+      needsOAI,
+      openaiKey,
+      useFast,
+      fastKind,
+      photoActions,
+      uiActions,
+    ]
+  );
 
-				const { data: response, cached, responseTime } = await SearchCache.cachedSearch(
-					cacheKey,
-					searchFn,
-				);
+  // Search using an example photo and text query
+  const searchLike = useCallback(
+    async (
+      path: string,
+      text?: string,
+      weight: number = 0.5,
+      topK: number = 24
+    ) => {
+      if (!dir) return;
 
-				monitoringService.trackSearch(q, response.results?.length || 0, responseTime);
+      try {
+        uiActions.setBusy("Searching with example...");
 
-				let res = response.results || [];
-				if (ratingMin > 0) {
-					res = res.filter((item) => (ratingMap[item.path] || 0) >= ratingMin);
-				}
-				setResults(res);
-				announce(
-					`Found ${res.length} ${res.length === 1 ? "result" : "results"} for "${q}"${
-						cached ? " (cached)" : ""
-					}`,
-					res.length === 0 ? "assertive" : "polite",
-				);
-				setSearchId(response.search_id || "");
+        const r = await apiSearchLike(dir, path, engine, topK, {
+          hfToken: needsHf ? hfToken : undefined,
+          openaiKey: needsOAI ? openaiKey : undefined,
+          useFast,
+          fastKind: useFast ? fastKind : undefined,
+          text,
+          weight,
+        });
 
-				const cacheStatus = cached ? " (cached)" : "";
-				setNote(`Found ${response.results?.length || 0} results${cacheStatus}.`);
+        photoActions.setResults(r.results || []);
+        photoActions.setSearchId(r.search_id || "");
+        uiActions.setNote(`Found ${r.results?.length || 0} matching photos`);
 
-				await Promise.all([loadFav(), loadSaved(), loadTags(), loadDiag()]);
-				completeOnboardingStep("first_search");
-			} catch (error) {
-				setNote(error instanceof Error ? error.message : "Search failed");
-				handleError(error, {
-					logToConsole: true,
-					logToServer: true,
-					context: {
-						action: "search",
-						component: "useSearchOperations.doSearchImmediate",
-						dir,
-					},
-				});
-			} finally {
-				setBusy("");
-			}
-		}, [
-			searchText,
-			enableDemoLibrary,
-			dir,
-			engine,
-			topK,
-			favOnly,
-			tagFilter,
-			dateFrom,
-			dateTo,
-			place,
-			hasText,
-			camera,
-			isoMin,
-			isoMax,
-			fMin,
-			fMax,
-			ratingMin,
-			persons,
-			useFast,
-			fastKind,
-			useCaps,
-			useOcr,
-			wsToggle,
-			needsHf,
-			hfToken,
-			needsOAI,
-			openaiKey,
-			resultView,
-			timelineBucket,
-			ratingMap,
-			loadLibrary,
-			loadFav,
-			loadSaved,
-			loadTags,
-			loadDiag,
-			libIndex,
-			setDir,
-			setQuery,
-			setResults,
-			setSearchId,
-			setBusy,
-			setNote,
-			completeOnboardingStep,
-			navigate,
-		]);
+        return r;
+      } catch (error) {
+        uiActions.setNote(
+          error instanceof Error ? error.message : "Example search failed"
+        );
+        throw error;
+      } finally {
+        uiActions.setBusy("");
+      }
+    },
+    [
+      dir,
+      engine,
+      needsHf,
+      hfToken,
+      needsOAI,
+      openaiKey,
+      useFast,
+      fastKind,
+      photoActions,
+      uiActions,
+    ]
+  );
 
-	return { doSearchImmediate };
+  // Build fast index for faster searching
+  const buildFastIndex = useCallback(
+    async (kind: "annoy" | "faiss" | "hnsw" = "faiss") => {
+      if (!dir) {
+        pushToast({
+          title: "Missing Library",
+          description: "Select a library before building an index.",
+        });
+        return;
+      }
+
+      try {
+        uiActions.setBusy("Building search index...");
+        pushToast({
+          title: "Building Index",
+          description: `Creating ${kind.toUpperCase()} index for faster searches...`,
+        });
+
+        const r = await apiBuildFast(
+          dir,
+          kind,
+          engine,
+          needsHf ? hfToken : undefined,
+          needsOAI ? openaiKey : undefined
+        );
+
+        pushToast({
+          title: "Index Ready",
+          description: `${kind.toUpperCase()} index built successfully`,
+        });
+        uiActions.setNote(`${kind.toUpperCase()} index ready`);
+
+        // Refresh diagnostics to show updated index status
+        workspaceActions.refreshDiagnostics();
+      } catch (error) {
+        uiActions.setNote(
+          error instanceof Error ? error.message : "Index build failed"
+        );
+        pushToast({
+          variant: "destructive",
+          title: "Index Build Failed",
+          description: "Failed to build search index. Please try again.",
+        });
+      } finally {
+        uiActions.setBusy("");
+      }
+    },
+    [
+      dir,
+      engine,
+      needsHf,
+      hfToken,
+      needsOAI,
+      openaiKey,
+      workspaceActions,
+      uiActions,
+      pushToast,
+    ]
+  );
+
+  // Search state
+  const searchState = useMemo(
+    () => ({
+      isSearching: uiActions.busy !== "",
+      hasQuery: Boolean(photoActions.query),
+      hasResults: (photoActions.results || []).length > 0,
+      canUseFastIndex: useFast && Boolean(fastKind),
+    }),
+    [
+      uiActions.busy,
+      photoActions.query,
+      photoActions.results,
+      useFast,
+      fastKind,
+    ]
+  );
+
+  return {
+    // Actions
+    performSearch,
+    searchSimilar,
+    searchLike,
+    buildFastIndex,
+
+    // State
+    searchState,
+
+    // Utilities
+    clearSearch: () => photoActions.setQuery(""),
+    updateQuery: (query: string) => photoActions.setQuery(query),
+  };
 }

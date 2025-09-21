@@ -71,6 +71,19 @@ export PHOTOVAULT_MODEL_DIR=/path/to/models
 # 3. Click "Import Models" and select your model directory
 ```
 
+### Electron Bundled Models
+
+When packaging the Electron app, the CLIP weights are downloaded and staged automatically so end users get a truly offline experience. Run:
+
+```bash
+# From the repository root
+npm --prefix photo-search-intent-first/electron run build:ui
+npm --prefix photo-search-intent-first/electron run prepare:models
+npm --prefix photo-search-intent-first/electron run dist
+```
+
+`prepare:models` uses the Hugging Face Hub to download `sentence-transformers/clip-ViT-B-32` and `openai/clip-vit-base-patch32`, computes a deterministic SHA-256 digest for each staged directory, and writes `electron/models/manifest.json`. The Electron runtime verifies the manifest on launch, copies models into `{appData}/photo-search/models`, and exports the required environment variables (`PHOTOVAULT_MODEL_DIR`, `SENTENCE_TRANSFORMERS_HOME`, `TRANSFORMERS_OFFLINE`, `HF_HUB_OFFLINE`). If you ever need to replace assets manually, use the **Refresh Bundled Models…** menu item or rerun the `prepare:models` script to regenerate the manifest.
+
 ### 3. Enable Offline Mode
 
 ```bash
