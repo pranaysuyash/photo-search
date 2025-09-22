@@ -1,57 +1,54 @@
 import clsx from "clsx";
 import type { MutableRefObject, RefObject } from "react";
-import { Suspense } from "react";
-import { lazy } from "react";
+import { lazy, Suspense } from "react";
 import {
+  type Location,
   Navigate,
+  type NavigateFunction,
   Route,
   Routes,
-  type Location,
-  type NavigateFunction,
 } from "react-router-dom";
-
-import { HintManager, useHintTriggers } from "./HintSystem";
-import { MobileOptimizations } from "./MobileOptimizations";
-import MobilePWATest from "./MobilePWATest";
-import ShareViewer from "./ShareViewer";
-import FirstRunSetup from "./modals/FirstRunSetup";
-import { AppShell } from "./AppShell";
-import { SuspenseFallback } from "./SuspenseFallback";
-import { StatsBar } from "./StatsBar";
-import { FilterPanel } from "./FilterPanel";
-import { ModalManager } from "./ModalManager";
+import type { LibraryActions, LibraryState } from "../contexts/LibraryContext";
 import { ModalDataProvider } from "../contexts/ModalDataContext";
-import { VideoLightbox } from "./VideoLightbox";
-import { Lightbox } from "./Lightbox";
-import { OverlayLayer } from "./OverlayLayer";
-import { StatusBar } from "./StatusBar";
-import { BottomNavigation } from "./BottomNavigation";
-import { ContextualHelp, OnboardingChecklist } from "./ProgressiveOnboarding";
-import { RecentActivityPanel } from "./RecentActivityPanel";
-import { SearchHistoryPanel } from "./SearchHistoryPanel";
-import { JobsCenter, type Job } from "./JobsCenter";
-import { OfflineIndicator } from "./OfflineIndicator";
-import {
-  AccessibilityPanel,
-  type AccessibilitySettings,
-} from "./AccessibilityPanel";
-import { OnboardingTour } from "./OnboardingTour";
-import ErrorBoundary from "./ErrorBoundary";
-import PerformanceMonitor from "./PerformanceMonitor";
-
 import {
   ResultsConfigProvider,
   type ResultView,
 } from "../contexts/ResultsConfigContext";
 import { ResultsUIProvider } from "../contexts/ResultsUIContext";
-import type { LibraryActions, LibraryState } from "../contexts/LibraryContext";
 import type { ModalControls } from "../hooks/useModalControls";
-
 import { CollectionsViewContainer } from "../views/CollectionsViewContainer";
 import { LibraryView as LibraryContainer } from "../views/LibraryView";
 import { PeopleViewContainer } from "../views/PeopleViewContainer";
 import { ResultsView } from "../views/ResultsView";
 import { SavedViewContainer } from "../views/SavedViewContainer";
+import {
+  AccessibilityPanel,
+  type AccessibilitySettings,
+} from "./AccessibilityPanel";
+import { AppShell } from "./AppShell";
+import { BottomNavigation } from "./BottomNavigation";
+import ErrorBoundary from "./ErrorBoundary";
+import { Welcome } from "./Welcome";
+import { FilterPanel } from "./FilterPanel";
+import { HintManager, useHintTriggers } from "./HintSystem";
+import { type Job, JobsCenter } from "./JobsCenter";
+import { Lightbox } from "./Lightbox";
+import { MobileOptimizations } from "./MobileOptimizations";
+import MobilePWATest from "./MobilePWATest";
+import { ModalManager } from "./ModalManager";
+import FirstRunSetup from "./modals/FirstRunSetup";
+import { OfflineIndicator } from "./OfflineIndicator";
+import { OnboardingTour } from "./OnboardingTour";
+import { OverlayLayer } from "./OverlayLayer";
+import PerformanceMonitor from "./PerformanceMonitor";
+import { ContextualHelp, OnboardingChecklist } from "./ProgressiveOnboarding";
+import { RecentActivityPanel } from "./RecentActivityPanel";
+import { SearchHistoryPanel } from "./SearchHistoryPanel";
+import ShareViewer from "./ShareViewer";
+import { StatsBar } from "./StatsBar";
+import { StatusBar } from "./StatusBar";
+import { SuspenseFallback } from "./SuspenseFallback";
+import { VideoLightbox } from "./VideoLightbox";
 
 const MapView = lazy(() => import("./MapView"));
 const SmartCollections = lazy(() => import("./SmartCollections"));
@@ -62,9 +59,10 @@ const VideoManager = lazy(() =>
   }))
 );
 
-import { VideoService } from "../services/VideoService";
 import { apiAuthCheck, apiOpen, apiSearchLike, apiSetFavorite } from "../api";
-import { isMobileTestPath, isSharePath, viewToPath } from "../utils/router";
+import { VideoService } from "../services/VideoService";
+import { isMobileTestPath, isSharePath, viewToPath, type View } from "../utils/router";
+import type { ViewType } from "./TopBar";
 
 interface LayoutProps {
   isMobile: boolean;
@@ -589,7 +587,7 @@ export function AppChrome({
             selectedView={viewToPath(location.pathname) as View}
             onViewChange={(view) => navigate(viewToPath(view as View))}
             onSelectLibrary={modalControls.openFolder}
-            collections={collections}
+            collections={collections as Record<string, string[]>}
             onOpenCollection={(collectionName) => {
               navigate(viewToPath("collections"));
               console.log(`Opening collection: ${collectionName}`);
@@ -726,6 +724,7 @@ export function AppChrome({
                             if (idx >= 0) setDetailIdx(idx);
                           }}
                           tagsMap={tagsMap}
+                          onCompleteOnboardingStep={completeOnboardingStep}
                         />
                       }
                     />
@@ -1238,8 +1237,7 @@ export function AppChrome({
           handleOnboardingComplete={handleOnboardingComplete}
           setShowOnboardingTour={setShowOnboardingTour}
         />
-
-              </div>
+      </div>
     </MobileOptimizations>
   );
 

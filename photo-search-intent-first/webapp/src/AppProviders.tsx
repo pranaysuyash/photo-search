@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
-import { ThemeProvider } from "./components/ThemeProvider";
 import { HintProvider } from "./components/HintSystem";
+import { ThemeProvider } from "./components/ThemeProvider";
 
 interface AppProvidersProps {
 	children: ReactNode;

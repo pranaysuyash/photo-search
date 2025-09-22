@@ -548,11 +548,13 @@ export async function apiMapClusters(
 ) {
 	const params = new URLSearchParams({
 		dir: encodeURIComponent(dir),
-		...options,
 		clusterSize: options.clusterSize?.toString() || "0.01",
 		minPhotos: options.minPhotos?.toString() || "1",
 	});
 
+	if (options.zoom !== undefined) {
+		params.append("zoom", options.zoom.toString());
+	}
 	if (options.bounds) {
 		params.append(
 			"bounds",
@@ -581,8 +583,14 @@ export async function apiClusterPhotos(
 	const params = new URLSearchParams({
 		dir: encodeURIComponent(dir),
 		clusterId,
-		...options,
 	});
+
+	if (options.limit !== undefined) {
+		params.append("limit", options.limit.toString());
+	}
+	if (options.offset !== undefined) {
+		params.append("offset", options.offset.toString());
+	}
 
 	const r = await fetch(`${API_BASE}/map/clusters/photos?${params}`);
 	if (!r.ok) throw new Error(await r.text());
@@ -849,6 +857,11 @@ export async function apiOperationStatus(dir: string, operation: string) {
 		done?: number;
 		updated?: number;
 		error?: string;
+		// Additional properties that may be returned by the API
+		target?: number;
+		note?: string;
+		state_detail?: string;
+		kind?: string;
 	}>;
 }
 

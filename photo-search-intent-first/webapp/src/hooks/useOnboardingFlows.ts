@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { View } from "../utils/router";
 
-type OnboardingStep =
+export type OnboardingStep =
 	| "select_directory"
 	| "index_photos"
 	| "first_search"

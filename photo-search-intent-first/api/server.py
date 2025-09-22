@@ -40,60 +40,26 @@ from infra.shares import (
     revoke_share as _share_revoke,
     is_expired as _share_expired,
 )
+from api.schemas.v1 import SearchRequest, SearchResponse, SearchResultItem
 import shutil, os, platform
 import json
 import time
 import logging
 
 from PIL import Image, ExifTags
-from infra.watcher import WatchManager
-from domain.models import SUPPORTED_EXTS
+from infra.config import config
 
 
 app = FastAPI(title="Photo Search – Intent-First API")
 _START_TIME = time.time()
 
+from infra.config import load_config
+config = load_config()
+
 # CORS / Origin policy – configurable via environment variables
-def _get_cors_origins() -> List[str]:
-    """Get CORS origins from environment variables or defaults."""
-    import os
-
-    # Default origins for local development
-    default_origins = [
-        "http://127.0.0.1:5173",
-        "http://localhost:5173",
-        "http://127.0.0.1:5174",
-        "http://localhost:5174",
-        "http://127.0.0.1:8000",
-        "http://localhost:8000",
-        "http://0.0.0.0:8000",
-        "app://local",  # Electron packaged build origin when using the custom protocol
-    ]
-
-    # Allow override via environment variable (comma-separated)
-    cors_origins_env = os.getenv("CORS_ORIGINS")
-    if cors_origins_env:
-        origins = [origin.strip() for origin in cors_origins_env.split(",")]
-        # Filter out empty strings
-        origins = [origin for origin in origins if origin]
-        if origins:
-            return origins
-
-    # Allow additional origins via environment variable
-    additional_origins_env = os.getenv("ADDITIONAL_CORS_ORIGINS")
-    if additional_origins_env:
-        additional_origins = [origin.strip() for origin in additional_origins_env.split(",")]
-        additional_origins = [origin for origin in additional_origins if origin]
-        if additional_origins:
-            return default_origins + additional_origins
-
-    return default_origins
-
-_allowed_origins = _get_cors_origins()
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_allowed_origins,
+    allow_origins=config.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -483,7 +449,7 @@ def api_auth_status() -> Dict[str, Any]:
 
     Note: Does not reveal the token. Useful for diagnosing 401s in dev.
     """
-    return {"auth_required": (not _DEV_NO_AUTH) and bool(_API_TOKEN)}
+    return {"auth_required": (not config.dev_no_auth) and bool(config.api_token)}
 
 @app.post("/auth/check")
 def api_auth_check() -> Dict[str, Any]:
@@ -494,7 +460,10 @@ def api_auth_check() -> Dict[str, Any]:
     return {"ok": True}
 
 # Watchers (optional)
+from infra.watcher import WatchManager
 _WATCH = WatchManager()
+
+from domain.models import SUPPORTED_EXTS, SearchResult
 
 @app.get("/watch/status")
 def api_watch_status() -> Dict[str, Any]:
@@ -691,37 +660,8 @@ def api_share_view(token: str) -> HTMLResponse:
     return HTMLResponse(content=html)
 
 
-# Load .env file (if present) so OPENAI_API_KEY/HF_API_TOKEN are available when not passed explicitly
-def _load_env_file() -> None:
-    try:
-        repo_root = Path(__file__).resolve().parents[2]
-        env_path = repo_root / ".env"
-        if not env_path.exists():
-            return
-        for raw in env_path.read_text(encoding="utf-8").splitlines():
-            line = raw.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            k, v = line.split("=", 1)
-            key = k.strip()
-            val = v.strip().strip('"').strip("'")
-            if key and key not in os.environ:
-                os.environ[key] = val
-    except Exception:
-        # Non-fatal; continue without .env values
-        pass
-
-_load_env_file()
-
 # Optional ephemeral auth token – when set, enforce on write endpoints
-_API_TOKEN = os.environ.get("API_TOKEN", "").strip() or None
-# Development bypass: when enabled, skip auth even if API_TOKEN is set
-_DEV_NO_AUTH = (os.environ.get("DEV_NO_AUTH", "").strip() == "1") or (
-    os.environ.get("ENV", "").strip().lower() in ("dev", "development")
-)
-
-_API_LOG_LEVEL = os.environ.get("API_LOG_LEVEL", "").strip().lower()
-_LOG_HTTP = _API_LOG_LEVEL in {"debug", "info"}
+_LOG_HTTP = config.api_log_level in {"debug", "info"}
 _http_logger: Optional[logging.Logger] = None
 if _LOG_HTTP:
     _http_logger = logging.getLogger("photo_search.api")
@@ -729,7 +669,7 @@ if _LOG_HTTP:
         handler = logging.StreamHandler()
         handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
         _http_logger.addHandler(handler)
-    _http_logger.setLevel(logging.DEBUG if _API_LOG_LEVEL == "debug" else logging.INFO)
+    _http_logger.setLevel(logging.DEBUG if config.api_log_level == "debug" else logging.INFO)
 
 @app.middleware("http")
 async def _auth_middleware(request, call_next):
@@ -739,7 +679,7 @@ async def _auth_middleware(request, call_next):
     response: Optional[Response] = None
     try:
         # Skip in development or if no token configured
-        if _DEV_NO_AUTH or not _API_TOKEN:
+        if config.dev_no_auth or not config.api_token:
             response = await call_next(request)
             return response
         # Allow static assets and share viewer endpoints without auth
@@ -754,7 +694,7 @@ async def _auth_middleware(request, call_next):
         # Enforce Authorization for mutating methods
         if request.method in ("POST", "PUT", "PATCH", "DELETE"):
             auth = request.headers.get("authorization") or request.headers.get("Authorization")
-            if not auth or auth != f"Bearer {_API_TOKEN}":
+            if not auth or auth != f"Bearer {config.api_token}":
                 response = JSONResponse(status_code=401, content={"detail": "Unauthorized"})
                 return response
         response = await call_next(request)
@@ -1267,77 +1207,42 @@ def api_search_cached(
 
 
 @app.post("/search")
-def api_search(
-	dir: Optional[str] = None,
-	query: Optional[str] = None,
-	top_k: Optional[int] = None,
-	provider: Optional[str] = None,
-	hf_token: Optional[str] = None,
-	openai_key: Optional[str] = None,
-	use_fast: Optional[bool] = None,
-	fast_kind: Optional[str] = None,
-	use_captions: Optional[bool] = None,
-	use_ocr: Optional[bool] = None,
-	favorites_only: Optional[bool] = None,
-	tags: Optional[List[str]] = None,
-	date_from: Optional[float] = None,
-	date_to: Optional[float] = None,
-	camera: Optional[str] = None,
-	iso_min: Optional[int] = None,
-	iso_max: Optional[int] = None,
-	f_min: Optional[float] = None,
-	f_max: Optional[float] = None,
-	flash: Optional[str] = None,
-	wb: Optional[str] = None,
-	metering: Optional[str] = None,
-	alt_min: Optional[float] = None,
-	alt_max: Optional[float] = None,
-	heading_min: Optional[float] = None,
-	heading_max: Optional[float] = None,
-	place: Optional[str] = None,
-	has_text: Optional[bool] = None,
-	person: Optional[str] = None,
-	persons: Optional[List[str]] = None,
-	sharp_only: Optional[bool] = None,
-	exclude_underexp: Optional[bool] = None,
-	exclude_overexp: Optional[bool] = None,
-	body: Optional[Dict[str, Any]] = Body(None),
-) -> Dict[str, Any]:
-	dir_value = _require(_from_body(body, dir, "dir"), "dir")
-	query_value = _require(_from_body(body, query, "query"), "query")
-	top_k_value = _from_body(body, top_k, "top_k", default=12, cast=lambda v: int(v)) or 12
-	provider_value = _from_body(body, provider, "provider", default="local") or "local"
-	hf_token_value = _from_body(body, hf_token, "hf_token")
-	openai_key_value = _from_body(body, openai_key, "openai_key")
-	use_fast_value = _from_body(body, use_fast, "use_fast", default=False, cast=_as_bool) or False
-	fast_kind_value = _from_body(body, fast_kind, "fast_kind")
-	use_captions_value = _from_body(body, use_captions, "use_captions", default=False, cast=_as_bool) or False
-	use_ocr_value = _from_body(body, use_ocr, "use_ocr", default=False, cast=_as_bool) or False
-	favorites_only_value = _from_body(body, favorites_only, "favorites_only", default=False, cast=_as_bool) or False
-	tags_value = _from_body(body, tags, "tags")
-	tags_list = _as_str_list(tags_value)
-	date_from_value = _from_body(body, date_from, "date_from", cast=lambda v: float(v))
-	date_to_value = _from_body(body, date_to, "date_to", cast=lambda v: float(v))
-	camera_value = _from_body(body, camera, "camera")
-	iso_min_value = _from_body(body, iso_min, "iso_min", cast=lambda v: int(v))
-	iso_max_value = _from_body(body, iso_max, "iso_max", cast=lambda v: int(v))
-	f_min_value = _from_body(body, f_min, "f_min", cast=lambda v: float(v))
-	f_max_value = _from_body(body, f_max, "f_max", cast=lambda v: float(v))
-	flash_value = _from_body(body, flash, "flash")
-	wb_value = _from_body(body, wb, "wb")
-	metering_value = _from_body(body, metering, "metering")
-	alt_min_value = _from_body(body, alt_min, "alt_min", cast=lambda v: float(v))
-	alt_max_value = _from_body(body, alt_max, "alt_max", cast=lambda v: float(v))
-	heading_min_value = _from_body(body, heading_min, "heading_min", cast=lambda v: float(v))
-	heading_max_value = _from_body(body, heading_max, "heading_max", cast=lambda v: float(v))
-	place_value = _from_body(body, place, "place")
-	has_text_value = _from_body(body, has_text, "has_text", default=False, cast=_as_bool) or False
-	person_value = _from_body(body, person, "person")
-	persons_value = _from_body(body, persons, "persons")
-	persons_list = _as_str_list(persons_value) if persons_value is not None else []
-	sharp_only_value = _from_body(body, sharp_only, "sharp_only", default=False, cast=_as_bool) or False
-	exclude_under_value = _from_body(body, exclude_underexp, "exclude_underexp", default=False, cast=_as_bool) or False
-	exclude_over_value = _from_body(body, exclude_overexp, "exclude_overexp", default=False, cast=_as_bool) or False
+def api_search(req: SearchRequest) -> SearchResponse:
+	"""Search for photos using semantic similarity and advanced filtering."""
+	# Extract parameters from request model
+	dir_value = req.dir
+	query_value = req.query
+	top_k_value = req.top_k
+	provider_value = req.provider
+	hf_token_value = req.hf_token
+	openai_key_value = req.openai_key
+	use_fast_value = req.use_fast
+	fast_kind_value = req.fast_kind
+	use_captions_value = req.use_captions
+	use_ocr_value = req.use_ocr
+	favorites_only_value = req.favorites_only
+	tags_value = req.tags
+	date_from_value = req.date_from
+	date_to_value = req.date_to
+	camera_value = req.camera
+	iso_min_value = req.iso_min
+	iso_max_value = req.iso_max
+	f_min_value = req.f_min
+	f_max_value = req.f_max
+	flash_value = req.flash
+	wb_value = req.wb
+	metering_value = req.metering
+	alt_min_value = req.alt_min
+	alt_max_value = req.alt_max
+	heading_min_value = req.heading_min
+	heading_max_value = req.heading_max
+	place_value = req.place
+	has_text_value = req.has_text
+	person_value = req.person
+	persons_value = req.persons
+	sharp_only_value = req.sharp_only
+	exclude_under_value = req.exclude_underexp
+	exclude_over_value = req.exclude_overexp
 
 	# Alias variables to reuse existing filtering logic
 	dir = dir_value
@@ -1351,7 +1256,7 @@ def api_search(
 	use_captions = use_captions_value
 	use_ocr = use_ocr_value
 	favorites_only = favorites_only_value
-	tags = tags_list
+	tags = tags_value
 	date_from = date_from_value
 	date_to = date_to_value
 	camera = camera_value
@@ -1369,7 +1274,7 @@ def api_search(
 	place = place_value
 	has_text = has_text_value
 	person = person_value
-	persons = persons_list
+	persons = persons_value
 	sharp_only = sharp_only_value
 	exclude_under = exclude_under_value
 	exclude_over = exclude_over_value
@@ -1397,29 +1302,29 @@ def api_search(
 	if use_fast:
 		try:
 			if fast_kind and fast_kind.lower() == 'faiss' and store.faiss_status().get('exists'):
-				results = store.search_faiss(emb, query, top_k=top_k)
+				results = store.search_faiss(emb, query, top_k)
 			elif fast_kind and fast_kind.lower() == 'hnsw' and store.hnsw_status().get('exists'):
-				results = store.search_hnsw(emb, query, top_k=top_k)
+				results = store.search_hnsw(emb, query, top_k)
 			elif fast_kind and fast_kind.lower() == 'annoy' and store.ann_status().get('exists'):
-				results = store.search_annoy(emb, query, top_k=top_k)
+				results = store.search_annoy(emb, query, top_k)
 			else:
 				if store.faiss_status().get('exists'):
-					results = store.search_faiss(emb, query, top_k=top_k)
+					results = store.search_faiss(emb, query, top_k)
 				elif store.hnsw_status().get('exists'):
-					results = store.search_hnsw(emb, query, top_k=top_k)
+					results = store.search_hnsw(emb, query, top_k)
 				elif store.ann_status().get('exists'):
-					results = store.search_annoy(emb, query, top_k=top_k)
+					results = store.search_annoy(emb, query, top_k)
 				else:
-					results = store.search(emb, query, top_k=top_k)
+					results = store.search(emb, query, top_k)
 		except Exception:
-			results = store.search(emb, query, top_k=top_k)
+			results = store.search(emb, query, top_k)
 	else:
 		if use_captions and store.captions_available():
-			results = store.search_with_captions(emb, query, top_k=top_k)
+			results = store.search_with_captions(emb, query, top_k)
 		elif use_ocr and store.ocr_available():
-			results = store.search_with_ocr(emb, query, top_k=top_k)
+			results = store.search_with_ocr(emb, query, top_k)
 		else:
-			results = store.search(emb, query, top_k=top_k)
+			results = store.search(emb, query, top_k)
 	out = results
 	if favorites_only:
 		try:
@@ -1768,6 +1673,7 @@ def api_search(
 								return False
 							except Exception:
 								return False
+
 						if field == 'filetype':
 							ext = (Path(lp).suffix or '').lower().lstrip('.')
 							return ext == fv.lower()
@@ -1793,11 +1699,13 @@ def api_search(
 		pass
 
 	sid = log_search(store.index_dir, getattr(emb, 'index_id', 'default'), query, [(str(r.path), float(r.score)) for r in out])
-	return {
-		"search_id": sid,
-		"results": [{"path": str(r.path), "score": float(r.score)} for r in out],
-		"cached": False,
-	}
+	
+	# Return structured response using SearchResponse schema
+	return SearchResponse(
+		search_id=sid,
+		results=[SearchResultItem(path=str(r.path), score=float(r.score)) for r in out],
+		cached=False
+	)
 
 
 @app.post("/captions/build")
@@ -1962,26 +1870,26 @@ def api_search_workspace(
     k = max(1, min(top_k_value, len(sims)))
     idx = np.argpartition(-sims, k - 1)[:k]
     idx = idx[np.argsort(-sims[idx])]
-    out_pairs = [(paths[i], float(sims[i])) for i in idx]
+    out = [SearchResult(path=Path(paths[i]), score=float(sims[i])) for i in idx]
 
     if favorites_value:
         favset = set()
         for s in stores:
             coll = load_collections(s.index_dir)
             favset.update(coll.get('Favorites', []))
-        out_pairs = [(p, s) for (p, s) in out_pairs if p in favset]
+        out = [r for r in out if str(r.path) in favset]
     if tags_value:
         req = set(tags_value)
         tmap: Dict[str, List[str]] = {}
         for s in stores:
             for k, v in load_tags(s.index_dir).items():
                 tmap[k] = v
-        out_pairs = [(p, s) for (p, s) in out_pairs if req.issubset(set(tmap.get(p, [])))]
+        out = [r for r in out if req.issubset(set(tmap.get(str(r.path), [])))]
     if date_from_value is not None and date_to_value is not None:
         mmap: Dict[str, float] = {}
         for s in stores:
             mmap.update({sp: float(mt) for sp, mt in zip(s.state.paths or [], s.state.mtimes or [])})
-        out_pairs = [(p, s) for (p, s) in out_pairs if date_from_value <= mmap.get(p, 0.0) <= date_to_value]
+        out = [r for r in out if date_from_value <= mmap.get(str(r.path), 0.0) <= date_to_value]
     try:
         if persons_value:
             sets: List[set] = []
@@ -1995,7 +1903,7 @@ def api_search_workspace(
                 sets.append(pp)
             if sets:
                 inter = set.intersection(*sets) if len(sets) > 1 else sets[0]
-                out_pairs = [(p, sc) for (p, sc) in out_pairs if p in inter]
+                out = [r for r in out if str(r.path) in inter]
         elif person_value:
             ppl = set()
             for s in stores:
@@ -2003,7 +1911,7 @@ def api_search_workspace(
                     ppl.update(set(_face_photos(s.index_dir, str(person_value))))
                 except Exception:
                     continue
-            out_pairs = [(p, sc) for (p, sc) in out_pairs if p in ppl]
+            out = [r for r in out if str(r.path) in ppl]
     except Exception:
         pass
     if place_value and str(place_value).strip():
@@ -2017,7 +1925,7 @@ def api_search_workspace(
             except Exception:
                 continue
         pl = str(place_value).strip().lower()
-        out_pairs = [(p, sc) for (p, sc) in out_pairs if pl in (place_map.get(p, '') or '').lower()]
+        out = [r for r in out if pl in (place_map.get(str(r.path), '') or '').lower()]
     if has_text_value:
         texts_map: Dict[str, str] = {}
         for s in stores:
@@ -2027,10 +1935,10 @@ def api_search_workspace(
                     texts_map.update({p: (t or '') for p, t in zip(d.get('paths', []), d.get('texts', []))})
             except Exception:
                 continue
-        out_pairs = [(p, sc) for (p, sc) in out_pairs if texts_map.get(p, '').strip()]
+        out = [r for r in out if texts_map.get(str(r.path), '').strip()]
 
-    sid = log_search(primary.index_dir, getattr(emb, 'index_id', 'default'), query_value, out_pairs)
-    return {"search_id": sid, "results": [{"path": p, "score": sc} for (p, sc) in out_pairs]}
+    sid = log_search(primary.index_dir, getattr(emb, 'index_id', 'default'), query_value, [(str(r.path), float(r.score)) for r in out])
+    return {"search_id": sid, "results": [{"path": p, "score": sc} for (p, sc) in [(str(r.path), float(r.score)) for r in out]]}
 
 
 @app.get("/favorites")
@@ -2446,86 +2354,232 @@ def api_resolve_smart_collection(
                         return False
                 return True
             out = [r for r in out if ok(str(r.path))]
-        else:
-            out = out
     except Exception:
         out = out
-    
-    # OCR filters
-    try:
-        texts_map = {}
-        if hasattr(store, 'ocr_texts_file') and store.ocr_texts_file.exists():
-            d = json.loads(store.ocr_texts_file.read_text())
-            texts_map = {p: (t or '') for p, t in zip(d.get('paths', []), d.get('texts', []))}
-        if has_text:
-            out = [r for r in out if (texts_map.get(str(r.path), '').strip() != '')]
-        import re as _re
-        d_parts = _re.findall(r'"([^"]+)"', query or '')
-        s_parts = _re.findall(r"'([^']+)'", query or '')
-        req = (d_parts or []) + (s_parts or [])
-        if req:
-            low = {p: texts_map.get(p, '').lower() for p in texts_map.keys()}
-            def has_all(pth: str) -> bool:
-                s = low.get(pth, '')
-                return all(x.lower() in s for x in req)
-            out = [r for r in out if has_all(str(r.path))]
-    except Exception:
-        pass
-    sid = log_search(store.index_dir, getattr(emb, 'index_id', 'default'), f"smart:{name}:{query}", [(str(r.path), float(r.score)) for r in out])
+    sid = log_search(store.index_dir, getattr(emb, 'index_id', 'default'), query, [(str(r.path), float(r.score)) for r in out])
     return {"search_id": sid, "results": [{"path": str(r.path), "score": float(r.score)} for r in out]}
 
 
-@app.post("/feedback")
-def api_feedback(
+# Progressive Loading APIs
+@app.post("/search/paginated")
+def api_search_paginated(
     dir: Optional[str] = None,
-    search_id: Optional[str] = None,
     query: Optional[str] = None,
-    positives: Optional[List[str]] = None,
-    note: Optional[str] = None,
+    provider: Optional[str] = None,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
+    hf_token: Optional[str] = None,
+    openai_key: Optional[str] = None,
+    favorites_only: Optional[bool] = None,
+    tags: Optional[List[str]] = None,
+    date_from: Optional[float] = None,
+    date_to: Optional[float] = None,
+    use_fast: Optional[bool] = None,
+    fast_kind: Optional[str] = None,
+    use_captions: Optional[bool] = None,
+    use_ocr: Optional[bool] = None,
+    camera: Optional[str] = None,
+    iso_min: Optional[int] = None,
+    iso_max: Optional[int] = None,
+    f_min: Optional[float] = None,
+    f_max: Optional[float] = None,
+    place: Optional[str] = None,
+    flash: Optional[str] = None,
+    wb: Optional[str] = None,
+    metering: Optional[str] = None,
+    alt_min: Optional[float] = None,
+    alt_max: Optional[float] = None,
+    heading_min: Optional[float] = None,
+    heading_max: Optional[float] = None,
+    sharp_only: Optional[bool] = None,
+    exclude_underexp: Optional[bool] = None,
+    exclude_overexp: Optional[bool] = None,
+    has_text: Optional[bool] = None,
+    person: Optional[str] = None,
+    persons: Optional[List[str]] = None,
     body: Optional[Dict[str, Any]] = Body(None),
 ) -> Dict[str, Any]:
+    """Paginated search with cursor support for large result sets."""
     dir_value = _require(_from_body(body, dir, "dir"), "dir")
-    search_id_value = _require(_from_body(body, search_id, "search_id"), "search_id")
     query_value = _require(_from_body(body, query, "query"), "query")
-    positives_value = _from_body(body, positives, "positives", default=[], cast=_as_str_list) or []
-    note_value = _from_body(body, note, "note", default="") or ""
+    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+    limit_value = _from_body(body, limit, "limit", default=24, cast=lambda v: int(v)) or 24
+    offset_value = _from_body(body, offset, "offset", default=0, cast=lambda v: int(v)) or 0
+    hf_token_value = _from_body(body, hf_token, "hf_token")
+    openai_key_value = _from_body(body, openai_key, "openai_key")
+    favorites_value = _from_body(body, favorites_only, "favorites_only", default=False, cast=_as_bool) or False
+    tags_value = _from_body(body, tags, "tags", default=[], cast=_as_str_list) or []
+    date_from_value = _from_body(body, date_from, "date_from")
+    date_to_value = _from_body(body, date_to, "date_to")
+    use_fast_value = _from_body(body, use_fast, "use_fast", default=False, cast=_as_bool) or False
+    fast_kind_value = _from_body(body, fast_kind, "fast_kind")
+    use_captions_value = _from_body(body, use_captions, "use_captions", default=False, cast=_as_bool) or False
+    use_ocr_value = _from_body(body, use_ocr, "use_ocr", default=False, cast=_as_bool) or False
+    camera_value = _from_body(body, camera, "camera")
+    iso_min_value = _from_body(body, iso_min, "iso_min")
+    iso_max_value = _from_body(body, iso_max, "iso_max")
+    f_min_value = _from_body(body, f_min, "f_min")
+    f_max_value = _from_body(body, f_max, "f_max")
+    place_value = _from_body(body, place, "place")
+    flash_value = _from_body(body, flash, "flash")
+    wb_value = _from_body(body, wb, "wb")
+    metering_value = _from_body(body, metering, "metering")
+    alt_min_value = _from_body(body, alt_min, "alt_min")
+    alt_max_value = _from_body(body, alt_max, "alt_max")
+    heading_min_value = _from_body(body, heading_min, "heading_min")
+    heading_max_value = _from_body(body, heading_max, "heading_max")
+    sharp_only_value = _from_body(body, sharp_only, "sharp_only", default=False, cast=_as_bool) or False
+    exclude_under_value = _from_body(body, exclude_underexp, "exclude_underexp", default=False, cast=_as_bool) or False
+    exclude_over_value = _from_body(body, exclude_overexp, "exclude_overexp", default=False, cast=_as_bool) or False
+    has_text_value = _from_body(body, has_text, "has_text", default=False, cast=_as_bool) or False
+    person_value = _from_body(body, person, "person")
+    persons_value = _from_body(body, persons, "persons", default=[], cast=_as_str_list) or []
 
-    store = IndexStore(Path(dir_value))
-    log_feedback(store.index_dir, search_id_value, query_value, positives_value, note_value)
-    return {"ok": True}
+    folder = Path(dir_value)
+    if not folder.exists():
+        raise HTTPException(400, "Folder not found")
+
+    emb = _emb(provider_value, hf_token_value, openai_key_value)
+    store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
+    store.load()
+
+    # Get more results than needed for pagination
+    search_top_k = min(limit_value + offset_value + 50, len(store.state.paths or []))
+
+    if use_fast_value:
+        try:
+            if fast_kind_value and fast_kind_value.lower() == 'faiss' and store.faiss_status().get('exists'):
+                results = store.search_faiss(emb, query_value, top_k=search_top_k)
+            elif fast_kind_value and fast_kind_value.lower() == 'hnsw' and store.hnsw_status().get('exists'):
+                results = store.search_hnsw(emb, query_value, top_k=search_top_k)
+            elif fast_kind_value and fast_kind_value.lower() == 'annoy' and store.ann_status().get('exists'):
+                results = store.search_annoy(emb, query_value, top_k=search_top_k)
+            else:
+                if store.faiss_status().get('exists'):
+                    results = store.search_faiss(emb, query_value, top_k=search_top_k)
+                elif store.hnsw_status().get('exists'):
+                    results = store.search_hnsw(emb, query_value, top_k=search_top_k)
+                elif store.ann_status().get('exists'):
+                    results = store.search_annoy(emb, query_value, top_k=search_top_k)
+                else:
+                    results = store.search(emb, query_value, top_k=search_top_k)
+        except Exception:
+            results = store.search(emb, query_value, top_k=search_top_k)
+    else:
+        if use_captions_value and store.captions_available():
+            results = store.search_with_captions(emb, query_value, top_k=search_top_k)
+        elif use_ocr_value and store.ocr_available():
+            results = store.search_with_ocr(emb, query_value, top_k=search_top_k)
+        else:
+            results = store.search(emb, query_value, top_k=search_top_k)
+
+    out = results
+
+    # Apply filters (simplified version)
+    if favorites_value:
+        coll = load_collections(store.index_dir)
+        favs = set(coll.get('Favorites', []))
+        out = [r for r in out if str(r.path) in favs]
+
+    if tags_value:
+        tmap = load_tags(store.index_dir)
+        req = set(tags_value)
+        out = [r for r in out if req.issubset(set(tmap.get(str(r.path), [])))]
+
+    if date_from_value is not None and date_to_value is not None:
+        mmap = {sp: float(mt) for sp, mt in zip(store.state.paths or [], store.state.mtimes or [])}
+        out = [r for r in out if date_from_value <= mmap.get(str(r.path), 0.0) <= date_to_value]
+
+    # Apply pagination
+    total = len(out)
+    paginated_results = out[offset_value:offset_value + limit_value]
+
+    sid = log_search(store.index_dir, getattr(emb, 'index_id', 'default'), query_value, [(str(r.path), float(r.score)) for r in out])
+
+    return {
+        "search_id": sid,
+        "results": [{"path": str(r.path), "score": float(r.score)} for r in paginated_results],
+        "pagination": {
+            "offset": offset_value,
+            "limit": limit_value,
+            "total": total,
+            "has_more": offset_value + limit_value < total
+        }
+    }
 
 
-@app.get("/lookalikes")
-def api_lookalikes(dir: str, max_distance: int = 5) -> Dict[str, Any]:
-    store = IndexStore(Path(dir))
-    groups = find_lookalikes(store.index_dir, max_distance=max_distance)
-    resolved = set(load_resolved(store.index_dir))
-    items = []
-    for g in groups:
-        gid = _group_id(g)
-        items.append({"id": gid, "paths": g, "resolved": gid in resolved})
-    return {"groups": items}
-
-
-@app.post("/lookalikes/resolve")
-def api_resolve_lookalike(
+# Video Search API
+@app.post("/search_video")
+def api_search_video(
     dir: Optional[str] = None,
-    group_paths: Optional[List[str]] = None,
+    query: Optional[str] = None,
+    top_k: Optional[int] = None,
+    provider: Optional[str] = None,
+    hf_token: Optional[str] = None,
+    openai_key: Optional[str] = None,
     body: Optional[Dict[str, Any]] = Body(None),
 ) -> Dict[str, Any]:
+    """Search for videos using semantic search on extracted metadata and keyframes."""
     dir_value = _require(_from_body(body, dir, "dir"), "dir")
-    group_paths_value = _from_body(body, group_paths, "group_paths", default=[], cast=_as_str_list) or []
+    query_value = _require(_from_body(body, query, "query"), "query")
+    top_k_value = _from_body(body, top_k, "top_k", default=12, cast=lambda v: int(v)) or 12
+    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+    hf_token_value = _from_body(body, hf_token, "hf_token")
+    openai_key_value = _from_body(body, openai_key, "openai_key")
 
-    store = IndexStore(Path(dir_value))
-    gid = _group_id(group_paths_value)
-    ids = load_resolved(store.index_dir)
-    if gid not in ids:
-        ids.append(gid)
-    save_resolved(store.index_dir, ids)
-    return {"ok": True, "id": gid}
+    folder = Path(dir_value)
+    if not folder.exists():
+        raise HTTPException(400, "Folder not found")
+
+    # Get video index store
+    video_store = VideoIndexStore(folder)
+    if not video_store.load():
+        return {"results": []}
+
+    # Embed query
+    emb = _emb(provider_value, hf_token_value, openai_key_value)
+    try:
+        qv = emb.embed_text(query_value)
+    except Exception:
+        raise HTTPException(500, "Embedding failed")
+
+    # Search in video store
+    results = video_store.search(qv, top_k=top_k_value)
+
+    return {"results": [{"path": r.path, "score": float(r.score)} for r in results]}
 
 
-# Extras now that we have a proper frontend
+@app.post("/search_video_like")
+def api_search_video_like(
+    dir: Optional[str] = None,
+    path: Optional[str] = None,
+    top_k: Optional[int] = None,
+    provider: Optional[str] = None,
+    hf_token: Optional[str] = None,
+    openai_key: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    """Find visually similar videos based on a reference video."""
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    path_value = _require(_from_body(body, path, "path"), "path")
+    top_k_value = _from_body(body, top_k, "top_k", default=12, cast=lambda v: int(v)) or 12
+    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+    hf_token_value = _from_body(body, hf_token, "hf_token")
+    openai_key_value = _from_body(body, openai_key, "openai_key")
+
+    folder = Path(dir_value)
+    if not folder.exists():
+        raise HTTPException(400, "Folder not found")
+
+    # Get video index store
+    video_store = VideoIndexStore(folder)
+    if not video_store.load():
+        return {"results": []}
+
+    # Search for similar videos
+    results = video_store.search_like(path_value, top_k=top_k_value)
+
+    return {"results": [{"path": r.path, "score": float(r.score)} for r in results]}
 @app.post("/ocr/build")
 def api_build_ocr(
     dir: Optional[str] = None,
@@ -3565,19 +3619,13 @@ def api_delete(
     moved_list: list[dict[str,str]] = []
     os.makedirs(dest_root, exist_ok=True)
     for p in paths_value:
-        sp = Path(p)
-        try:
-            sp_res = sp.resolve(); folder_res = folder.resolve()
-            if not str(sp_res).startswith(str(folder_res)):
-                continue
-        except Exception:
+        src = Path(p)
+        if not src.exists():
             continue
-        rel = sp.resolve().relative_to(folder.resolve())
-        dst = dest_root / rel
-        dst.parent.mkdir(parents=True, exist_ok=True)
+        out = dest_root / src.name
         try:
-            import shutil as _sh; _sh.move(str(sp), str(dst))
-            moved_list.append({"src": str(sp), "dst": str(dst)})
+            shutil.move(str(src), str(out))
+            moved_list.append({"src": str(src), "dst": str(out)})
         except Exception:
             continue
     global _last_delete
@@ -4079,51 +4127,6 @@ def api_search_paginated(
             "total": total,
             "has_more": offset_value + limit_value < total
         }
-    }
-
-
-@app.get("/library/paginated")
-def api_library_paginated(dir: str, provider: str = "local", limit: int = 120, offset: int = 0, sort: str = "mtime", order: str = "desc") -> Dict[str, Any]:
-    """Enhanced library endpoint with sorting and pagination options."""
-    folder = Path(dir)
-    if not folder.exists():
-        raise HTTPException(400, "Folder not found")
-    
-    emb = _emb(provider, None, None)
-    store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
-    store.load()
-    
-    paths = store.state.paths or []
-    mtimes = store.state.mtimes or []
-    
-    # Create path-mtime pairs for sorting
-    path_data = list(zip(paths, mtimes))
-    
-    # Sort based on parameters
-    if sort == "mtime":
-        path_data.sort(key=lambda x: x[1], reverse=(order == "desc"))
-    elif sort == "name":
-        path_data.sort(key=lambda x: str(x[0]), reverse=(order == "desc"))
-    elif sort == "size":
-        # Sort by file size (requires disk access)
-        path_data.sort(key=lambda x: Path(x[0]).stat().st_size if Path(x[0]).exists() else 0, reverse=(order == "desc"))
-    
-    # Apply pagination
-    total = len(path_data)
-    start = max(0, int(offset))
-    end = max(start, min(len(path_data), start + int(limit)))
-    
-    paginated_data = path_data[start:end]
-    result_paths = [str(path) for path, _ in paginated_data]
-    
-    return {
-        "total": total,
-        "offset": start,
-        "limit": int(limit),
-        "paths": result_paths,
-        "sort": sort,
-        "order": order,
-        "has_more": end < total
     }
 
 

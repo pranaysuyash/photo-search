@@ -13,6 +13,9 @@ interface UseGlobalShortcutsParams {
 	showInfoOverlay: boolean;
 	setShowInfoOverlay?: (v: boolean) => void;
 
+	// Filters
+	openFilters: () => void;
+
 	// View context
 	selectedView: string;
 	resultView?: string;
@@ -25,6 +28,7 @@ export function useGlobalShortcuts({
 	searchCommandCenter,
 	showInfoOverlay,
 	setShowInfoOverlay,
+	openFilters,
 	selectedView,
 	resultView,
 }: UseGlobalShortcutsParams) {

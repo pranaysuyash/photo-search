@@ -1,6 +1,6 @@
 import { Label } from "@radix-ui/react-label";
 import type { Meta, StoryObj } from "@storybook/react";
-import { Input } from "./shadcn/Input";
+import { Input } from "./Input";
 
 const meta = {
 	title: "UI Library/Input",

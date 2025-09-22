@@ -17,10 +17,11 @@
 - Keep the newest updates at the top so it is easy to see the latest context.
 - Include brief notes (tests run, follow-ups needed) so the next session knows what to pick up.
 
-## Current Items (2025-09-17)
+## Current Items (2025-09-22)
 
 | Task                                                  | Status   | Notes                                                                                                                                                                                                                                                                                                 |
 | ----------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Onboarding integration for EnhancedWelcome CTAs       | Finished | Connected EnhancedWelcome CTA clicks to useOnboardingFlows hook; added onCompleteOnboardingStep callbacks through LibraryView → EnhancedWelcome → useOnboardingFlows; ensures user progress ("start_demo", "select_directory") is tracked and persisted across reloads.                               |
 | API integration smoke tests scope                     | Started  | Drafting recommendation: treat as FastAPI TestClient smoke layer covering `/search`, favorites, collections with tmp dirs + sample assets; augment vitest with minimal msw-backed fetch contract checks once backend smoke passes. Awaiting decision on depth vs timebox before implementation.       |
 | Backend pytest collection alignment                   | Tested   | Updated status/health tests to use new `/status/*` routes + sanitized index keys and tightened legacy scripts (Electron/offline) so they run against the FastAPI app in-process; `python3 -m pytest` now lands 25/25 green with no skipped smoke checks.                                              |
 | Core `/search` API endpoint restoration               | Finished | Added FastAPI `/search` route with advanced filtering, OCR/captions parsing, and shared search flow; pending local verification of vitest suites due to Node OOM (rerun with `NODE_OPTIONS=--max-old-space-size=4096`).                                                                               |

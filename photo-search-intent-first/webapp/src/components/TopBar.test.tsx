@@ -1,8 +1,8 @@
 import { act, fireEvent } from "@testing-library/react";
+import type { MutableRefObject } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TopBar } from "../components/TopBar";
 import { render, screen } from "../test/test-utils";
-import type { MutableRefObject } from "react";
 
 // Mock the UIContext (partial: keep UIProvider export)
 vi.mock("../contexts/UIContext", async (importOriginal) => {
@@ -277,28 +277,28 @@ describe("TopBar", () => {
 
 			expect(apiDeleteMock).toHaveBeenCalled();
 
-				expect(setSelected).toHaveBeenCalledWith(new Set());
-				expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 10000);
-				expect(setToast).toHaveBeenCalledWith(
-					expect.objectContaining({
-						actionLabel: "Undo",
-						message: expect.stringContaining("Moved 2"),
-					}),
-				);
+			expect(setSelected).toHaveBeenCalledWith(new Set());
+			expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 10000);
+			expect(setToast).toHaveBeenCalledWith(
+				expect.objectContaining({
+					actionLabel: "Undo",
+					message: expect.stringContaining("Moved 2"),
+				}),
+			);
 
-				const toastCall = setToast.mock.calls[0]?.[0];
-				expect(typeof toastCall?.onAction).toBe("function");
+			const toastCall = setToast.mock.calls[0]?.[0];
+			expect(typeof toastCall?.onAction).toBe("function");
 
-				await toastCall?.onAction?.();
+			await toastCall?.onAction?.();
 
-				expect(apiUndoDeleteMock).toHaveBeenCalledTimes(1);
-				expect(setToast).toHaveBeenCalledWith(null);
-				expect(clearTimeoutSpy).toHaveBeenCalled();
-				expect(toastTimerRef.current).toBeNull();
-			} finally {
-				confirmSpy.mockRestore();
-				setTimeoutSpy.mockRestore();
-				clearTimeoutSpy.mockRestore();
-			}
+			expect(apiUndoDeleteMock).toHaveBeenCalledTimes(1);
+			expect(setToast).toHaveBeenCalledWith(null);
+			expect(clearTimeoutSpy).toHaveBeenCalled();
+			expect(toastTimerRef.current).toBeNull();
+		} finally {
+			confirmSpy.mockRestore();
+			setTimeoutSpy.mockRestore();
+			clearTimeoutSpy.mockRestore();
+		}
 	});
 });

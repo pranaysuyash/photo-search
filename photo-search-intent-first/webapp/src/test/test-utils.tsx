@@ -48,7 +48,6 @@ vi.mock("../components/AccessibilityPanel", () => ({
 	}),
 }));
 
-
 // Mock the theme store (simulate Zustand selector behavior)
 vi.mock("../stores/settingsStore", async (importOriginal) => {
 	const actual =

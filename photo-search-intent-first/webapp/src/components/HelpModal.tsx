@@ -13,9 +13,9 @@ import {
 	Zap,
 } from "lucide-react";
 import { useState } from "react";
+import { searchHistoryService } from "../services/SearchHistoryService";
 import { KeyboardShortcutsPanel } from "./KeyboardShortcutsPanel";
 import { SearchHistoryPrivacy } from "./SearchHistoryPrivacy";
-import { searchHistoryService } from "../services/SearchHistoryService";
 
 interface HelpModalProps {
 	isOpen: boolean;
@@ -36,44 +36,50 @@ type HelpSection =
 	| "troubleshooting";
 
 export function HelpModal({
-  isOpen,
-  onClose,
-  initialSection = "getting-started",
+	isOpen,
+	onClose,
+	initialSection = "getting-started",
 }: HelpModalProps) {
-  const [activeSection, setActiveSection] =
-    useState<HelpSection>(initialSection);
-  const [showShortcuts, setShowShortcuts] = useState(false);
+	const [activeSection, setActiveSection] =
+		useState<HelpSection>(initialSection);
+	const [showShortcuts, setShowShortcuts] = useState(false);
 
-  // Handle keyboard shortcuts globally
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Show help when pressing '?'
-      if (e.key === "?" && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
-        // Don't show help if user is typing in an input field
-        if (
-          document.activeElement instanceof HTMLInputElement ||
-          document.activeElement instanceof HTMLTextAreaElement ||
-          document.activeElement?.hasAttribute("contenteditable")
-        ) {
-          return;
-        }
-        
-        e.preventDefault();
-        // Blur the active element to ensure we're not in an input
-        (document.activeElement as HTMLElement)?.blur?.();
-        // Note: The parent component should handle opening the help modal
-        // This is just preventing the default behavior
-      }
-    };
+	// Handle keyboard shortcuts globally
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			// Show help when pressing '?'
+			if (
+				e.key === "?" &&
+				!e.ctrlKey &&
+				!e.metaKey &&
+				!e.altKey &&
+				!e.shiftKey
+			) {
+				// Don't show help if user is typing in an input field
+				if (
+					document.activeElement instanceof HTMLInputElement ||
+					document.activeElement instanceof HTMLTextAreaElement ||
+					document.activeElement?.hasAttribute("contenteditable")
+				) {
+					return;
+				}
 
-    document.addEventListener("keydown", handleKeyDown);
-    
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, []);
+				e.preventDefault();
+				// Blur the active element to ensure we're not in an input
+				(document.activeElement as HTMLElement)?.blur?.();
+				// Note: The parent component should handle opening the help modal
+				// This is just preventing the default behavior
+			}
+		};
 
-  if (!isOpen) return null;
+		document.addEventListener("keydown", handleKeyDown);
+
+		return () => {
+			document.removeEventListener("keydown", handleKeyDown);
+		};
+	}, []);
+
+	if (!isOpen) return null;
 
 	const sections = [
 		{
@@ -252,113 +258,142 @@ export function HelpModal({
 				</div>
 			),
 		},
-							{
-						id: "shortcuts",
-						title: "Keyboard Shortcuts",
-						icon: <Keyboard className="w-5 h-5" />,
-						content: (
-							<div className="space-y-6">
+		{
+			id: "shortcuts",
+			title: "Keyboard Shortcuts",
+			icon: <Keyboard className="w-5 h-5" />,
+			content: (
+				<div className="space-y-6">
+					<div>
+						<h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+							Master Keyboard Navigation
+						</h3>
+						<p className="text-gray-600 dark:text-gray-300 mb-4">
+							Speed up your workflow with powerful keyboard shortcuts. Learn the
+							essentials or dive deep into advanced navigation techniques.
+						</p>
+						<p className="text-gray-600 dark:text-gray-300 text-sm">
+							Tip: Press{" "}
+							<span className="font-mono bg-gray-100 dark:bg-gray-700 px-1 rounded">
+								?
+							</span>
+							anytime to open this shortcuts reference.
+						</p>
+					</div>
+
+					<div className="grid gap-4">
+						<div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+							<div className="flex items-start gap-3">
+								<div className="w-8 h-8 bg-blue-100 dark:bg-blue-800 rounded-full flex items-center justify-center flex-shrink-0">
+									<span className="text-blue-600 dark:text-blue-400 font-semibold">
+										⌘/
+									</span>
+								</div>
 								<div>
-									<h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-										Master Keyboard Navigation
-									</h3>
-									<p className="text-gray-600 dark:text-gray-300 mb-4">
-										Speed up your workflow with powerful keyboard shortcuts. 
-										Learn the essentials or dive deep into advanced navigation techniques.
+									<h4 className="font-medium text-blue-900 dark:text-blue-300 mb-1">
+										Universal Access
+									</h4>
+									<p className="text-sm text-blue-700 dark:text-blue-400">
+										The{" "}
+										<span className="font-mono bg-blue-100 dark:bg-blue-800 px-1 rounded">
+											/
+										</span>{" "}
+										key opens search anywhere, and{" "}
+										<span className="font-mono bg-blue-100 dark:bg-blue-800 px-1 rounded">
+											?
+										</span>
+										shows this help panel.
 									</p>
-									<p className="text-gray-600 dark:text-gray-300 text-sm">
-										Tip: Press <span className="font-mono bg-gray-100 dark:bg-gray-700 px-1 rounded">?</span> 
-										anytime to open this shortcuts reference.
-									</p>
-								</div>
-
-								<div className="grid gap-4">
-									<div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-										<div className="flex items-start gap-3">
-											<div className="w-8 h-8 bg-blue-100 dark:bg-blue-800 rounded-full flex items-center justify-center flex-shrink-0">
-												<span className="text-blue-600 dark:text-blue-400 font-semibold">
-													⌘/
-												</span>
-											</div>
-											<div>
-												<h4 className="font-medium text-blue-900 dark:text-blue-300 mb-1">
-													Universal Access
-												</h4>
-												<p className="text-sm text-blue-700 dark:text-blue-400">
-													The <span className="font-mono bg-blue-100 dark:bg-blue-800 px-1 rounded">/</span> key 
-													opens search anywhere, and <span className="font-mono bg-blue-100 dark:bg-blue-800 px-1 rounded">?</span> 
-													shows this help panel.
-												</p>
-											</div>
-										</div>
-									</div>
-
-									<div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-										<div className="flex items-start gap-3">
-											<div className="w-8 h-8 bg-green-100 dark:bg-green-800 rounded-full flex items-center justify-center flex-shrink-0">
-												<span className="text-green-600 dark:text-green-400 font-semibold">
-													↑↓
-												</span>
-											</div>
-											<div>
-												<h4 className="font-medium text-green-900 dark:text-green-300 mb-1">
-													Navigation Mastery
-												</h4>
-												<p className="text-sm text-green-700 dark:text-green-400">
-													Use arrow keys to navigate photo grids, 
-													<span className="font-mono bg-green-100 dark:bg-green-800 px-1 rounded">Enter</span> 
-													to open details, and <span className="font-mono bg-green-100 dark:bg-green-800 px-1 rounded">Space</span> 
-													to select.
-												</p>
-											</div>
-										</div>
-									</div>
-
-									<div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
-										<div className="flex items-start gap-3">
-											<div className="w-8 h-8 bg-purple-100 dark:bg-purple-800 rounded-full flex items-center justify-center flex-shrink-0">
-												<span className="text-purple-600 dark:text-purple-400 font-semibold">
-													⌘K
-												</span>
-											</div>
-											<div>
-												<h4 className="font-medium text-purple-900 dark:text-purple-300 mb-1">
-													Command Palette
-												</h4>
-												<p className="text-sm text-purple-700 dark:text-purple-400">
-													Press <span className="font-mono bg-purple-100 dark:bg-purple-800 px-1 rounded">⌘K</span> 
-													(Ctrl+K on Windows) to access the powerful command palette for instant navigation.
-												</p>
-											</div>
-										</div>
-									</div>
-								</div>
-
-								<div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-									<button
-										type="button"
-										onClick={() => setShowShortcuts(true)}
-										className="w-full flex items-center justify-between p-4 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors group"
-									>
-										<div className="flex items-center gap-3">
-											<Keyboard className="w-5 h-5 text-gray-500 dark:text-gray-400 group-hover:text-blue-500" />
-											<div className="text-left">
-												<h4 className="font-medium text-gray-900 dark:text-white group-hover:text-blue-500">
-													View All Keyboard Shortcuts
-												</h4>
-												<p className="text-sm text-gray-500 dark:text-gray-400">
-													Complete reference with categorized shortcuts
-												</p>
-											</div>
-										</div>
-										<svg className="w-5 h-5 text-gray-400 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-										</svg>
-									</button>
 								</div>
 							</div>
-						),
-					},,
+						</div>
+
+						<div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+							<div className="flex items-start gap-3">
+								<div className="w-8 h-8 bg-green-100 dark:bg-green-800 rounded-full flex items-center justify-center flex-shrink-0">
+									<span className="text-green-600 dark:text-green-400 font-semibold">
+										↑↓
+									</span>
+								</div>
+								<div>
+									<h4 className="font-medium text-green-900 dark:text-green-300 mb-1">
+										Navigation Mastery
+									</h4>
+									<p className="text-sm text-green-700 dark:text-green-400">
+										Use arrow keys to navigate photo grids,
+										<span className="font-mono bg-green-100 dark:bg-green-800 px-1 rounded">
+											Enter
+										</span>
+										to open details, and{" "}
+										<span className="font-mono bg-green-100 dark:bg-green-800 px-1 rounded">
+											Space
+										</span>
+										to select.
+									</p>
+								</div>
+							</div>
+						</div>
+
+						<div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
+							<div className="flex items-start gap-3">
+								<div className="w-8 h-8 bg-purple-100 dark:bg-purple-800 rounded-full flex items-center justify-center flex-shrink-0">
+									<span className="text-purple-600 dark:text-purple-400 font-semibold">
+										⌘K
+									</span>
+								</div>
+								<div>
+									<h4 className="font-medium text-purple-900 dark:text-purple-300 mb-1">
+										Command Palette
+									</h4>
+									<p className="text-sm text-purple-700 dark:text-purple-400">
+										Press{" "}
+										<span className="font-mono bg-purple-100 dark:bg-purple-800 px-1 rounded">
+											⌘K
+										</span>
+										(Ctrl+K on Windows) to access the powerful command palette
+										for instant navigation.
+									</p>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+						<button
+							type="button"
+							onClick={() => setShowShortcuts(true)}
+							className="w-full flex items-center justify-between p-4 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors group"
+						>
+							<div className="flex items-center gap-3">
+								<Keyboard className="w-5 h-5 text-gray-500 dark:text-gray-400 group-hover:text-blue-500" />
+								<div className="text-left">
+									<h4 className="font-medium text-gray-900 dark:text-white group-hover:text-blue-500">
+										View All Keyboard Shortcuts
+									</h4>
+									<p className="text-sm text-gray-500 dark:text-gray-400">
+										Complete reference with categorized shortcuts
+									</p>
+								</div>
+							</div>
+							<svg
+								className="w-5 h-5 text-gray-400 group-hover:text-blue-500"
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+							>
+								<path
+									strokeLinecap="round"
+									strokeLinejoin="round"
+									strokeWidth={2}
+									d="M9 5l7 7-7 7"
+								/>
+							</svg>
+						</button>
+					</div>
+				</div>
+			),
+		},
+		,
 		{
 			id: "privacy" as HelpSection,
 			title: "Privacy & Data",

@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
+    "lint:imports": "python -m importlinter --config importlinter.ini || (echo 'Import contracts failed' && exit 1)",
     "test:web:classic": "npm --prefix archive/photo-search-classic/webapp run test",
     "test:web:if": "npm --prefix photo-search-intent-first/webapp run test",
     "test:web": "npm run -s test:web:classic && npm run -s test:web:if",

@@ -23,12 +23,15 @@
     "lint:fix": "npx @biomejs/biome check src --write",
     "lint:fix:unsafe": "npx @biomejs/biome check src --write --unsafe",
     "lint:auto": "node fix-button-types.mjs && node fix-typescript-types.mjs && node fix-accessibility.mjs",
+    "lint:eslint": "eslint src --ext .ts,.tsx",
+    "lint:eslint:fix": "eslint src --ext .ts,.tsx --fix",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },
   "dependencies": {
     "@floating-ui/react": "^0.27.16",
     "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-select": "^2.2.6",
     "@radix-ui/react-slot": "^1.2.3",
     "@radix-ui/react-toast": "^1.2.15",
@@ -45,6 +48,7 @@
     "react-scan": "^0.4.3",
     "react-window": "^2.0.2",
     "tailwind-merge": "^3.3.1",
+    "zod": "^3.25.76",
     "zustand": "^5.0.8"
   },
   "devDependencies": {
@@ -58,9 +62,13 @@
     "@types/node": "^24.3.1",
     "@types/react": "^18.2.15",
     "@types/react-dom": "^18.2.7",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
     "@vitejs/plugin-react": "^4.2.0",
     "@vitest/coverage-v8": "^1.6.0",
     "autoprefixer": "^10.4.18",
+    "eslint": "^8.57.0",
+    "eslint-plugin-boundaries": "^4.2.0",
     "glob": "^11.0.3",
     "jsdom": "^24.0.0",
     "playwright": "^1.55.0",

@@ -1,6 +1,6 @@
 import type React from "react";
-import { useEffect, useState, useCallback } from "react";
-import { apiWorkspaceList, apiDemoDir } from "../api";
+import { useCallback, useEffect, useState } from "react";
+import { apiDemoDir, apiWorkspaceList } from "../api";
 import { useDemoLibraryHandlers } from "../hooks/useDemoLibraryHandlers";
 
 interface LibrarySwitcherProps {
@@ -29,7 +29,7 @@ export const LibrarySwitcher: React.FC<LibrarySwitcherProps> = ({
 		engine: "local",
 		needsHf: false,
 		needsOAI: false,
-		setShowOnboarding: () => {}
+		setShowOnboarding: () => {},
 	});
 
 	const loadLibraries = useCallback(async () => {
@@ -46,7 +46,7 @@ export const LibrarySwitcher: React.FC<LibrarySwitcherProps> = ({
 					name: folder.split("/").pop() || folder, // Use folder name
 					path: folder,
 					isDemo: false,
-				})
+				}),
 			);
 
 			const allLibs = [...workspaceLibs];
@@ -88,7 +88,7 @@ export const LibrarySwitcher: React.FC<LibrarySwitcherProps> = ({
 		}
 	};
 
-	const currentLibrary = libraries.find(lib => lib.path === currentDir);
+	const currentLibrary = libraries.find((lib) => lib.path === currentDir);
 
 	return (
 		<div className="relative">
@@ -103,7 +103,9 @@ export const LibrarySwitcher: React.FC<LibrarySwitcherProps> = ({
 					id="library-select"
 					value={currentLibrary?.id || ""}
 					onChange={(e) => {
-						const selectedLib = libraries.find(lib => lib.id === e.target.value);
+						const selectedLib = libraries.find(
+							(lib) => lib.id === e.target.value,
+						);
 						if (selectedLib) {
 							handleLibrarySelect(selectedLib);
 						}

@@ -2,14 +2,14 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
 	ChevronDown,
 	ChevronUp,
+	Download,
+	FolderOpen,
 	HelpCircle,
 	Play,
 	Search,
 	Settings,
-	Wand2,
-	Download,
 	Upload,
-	FolderOpen,
+	Wand2,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -41,7 +41,7 @@ export function EmptyStateQuickActions({
 		: {
 				whileHover: { scale: 1.02 },
 				whileTap: { scale: 0.98 },
-		  };
+			};
 
 	const getContextualActions = () => {
 		switch (context) {
@@ -61,7 +61,7 @@ export function EmptyStateQuickActions({
 									action: onTryDemo,
 									variant: "primary" as const,
 								},
-						  ]
+							]
 						: []),
 				];
 			case "collections":
@@ -101,7 +101,7 @@ export function EmptyStateQuickActions({
 									action: onTryDemo,
 									variant: "primary" as const,
 								},
-						  ]
+							]
 						: []),
 				];
 			default:
@@ -187,11 +187,11 @@ export function EmptyStateQuickActions({
 			<AnimatePresence>
 				{showMore && (
 					<motion.div
-						initial={prefersReducedMotion ? undefined : { opacity: 0, height: 0 }}
+						initial={
+							prefersReducedMotion ? undefined : { opacity: 0, height: 0 }
+						}
 						animate={
-							prefersReducedMotion
-								? undefined
-								: { opacity: 1, height: "auto" }
+							prefersReducedMotion ? undefined : { opacity: 1, height: "auto" }
 						}
 						exit={prefersReducedMotion ? undefined : { opacity: 0, height: 0 }}
 						transition={
@@ -250,7 +250,8 @@ export function EmptyStateQuickActions({
 										Save frequently used searches for quick access
 									</p>
 									<p className="text-xs text-gray-500 dark:text-gray-500">
-										Search for photos first, then use the "Save" button to store your query
+										Search for photos first, then use the "Save" button to store
+										your query
 									</p>
 								</div>
 							)}

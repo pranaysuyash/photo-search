@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { Button } from "./shadcn/Button";
+import { Button } from "./Button";
 import {
 	Dialog,
 	DialogClose,
@@ -11,7 +11,7 @@ import {
 	DialogPortal,
 	DialogTitle,
 	DialogTrigger,
-} from "./shadcn/Dialog";
+} from "./Dialog";
 
 const meta = {
 	title: "UI Library/Dialog",

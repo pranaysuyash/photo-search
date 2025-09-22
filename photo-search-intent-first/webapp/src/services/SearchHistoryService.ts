@@ -284,6 +284,8 @@ class SearchHistoryService {
 export const searchHistoryService = new SearchHistoryService();
 
 // Factory function for creating configured instances
-export function createSearchHistoryService(config: SearchHistoryConfig): SearchHistoryService {
+export function createSearchHistoryService(
+	config: SearchHistoryConfig,
+): SearchHistoryService {
 	return new SearchHistoryService(config);
 }

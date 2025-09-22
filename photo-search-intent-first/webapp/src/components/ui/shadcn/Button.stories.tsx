@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { Button } from "./shadcn/Button";
+import { Button } from "./Button";
 
 const meta = {
 	title: "UI Library/Button",

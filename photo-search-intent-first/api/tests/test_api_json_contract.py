@@ -60,10 +60,10 @@ def test_analytics_log_accepts_json(tmp_path, client):
 
 
 def test_monitoring_post_allows_unauthenticated_requests(client):
-    original_token = server._API_TOKEN
-    original_dev_no_auth = server._DEV_NO_AUTH
-    server._API_TOKEN = "unit-test-token"
-    server._DEV_NO_AUTH = False
+    original_token = server.config.api_token
+    original_dev_no_auth = server.config.dev_no_auth
+    server.config.api_token = "unit-test-token"
+    server.config.dev_no_auth = False
     try:
         resp = client.post("/monitoring", json={"ping": True})
         assert resp.status_code == 200
@@ -75,8 +75,8 @@ def test_monitoring_post_allows_unauthenticated_requests(client):
         payload_api = resp_api.json()
         assert payload_api.get("ok") is True
     finally:
-        server._API_TOKEN = original_token
-        server._DEV_NO_AUTH = original_dev_no_auth
+        server.config.api_token = original_token
+        server.config.dev_no_auth = original_dev_no_auth
 
 
 def test_health_endpoint_reports_uptime(client):

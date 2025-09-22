@@ -25,7 +25,12 @@ ann = ["annoy>=1.17.3"]
 faiss = ["faiss-cpu>=1.7.4"]
 ocr = ["easyocr>=1.7.1"]
 hnsw = ["hnswlib>=0.7.0"]
-dev = ["ruff>=0.5.0", "mypy>=1.8.0", "pytest>=7.4.0"]
+dev = [
+  "ruff>=0.5.0",
+  "mypy>=1.8.0",
+  "pytest>=7.4.0",
+  "import-linter>=2.0",
+]
 
 [project.scripts]
 ps-intent = "photo_search_intent_first.cli:main"
@@ -40,3 +45,6 @@ where = ["photo-search-intent-first"]
 [tool.ruff]
 line-length = 100
 target-version = "py39"
+
+[tool.importlinter]
+config = "importlinter.ini"

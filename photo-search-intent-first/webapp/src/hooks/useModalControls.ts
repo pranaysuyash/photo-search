@@ -1,54 +1,57 @@
 import { useMemo } from "react";
 import { type ModalKey, useModalContext } from "../contexts/ModalContext";
-import { useModalDataContext, useModalDataActions } from "../contexts/ModalDataContext";
+import {
+	useModalDataActions,
+	useModalDataContext,
+} from "../contexts/ModalDataContext";
 
 // Fallback data for when used outside ModalDataProvider
 const fallbackModalData = {
-  selected: new Set<string>(),
-  dir: "",
-  engine: "",
-  topK: 0,
-  highContrast: false,
-  useFast: false,
-  fastKind: "" as const,
-  useCaps: false,
-  useOcr: false,
-  hasText: false,
-  useOsTrash: false,
-  searchText: "",
-  query: "",
-  collections: {},
-  clusters: [],
-  allTags: [],
-  meta: null,
+	selected: new Set<string>(),
+	dir: "",
+	engine: "",
+	topK: 0,
+	highContrast: false,
+	useFast: false,
+	fastKind: "" as const,
+	useCaps: false,
+	useOcr: false,
+	hasText: false,
+	useOsTrash: false,
+	searchText: "",
+	query: "",
+	collections: {},
+	clusters: [],
+	allTags: [],
+	meta: null,
 };
 
 // Fallback actions for when used outside ModalDataProvider
 const fallbackModalActions = {
-  settingsActions: {
-    setDir: () => {},
-    setUseOsTrash: () => {},
-    setUseFast: () => {},
-    setFastKind: () => {},
-    setUseCaps: () => {},
-    setUseOcr: () => {},
-    setHasText: () => {},
-    setHighContrast: () => {},
-  },
-  uiActions: {
-    setBusy: () => {},
-    setNote: () => {},
-  },
-  photoActions: {
-    setResults: () => {},
-    setSaved: () => {},
-    setCollections: () => {},
-  },
-  libIndex: () => {},
-  prepareFast: () => {},
-  buildOCR: () => {},
-  buildMetadata: () => {},
-  tagSelected: () => {},
+	settingsActions: {
+		setDir: () => {},
+		setUseOsTrash: () => {},
+		setUseFast: () => {},
+		setFastKind: () => {},
+		setUseCaps: () => {},
+		setUseOcr: () => {},
+		setHasText: () => {},
+		setHighContrast: () => {},
+	},
+	uiActions: {
+		setBusy: () => {},
+		setNote: () => {},
+	},
+	photoActions: {
+		setResults: () => {},
+		setSaved: () => {},
+		setCollections: () => {},
+	},
+	libIndex: () => {},
+	prepareFast: () => {},
+	buildOCR: () => {},
+	buildMetadata: () => {},
+	tagSelected: () => {},
 };
 
 export interface ModalControls {
@@ -100,7 +103,8 @@ export function useModalControls(): ModalControls {
 			// Data-aware modal controls
 			canOpenShare: () => data.selected.size > 0 && !!data.dir,
 			canOpenExport: () => data.selected.size > 0 && !!data.dir,
-			canOpenCollections: () => data.selected.size > 0 && Object.keys(data.collections).length > 0,
+			canOpenCollections: () =>
+				data.selected.size > 0 && Object.keys(data.collections).length > 0,
 			hasSelectedItems: () => data.selected.size > 0,
 		}),
 		[actions, data],

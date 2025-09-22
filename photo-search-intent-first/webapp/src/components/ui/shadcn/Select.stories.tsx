@@ -8,7 +8,7 @@ import {
 	SelectSeparator,
 	SelectTrigger,
 	SelectValue,
-} from "./shadcn/Select";
+} from "./Select";
 
 const meta = {
 	title: "UI Library/Select",

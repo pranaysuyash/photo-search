@@ -1,10 +1,5 @@
 import { useCallback } from "react";
-import {
-	API_BASE,
-	apiDemoDir,
-	apiIndex,
-	apiWorkspaceAdd,
-} from "../api";
+import { API_BASE, apiDemoDir, apiIndex, apiWorkspaceAdd } from "../api";
 import { useLibraryContext } from "../contexts/LibraryContext";
 import { useSettingsActions, useUIActions } from "../stores/useStores";
 import { handleError } from "../utils/errors";
@@ -127,7 +122,7 @@ export function useDemoLibraryHandlers({
 					try {
 						await apiWorkspaceAdd(path);
 					} catch {}
-					(void (async () => {
+					void (async () => {
 						try {
 							await apiIndex(
 								path,
@@ -137,7 +132,7 @@ export function useDemoLibraryHandlers({
 								needsOAI ? openaiKey : undefined,
 							);
 						} catch {}
-					})());
+					})();
 				}
 
 				setShowOnboarding(false);
