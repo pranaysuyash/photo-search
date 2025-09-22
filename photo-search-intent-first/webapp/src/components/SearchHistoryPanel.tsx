@@ -490,5 +490,3 @@ export const SearchHistoryPanel: React.FC<SearchHistoryPanelProps> = ({
 		</div>
 	);
 };
-
-export { SearchHistoryPanel };

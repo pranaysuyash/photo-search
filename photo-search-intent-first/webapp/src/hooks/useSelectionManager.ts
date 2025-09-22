@@ -4,9 +4,8 @@
  */
 import { useCallback, useMemo } from "react";
 import { apiDelete, apiSetTags, apiUndoDelete } from "@/api";
-import { useToast } from "@/hooks/useToast";
-import { usePhotoActions } from "@/stores/usePhotoStore";
-import { useUIActions } from "@/stores/useUIStore";
+import { useToast } from "@/hooks/use-toast";
+import { usePhotoActions, useUIActions } from "@/stores/useStores";
 
 interface UseSelectionManagerProps {
 	dir: string | null;
@@ -23,9 +22,9 @@ export function useSelectionManager({
 	loadTags,
 	loadFav,
 }: UseSelectionManagerProps) {
-	const { photoActions } = usePhotoActions();
-	const { uiActions } = useUIActions();
-	const { pushToast } = useToast();
+	const photoActions = usePhotoActions();
+	const uiActions = useUIActions();
+	const { toast: pushToast } = useToast();
 
 	// Toggle selection for a single item
 	const toggleSelect = useCallback(
