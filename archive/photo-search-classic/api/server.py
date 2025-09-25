@@ -397,7 +397,7 @@ def api_resolve_smart_collection(dir: str, name: str, provider: str = "local", t
             ppl = set(_face_photos(store.index_dir, str(person)))
             out = [(p, s) for (p, s) in out if p in ppl]
     except Exception:
-        logging.exception("EXIF read failed for %s", str(p))
+        logging.exception("EXIF read failed")
     # Date filter
     if date_from is not None and date_to is not None:
         mmap = {sp: float(mt) for sp, mt in zip(store.paths or [], store.mtimes or [])}

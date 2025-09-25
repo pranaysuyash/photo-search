@@ -1,4 +1,16 @@
-Photo Search – Two Approaches
+# photo-search
+## Tech Stack
+
+- **Shell:** Electron (desktop)
+- **Frontend:** React + Vite (dev at `http://127.0.0.1:5173`, prod built into `photo-search-intent-first/api/web/index.html` served via `app://`)
+- **Backend:** FastAPI (Uvicorn on `http://127.0.0.1:8000`, `/docs` for OpenAPI, optional `/app/` to serve SPA)
+- **State/UX:** Zustand, TanStack React Query, Radix UI, Tailwind, Framer Motion
+- **Not used:** Streamlit (legacy prototype lives under `photo-search-intent-first/ui/`, not part of the app)
+
+> **Note:** `photo-search-intent-first/ui` contains a legacy Streamlit proof-of-concept.  
+> The shipping application is `photo-search-intent-first/webapp` (React) + `photo-search-intent-first/electron` (shell) with a FastAPI backend in `photo-search-intent-first/api`
+
+
 
 What’s Included
 

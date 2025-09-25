@@ -3,8 +3,7 @@
  * Encapsulates grid size, view modes, and UI preferences
  */
 import { useCallback, useMemo } from "react";
-import { useSettings } from "@/stores/useSettingsStore";
-import { useUIActions } from "@/stores/useUIStore";
+import { useSettings, useUIActions } from "@/stores/useStores";
 
 type GridSize = "small" | "medium" | "large";
 type ViewType = "results" | "library" | "map" | "people" | "tasks" | "trips";

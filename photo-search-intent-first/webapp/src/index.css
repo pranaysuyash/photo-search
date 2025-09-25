@@ -21,6 +21,7 @@
 		-moz-osx-font-smoothing: grayscale;
 		overflow-x: hidden;
 		overscroll-behavior: none;
+		min-height: 100vh;
 	}
 
 	#root {

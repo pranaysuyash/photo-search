@@ -12,6 +12,7 @@ Usage:
     python electron_offline_test.py [--api-url URL]
 """
 
+import logging
 import os
 import sys
 import json
@@ -40,8 +41,40 @@ except ImportError:  # pragma: no cover - pytest unavailable in CLI mode
 # Add the project root to Python path
 sys.path.insert(0, str(Path(__file__).parent))
 
+
+logger = logging.getLogger(__name__)
+
 def _perform_request(method: str, endpoint: str, api_url: str, **kwargs):
-    """Perform request against API, falling back to in-process app when local."""
+    """Perform request against the API.
+
+    Prefer an in-process FastAPI app when available to avoid hitting an unrelated
+    localhost:8000 that may be running on the developer machine. If the app cannot
+    be imported, fall back to real HTTP requests.
+    """
+    # Try in-process app first
+    try:
+        from fastapi.testclient import TestClient
+        app = None  # type: ignore
+        try:
+            # Preferred path in this repo
+            from api.server import app as _app  # type: ignore
+            app = _app
+        except Exception:
+            try:
+                from server import app as _app  # type: ignore
+                app = _app
+            except Exception:
+                app = None  # type: ignore
+        if app is not None:
+            client = TestClient(app)
+            client_kwargs = dict(kwargs)
+            client_kwargs.pop("timeout", None)
+            request_fn = getattr(client, method.lower())
+            return request_fn(endpoint, **client_kwargs)
+    except Exception:
+        pass
+
+    # Fall back to real HTTP request
     url = f"{api_url}{endpoint}"
     try:
         return requests.request(method, url, **kwargs)
@@ -49,21 +82,12 @@ def _perform_request(method: str, endpoint: str, api_url: str, **kwargs):
         parsed = urlparse(api_url)
         if parsed.hostname not in {"localhost", "127.0.0.1"}:
             pytest.skip(f"API server unavailable at {api_url}")
-
-        # Fall back to in-process FastAPI app for local testing.
-        from fastapi.testclient import TestClient
-        from server import app  # type: ignore
-
-        client = TestClient(app)
-        client_kwargs = dict(kwargs)
-        client_kwargs.pop("timeout", None)
-        request_fn = getattr(client, method.lower())
-        return request_fn(endpoint, **client_kwargs)
+        raise
 
 
 def test_cors_configuration(api_url="http://localhost:8000"):
     """Test that CORS is properly configured for Electron app:// protocol."""
-    print("Testing CORS configuration for Electron...")
+    logger.info("Testing CORS configuration for Electron...")
 
     try:
         # Test OPTIONS preflight request
@@ -80,21 +104,21 @@ def test_cors_configuration(api_url="http://localhost:8000"):
         allowed_origins = cors_headers.get('Access-Control-Allow-Origin', '')
 
         if 'app://local' in allowed_origins or '*' in allowed_origins:
-            print("✓ CORS configured for app://local origin")
+            logger.info("CORS configured for app://local origin")
             return
 
         message = f"✗ CORS not configured for app://local. Allowed origins: {allowed_origins}"
-        print(message)
+        logger.error(message)
         raise AssertionError(message)
 
     except Exception as e:
-        print(f"✗ CORS test failed: {e}")
+        logger.error("CORS test failed: %s", e)
         raise
 
 
 def test_electron_api_endpoints(api_url="http://localhost:8000"):
     """Test Electron-specific API endpoints."""
-    print("Testing Electron-specific API endpoints...")
+    logger.info("Testing Electron-specific API endpoints...")
 
     with tempfile.TemporaryDirectory() as tmpdir:
         assets_dir = Path(tmpdir)
@@ -126,7 +150,7 @@ def test_electron_api_endpoints(api_url="http://localhost:8000"):
                 response = _perform_request("GET", endpoint, api_url, headers=headers, timeout=5, params=params)
 
                 if response.status_code == 200:
-                    print(f"✓ {endpoint} accessible (status: {response.status_code})")
+                    logger.info("%s accessible (status: %s)", endpoint, response.status_code)
                     try:
                         payload = response.json()
                     except Exception as exc:  # noqa: BLE001
@@ -143,17 +167,17 @@ def test_electron_api_endpoints(api_url="http://localhost:8000"):
                         if "Favorites" not in collections:
                             failures[endpoint] = "missing Favorites collection"
                 else:
-                    print(f"✗ {endpoint} failed (status: {response.status_code})")
+                    logger.error("%s failed (status: %s)", endpoint, response.status_code)
                     failures[endpoint] = f"status {response.status_code}"
 
             except requests.exceptions.Timeout:
-                print(f"✗ {endpoint} timed out")
+                logger.error("%s timed out", endpoint)
                 failures[endpoint] = "timeout"
             except requests.exceptions.ConnectionError:
-                print(f"✗ Cannot connect to {endpoint}")
+                logger.error("Cannot connect to %s", endpoint)
                 failures[endpoint] = "connection error"
             except Exception as e:
-                print(f"✗ {endpoint} error: {e}")
+                logger.error("%s error: %s", endpoint, e)
                 failures[endpoint] = str(e)
 
         if failures:
@@ -165,13 +189,13 @@ def test_electron_api_endpoints(api_url="http://localhost:8000"):
 
 def test_offline_service_configuration():
     """Test offline service configuration in the webapp."""
-    print("Testing offline service configuration...")
+    logger.info("Testing offline service configuration...")
 
     # Check if service worker exists
     sw_path = Path(__file__).parent / "webapp" / "public" / "service-worker.js"
     if not sw_path.exists():
         message = "Service worker not found"
-        print(f"✗ {message}")
+        logger.error(message)
         raise AssertionError(message)
 
     try:
@@ -189,9 +213,9 @@ def test_offline_service_configuration():
         missing = [name for name, ok in checks if not ok]
         for check_name, passed in checks:
             if passed:
-                print(f"✓ {check_name} implemented")
+                logger.info("%s implemented", check_name)
             else:
-                print(f"✗ {check_name} missing")
+                logger.error("%s missing", check_name)
 
         if missing:
             raise AssertionError(
@@ -199,19 +223,19 @@ def test_offline_service_configuration():
             )
 
     except Exception as e:
-        print(f"✗ Error reading service worker: {e}")
+        logger.error("Error reading service worker: %s", e)
         raise
 
 
 def test_electron_detection_logic():
     """Test the Electron detection logic in the webapp."""
-    print("Testing Electron detection logic...")
+    logger.info("Testing Electron detection logic...")
 
     # Check the HTML file for Electron detection
     html_path = Path(__file__).parent / "webapp" / "index.html"
     if not html_path.exists():
         message = "index.html not found"
-        print(f"✗ {message}")
+        logger.error(message)
         raise AssertionError(message)
 
     try:
@@ -227,9 +251,9 @@ def test_electron_detection_logic():
         missing = [name for name, ok in checks if not ok]
         for check_name, passed in checks:
             if passed:
-                print(f"✓ {check_name} found")
+                logger.info("%s found", check_name)
             else:
-                print(f"✗ {check_name} missing")
+                logger.error("%s missing", check_name)
 
         if missing:
             raise AssertionError(
@@ -237,7 +261,7 @@ def test_electron_detection_logic():
             )
 
     except Exception as e:
-        print(f"✗ Error reading index.html: {e}")
+        logger.error("Error reading index.html: %s", e)
         raise
 
 
@@ -250,8 +274,10 @@ def main():
 
     args = parser.parse_args()
 
-    print("Electron Offline Verification")
-    print("=" * 40)
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+    logger.info("Electron Offline Verification")
+    logger.info("=" * 40)
 
     results = []
 
@@ -260,49 +286,49 @@ def main():
         try:
             test_fn(*fn_args)
         except pytest.skip.Exception as err:
-            print(f"Skipped {test_fn.__name__}: {err}")
+            logger.warning("Skipped %s: %s", test_fn.__name__, err)
             return False
         except AssertionError as err:
-            print(f"Assertion failed in {test_fn.__name__}: {err}")
+            logger.error("Assertion failed in %s: %s", test_fn.__name__, err)
             return False
         except Exception as err:
-            print(f"Unexpected error in {test_fn.__name__}: {err}")
+            logger.error("Unexpected error in %s: %s", test_fn.__name__, err)
             return False
         return True
 
     results.append(_run(test_cors_configuration, args.api_url))
-    print()
+    logger.info("")
 
     # Test Electron API endpoints
     results.append(_run(test_electron_api_endpoints, args.api_url))
-    print()
+    logger.info("")
 
     # Test offline service configuration
     results.append(_run(test_offline_service_configuration))
-    print()
+    logger.info("")
 
     # Test Electron detection logic
     results.append(_run(test_electron_detection_logic))
-    print()
+    logger.info("")
 
     # Summary
     passed = sum(results)
     total = len(results)
 
-    print("Summary:")
-    print(f"  Tests passed: {passed}/{total}")
+    logger.info("Summary:")
+    logger.info("  Tests passed: %s/%s", passed, total)
 
     if passed == total:
-        print("✓ All Electron offline tests PASSED")
-        print("\nNext steps for full Electron app:")
-        print("1. Set up Electron build configuration")
-        print("2. Create main Electron process file")
-        print("3. Configure preload script for electronAPI")
-        print("4. Build and package the app")
-        print("5. Test offline boot with local models")
+        logger.info("✓ All Electron offline tests PASSED")
+        logger.info("\nNext steps for full Electron app:")
+        logger.info("1. Set up Electron build configuration")
+        logger.info("2. Create main Electron process file")
+        logger.info("3. Configure preload script for electronAPI")
+        logger.info("4. Build and package the app")
+        logger.info("5. Test offline boot with local models")
         return 0
     else:
-        print("✗ Some Electron offline tests FAILED")
+        logger.error("✗ Some Electron offline tests FAILED")
         return 1
 
 

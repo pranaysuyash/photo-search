@@ -227,21 +227,21 @@ export function SmartAlbumSuggestions({
 
 	return (
 		<div
-			className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm"
+			className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm max-h-[500px] sm:max-h-[600px] md:max-h-[700px] lg:max-h-[800px]"
 			role="region"
 			aria-labelledby="smart-album-suggestions-heading"
 		>
-			<div className="border-b border-border px-3 py-3 sm:px-4 sm:py-4 flex-shrink-0">
+			<div className="border-b border-border px-3 py-3 sm:px-4 sm:py-4 md:px-6 flex-shrink-0">
 				<h3
 					id="smart-album-suggestions-heading"
-					className="flex items-center gap-2 text-sm sm:text-base font-semibold text-foreground"
+					className="flex items-center gap-3 text-base sm:text-lg font-semibold text-foreground"
 				>
-					<span className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-						<FolderPlus className="h-4 w-4 sm:h-5 sm:w-5" />
+					<span className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+						<FolderPlus className="h-5 w-5 sm:h-6 sm:w-6" />
 					</span>
 					<span className="truncate">Smart Album Suggestions</span>
 				</h3>
-				<p className="mt-1 sm:mt-2 text-xs sm:text-sm text-muted-foreground">
+				<p className="mt-2 text-sm text-muted-foreground">
 					{suggestions.length} smart album suggestions based on your library
 				</p>
 			</div>
@@ -260,14 +260,16 @@ export function SmartAlbumSuggestions({
 							>
 								<button
 									type="button"
-									className="flex w-full items-center justify-between gap-2 sm:gap-3 px-3 py-2.5 sm:px-4 sm:py-3 text-left transition-colors hover:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+									className="flex w-full items-center justify-between gap-3 px-3 py-2 sm:px-4 sm:py-3 text-left transition-colors hover:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 									onClick={() => toggleSection(type)}
 									aria-expanded={isExpanded}
 									aria-controls={sectionId}
-									aria-label={`${isExpanded ? "Collapse" : "Expand"} ${info?.title ?? type} section`}
+									aria-label={`${isExpanded ? "Collapse" : "Expand"} ${
+										info?.title ?? type
+									} section`}
 								>
-									<span className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm font-medium text-foreground">
-										<span className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-muted text-muted-foreground">
+									<span className="flex items-center gap-3 text-sm font-medium text-foreground">
+										<span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground">
 											{info?.icon}
 										</span>
 										<span className="truncate">{info?.title ?? type}</span>
@@ -288,34 +290,31 @@ export function SmartAlbumSuggestions({
 								</button>
 
 								{isExpanded && (
-									<div
-										id={sectionId}
-										className="space-y-1.5 sm:space-y-2 px-3 pb-3 sm:px-4 sm:pb-4"
-									>
+									<div id={sectionId} className="space-y-2 px-3 pb-3 sm:px-4 sm:pb-4">
 										{sectionSuggestions.map((suggestion) => (
 											<button
 												key={suggestion.id}
 												type="button"
-												className="w-full rounded-lg border border-border bg-background px-3 py-2.5 sm:px-4 sm:py-3 text-left transition hover:border-primary/40 hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+												className="w-full rounded-lg border border-border bg-background px-3 py-2 sm:px-4 sm:py-3 text-left transition hover:border-primary/40 hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 												onClick={() => onSuggestionSelect(suggestion)}
 												aria-label={`Create smart album: ${suggestion.title}`}
 											>
-												<div className="flex items-start gap-2.5 sm:gap-3">
-													<span className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-primary/10 text-primary flex-shrink-0">
+												<div className="flex items-start gap-3">
+													<span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary flex-shrink-0">
 														{suggestion.icon}
 													</span>
 													<div className="min-w-0 flex-1">
-														<div className="text-xs sm:text-sm font-medium text-foreground truncate">
+														<div className="text-sm font-medium text-foreground truncate">
 															{suggestion.title}
 														</div>
-														<p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-muted-foreground line-clamp-2">
+														<p className="mt-1 text-sm text-muted-foreground line-clamp-2">
 															{suggestion.description}
 														</p>
-														<div className="mt-1.5 sm:mt-2 text-xs font-medium text-muted-foreground">
+														<div className="mt-2 text-xs font-medium text-muted-foreground">
 															~{suggestion.estimatedCount} photos
 														</div>
 													</div>
-													<FolderPlus className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0 text-muted-foreground mt-0.5" />
+													<FolderPlus className="h-4 w-4 flex-shrink-0 text-muted-foreground mt-0.5" />
 												</div>
 											</button>
 										))}

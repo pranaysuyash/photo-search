@@ -1,26 +1,18 @@
 /**
- * ActionsContext - Provides commonly used actions to reduce prop drilling
- * This context consolidates action functions that are frequently passed down
- * through the component tree to reduce prop drilling.
+ * ActionsContext - Provides a consolidated interface for all application actions
+ * This context acts as a facade that combines all domain-specific contexts
+ * to provide a unified interface for application actions.
  */
 import type React from "react";
-import { createContext, useContext } from "react";
-import type { SearchResult } from "../api";
+import { createContext, useContext, useMemo } from "react";
+import type { AccessibilitySettings } from "../../components/AccessibilityPanel";
 
 // Define the shape of our actions context
 interface ActionsContextType {
-	// Search operations
-	performSearch: (query: string, topK?: number) => Promise<void>;
-	searchSimilar: (path: string, topK?: number) => Promise<void>;
-	searchLike: (
-		path: string,
-		text?: string,
-		weight?: number,
-		topK?: number,
-	) => Promise<void>;
-	doSearchImmediate: (query: string) => Promise<void>;
+	// Search operations (delegated to SearchOperationsContext)
+	doSearchImmediate: (query?: string) => Promise<void>;
 
-	// Data loading
+	// Data loading (delegated to DataManagementContext)
 	loadFav: () => Promise<void>;
 	loadSaved: () => Promise<void>;
 	loadTags: () => Promise<void>;
@@ -35,82 +27,46 @@ interface ActionsContextType {
 	loadMetadata: () => Promise<void>;
 	loadPresets: () => Promise<void>;
 
-	// Index operations
-	buildFast: (kind: "annoy" | "faiss" | "hnsw") => Promise<void>;
+	// Index operations (delegated to IndexOperationsContext)
+	prepareFast: (kind: "annoy" | "faiss" | "hnsw") => Promise<void>;
 	buildOCR: () => Promise<void>;
 	buildMetadata: () => Promise<void>;
 
-	// UI actions
-	setQuery: (query: string) => void;
-	setResults: (results: SearchResult[]) => void;
-	setSearchId: (id: string) => void;
-	setBusy: (message: string) => void;
-	setNote: (message: string) => void;
-	setDir: (dir: string) => void;
+	// UI actions (delegated to IndexOperationsContext)
+	monitorOperation: (
+		jobId: string,
+		operation: "ocr" | "metadata" | "fast_index",
+	) => () => void;
 
-	// Selection actions
-	toggleSelect: (path: string) => void;
-	selectAll: () => void;
-	clearSelection: () => void;
-	deleteSelected: () => Promise<void>;
+	// Navigation (delegated to NavigationContext)
+	openDetailByPath: (path: string) => void;
+	navDetail: (delta: number) => void;
+
+	// Selection actions (delegated to SelectionContext)
 	tagSelected: (tagText: string) => Promise<void>;
 	setRatingSelected: (rating: 1 | 2 | 3 | 4 | 5 | 0) => Promise<void>;
 
-	// View management
-	setViewMode: (mode: "grid" | "film" | "timeline" | "map") => void;
-	setResultView: (view: "grid" | "film" | "timeline" | "map") => void;
-	setTimelineBucket: (bucket: "day" | "week" | "month" | "year") => void;
-
-	// Settings actions
-	setFavOnly: (value: boolean) => void;
-	setTagFilter: (value: string) => void;
-	setPlace: (value: string) => void;
-	setCamera: (value: string) => void;
-	setIsoMin: (value: number) => void;
-	setIsoMax: (value: number) => void;
-	setFMin: (value: number) => void;
-	setFMax: (value: number) => void;
-	setHasText: (value: boolean) => void;
-	setUseFast: (value: boolean) => void;
-	setFastKind: (value: string) => void;
-	setUseCaps: (value: boolean) => void;
-	setUseOcr: (value: boolean) => void;
-	setResultViewSetting: (value: "grid" | "film" | "timeline" | "map") => void;
-	setTimelineBucketSetting: (value: "day" | "week" | "month" | "year") => void;
-
-	// Workspace actions
-	setPersons: (persons: string[]) => void;
-	setClusters: (clusters: unknown[]) => void;
-	setPoints: (points: unknown[]) => void;
-	setDiag: (diag: unknown) => void;
-	setMeta: (meta: unknown) => void;
-
-	// Modal actions
-	openModal: (modal: string) => void;
-	closeModal: (modal: string) => void;
-
-	// Navigation
-	navigate: (path: string) => void;
-
-	// Utility functions
+	// Utility functions (delegated to PhotoOperationsContext)
+	exportSelected: (dest: string) => Promise<void>;
 	handlePhotoOpen: (path: string) => void;
 	handlePhotoAction: (
 		action: string,
 		photo: { path: string; [key: string]: unknown },
 	) => void;
-	exportSelected: (dest: string) => Promise<void>;
-	monitorOperation: (jobId: string, operation: string) => () => void;
+	handleAccessibilitySettingsChange: (settings: AccessibilitySettings) => void;
+	rowsEqual: (a: number[][], b: number[][]) => boolean;
 }
 
 // Create the context with a default value
 const ActionsContext = createContext<ActionsContextType | undefined>(undefined);
 
-// Provider component
+// Provider component props
 interface ActionsProviderProps {
 	children: React.ReactNode;
 	value: ActionsContextType;
 }
 
+// Provider component
 export const ActionsProvider: React.FC<ActionsProviderProps> = ({
 	children,
 	value,
@@ -129,27 +85,18 @@ export const useActionsContext = (): ActionsContextType => {
 	return context;
 };
 
-// Selector hooks for specific actions
+// Selector hooks for specific actions (maintaining backward compatibility)
 export const useSearchActions = (): Pick<
 	ActionsContextType,
-	| "performSearch"
-	| "searchSimilar"
-	| "searchLike"
-	| "doSearchImmediate"
-	| "setQuery"
-	| "setResults"
-	| "setSearchId"
+	"doSearchImmediate"
 > => {
 	const context = useActionsContext();
-	return {
-		performSearch: context.performSearch,
-		searchSimilar: context.searchSimilar,
-		searchLike: context.searchLike,
-		doSearchImmediate: context.doSearchImmediate,
-		setQuery: context.setQuery,
-		setResults: context.setResults,
-		setSearchId: context.setSearchId,
-	};
+	return useMemo(
+		() => ({
+			doSearchImmediate: context.doSearchImmediate,
+		}),
+		[context.doSearchImmediate],
+	);
 };
 
 export const useDataActions = (): Pick<
@@ -165,133 +112,86 @@ export const useDataActions = (): Pick<
 	| "loadPresets"
 > => {
 	const context = useActionsContext();
-	return {
-		loadFav: context.loadFav,
-		loadSaved: context.loadSaved,
-		loadTags: context.loadTags,
-		loadDiag: context.loadDiag,
-		loadFaces: context.loadFaces,
-		loadMap: context.loadMap,
-		loadLibrary: context.loadLibrary,
-		loadMetadata: context.loadMetadata,
-		loadPresets: context.loadPresets,
-	};
+	return useMemo(
+		() => ({
+			loadFav: context.loadFav,
+			loadSaved: context.loadSaved,
+			loadTags: context.loadTags,
+			loadDiag: context.loadDiag,
+			loadFaces: context.loadFaces,
+			loadMap: context.loadMap,
+			loadLibrary: context.loadLibrary,
+			loadMetadata: context.loadMetadata,
+			loadPresets: context.loadPresets,
+		}),
+		[
+			context.loadFav,
+			context.loadSaved,
+			context.loadTags,
+			context.loadDiag,
+			context.loadFaces,
+			context.loadMap,
+			context.loadLibrary,
+			context.loadMetadata,
+			context.loadPresets,
+		],
+	);
 };
 
 export const useIndexActions = (): Pick<
 	ActionsContextType,
-	"buildFast" | "buildOCR" | "buildMetadata"
+	"prepareFast" | "buildOCR" | "buildMetadata"
 > => {
 	const context = useActionsContext();
-	return {
-		buildFast: context.buildFast,
-		buildOCR: context.buildOCR,
-		buildMetadata: context.buildMetadata,
-	};
+	return useMemo(
+		() => ({
+			prepareFast: context.prepareFast,
+			buildOCR: context.buildOCR,
+			buildMetadata: context.buildMetadata,
+		}),
+		[context.prepareFast, context.buildOCR, context.buildMetadata],
+	);
 };
 
 export const useUIActions = (): Pick<
 	ActionsContextType,
-	| "setBusy"
-	| "setNote"
-	| "setDir"
-	| "setViewMode"
-	| "setResultView"
-	| "setTimelineBucket"
+	"monitorOperation"
 > => {
 	const context = useActionsContext();
-	return {
-		setBusy: context.setBusy,
-		setNote: context.setNote,
-		setDir: context.setDir,
-		setViewMode: context.setViewMode,
-		setResultView: context.setResultView,
-		setTimelineBucket: context.setTimelineBucket,
-	};
+	return useMemo(
+		() => ({
+			monitorOperation: context.monitorOperation,
+		}),
+		[context.monitorOperation],
+	);
 };
 
 export const useSelectionActions = (): Pick<
 	ActionsContextType,
-	| "toggleSelect"
-	| "selectAll"
-	| "clearSelection"
-	| "deleteSelected"
-	| "tagSelected"
-	| "setRatingSelected"
+	"tagSelected" | "setRatingSelected"
 > => {
 	const context = useActionsContext();
-	return {
-		toggleSelect: context.toggleSelect,
-		selectAll: context.selectAll,
-		clearSelection: context.clearSelection,
-		deleteSelected: context.deleteSelected,
-		tagSelected: context.tagSelected,
-		setRatingSelected: context.setRatingSelected,
-	};
+	return useMemo(
+		() => ({
+			tagSelected: context.tagSelected,
+			setRatingSelected: context.setRatingSelected,
+		}),
+		[context.tagSelected, context.setRatingSelected],
+	);
 };
 
-export const useSettingsActions = (): Pick<
+export const useNavigationActions = (): Pick<
 	ActionsContextType,
-	| "setFavOnly"
-	| "setTagFilter"
-	| "setPlace"
-	| "setCamera"
-	| "setIsoMin"
-	| "setIsoMax"
-	| "setFMin"
-	| "setFMax"
-	| "setHasText"
-	| "setUseFast"
-	| "setFastKind"
-	| "setUseCaps"
-	| "setUseOcr"
-	| "setResultViewSetting"
-	| "setTimelineBucketSetting"
+	"openDetailByPath" | "navDetail"
 > => {
 	const context = useActionsContext();
-	return {
-		setFavOnly: context.setFavOnly,
-		setTagFilter: context.setTagFilter,
-		setPlace: context.setPlace,
-		setCamera: context.setCamera,
-		setIsoMin: context.setIsoMin,
-		setIsoMax: context.setIsoMax,
-		setFMin: context.setFMin,
-		setFMax: context.setFMax,
-		setHasText: context.setHasText,
-		setUseFast: context.setUseFast,
-		setFastKind: context.setFastKind,
-		setUseCaps: context.setUseCaps,
-		setUseOcr: context.setUseOcr,
-		setResultViewSetting: context.setResultViewSetting,
-		setTimelineBucketSetting: context.setTimelineBucketSetting,
-	};
-};
-
-export const useWorkspaceActions = (): Pick<
-	ActionsContextType,
-	"setPersons" | "setClusters" | "setPoints" | "setDiag" | "setMeta"
-> => {
-	const context = useActionsContext();
-	return {
-		setPersons: context.setPersons,
-		setClusters: context.setClusters,
-		setPoints: context.setPoints,
-		setDiag: context.setDiag,
-		setMeta: context.setMeta,
-	};
-};
-
-export const useModalActions = (): Pick<
-	ActionsContextType,
-	"openModal" | "closeModal" | "navigate"
-> => {
-	const context = useActionsContext();
-	return {
-		openModal: context.openModal,
-		closeModal: context.closeModal,
-		navigate: context.navigate,
-	};
+	return useMemo(
+		() => ({
+			openDetailByPath: context.openDetailByPath,
+			navDetail: context.navDetail,
+		}),
+		[context.openDetailByPath, context.navDetail],
+	);
 };
 
 export const usePhotoActions = (): Pick<
@@ -299,15 +199,27 @@ export const usePhotoActions = (): Pick<
 	| "handlePhotoOpen"
 	| "handlePhotoAction"
 	| "exportSelected"
-	| "monitorOperation"
+	| "handleAccessibilitySettingsChange"
+	| "rowsEqual"
 > => {
 	const context = useActionsContext();
-	return {
-		handlePhotoOpen: context.handlePhotoOpen,
-		handlePhotoAction: context.handlePhotoAction,
-		exportSelected: context.exportSelected,
-		monitorOperation: context.monitorOperation,
-	};
+	return useMemo(
+		() => ({
+			handlePhotoOpen: context.handlePhotoOpen,
+			handlePhotoAction: context.handlePhotoAction,
+			exportSelected: context.exportSelected,
+			handleAccessibilitySettingsChange:
+				context.handleAccessibilitySettingsChange,
+			rowsEqual: context.rowsEqual,
+		}),
+		[
+			context.handlePhotoOpen,
+			context.handlePhotoAction,
+			context.exportSelected,
+			context.handleAccessibilitySettingsChange,
+			context.rowsEqual,
+		],
+	);
 };
 
 export default ActionsContext;

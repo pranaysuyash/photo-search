@@ -9,7 +9,8 @@ import os
 from pathlib import Path
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
+from pydantic import ConfigDict
 
 
 class Config(BaseModel):
@@ -42,20 +43,21 @@ class Config(BaseModel):
     # Other
     env: str = Field(default="dev", description="Environment (dev/prod)")
 
-    @validator('cors_origins', pre=True)
+    @field_validator('cors_origins', mode='before')
     def parse_cors_origins(cls, v):
         if isinstance(v, str):
             return [origin.strip() for origin in v.split(',') if origin.strip()]
         return v
 
-    @validator('photovault_model_dir', 'sentence_transformers_home', 'ps_appdata_dir', pre=True)
+    @field_validator('photovault_model_dir', 'sentence_transformers_home', 'ps_appdata_dir', mode='before')
     def expand_path(cls, v):
         if v:
             return Path(v).expanduser().resolve()
         return v
 
-    class Config:
-        env_prefix = ""  # No prefix, use exact env var names
+    model_config = ConfigDict(
+        extra='ignore'
+    )
 
 
 # Load config from environment

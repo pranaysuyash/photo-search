@@ -226,3 +226,7 @@ cypress/screenshots/
 *.pack.log
 
 *storybook.log
+
+
+#Ignore vscode AI rules
+.github/instructions/codacy.instructions.md

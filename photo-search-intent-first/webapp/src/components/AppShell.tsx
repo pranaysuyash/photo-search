@@ -91,7 +91,7 @@ export const AppShell: React.FC<AppShellProps> = ({
 
 			{/* Main column */}
 			<div className="flex-1 flex flex-col overflow-hidden bg-background min-h-screen">
-				<header className="bg-card border-b border-border shadow-sm px-3 py-3 sm:px-6 lg:px-8 sm:py-4 md:py-5 flex flex-col gap-2 sm:gap-3 flex-shrink-0">
+				<header className="bg-card border-b border-border shadow-sm px-2 py-2 sm:px-3 sm:py-3 md:px-6 lg:px-8 md:py-4 lg:py-5 flex flex-col gap-1 sm:gap-2 md:gap-3 flex-shrink-0">
 					<TopBar {...topBarProps} />
 					{quickActions ? <HeaderQuickActions {...quickActions} /> : null}
 				</header>
@@ -100,7 +100,7 @@ export const AppShell: React.FC<AppShellProps> = ({
 					id="main-content"
 					className="flex-1 overflow-y-auto overflow-x-hidden"
 				>
-					<div className="w-full px-3 pb-6 pt-4 sm:px-6 lg:px-8 sm:pb-8 sm:pt-6">
+					<div className="w-full px-2 pb-4 pt-3 sm:px-3 sm:pb-6 sm:pt-4 md:px-6 lg:px-8 md:pb-8 md:pt-6">
 						{children}
 					</div>
 				</main>

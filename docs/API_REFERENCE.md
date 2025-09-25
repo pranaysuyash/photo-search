@@ -2,6 +2,11 @@
 
 Photo Search exposes a FastAPI-based HTTP API. Interactive OpenAPI
 documentation is available at `/docs` (Swagger UI) and `/redoc` once the
+
+# API Reference Overview
+
+Photo Search exposes a FastAPI-based HTTP API. Interactive OpenAPI
+documentation is available at `/docs` (Swagger UI) and `/redoc` once the
 API server is running.
 
 ## Core Endpoints
@@ -29,7 +34,7 @@ latency to stdout.
 Use the `/health` endpoint for infrastructure liveness probes. Pass a
 `dir` parameter to verify that an index directory exists, for example:
 
-```
+```bash
 curl "http://localhost:8000/health?dir=/path/to/library"
 ```
 
@@ -39,11 +44,17 @@ When `API_TOKEN` is set, mutating endpoints require a `Bearer` token via
 `Authorization` headers. Set `DEV_NO_AUTH=1` during local development to
 bypass authentication.
 
+Server behavior details:
+
+- A lightweight auth dependency enforces `Authorization: Bearer <API_TOKEN>` on POST/PUT/PATCH/DELETE routes in the extracted routers (indexing, analytics, config) and selected sensitive endpoints. When `DEV_NO_AUTH=1` or `API_TOKEN` is unset, requests are allowed without a token.
+- Public endpoints remain unauthenticated: `/health`, `/api/health`, `/api/ping`, `/monitoring`, `/api/monitoring`, static assets, and share viewer routes under `/share/*`.
+- The dev helpers `/auth/status` and `/auth/check` aid clients in discovering whether a token is currently required and validating a token at runtime.
+
 ## Generating OpenAPI Artifacts
 
 To export the OpenAPI document, run:
 
-```
+```bash
 uvicorn photo-search-intent-first.api.server:app --reload
 # then download http://localhost:8000/openapi.json
 ```

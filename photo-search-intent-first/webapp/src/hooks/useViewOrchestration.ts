@@ -111,7 +111,6 @@ export function useViewOrchestration() {
 	// Setup query param filters (from original App.tsx line 788)
 	useQueryParamFilters({
 		location: appState.location,
-		isMounted: lifecycleState.isMounted,
 		searchText: appState.localState.searchText,
 		setSearchText: appState.actions.setSearchText,
 		setDateFrom: appState.actions.setDateFrom,

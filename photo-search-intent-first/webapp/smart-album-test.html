@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SmartAlbumSuggestions Test</title>
+    <script
+      crossorigin
+      src="https://unpkg.com/react@18/umd/react.development.js"
+    ></script>
+    <script
+      crossorigin
+      src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"
+    ></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide-react@0.453.0/umd/lucide-react.development.js"></script>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          sans-serif;
+        margin: 0;
+        padding: 20px;
+        background: #f5f5f5;
+      }
+      .test-container {
+        max-width: 800px;
+        margin: 0 auto;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState } = React;
+      const {
+        Calendar,
+        Camera,
+        ChevronDown,
+        ChevronUp,
+        Clock,
+        FolderPlus,
+        Hash,
+        Heart,
+        Image,
+        MapPin,
+        Star,
+        User,
+        Zap,
+      } = lucideReact;
+
+      // Mock data for testing
+      const mockData = {
+        photoCount: 1250,
+        availableTags: [
+          "beach",
+          "mountains",
+          "family",
+          "vacation",
+          "wedding",
+          "portrait",
+        ],
+        availablePersons: [
+          "John Doe",
+          "Jane Smith",
+          "Bob Johnson",
+          "Alice Williams",
+        ],
+        availableLocations: ["New York", "Paris", "Tokyo", "London", "Sydney"],
+        availableCameras: ["Canon EOS R5", "Sony A7R IV", "Nikon D850"],
+      };
+
+      function SmartAlbumSuggestions({
+        onSuggestionSelect,
+        photoCount,
+        availableTags,
+        availablePersons,
+        availableLocations,
+        availableCameras,
+      }) {
+        const [expandedSections, setExpandedSections] = useState({
+          date: true,
+          location: true,
+          person: true,
+          event: true,
+          metadata: true,
+          ai: true,
+        });
+
+        const toggleSection = (section) => {
+          setExpandedSections((prev) => ({
+            ...prev,
+            [section]: !prev[section],
+          }));
+        };
+
+        // Generate smart album suggestions
+        const suggestions = [
+          // Date-based
+          {
+            id: "recent-photos",
+            title: "Recent Photos",
+            description: "Photos from the last 30 days",
+            icon: React.createElement(Clock, { className: "w-5 h-5" }),
+            criteria: { dateFrom: "2024-01-01" },
+            estimatedCount: 300,
+            type: "date",
+          },
+          {
+            id: "this-year",
+            title: "This Year",
+            description: "All photos from 2024",
+            icon: React.createElement(Calendar, { className: "w-5 h-5" }),
+            criteria: { dateFrom: "2024-01-01" },
+            estimatedCount: 400,
+            type: "date",
+          },
+
+          // Location-based
+          ...availableLocations.slice(0, 3).map((location, index) => ({
+            id: `location-${index}`,
+            title: location,
+            description: `Photos taken in ${location}`,
+            icon: React.createElement(MapPin, { className: "w-5 h-5" }),
+            criteria: { place: location },
+            estimatedCount: 50,
+            type: "location",
+          })),
+
+          // Person-based
+          ...availablePersons.slice(0, 3).map((person, index) => ({
+            id: `person-${index}`,
+            title: person,
+            description: `Photos with ${person}`,
+            icon: React.createElement(User, { className: "w-5 h-5" }),
+            criteria: { person },
+            estimatedCount: 100,
+            type: "person",
+          })),
+
+          // Event-based
+          ...availableTags
+            .filter((tag) =>
+              ["wedding", "vacation", "party"].includes(tag.toLowerCase())
+            )
+            .slice(0, 2)
+            .map((tag, index) => ({
+              id: `event-${index}`,
+              title: tag.charAt(0).toUpperCase() + tag.slice(1),
+              description: `Photos tagged with "${tag}"`,
+              icon: React.createElement(Star, { className: "w-5 h-5" }),
+              criteria: { tags: [tag] },
+              estimatedCount: 30,
+              type: "event",
+            })),
+
+          // Metadata-based
+          ...availableCameras.slice(0, 2).map((camera, index) => ({
+            id: `camera-${index}`,
+            title: camera,
+            description: `Photos taken with ${camera}`,
+            icon: React.createElement(Camera, { className: "w-5 h-5" }),
+            criteria: { camera },
+            estimatedCount: 150,
+            type: "metadata",
+          })),
+
+          // AI-based
+          {
+            id: "favorites",
+            title: "Favorites",
+            description: "Your most favorited photos",
+            icon: React.createElement(Heart, {
+              className: "w-5 h-5 text-red-500",
+            }),
+            criteria: { favOnly: true },
+            estimatedCount: 100,
+            type: "ai",
+          },
+          {
+            id: "portraits",
+            title: "Portraits",
+            description: "AI detected portrait photos",
+            icon: React.createElement(User, { className: "w-5 h-5" }),
+            criteria: { tags: ["portrait"] },
+            estimatedCount: 120,
+            type: "ai",
+          },
+        ];
+
+        const groupedSuggestions = suggestions.reduce((acc, suggestion) => {
+          if (!acc[suggestion.type]) acc[suggestion.type] = [];
+          acc[suggestion.type].push(suggestion);
+          return acc;
+        }, {});
+
+        const sectionInfo = {
+          date: {
+            title: "By Date",
+            icon: React.createElement(Calendar, { className: "w-4 h-4" }),
+          },
+          location: {
+            title: "By Location",
+            icon: React.createElement(MapPin, { className: "w-4 h-4" }),
+          },
+          person: {
+            title: "By Person",
+            icon: React.createElement(User, { className: "w-4 h-4" }),
+          },
+          event: {
+            title: "Events",
+            icon: React.createElement(Star, { className: "w-4 h-4" }),
+          },
+          metadata: {
+            title: "By Metadata",
+            icon: React.createElement(Hash, { className: "w-4 h-4" }),
+          },
+          ai: {
+            title: "AI Suggestions",
+            icon: React.createElement(Zap, { className: "w-4 h-4" }),
+          },
+        };
+
+        return React.createElement(
+          "div",
+          {
+            className:
+              "flex min-h-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm max-h-[600px] md:max-h-[700px]",
+            role: "region",
+            "aria-labelledby": "smart-album-suggestions-heading",
+          },
+          [
+            React.createElement(
+              "div",
+              {
+                className:
+                  "border-b border-gray-200 px-4 py-4 sm:px-6 flex-shrink-0",
+                key: "header",
+              },
+              [
+                React.createElement(
+                  "h3",
+                  {
+                    id: "smart-album-suggestions-heading",
+                    className:
+                      "flex items-center gap-3 text-base sm:text-lg font-semibold text-gray-900",
+                  },
+                  [
+                    React.createElement(
+                      "span",
+                      {
+                        className:
+                          "flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600",
+                      },
+                      React.createElement(FolderPlus, {
+                        className: "h-5 w-5 sm:h-6 sm:w-6",
+                      })
+                    ),
+                    React.createElement(
+                      "span",
+                      { className: "truncate" },
+                      "Smart Album Suggestions"
+                    ),
+                  ]
+                ),
+                React.createElement(
+                  "p",
+                  { className: "mt-2 text-sm text-gray-600" },
+                  `${suggestions.length} smart album suggestions based on your library`
+                ),
+              ]
+            ),
+
+            React.createElement(
+              "div",
+              { className: "flex-1 overflow-y-auto min-h-0", key: "content" },
+              Object.entries(groupedSuggestions).map(
+                ([type, sectionSuggestions]) => {
+                  const info = sectionInfo[type];
+                  const isExpanded = expandedSections[type];
+                  const sectionId = `smart-album-section-${type}`;
+
+                  return React.createElement(
+                    "div",
+                    {
+                      className: "border-b border-gray-200 last:border-b-0",
+                      key: type,
+                    },
+                    [
+                      React.createElement(
+                        "button",
+                        {
+                          type: "button",
+                          className:
+                            "flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+                          onClick: () => toggleSection(type),
+                          "aria-expanded": isExpanded,
+                          "aria-controls": sectionId,
+                          "aria-label": `${
+                            isExpanded ? "Collapse" : "Expand"
+                          } ${info?.title ?? type} section`,
+                        },
+                        [
+                          React.createElement(
+                            "span",
+                            {
+                              className:
+                                "flex items-center gap-3 text-sm font-medium text-gray-900",
+                            },
+                            [
+                              React.createElement(
+                                "span",
+                                {
+                                  className:
+                                    "flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-600",
+                                },
+                                info?.icon
+                              ),
+                              React.createElement(
+                                "span",
+                                { className: "truncate" },
+                                info?.title ?? type
+                              ),
+                            ]
+                          ),
+                          React.createElement(
+                            "span",
+                            {
+                              className:
+                                "flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-gray-500",
+                            },
+                            isExpanded
+                              ? [
+                                  React.createElement(ChevronUp, {
+                                    className: "w-4 h-4",
+                                    key: "up",
+                                  }),
+                                  React.createElement(
+                                    "span",
+                                    { className: "sr-only", key: "hide" },
+                                    "Hide"
+                                  ),
+                                ]
+                              : [
+                                  React.createElement(ChevronDown, {
+                                    className: "w-4 h-4",
+                                    key: "down",
+                                  }),
+                                  React.createElement(
+                                    "span",
+                                    { className: "sr-only", key: "show" },
+                                    "Show"
+                                  ),
+                                ]
+                          ),
+                        ]
+                      ),
+
+                      isExpanded &&
+                        React.createElement(
+                          "div",
+                          { id: sectionId, className: "space-y-2 px-4 pb-4" },
+                          sectionSuggestions.map((suggestion) =>
+                            React.createElement(
+                              "button",
+                              {
+                                key: suggestion.id,
+                                type: "button",
+                                className:
+                                  "w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-left transition hover:border-blue-300 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+                                onClick: () => onSuggestionSelect(suggestion),
+                                "aria-label": `Create smart album: ${suggestion.title}`,
+                              },
+                              [
+                                React.createElement(
+                                  "div",
+                                  { className: "flex items-start gap-3" },
+                                  [
+                                    React.createElement(
+                                      "span",
+                                      {
+                                        className:
+                                          "flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600 flex-shrink-0",
+                                      },
+                                      suggestion.icon
+                                    ),
+                                    React.createElement(
+                                      "div",
+                                      { className: "min-w-0 flex-1" },
+                                      [
+                                        React.createElement(
+                                          "div",
+                                          {
+                                            className:
+                                              "text-sm font-medium text-gray-900 truncate",
+                                          },
+                                          suggestion.title
+                                        ),
+                                        React.createElement(
+                                          "p",
+                                          {
+                                            className:
+                                              "mt-1 text-sm text-gray-600 line-clamp-2",
+                                          },
+                                          suggestion.description
+                                        ),
+                                        React.createElement(
+                                          "div",
+                                          {
+                                            className:
+                                              "mt-2 text-xs font-medium text-gray-500",
+                                          },
+                                          `~${suggestion.estimatedCount} photos`
+                                        ),
+                                      ]
+                                    ),
+                                    React.createElement(FolderPlus, {
+                                      className:
+                                        "h-4 w-4 flex-shrink-0 text-gray-400 mt-0.5",
+                                    }),
+                                  ]
+                                ),
+                              ]
+                            )
+                          )
+                        ),
+                    ]
+                  );
+                }
+              )
+            ),
+          ]
+        );
+      }
+
+      function App() {
+        const [selections, setSelections] = useState([]);
+
+        const handleSuggestionSelect = (suggestion) => {
+          console.log("Selected:", suggestion);
+          setSelections((prev) => [...prev, suggestion.title]);
+        };
+
+        return React.createElement("div", { className: "test-container" }, [
+          React.createElement(
+            "h1",
+            { key: "title", className: "text-2xl font-bold mb-4" },
+            "SmartAlbumSuggestions Test"
+          ),
+          React.createElement(SmartAlbumSuggestions, {
+            key: "component",
+            onSuggestionSelect: handleSuggestionSelect,
+            ...mockData,
+          }),
+          selections.length > 0 &&
+            React.createElement(
+              "div",
+              {
+                key: "selections",
+                className: "mt-4 p-4 bg-white rounded border",
+              },
+              [
+                React.createElement(
+                  "h2",
+                  { className: "font-semibold mb-2" },
+                  "Selected Suggestions:"
+                ),
+                React.createElement(
+                  "ul",
+                  { className: "list-disc list-inside" },
+                  selections.map((title, i) =>
+                    React.createElement("li", { key: i }, title)
+                  )
+                ),
+              ]
+            ),
+        ]);
+      }
+
+      const root = ReactDOM.createRoot(document.getElementById("root"));
+      root.render(React.createElement(App));
+    </script>
+  </body>
+</html>

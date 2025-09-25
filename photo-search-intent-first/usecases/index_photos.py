@@ -4,7 +4,8 @@ from typing import Tuple, Optional
 from adapters.fs_scanner import list_photos
 from infra.index_store import IndexStore
 from adapters.provider_factory import get_provider
-import json, time
+from adapters.jobs_bridge import JobsBridge
+import json, time, uuid
 
 
 def index_photos(
@@ -14,6 +15,7 @@ def index_photos(
     hf_token: Optional[str] = None,
     openai_api_key: Optional[str] = None,
     embedder=None,
+    job_id: Optional[str] = None,
 ) -> Tuple[int, int, int]:
     """Build or update the photo index for a folder.
 
@@ -21,7 +23,19 @@ def index_photos(
     """
     embedder = embedder or get_provider(provider, hf_token=hf_token, openai_api_key=openai_api_key)
     store = IndexStore(folder, index_key=getattr(embedder, 'index_id', None))
+    
+    # Generate job_id if not provided
+    if job_id is None:
+        job_id = f"index-{uuid.uuid4().hex[:8]}"
+    
+    # List photos first
     photos = list_photos(folder)
+    
+    # Create JobsBridge for real-time progress events
+    jobs_bridge = JobsBridge("http://127.0.0.1:8000", str(folder), job_id)
+    
+    # Emit job started event
+    jobs_bridge.started("Indexing photos", f"Building search index for {folder.name}", total=len(photos))
 
     # Prepare progress status file for UI polling
     status_path = store.index_dir / 'index_status.json'
@@ -49,6 +63,12 @@ def index_photos(
         pass
 
     def _progress(ev: dict):
+        # Check for cancellation first
+        cancel_event = JobsBridge.get_cancel_event(job_id)
+        if cancel_event and cancel_event.is_set():
+            jobs_bridge.cancelled()
+            raise Exception("Job cancelled by user")
+        
         try:
             # Update index_status.json with the latest chunk progress
             cur = {}
@@ -59,9 +79,13 @@ def index_photos(
             if ev.get('phase') == 'update':
                 cur['updated_done'] = int(ev.get('done') or 0)
                 cur['updated_total'] = int(ev.get('total') or 0)
+                # Emit progress event for updates
+                jobs_bridge.progress(cur['updated_done'], f"Updating {cur['updated_done']}/{cur['updated_total']} photos")
             if ev.get('phase') == 'insert':
                 cur['insert_done'] = int(ev.get('done') or 0)
                 cur['insert_total'] = int(ev.get('total') or 0)
+                # Emit progress event for inserts
+                jobs_bridge.progress(cur['insert_done'], f"Indexing {cur['insert_done']}/{cur['insert_total']} photos")
             status_path.write_text(json.dumps(cur), encoding='utf-8')
             # Honor pause control between chunks
             try:
@@ -97,18 +121,27 @@ def index_photos(
         except Exception:
             pass
 
-    new_count, updated_count = store.upsert(embedder, photos, batch_size=batch_size, progress=_progress)
-    total = len(store.state.paths)
-    # Mark completion
     try:
-        status = {
-            'state': 'complete',
-            'end': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
-            'total': int(total),
-            'new': int(new_count),
-            'updated': int(updated_count),
-        }
-        status_path.write_text(json.dumps(status), encoding='utf-8')
-    except Exception:
-        pass
-    return new_count, updated_count, total
+        new_count, updated_count = store.upsert(embedder, photos, batch_size=batch_size, progress=_progress)
+        total = len(store.state.paths)
+        # Mark completion
+        try:
+            status = {
+                'state': 'complete',
+                'end': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+                'total': int(total),
+                'new': int(new_count),
+                'updated': int(updated_count),
+            }
+            status_path.write_text(json.dumps(status), encoding='utf-8')
+        except Exception:
+            pass
+        
+        # Emit job completed event
+        jobs_bridge.completed(success_count=new_count + updated_count, total=total)
+        
+        return new_count, updated_count, total
+    except Exception as e:
+        # Emit job failed event
+        jobs_bridge.failed(str(e))
+        raise

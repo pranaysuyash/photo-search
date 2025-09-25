@@ -4,7 +4,7 @@
 // - This SW is generic and doesn't rely on build-time injection; it updates caches opportunistically.
 // - Dynamic API JSON is left to the app's Offline services; we focus on shell, JS/CSS, images, and thumbs.
 
-const VERSION = 'v2';
+const VERSION = 'v3';
 const SHELL_CACHE = `ps-shell-${VERSION}`;
 const STATIC_CACHE = `ps-static-${VERSION}`;
 const JSON_CACHE = `ps-json-${VERSION}`;
@@ -68,13 +68,14 @@ function isStaticAsset(url) {
 }
 
 function isThumb(url) {
-  // Cache thumbnails served by the API for offline gallery browsing
-  return /\/thumb(\?|$)/.test(url);
+  // Cache thumbnails served by the API for offline gallery browsing (incl. faces & video thumbs)
+  return /\/(thumb|thumb_face|video\/thumbnail)(\?|$)/.test(url);
 }
 
 function isJsonApi(url) {
   // Cache read-only JSON API responses for offline browsing
-  return /\/(library|collections|trips|smart_collections|presets|favorites|tags|saved)(\?|$)/.test(url);
+  // Include nested routes (e.g., /map/clusters, /faces/photos) by allowing '/' after the prefix
+  return /\/(library|collections|trips|smart_collections|presets|favorites|tags|saved|metadata|map|faces|ocr|workspace|videos)(\?|\/|$)/.test(url);
 }
 
 function isCacheableJson(request) {
@@ -103,6 +104,7 @@ async function storeJsonResponse(request, response) {
 }
 
 async function fetchAndStoreJson(request) {
+  // nosemgrep: ESLint8_security-node_detect-unhandled-async-errors -- Errors are caught and ignored in caching logic
   try {
     const networkResponse = await fetch(request);
     if (networkResponse && networkResponse.status === 200) {

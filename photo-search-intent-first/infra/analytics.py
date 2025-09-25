@@ -5,6 +5,9 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+from collections import deque
+import time
+import os
 
 
 def _analytics_file(index_dir: Path) -> Path:
@@ -13,6 +16,22 @@ def _analytics_file(index_dir: Path) -> Path:
 
 def _feedback_file(index_dir: Path) -> Path:
     return Path(index_dir) / "feedback.json"
+
+
+def _write_event(index_dir: Path, event: dict) -> None:
+    """Append a single analytics event to the per-index JSONL store.
+    Uses AnalyticsStore under the hood so rotation/limits are respected.
+    """
+    store = AnalyticsStore(index_dir)
+    store.append_event(event)
+
+
+def read_recent_events(index_dir: Path, limit: int = 100, *, dir_filter: Optional[str] = None) -> List[dict]:
+    """Return the last `limit` events for this index directory.
+    If dir_filter is provided, it filters events by event["dir"].
+    """
+    store = AnalyticsStore(index_dir)
+    return store.get_recent_events(limit=limit, dir_filter=dir_filter)
 
 
 def log_search(index_dir: Path, engine_id: str, query: str, results: List[Tuple[str, float]]) -> str:
@@ -84,7 +103,12 @@ def log_feedback(index_dir: Path, search_id: str, query: str, positives: List[st
     save_feedback(index_dir, fb)
 
 
-def apply_feedback_boost(index_dir: Path, query: str, results: List[Tuple[str, float]], boost: float = 0.1) -> List[Tuple[str, float]]:
+def apply_feedback_boost(
+    index_dir: Path,
+    query: str,
+    results: List[Tuple[str, float]],
+    boost: float = 0.1,
+) -> List[Tuple[str, float]]:
     fb = load_feedback(index_dir)
     votes = fb.get(query, {})
     adjusted: List[Tuple[str, float]] = []
@@ -94,3 +118,91 @@ def apply_feedback_boost(index_dir: Path, query: str, results: List[Tuple[str, f
     adjusted.sort(key=lambda x: -x[1])
     return adjusted
 
+
+class AnalyticsStore:
+    """Storage class for job analytics events with rotation and size limits."""
+
+    def __init__(self, data_dir: Path, max_size_mb: float = 5.0, max_lines: int = 10000):
+        self.data_dir = data_dir
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.analytics_file = data_dir / "analytics.jsonl"
+        self.max_size_bytes = int(max_size_mb * 1024 * 1024)
+        self.max_lines = max_lines
+
+    def _rotate_if_needed(self):
+        """Rotate analytics file if it exceeds size or line limits."""
+        if not self.analytics_file.exists():
+            return
+
+        # Check size
+        size = self.analytics_file.stat().st_size
+        if size >= self.max_size_bytes:
+            self._rotate_file("size")
+            return
+
+        # Check line count without loading entire file into memory
+        try:
+            count = 0
+            with open(self.analytics_file, 'r', encoding='utf-8', errors='ignore') as f:
+                for count, _ in enumerate(f, start=1):
+                    if count >= self.max_lines:
+                        self._rotate_file("lines")
+                        break
+        except Exception:
+            pass  # Best effort
+
+    def _rotate_file(self, reason: str):
+        """Rotate current file to timestamped backup."""
+        timestamp = int(time.time())
+        backup_name = f"analytics.{timestamp}.{reason}.jsonl"
+        backup_path = self.data_dir / backup_name
+
+        try:
+            self.data_dir.mkdir(parents=True, exist_ok=True)
+            self.analytics_file.rename(backup_path)
+            # Keep only last 5 backups to prevent accumulation
+            backups = sorted(self.data_dir.glob("analytics.*.jsonl"))
+            if len(backups) > 5:
+                for old_backup in backups[:-5]:
+                    old_backup.unlink()
+        except Exception:
+            pass  # Best effort rotation
+
+    def append_event(self, event: dict):
+        """Append an analytics event to the file."""
+        self._rotate_if_needed()
+
+        # Preserve provided timestamp if present; otherwise stamp ISO8601 Z for frontend compatibility
+        if "time" not in event:
+            event = {**event, "time": datetime.utcnow().isoformat() + "Z"}
+
+        try:
+            self.data_dir.mkdir(parents=True, exist_ok=True)
+            with open(self.analytics_file, 'a', encoding='utf-8') as f:
+                json.dump(event, f, ensure_ascii=False)
+                f.write('\n')
+        except Exception:
+            pass  # Best effort logging
+
+    def get_recent_events(self, limit: int = 100, dir_filter: Optional[str] = None) -> List[dict]:
+        """Get recent events, optionally filtered by directory. Efficiently tails the last `limit` lines."""
+        if not self.analytics_file.exists():
+            return []
+
+        tail = deque(maxlen=max(1, int(limit)))
+        try:
+            with open(self.analytics_file, 'r', encoding='utf-8', errors='ignore') as f:
+                for line in f:
+                    tail.append(line)
+        except Exception:
+            return []
+
+        events: List[dict] = []
+        for line in tail:
+            try:
+                event = json.loads(line.strip())
+                if dir_filter is None or str(event.get("dir")) == str(dir_filter):
+                    events.append(event)
+            except Exception:
+                continue
+        return events

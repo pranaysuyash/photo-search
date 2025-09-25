@@ -1,0 +1,14 @@
+name: Stack Guard
+
+on: [push, pull_request]
+
+jobs:
+  no-streamlit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail if Streamlit references exist
+        run: |
+          set -euo pipefail
+          ! git grep -nIiE '(^|\W)(streamlit|st\.)' -- . ':(exclude)photo-search-intent-first/ui/**' || \
+            (echo "::error ::Streamlit reference found; this project is Electron+React+FastAPI" && exit 1)

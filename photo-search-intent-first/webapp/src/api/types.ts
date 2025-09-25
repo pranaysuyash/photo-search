@@ -141,14 +141,14 @@ export interface MetadataBatchParams {
 	dir: string;
 	paths: string[];
 	operation: string;
-	value?: any;
+	value?: string | number | boolean | string[] | Record<string, unknown>;
 }
 
 export interface WorkspaceParams {
 	dir: string;
 	workspace: string;
 	operation: string;
-	value?: any;
+	value?: string | number | boolean | string[] | Record<string, unknown>;
 }
 
 // Response types
@@ -192,8 +192,22 @@ export interface PingResponse {
 }
 
 export interface DiagnosticsResponse {
-	// Will be defined based on actual response structure
-	[key: string]: any;
+	index: {
+		total_photos: number;
+		indexed_photos: number;
+		embedding_provider: string;
+		model_status: string;
+	};
+	features: {
+		ocr: boolean;
+		captions: boolean;
+		faces: boolean;
+	};
+	system: {
+		python_version: string;
+		torch_available: boolean;
+		gpu_available: boolean;
+	};
 }
 
 export interface LibraryResponse {
@@ -215,8 +229,19 @@ export interface FavoritesResponse {
 }
 
 export interface MapResponse {
-	// Will be defined based on actual response structure
-	[key: string]: any;
+	photos: Array<{
+		path: string;
+		latitude: number;
+		longitude: number;
+		altitude?: number;
+		heading?: number;
+	}>;
+	bounds?: {
+		north: number;
+		south: number;
+		east: number;
+		west: number;
+	};
 }
 
 export interface ExportResponse {
@@ -227,4 +252,71 @@ export interface ExportResponse {
 export interface DemoDirResponse {
 	path: string;
 	ready: boolean;
+}
+
+// Preset types
+export interface SearchPreset {
+	name: string;
+	query?: string;
+	options?: SearchOptions;
+	topK?: number;
+	created?: string;
+}
+
+export interface PresetsResponse {
+	presets: SearchPreset[];
+}
+
+// Smart collection types
+export interface SmartCollectionDefinition {
+	query?: string;
+	options?: SearchOptions;
+	autoUpdate?: boolean;
+	lastUpdated?: string;
+}
+
+export interface SmartCollectionsResponse {
+	smart_collections: Record<string, SmartCollectionDefinition>;
+}
+
+// Metadata types
+export interface PhotoMetadata {
+	path: string;
+	size?: number;
+	modified?: number;
+	width?: number;
+	height?: number;
+	make?: string;
+	model?: string;
+	iso?: number;
+	focal_length?: number;
+	aperture?: number;
+	shutter_speed?: number;
+	flash?: string;
+	white_balance?: string;
+	metering_mode?: string;
+	exposure_compensation?: number;
+	gps?: {
+		latitude?: number;
+		longitude?: number;
+		altitude?: number;
+		heading?: number;
+	};
+	ocr_text?: string;
+	caption?: string;
+	faces?: Array<{
+		name?: string;
+		bbox: [number, number, number, number];
+		confidence?: number;
+	}>;
+	tags?: string[];
+	favorite?: boolean;
+}
+
+export interface FaceClustersResponse {
+	clusters: Array<{
+		representative: string;
+		members: string[];
+		confidence: number;
+	}>;
 }

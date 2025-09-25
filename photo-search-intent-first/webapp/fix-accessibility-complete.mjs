@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+// nosemgrep: javascript_xss_rule-xss -- Build-time script for fixing accessibility, safe context
 import fs from "node:fs";
 import path, { dirname } from "node:path";
 import { fileURLToPath } from "node:url";

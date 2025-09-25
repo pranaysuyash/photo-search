@@ -1,17 +1,28 @@
+/**
+ * JobsContext - Simplified jobs context that integrates with the new JobQueueSystem
+ * This context provides a familiar interface while leveraging the enhanced job queue system.
+ */
 import type React from "react";
-import {
-	createContext,
-	useCallback,
-	useContext,
-	useMemo,
-	useState,
-} from "react";
+import { createContext, useContext, useMemo } from "react";
 import type { Job } from "../components/JobsCenter";
+import {
+	createJob,
+	type ExtendedJob,
+	type JobPriority,
+	JobQueueProvider,
+	type JobStatus,
+	useJobQueue,
+	useJobScheduler,
+	useJobStatistics,
+	useJobs,
+} from "../framework/JobQueueSystem";
 
+// Backward compatible JobsState
 type JobsState = {
 	jobs: Job[];
 };
 
+// Backward compatible JobsActions
 type JobsActions = {
 	add: (job: Job) => void;
 	setStatus: (id: string, status: Job["status"]) => void;
@@ -20,79 +31,174 @@ type JobsActions = {
 	clearStopped: () => void; // keep running/queued only
 };
 
-const Ctx = createContext<{ state: JobsState; actions: JobsActions } | null>(
-	null,
-);
+// Create the context with backward compatibility
+const JobsContext = createContext<{
+	state: JobsState;
+	actions: JobsActions;
+} | null>(null);
 
-export function JobsProvider({ children }: { children: React.ReactNode }) {
-	const [jobs, setJobs] = useState<Job[]>([]);
-	const [announcement, setAnnouncement] = useState<string>("");
+// JobsProvider component props
+interface JobsProviderProps {
+	children: React.ReactNode;
+	pollInterval?: number;
+}
 
-	const add = useCallback((job: Job) => {
-		setJobs((prev) => [...prev, job]);
-		try {
-			if (job.status === "running" || job.status === "queued")
-				setAnnouncement(`${job.title} ${job.status}`);
-		} catch {}
-	}, []);
+// Enhanced JobsProvider that uses JobQueueProvider internally
+export const JobsProvider: React.FC<JobsProviderProps> = ({
+	children,
+	pollInterval = 2000,
+}) => {
+	return (
+		<JobQueueProvider pollInterval={pollInterval}>
+			<JobsContextWrapper>{children}</JobsContextWrapper>
+		</JobQueueProvider>
+	);
+};
 
-	const setStatus = useCallback(
-		(id: string, status: Job["status"]) => {
-			setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, status } : j)));
-			try {
-				const j = jobs.find((jj) => jj.id === id);
-				if (
-					j &&
-					(status === "paused" || status === "completed" || status === "failed")
-				) {
-					const txt =
-						status === "completed"
-							? "completed"
-							: status === "failed"
-								? "failed"
-								: "paused";
-					setAnnouncement(`${j.title} ${txt}`);
+// Wrapper component that maps the new system to the old interface
+const JobsContextWrapper: React.FC<{ children: React.ReactNode }> = ({
+	children,
+}) => {
+	const { state: queueState, dispatch } = useJobQueue();
+	const scheduler = useJobScheduler();
+	const jobs = useJobs();
+
+	// Convert ExtendedJob to backward compatible Job
+	const convertToLegacyJob = (extendedJob: ExtendedJob): Job => {
+		return {
+			id: extendedJob.id,
+			type: extendedJob.type,
+			title: extendedJob.title,
+			description: extendedJob.description,
+			status: extendedJob.status as Job["status"],
+			total: extendedJob.total,
+			progress: extendedJob.progress,
+			startTime: extendedJob.startTime,
+			endTime:
+				extendedJob.endTime ||
+				extendedJob.completedAt ||
+				extendedJob.failedAt ||
+				extendedJob.cancelledAt,
+			currentItem: extendedJob.currentStep,
+			speed: extendedJob.executionContext?.resourcesUsed
+				? `${Object.values(extendedJob.executionContext.resourcesUsed).reduce((sum, val) => sum + val, 0)} items/sec`
+				: undefined,
+			estimatedTimeRemaining: extendedJob.estimatedTimeRemaining,
+			successCount: extendedJob.metadata?.successCount as number,
+			warningCount: extendedJob.metadata?.warningCount as number,
+			errorCount: extendedJob.metadata?.errorCount as number,
+			error: extendedJob.lastError?.message,
+			canCancel: extendedJob.cancellable,
+			canPause: extendedJob.pausable,
+		};
+	};
+
+	// Map jobs to legacy format
+	const legacyJobs = useMemo(() => {
+		return jobs.map(convertToLegacyJob);
+	}, [jobs]);
+
+	// Create backward compatible actions
+	const actions = useMemo<JobsActions>(
+		() => ({
+			add: (job: Job) => {
+				// Convert legacy job to extended job
+				const extendedJob = createJob(job.type, job.title, {
+					description: job.description,
+					total: job.total,
+					priority: "normal",
+					cancellable: job.canCancel,
+					pausable: job.canPause,
+				});
+
+				scheduler.enqueue(extendedJob);
+			},
+
+			setStatus: (id: string, status: Job["status"]) => {
+				const job = jobs.find((j) => j.id === id);
+				if (!job) return;
+
+				switch (status) {
+					case "running":
+						scheduler.resume(id);
+						break;
+					case "paused":
+						scheduler.pause(id);
+						break;
+					case "cancelled":
+						scheduler.cancel(id);
+						break;
+					case "completed":
+					case "failed":
+						// These are typically set by the system based on events
+						break;
+					default:
+						// For other statuses, we might need to update directly
+						dispatch({
+							type: "SET_STATUS",
+							id,
+							status: status as unknown as JobStatus,
+						});
 				}
-			} catch {}
-		},
-		[jobs],
+			},
+
+			update: (id: string, patch: Partial<Job>) => {
+				dispatch({
+					type: "UPDATE_JOB",
+					id,
+					updates: patch,
+				});
+			},
+
+			remove: (id: string) => {
+				dispatch({
+					type: "REMOVE_JOB",
+					id,
+				});
+			},
+
+			clearStopped: () => {
+				// Clear completed, failed, and cancelled jobs
+				scheduler.clearCompleted();
+				scheduler.clearFailed();
+				scheduler.clearCancelled();
+			},
+		}),
+		[jobs, scheduler, dispatch],
 	);
 
-	const update = useCallback((id: string, patch: Partial<Job>) => {
-		setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, ...patch } : j)));
-	}, []);
-
-	const remove = useCallback((id: string) => {
-		setJobs((prev) => prev.filter((j) => j.id !== id));
-	}, []);
-
-	const clearStopped = useCallback(() => {
-		setJobs((prev) =>
-			prev.filter((j) => j.status === "running" || j.status === "queued"),
-		);
-	}, []);
+	// Create backward compatible state
+	const state = useMemo<JobsState>(
+		() => ({
+			jobs: legacyJobs,
+		}),
+		[legacyJobs],
+	);
 
 	const value = useMemo(
 		() => ({
-			state: { jobs },
-			actions: { add, setStatus, update, remove, clearStopped },
+			state,
+			actions,
 		}),
-		[jobs, add, setStatus, update, remove, clearStopped],
+		[state, actions],
 	);
 
-	return (
-		<Ctx.Provider value={value}>
-			{children}
-			{/* Visually hidden live region for job updates */}
-			<div className="sr-only" aria-live="polite">
-				{announcement}
-			</div>
-		</Ctx.Provider>
-	);
-}
+	return <JobsContext.Provider value={value}>{children}</JobsContext.Provider>;
+};
 
+// Hook to consume the context (backward compatible)
 export function useJobsContext() {
-	const v = useContext(Ctx);
-	if (!v) throw new Error("useJobsContext must be used within JobsProvider");
-	return v;
+	const context = useContext(JobsContext);
+	if (!context) {
+		throw new Error("useJobsContext must be used within JobsProvider");
+	}
+	return context;
 }
+
+// Export the JobQueueProvider for direct use when needed
+export { JobQueueProvider };
+
+// Export hooks from the new system for advanced use cases
+export { useJobQueue, useJobScheduler, useJobs, useJobStatistics, createJob };
+
+export default JobsContext;

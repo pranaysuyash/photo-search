@@ -4,11 +4,13 @@
  */
 import { useCallback, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { useJobs } from "@/stores/useJobsStore";
-import { usePhotoActions } from "@/stores/usePhotoStore";
-import { useSettings } from "@/stores/useSettingsStore";
-import { useUIActions } from "@/stores/useUIStore";
-import { useWorkspace } from "@/stores/useWorkspaceStore";
+import {
+	useJobs,
+	usePhotoActions,
+	useSettings,
+	useUIActions,
+	useWorkspace,
+} from "@/stores/useStores";
 
 interface UseDataLifecycleProps {
 	dir: string | null;

@@ -28,20 +28,6 @@ interface SuggestionItem {
 	type: SuggestionType;
 }
 
-// Search history management using SearchHistoryService
-const addToSearchHistory = (query: string, resultCount: number = 0) => {
-	if (!query?.trim()) return;
-	try {
-		searchHistoryService.addToHistory({
-			query: query.trim(),
-			timestamp: Date.now(),
-			resultCount,
-		});
-	} catch (error) {
-		console.warn("Failed to save search history:", error);
-	}
-};
-
 export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 	(
 		{
@@ -109,7 +95,7 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 		const handleSearch = (text: string) => {
 			const trimmedText = text.trim();
 			if (trimmedText) {
-				addToSearchHistory(trimmedText, 0); // TODO: Pass actual result count when available
+				// Search history is now tracked in useSearchOperations hook
 			}
 			onSearch(text);
 			setSuggestOpen(false);

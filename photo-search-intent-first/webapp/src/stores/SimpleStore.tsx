@@ -1,5 +1,16 @@
+/**
+ * SimpleStore - Enhanced simple state management with error handling
+ * This replaces Zustand and eliminates infinite loops while adding comprehensive error handling.
+ */
 import React, { createContext, useCallback, useContext, useState } from "react";
 import type { SearchResult } from "../api";
+import {
+	type AppError,
+	errorFactory,
+	handleGlobalError,
+	useErrorHandler,
+	useErrorNotification,
+} from "../framework/EnhancedErrorHandling";
 import type { WorkspaceState } from "./types";
 
 // Simple state management to replace Zustand and eliminate infinite loops
@@ -53,6 +64,10 @@ interface SimpleUI {
 	viewMode: "grid" | "film";
 	showWelcome: boolean;
 	showHelp: boolean;
+	// Error handling state
+	error?: AppError;
+	showErrorBanner: boolean;
+	errorNotifications: AppError[];
 }
 
 interface SimpleWorkspace {
@@ -81,7 +96,7 @@ const initialState: SimpleStore = {
 		useFast: false,
 		fastKind: "faiss",
 		useCaps: false,
-		vlmModel: "gpt-4o",
+		vlmModel: "Qwen/Qwen2-VL-2B-Instruct",
 		useOcr: false,
 		hasText: false,
 		useOsTrash: false,
@@ -117,6 +132,8 @@ const initialState: SimpleStore = {
 		viewMode: "grid",
 		showWelcome: false,
 		showHelp: false,
+		showErrorBanner: false,
+		errorNotifications: [],
 	},
 	workspace: {
 		workspace: "",
@@ -137,6 +154,13 @@ const SimpleStoreContext = createContext<{
 	) => void;
 	setUI: (ui: Partial<SimpleUI>) => void;
 	setWorkspace: (workspace: Partial<SimpleWorkspace>) => void;
+	// Enhanced error handling methods
+	setError: (error: AppError | null) => void;
+	clearError: () => void;
+	showErrorBanner: (show: boolean) => void;
+	addErrorNotification: (error: AppError) => void;
+	removeErrorNotification: (timestamp: number) => void;
+	clearErrorNotifications: () => void;
 } | null>(null);
 
 export const SimpleStoreProvider: React.FC<{ children: React.ReactNode }> = ({
@@ -179,9 +203,91 @@ export const SimpleStoreProvider: React.FC<{ children: React.ReactNode }> = ({
 		}));
 	}, []);
 
+	// Enhanced error handling methods
+	const setError = useCallback((error: AppError | null) => {
+		setState((prev) => ({
+			...prev,
+			ui: {
+				...prev.ui,
+				error: error || undefined,
+				showErrorBanner: !!error,
+			},
+		}));
+	}, []);
+
+	const clearError = useCallback(() => {
+		setState((prev) => ({
+			...prev,
+			ui: {
+				...prev.ui,
+				error: undefined,
+				showErrorBanner: false,
+			},
+		}));
+	}, []);
+
+	const showErrorBanner = useCallback((show: boolean) => {
+		setState((prev) => ({
+			...prev,
+			ui: {
+				...prev.ui,
+				showErrorBanner: show,
+			},
+		}));
+	}, []);
+
+	const addErrorNotification = useCallback((error: AppError) => {
+		setState((prev) => ({
+			...prev,
+			ui: {
+				...prev.ui,
+				errorNotifications: [...prev.ui.errorNotifications, error],
+			},
+		}));
+
+		// Auto-remove notification after 5 seconds
+		setTimeout(() => {
+			removeErrorNotification(error.timestamp);
+		}, 5000);
+	}, []);
+
+	const removeErrorNotification = useCallback((timestamp: number) => {
+		setState((prev) => ({
+			...prev,
+			ui: {
+				...prev.ui,
+				errorNotifications: prev.ui.errorNotifications.filter(
+					(n) => n.timestamp !== timestamp,
+				),
+			},
+		}));
+	}, []);
+
+	const clearErrorNotifications = useCallback(() => {
+		setState((prev) => ({
+			...prev,
+			ui: {
+				...prev.ui,
+				errorNotifications: [],
+			},
+		}));
+	}, []);
+
 	return (
 		<SimpleStoreContext.Provider
-			value={{ state, setSettings, setPhoto, setUI, setWorkspace }}
+			value={{
+				state,
+				setSettings,
+				setPhoto,
+				setUI,
+				setWorkspace,
+				setError,
+				clearError,
+				showErrorBanner,
+				addErrorNotification,
+				removeErrorNotification,
+				clearErrorNotifications,
+			}}
 		>
 			{children}
 		</SimpleStoreContext.Provider>
@@ -247,6 +353,13 @@ export const useNote = () => useSimpleStore().state.ui.note;
 export const useViewMode = () => useSimpleStore().state.ui.viewMode;
 export const useShowWelcome = () => useSimpleStore().state.ui.showWelcome;
 export const useShowHelp = () => useSimpleStore().state.ui.showHelp;
+
+// Enhanced error handling selectors
+export const useError = () => useSimpleStore().state.ui.error;
+export const useShowErrorBanner = () =>
+	useSimpleStore().state.ui.showErrorBanner;
+export const useErrorNotifications = () =>
+	useSimpleStore().state.ui.errorNotifications;
 
 export const useWorkspace = () => useSimpleStore().state.workspace.workspace;
 export const useWsToggle = () => useSimpleStore().state.workspace.wsToggle;
@@ -338,7 +451,15 @@ export const usePhotoActions = () => {
 };
 
 export const useUIActions = () => {
-	const { setUI } = useSimpleStore();
+	const {
+		setUI,
+		setError,
+		clearError,
+		showErrorBanner,
+		addErrorNotification,
+		removeErrorNotification,
+		clearErrorNotifications,
+	} = useSimpleStore();
 	return React.useMemo(
 		() => ({
 			setBusy: (busy: string) => setUI({ busy }),
@@ -347,8 +468,116 @@ export const useUIActions = () => {
 			setShowWelcome: (showWelcome: boolean) => setUI({ showWelcome }),
 			setShowHelp: (showHelp: boolean) => setUI({ showHelp }),
 			clearBusy: () => setUI({ busy: "" }),
+
+			// Enhanced error handling actions
+			setError: (error: AppError | null) => setError(error),
+			clearError: () => clearError(),
+			showErrorBanner: (show: boolean) => showErrorBanner(show),
+			addErrorNotification: (error: AppError) => addErrorNotification(error),
+			removeErrorNotification: (timestamp: number) =>
+				removeErrorNotification(timestamp),
+			clearErrorNotifications: () => clearErrorNotifications(),
+
+			// Convenience methods for common error scenarios
+			handleNetworkError: (
+				message: string,
+				context?: Record<string, unknown>,
+			) => {
+				const error = errorFactory.networkError(message, { context });
+				setError(error);
+				addErrorNotification(error);
+				return error;
+			},
+
+			handleValidationError: (
+				message: string,
+				context?: Record<string, unknown>,
+			) => {
+				const error = errorFactory.validationError(message, { context });
+				setError(error);
+				addErrorNotification(error);
+				return error;
+			},
+
+			handlePermissionError: (
+				message: string,
+				context?: Record<string, unknown>,
+			) => {
+				const error = errorFactory.permissionError(message, { context });
+				setError(error);
+				addErrorNotification(error);
+				return error;
+			},
+
+			handleFileSystemError: (
+				message: string,
+				context?: Record<string, unknown>,
+			) => {
+				const error = errorFactory.fileSystemError(message, { context });
+				setError(error);
+				addErrorNotification(error);
+				return error;
+			},
+
+			handleIndexingError: (
+				message: string,
+				context?: Record<string, unknown>,
+			) => {
+				const error = errorFactory.indexingError(message, { context });
+				setError(error);
+				addErrorNotification(error);
+				return error;
+			},
+
+			handleSearchError: (
+				message: string,
+				context?: Record<string, unknown>,
+			) => {
+				const error = errorFactory.searchError(message, { context });
+				setError(error);
+				addErrorNotification(error);
+				return error;
+			},
+
+			handleExportError: (
+				message: string,
+				context?: Record<string, unknown>,
+			) => {
+				const error = errorFactory.exportError(message, { context });
+				setError(error);
+				addErrorNotification(error);
+				return error;
+			},
+
+			handleResourceLimitError: (
+				message: string,
+				context?: Record<string, unknown>,
+			) => {
+				const error = errorFactory.resourceLimitError(message, { context });
+				setError(error);
+				addErrorNotification(error);
+				return error;
+			},
+
+			handleUnknownError: (
+				message: string,
+				context?: Record<string, unknown>,
+			) => {
+				const error = errorFactory.unknownError(message, { context });
+				setError(error);
+				addErrorNotification(error);
+				return error;
+			},
 		}),
-		[setUI],
+		[
+			setUI,
+			setError,
+			clearError,
+			showErrorBanner,
+			addErrorNotification,
+			removeErrorNotification,
+			clearErrorNotifications,
+		],
 	);
 };
 
@@ -370,3 +599,31 @@ export const useWorkspaceActions = () => {
 		[setWorkspace],
 	);
 };
+
+// Enhanced error handling hooks
+export const useErrorHandling = () => {
+	const { setError, clearError, addErrorNotification } = useSimpleStore();
+	const { handleError } = useErrorHandler();
+	const { showNotification } = useErrorNotification();
+
+	return React.useMemo(
+		() => ({
+			setError,
+			clearError,
+			addErrorNotification,
+			handleError: async (
+				error: unknown,
+				context?: Record<string, unknown>,
+			) => {
+				const appError = await handleGlobalError(error, context);
+				setError(appError);
+				addErrorNotification(appError);
+				showNotification(appError);
+				return appError;
+			},
+		}),
+		[setError, clearError, addErrorNotification, handleError, showNotification],
+	);
+};
+
+export default SimpleStoreContext;

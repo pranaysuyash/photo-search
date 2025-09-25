@@ -3,12 +3,13 @@ import type { Location } from "react-router-dom";
 
 interface UseQueryParamFiltersArgs {
 	location: Location;
-	isMounted: boolean;
 	searchText: string;
 	setSearchText: (value: string) => void;
 	setDateFrom: (value: string) => void;
 	setDateTo: (value: string) => void;
 	setRatingMin: (value: number) => void;
+	resultView?: string;
+	timelineBucket?: string;
 	setResultViewLocal?: (value: "grid" | "timeline") => void;
 	setTimelineBucketLocal?: (value: "day" | "week" | "month") => void;
 	photoActions: {
@@ -37,12 +38,13 @@ interface UseQueryParamFiltersArgs {
 
 export function useQueryParamFilters({
 	location,
-	isMounted,
 	searchText,
 	setSearchText,
 	setDateFrom,
 	setDateTo,
 	setRatingMin,
+	resultView,
+	timelineBucket,
 	setResultViewLocal,
 	setTimelineBucketLocal,
 	photoActions,
@@ -68,7 +70,6 @@ export function useQueryParamFilters({
 	const { setPersons } = workspaceActions;
 
 	useEffect(() => {
-		if (!isMounted) return;
 		const sp = new URLSearchParams(location.search);
 		const q = sp.get("q") || "";
 		if (q && q !== searchText) setSearchText(q);
@@ -137,34 +138,35 @@ export function useQueryParamFilters({
 			const ocr = sp.get("ocr");
 			if (ocr === "1") setUseOcr?.(true);
 
-			const resultView = sp.get("rv");
-			if (resultView) {
-				setResultView?.(resultView);
-				if (resultView === "grid" || resultView === "timeline") {
-					setResultViewLocal?.(resultView);
+			const resultViewParam = sp.get("rv");
+			if (resultViewParam && resultViewParam !== resultView) {
+				setResultView?.(resultViewParam);
+				if (resultViewParam === "grid" || resultViewParam === "timeline") {
+					setResultViewLocal?.(resultViewParam);
 				}
 			}
 
-			const timelineBucket = sp.get("tb");
-			if (timelineBucket) {
-				setTimelineBucket?.(timelineBucket);
+			const timelineBucketParam = sp.get("tb");
+			if (timelineBucketParam && timelineBucketParam !== timelineBucket) {
+				setTimelineBucket?.(timelineBucketParam);
 				if (
-					timelineBucket === "day" ||
-					timelineBucket === "week" ||
-					timelineBucket === "month"
+					timelineBucketParam === "day" ||
+					timelineBucketParam === "week" ||
+					timelineBucketParam === "month"
 				) {
-					setTimelineBucketLocal?.(timelineBucket);
+					setTimelineBucketLocal?.(timelineBucketParam);
 				}
 			}
 		} catch {}
 	}, [
 		location.search,
-		isMounted,
 		searchText,
 		setSearchText,
 		setDateFrom,
 		setDateTo,
 		setRatingMin,
+		resultView,
+		timelineBucket,
 		setFavOnly,
 		setTagFilter,
 		setPlace,

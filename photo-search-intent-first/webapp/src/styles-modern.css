@@ -736,7 +736,7 @@ body {
 }
 
 .indexed-progress-bar {
-	width: 40%;
+	width: var(--progress-width, 40%);
 	height: 100%;
 	background: var(--color-primary-500);
 	animation: pulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ToastAction } from "@/components/ui/toast";
 import { useToast } from "@/hooks/use-toast";
@@ -15,7 +15,6 @@ import { useGlobalShortcuts } from "./useGlobalShortcuts";
 import { useResultsShortcuts } from "./useResultsShortcuts";
 
 export interface AppLifecycleState {
-	isMounted: boolean;
 	isMobile: boolean;
 	isTablet: boolean;
 	screenSize: string;
@@ -32,13 +31,6 @@ export function useAppLifecycle() {
 	const navigate = useNavigate();
 	const { toast } = useToast();
 	const { setThemeMode } = useThemeStore();
-
-	// Safety check to prevent infinite loops on initial render
-	const [isMounted, setIsMounted] = useState(false);
-	useEffect(() => {
-		setIsMounted(true);
-		return () => setIsMounted(false);
-	}, []);
 
 	// Skip to content link for keyboard users
 	const skipToContentRef = useRef<HTMLAnchorElement>(null);
@@ -138,7 +130,6 @@ export function useAppLifecycle() {
 	}, [currentView, isMobile, hapticTrigger]);
 
 	const lifecycleState: AppLifecycleState = {
-		isMounted,
 		isMobile,
 		isTablet,
 		screenSize,

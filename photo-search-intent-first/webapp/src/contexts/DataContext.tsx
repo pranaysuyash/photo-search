@@ -6,11 +6,13 @@
 import type React from "react";
 import { createContext, useContext } from "react";
 import type { SearchResult } from "../api";
+import type { Job } from "../components/JobsCenter";
+import type { LibraryState } from "../contexts/LibraryContext";
 
 // Define the shape of our data context
 interface DataContextType {
 	// Directory and configuration
-	dir: string | null;
+	dir: string | undefined;
 	engine: string;
 	hfToken?: string;
 	openaiKey?: string;
@@ -23,7 +25,6 @@ interface DataContextType {
 	// Search and filtering
 	query: string;
 	results: SearchResult[];
-	searchId: string;
 	topK: number;
 	favOnly: boolean;
 	tagFilter: string;
@@ -45,10 +46,20 @@ interface DataContextType {
 	library: string[];
 	libHasMore: boolean;
 	persons: string[];
-	clusters: unknown[];
-	points: unknown[];
-	diag: unknown | null;
-	meta: unknown | null;
+	clusters: Array<{ name?: string }>;
+	points: Array<{ lat: number; lon: number }>;
+	diag: {
+		engines?: Array<{
+			key: string;
+			count?: number;
+			fast?: {
+				annoy?: boolean;
+				faiss?: boolean;
+				hnsw?: boolean;
+			};
+		}>;
+	} | null;
+	meta: { cameras: string[]; places?: string[] };
 
 	// State flags
 	needsHf: boolean;
@@ -56,9 +67,24 @@ interface DataContextType {
 	busy: string;
 	note: string;
 	isConnected: boolean;
-	isOnline: boolean;
 	showInfoOverlay: boolean;
 	highContrast: boolean;
+
+	// Additional data fields
+	fav: string[];
+	ocrReady: boolean;
+	ocrTextCount?: number;
+	presets: { name: string; query: string }[];
+	altSearch:
+		| { active: boolean; applied: string; original: string }
+		| null
+		| undefined;
+	ratingMap: Record<string, number>;
+	jobs: Job[];
+	libState: LibraryState;
+	items: { path: string; score?: number }[];
+	hasAnyFilters: boolean;
+	indexCoverage?: number;
 }
 
 // Create the context with a default value
@@ -87,19 +113,34 @@ export const useDataContext = (): DataContextType => {
 };
 
 // Selector hooks for specific pieces of data
-export const useDirectory = (): string | null => useDataContext().dir;
+export const useDirectory = (): string | undefined => useDataContext().dir;
 export const useEngine = (): string => useDataContext().engine;
 export const useQuery = (): string => useDataContext().query;
 export const useResults = (): SearchResult[] => useDataContext().results;
 export const useLibrary = (): string[] => useDataContext().library;
 export const useBusy = (): string => useDataContext().busy;
 export const useNote = (): string => useDataContext().note;
-export const useIsOnline = (): boolean => useDataContext().isOnline;
 export const useShowInfoOverlay = (): boolean =>
 	useDataContext().showInfoOverlay;
 export const useHighContrast = (): boolean => useDataContext().highContrast;
 export const useTagsMap = (): Record<string, string[]> =>
 	useDataContext().tagsMap;
 export const useAllTags = (): string[] => useDataContext().allTags;
+export const useFav = (): string[] => useDataContext().fav;
+export const useOcrReady = (): boolean => useDataContext().ocrReady;
+export const useOcrTextCount = (): number | undefined =>
+	useDataContext().ocrTextCount;
+export const usePresets = (): { name: string; query: string }[] =>
+	useDataContext().presets;
+export const useAltSearch = (): unknown => useDataContext().altSearch;
+export const useRatingMap = (): Record<string, number> =>
+	useDataContext().ratingMap;
+export const useJobs = (): Job[] => useDataContext().jobs;
+export const useLibState = (): LibraryState => useDataContext().libState;
+export const useItems = (): { path: string; score?: number }[] =>
+	useDataContext().items;
+export const useHasAnyFilters = (): boolean => useDataContext().hasAnyFilters;
+export const useIndexCoverage = (): number | undefined =>
+	useDataContext().indexCoverage;
 
 export default DataContext;

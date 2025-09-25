@@ -1,3 +1,5 @@
+/* eslint-env node */
+/* global require, module */
 const { contextBridge, ipcRenderer } = require('electron')
 
 // Expose protected methods that allow the renderer process to use
@@ -5,5 +7,11 @@ const { contextBridge, ipcRenderer } = require('electron')
 contextBridge.exposeInMainWorld('electronAPI', {
   selectFolder: () => ipcRenderer.invoke('select-folder'),
   getApiToken: () => ipcRenderer.invoke('get-api-token'),
-  setAllowedRoot: (p) => ipcRenderer.invoke('set-allowed-root', p)
+  getApiConfig: () => ipcRenderer.invoke('get-api-config'),
+  setAllowedRoot: (p) => ipcRenderer.invoke('set-allowed-root', p),
+  restartBackend: () => ipcRenderer.invoke('backend:restart'),
+  models: {
+    getStatus: () => ipcRenderer.invoke('models:get-status'),
+    refresh: () => ipcRenderer.invoke('models:refresh')
+  }
 })

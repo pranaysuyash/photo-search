@@ -123,7 +123,20 @@ export const useSettingsStore = create<SettingsStore>()(
 			place: "",
 
 			// Actions
-			setDir: (dir) => set({ dir }),
+			setDir: (dir) => {
+				// Validate directory before setting
+				if (dir && dir.trim() !== "") {
+					try {
+						const path = Path(dir);
+						if (!path.isAbsolute()) {
+							console.warn("Directory path should be absolute");
+						}
+					} catch (e) {
+						console.warn("Invalid directory path", e);
+					}
+				}
+				set({ dir });
+			},
 			setEngine: (engine) => set({ engine }),
 			setHfToken: (hfToken) => set({ hfToken }),
 			setOpenaiKey: (openaiKey) => set({ openaiKey }),

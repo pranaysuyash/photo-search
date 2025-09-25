@@ -1,5 +1,7 @@
 import { renderHook } from "@testing-library/react";
+import type React from "react";
 import { describe, expect, it, vi } from "vitest";
+import { AllTheProviders } from "../test/test-utils";
 
 const open = vi.fn();
 const close = vi.fn();
@@ -7,6 +9,7 @@ const toggle = vi.fn();
 const closeAll = vi.fn();
 
 vi.mock("../contexts/ModalContext", () => ({
+	ModalProvider: ({ children }: { children: React.ReactNode }) => children,
 	useModalContext: () => ({
 		state: {},
 		actions: { open, close, toggle, closeAll },
@@ -17,7 +20,9 @@ import { useModalControls } from "./useModalControls";
 
 describe("useModalControls", () => {
 	it("delegates to modal actions", () => {
-		const { result } = renderHook(() => useModalControls());
+		const { result } = renderHook(() => useModalControls(), {
+			wrapper: AllTheProviders,
+		});
 
 		result.current.openFolder();
 		result.current.openHelp();

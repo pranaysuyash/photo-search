@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type RenderOptions, render } from "@testing-library/react";
 import type React from "react";
 import { BrowserRouter } from "react-router-dom";
@@ -9,9 +10,11 @@ import { ThemeProvider } from "../components/ThemeProvider";
 import { JobsProvider } from "../contexts/JobsContext";
 import { LibraryProvider } from "../contexts/LibraryContext";
 import { ModalProvider } from "../contexts/ModalContext";
+import { ModalDataProvider } from "../contexts/ModalDataContext";
 import { ResultsConfigProvider } from "../contexts/ResultsConfigContext";
 import { SearchProvider } from "../contexts/SearchContext";
 import { UIProvider } from "../contexts/UIContext";
+import { AccessibilityProvider } from "../framework/AccessibilityFramework";
 import { initializeAPI } from "../services/PhotoVaultAPI";
 import { PhotoVaultAPIProvider } from "../services/PhotoVaultAPIProvider";
 import { SimpleStoreProvider } from "../stores/SimpleStore";
@@ -231,10 +234,152 @@ vi.mock("../components/OnboardingTour", () => ({
 	ContextualHint: () => null,
 }));
 
+// Mock ActionsContext to avoid domain context dependencies
+vi.mock("../contexts/ActionsContext", () => ({
+	ActionsProvider: ({
+		children,
+	}: {
+		children: React.ReactNode;
+		value?: unknown;
+	}) => <>{children}</>,
+	useActionsContext: () => ({
+		doSearchImmediate: vi.fn(),
+		loadFav: vi.fn(),
+		loadSaved: vi.fn(),
+		loadTags: vi.fn(),
+		loadDiag: vi.fn(),
+		loadFaces: vi.fn(),
+		loadMap: vi.fn(),
+		loadLibrary: vi.fn(),
+		loadMetadata: vi.fn(),
+		loadPresets: vi.fn(),
+		prepareFast: vi.fn(),
+		buildOCR: vi.fn(),
+		buildMetadata: vi.fn(),
+		monitorOperation: vi.fn(),
+		openDetailByPath: vi.fn(),
+		navDetail: vi.fn(),
+		tagSelected: vi.fn(),
+		setRatingSelected: vi.fn(),
+		exportSelected: vi.fn(),
+		handlePhotoOpen: vi.fn(),
+		handlePhotoAction: vi.fn(),
+		handleAccessibilitySettingsChange: vi.fn(),
+		rowsEqual: vi.fn(),
+	}),
+	useSearchActions: () => ({
+		doSearchImmediate: vi.fn(),
+	}),
+	useDataActions: () => ({
+		loadFav: vi.fn(),
+		loadSaved: vi.fn(),
+		loadTags: vi.fn(),
+		loadDiag: vi.fn(),
+		loadFaces: vi.fn(),
+		loadMap: vi.fn(),
+		loadLibrary: vi.fn(),
+		loadMetadata: vi.fn(),
+		loadPresets: vi.fn(),
+	}),
+	useIndexActions: () => ({
+		prepareFast: vi.fn(),
+		buildOCR: vi.fn(),
+		buildMetadata: vi.fn(),
+	}),
+	useUIActions: () => ({
+		monitorOperation: vi.fn(),
+	}),
+	useSelectionActions: () => ({
+		tagSelected: vi.fn(),
+		setRatingSelected: vi.fn(),
+	}),
+	useNavigationActions: () => ({
+		openDetailByPath: vi.fn(),
+		navDetail: vi.fn(),
+	}),
+	usePhotoActions: () => ({
+		handlePhotoOpen: vi.fn(),
+		handlePhotoAction: vi.fn(),
+		exportSelected: vi.fn(),
+		handleAccessibilitySettingsChange: vi.fn(),
+		rowsEqual: vi.fn(),
+	}),
+}));
+
+// Mock SearchOperationsContext to avoid domain context dependencies
+vi.mock("../contexts/domains/SearchOperationsContext", () => ({
+	SearchOperationsProvider: ({ children }: { children: React.ReactNode }) => (
+		<>{children}</>
+	),
+	useSearchOperationsContext: () => ({
+		doSearchImmediate: vi.fn(),
+		doSearchWithFilters: vi.fn(),
+		searchId: "",
+		searchResults: [],
+		searchQuery: "",
+		topK: 24,
+		setSearchResults: vi.fn(),
+		setSearchId: vi.fn(),
+		setSearchQuery: vi.fn(),
+		setTopK: vi.fn(),
+		resetSearch: vi.fn(),
+		useCaps: false,
+		useOcr: false,
+		useFast: false,
+		fastKind: "",
+		setUseCaps: vi.fn(),
+		setUseOcr: vi.fn(),
+		setUseFast: vi.fn(),
+		setFastKind: vi.fn(),
+		error: null,
+		clearError: vi.fn(),
+		retryLastAction: vi.fn(),
+	}),
+	useSearchExecution: () => ({
+		doSearchImmediate: vi.fn(),
+		doSearchWithFilters: vi.fn(),
+		error: null,
+		clearError: vi.fn(),
+		retryLastAction: vi.fn(),
+	}),
+	useSearchState: () => ({
+		searchId: "",
+		searchResults: [],
+		searchQuery: "",
+		topK: 24,
+		setSearchResults: vi.fn(),
+		setSearchId: vi.fn(),
+		setSearchQuery: vi.fn(),
+		setTopK: vi.fn(),
+		resetSearch: vi.fn(),
+	}),
+	useSearchConfiguration: () => ({
+		useCaps: false,
+		useOcr: false,
+		useFast: false,
+		fastKind: "",
+		setUseCaps: vi.fn(),
+		setUseOcr: vi.fn(),
+		setUseFast: vi.fn(),
+		setFastKind: vi.fn(),
+	}),
+}));
+
 // Test wrapper that provides all necessary contexts
 const AllTheProviders: React.FC<{ children: React.ReactNode }> = ({
 	children,
 }) => {
+	// Create a client for testing
+	const queryClient = new QueryClient({
+		defaultOptions: {
+			queries: {
+				staleTime: 5 * 60 * 1000, // 5 minutes
+				gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+				retry: false, // Disable retries in tests
+			},
+		},
+	});
+
 	// Minimal browser polyfills for JSDOM
 	const w = window as unknown as {
 		matchMedia?: (query: string) => MediaQueryList;
@@ -279,53 +424,103 @@ const AllTheProviders: React.FC<{ children: React.ReactNode }> = ({
 	}
 
 	return (
-		<ErrorBoundary>
-			<BrowserRouter>
-				<ThemeProvider>
-					<UIProvider>
-						<SimpleStoreProvider>
-							<PhotoVaultAPIProvider>
-								<JobsProvider>
-									<LibraryProvider>
-										<SearchProvider>
-											<ModalProvider>
-												<HintProvider>
-													<HintManager>
-														<ResultsConfigProvider
-															value={{
-																resultView: "grid",
-																setResultView: () => {},
-																timelineBucket: "day",
-																setTimelineBucket: () => {},
+		<QueryClientProvider client={queryClient}>
+			<ErrorBoundary>
+				<BrowserRouter>
+					<ThemeProvider>
+						<UIProvider>
+							<SimpleStoreProvider>
+								<PhotoVaultAPIProvider>
+									<JobsProvider>
+										<LibraryProvider>
+											<SearchProvider>
+												<AccessibilityProvider>
+													<ModalProvider>
+														<ModalDataProvider
+															data={{
+																selected: new Set(),
+																dir: "",
+																engine: "local",
+																topK: 100,
+																highContrast: false,
+																useFast: false,
+																fastKind: "",
+																useCaps: false,
+																useOcr: false,
+																hasText: false,
+																useOsTrash: false,
+																searchText: "",
+																query: "",
+																collections: {},
+																clusters: [],
+																allTags: [],
+																meta: { cameras: [], places: [] },
+															}}
+															actions={{
+																settingsActions: {
+																	setDir: vi.fn(),
+																	setUseOsTrash: vi.fn(),
+																	setUseFast: vi.fn(),
+																	setFastKind: vi.fn(),
+																	setUseCaps: vi.fn(),
+																	setUseOcr: vi.fn(),
+																	setHasText: vi.fn(),
+																	setHighContrast: vi.fn(),
+																},
+																uiActions: {
+																	setBusy: vi.fn(),
+																	setNote: vi.fn(),
+																},
+																photoActions: {
+																	setResults: vi.fn(),
+																	setSaved: vi.fn(),
+																	setCollections: vi.fn(),
+																},
+																libIndex: vi.fn(),
+																prepareFast: vi.fn(),
+																buildOCR: vi.fn(),
+																buildMetadata: vi.fn(),
+																tagSelected: vi.fn(),
 															}}
 														>
-															<MobileOptimizations
-																onSwipeLeft={vi.fn()}
-																onSwipeRight={vi.fn()}
-																onSwipeUp={vi.fn()}
-																enableSwipeGestures={false}
-																enablePullToRefresh={false}
-																onPullToRefresh={vi.fn()}
-															>
-																{children}
-															</MobileOptimizations>
-														</ResultsConfigProvider>
-													</HintManager>
-												</HintProvider>
-											</ModalProvider>
-										</SearchProvider>
-									</LibraryProvider>
-								</JobsProvider>
-							</PhotoVaultAPIProvider>
-						</SimpleStoreProvider>
-					</UIProvider>
-				</ThemeProvider>
-			</BrowserRouter>
-		</ErrorBoundary>
+															<HintProvider>
+																<HintManager>
+																	<ResultsConfigProvider
+																		value={{
+																			resultView: "grid",
+																			setResultView: () => {},
+																			timelineBucket: "day",
+																			setTimelineBucket: () => {},
+																		}}
+																	>
+																		<MobileOptimizations
+																			onSwipeLeft={vi.fn()}
+																			onSwipeRight={vi.fn()}
+																			onSwipeUp={vi.fn()}
+																			enableSwipeGestures={false}
+																			enablePullToRefresh={false}
+																			onPullToRefresh={vi.fn()}
+																		>
+																			{children}
+																		</MobileOptimizations>
+																	</ResultsConfigProvider>
+																</HintManager>
+															</HintProvider>
+														</ModalDataProvider>
+													</ModalProvider>
+												</AccessibilityProvider>
+											</SearchProvider>
+										</LibraryProvider>
+									</JobsProvider>
+								</PhotoVaultAPIProvider>
+							</SimpleStoreProvider>
+						</UIProvider>
+					</ThemeProvider>
+				</BrowserRouter>
+			</ErrorBoundary>
+		</QueryClientProvider>
 	);
-};
-
-// Custom render function that includes all providers
+}; // Custom render function that includes all providers
 const customRender = (
 	ui: React.ReactElement,
 	options?: Omit<RenderOptions, "wrapper">,

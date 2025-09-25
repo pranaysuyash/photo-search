@@ -34,8 +34,6 @@ export function getModifierKeySymbol(): string {
 	switch (os) {
 		case "macOS":
 			return "⌘";
-		case "Windows":
-		case "Linux":
 		default:
 			return "Ctrl";
 	}
@@ -51,8 +49,6 @@ export function getModifierKeyEvent(): "metaKey" | "ctrlKey" {
 	switch (os) {
 		case "macOS":
 			return "metaKey";
-		case "Windows":
-		case "Linux":
 		default:
 			return "ctrlKey";
 	}

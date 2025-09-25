@@ -80,7 +80,7 @@ export function notifyJsonCacheInvalidation() {
 // Generic POST request handler
 export async function post<T>(
 	path: string,
-	body?: any,
+	body?: Record<string, unknown> | string | number | boolean | null,
 	options?: RequestInit,
 ): Promise<T> {
 	const url = `${API_BASE}${path}`;

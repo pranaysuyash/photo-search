@@ -1,25 +1,8 @@
-import clsx from "clsx";
 import { useReducedMotion } from "framer-motion";
-import type React from "react";
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import {
-  Navigate,
-  Route,
-  Routes,
-  useLocation,
-  useNavigate,
-} from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 // API layer
 import {
-  API_BASE,
   apiAnalytics,
   apiBuildFast,
   apiBuildMetadata,
@@ -37,9 +20,9 @@ import {
   apiMetadataBatch,
   apiOcrStatus,
   apiOperationStatus,
-  apiSetFavorite,
   apiSetTags,
 } from "./api";
+import { telemetryService } from "./services/TelemetryService";
 // Store helpers
 import { useAltSearch } from "./stores";
 import {
@@ -77,7 +60,6 @@ import {
   useNote,
   useOcrEnabled,
   useOpenaiKey,
-  useOsTrashEnabled,
   usePersons,
   usePhotoActions,
   usePlace,
@@ -88,7 +70,6 @@ import {
   useSearchResults,
   // Actions
   useSettingsActions,
-  useShowHelp,
   useShowInfoOverlay,
   useShowWelcome,
   useSmartCollections,
@@ -97,10 +78,7 @@ import {
   useTopK,
   useUIActions,
   useWorkspaceActions,
-  useWsToggle,
 } from "./stores/useStores";
-
-const basename = (p: string) => p.split("/").pop() || p;
 
 type GridSize = "small" | "medium" | "large";
 export type View =
@@ -115,43 +93,64 @@ export type View =
   | "memories"
   | "tasks"
   | "videos";
-type _IconType = React.ComponentType<React.SVGProps<SVGSVGElement>>;
-type ViewType = "results" | "library" | "map" | "people" | "tasks" | "trips";
 
-import { FocusTrap } from "./utils/accessibility";
-import { handleError } from "./utils/errors";
-import { pathToView } from "./utils/router";
-import type { ResultView } from "./contexts/ResultsConfigContext";
 import { AppProviders } from "./AppProviders";
+import type { AccessibilitySettings } from "./components/AccessibilityPanel";
 import { AppChrome } from "./components/AppChrome";
-import { ToastAction } from "./components/ui/toast";
-import { useToast } from "./hooks/use-toast";
-import { useJobsContext } from "./contexts/JobsContext";
-import { useLibraryContext } from "./contexts/LibraryContext";
 import type { Job } from "./components/JobsCenter";
+import {
+  useHapticFeedback,
+  useMobileDetection,
+} from "./components/MobileOptimizations";
+import { useOnboarding } from "./components/OnboardingTour";
+import { ToastAction } from "./components/ui/toast";
+import { ActionsProvider } from "./contexts/ActionsContext";
+import { DataProvider } from "./contexts/DataContext";
+import { useJobsContext } from "./contexts/JobsContext";
+import { LayoutProvider } from "./contexts/LayoutContext";
+import { useLibraryContext } from "./contexts/LibraryContext";
+import type { ModalKey } from "./contexts/ModalContext";
+import { OnboardingProvider } from "./contexts/OnboardingContext";
+import type { ResultView } from "./contexts/ResultsConfigContext";
+import { ViewStateProvider } from "./contexts/ViewStateContext";
+import { useToast } from "./hooks/use-toast";
+import { useConnectivityAndAuth } from "./hooks/useConnectivityAndAuth";
+import {
+  useFavorites as useFavoritesQuery,
+  useSavedSearches as useSavedSearchesQuery,
+  useTags as useTagsQuery,
+  useToggleFavorite,
+  useUpdateTags,
+} from "./hooks/useDataQueries";
+import { useDemoLibraryHandlers } from "./hooks/useDemoLibraryHandlers";
+import type { FilterPresetSetters } from "./hooks/useFilterPresets";
+import { useFilterPresets } from "./hooks/useFilterPresets";
+import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
+import { useModalControls } from "./hooks/useModalControls";
+import useModalStatus from "./hooks/useModalStatus";
+import { useMonitorOperation } from "./hooks/useMonitorOperation";
+import { useOnboardingActions } from "./hooks/useOnboardingActions";
 import useOnboardingFlows, {
   type OnboardingStep,
 } from "./hooks/useOnboardingFlows";
-import { useOnboarding } from "./components/OnboardingTour";
-import {
-  useMobileDetection,
-  useHapticFeedback,
-} from "./components/MobileOptimizations";
-import useModalStatus from "./hooks/useModalStatus";
-import { useModalControls } from "./hooks/useModalControls";
 import { usePageViewTracking } from "./hooks/usePageViewTracking";
-import { useConnectivityAndAuth } from "./hooks/useConnectivityAndAuth";
-import { useSearchOperations } from "./hooks/useSearchOperations";
-import { useDemoLibraryHandlers } from "./hooks/useDemoLibraryHandlers";
-import type { AccessibilitySettings } from "./components/AccessibilityPanel";
-import type { FilterPresetSetters } from "./hooks/useFilterPresets";
-import { useFilterPresets } from "./hooks/useFilterPresets";
-import { useOnboardingActions } from "./hooks/useOnboardingActions";
-import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
 import { useQueryParamFilters } from "./hooks/useQueryParamFilters";
-import type { ModalKey } from "./contexts/ModalContext";
-import type { SearchResult } from "./api";
 import { useResultsShortcuts } from "./hooks/useResultsShortcuts";
+import { useSearchOperations } from "./hooks/useSearchOperations";
+import type { FilterPreset } from "./models/FilterPreset";
+import { handleError } from "./utils/errors";
+import { pathToView } from "./utils/router";
+import {
+  loadViewPreferences,
+  saveViewPreferences,
+} from "./utils/viewPreferences";
+
+const RESULT_VIEW_VALUES: ResultView[] = ["grid", "film", "timeline", "map"];
+const TIMELINE_BUCKET_VALUES: Array<"day" | "week" | "month"> = [
+  "day",
+  "week",
+  "month",
+];
 
 // (Removed) Local ScrollLoader in favor of shared utils/loading ScrollLoader
 
@@ -159,20 +158,8 @@ export default function App() {
   // Skip to content link for keyboard users (reserved)
   // const _skipToContentRef = useRef<HTMLAnchorElement>(null);
 
-  // Safety check to prevent infinite loops on initial render
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-    return () => setIsMounted(false);
-  }, []);
-
   // Modern UX Integration - Mobile detection and haptic feedback
-  const {
-    isMobile,
-    isTablet: _isTablet,
-    screenSize: _screenSize,
-  } = useMobileDetection();
+  const { isMobile } = useMobileDetection();
   const { trigger: hapticTrigger } = useHapticFeedback();
 
   // Modern UX Integration - Onboarding and hints
@@ -182,7 +169,6 @@ export default function App() {
   // Modern UX Integration - New state for enhanced features
   const [showAccessibilityPanel, setShowAccessibilityPanel] = useState(false);
   const [showModernSidebar, setShowModernSidebar] = useState(false);
-  const [_useAnimatedGrid, _setUseAnimatedGrid] = useState(true);
   const [accessibilitySettings, setAccessibilitySettings] =
     useState<AccessibilitySettings | null>(null);
 
@@ -195,7 +181,6 @@ export default function App() {
   const fastKind = useFastKind();
   const useCaps = useCaptionsEnabled();
   const useOcr = useOcrEnabled();
-  const useOsTrash = useOsTrashEnabled();
   const hasText = useHasText();
   const place = usePlace();
   const camera = useCamera();
@@ -216,16 +201,8 @@ export default function App() {
   const favOnly = useFavOnly();
   const topK = useTopK();
   const saved = useSavedSearches();
-  const _savedSearches = saved; // alias for compatibility
   const collections = useCollections();
   const smart = useSmartCollections();
-  const _trips: Array<{
-    id: string;
-    name: string;
-    startDate: string;
-    endDate: string;
-    photos: string[];
-  }> = []; // TODO: implement trips
   const library = useLibrary();
   const _libHasMore = useLibHasMore();
   const tagsMap = useTagsMap();
@@ -235,11 +212,9 @@ export default function App() {
   const note = useNote();
   // const viewMode = useViewMode()
   const showWelcome = useShowWelcome();
-  const _showHelp = useShowHelp();
 
   // Individual hooks for workspace
   // const workspace = useWorkspace()
-  const wsToggle = useWsToggle();
   const persons = usePersons();
   const clusters = useClusters();
   // const groups = useGroups()
@@ -261,14 +236,19 @@ export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
   const currentView = pathToView(location.pathname);
+  const viewPreferences = useMemo(() => loadViewPreferences(), []);
   const [searchText, setSearchText] = useState("");
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [gridSize, setGridSize] = useState<GridSize>("medium");
-  const [resultView, _setResultView] = useState<ResultView>("grid");
+  const [gridSize, setGridSize] = useState<GridSize>(
+    () => viewPreferences.gridSize ?? "medium"
+  );
+  const [resultView, _setResultView] = useState<ResultView>(
+    () => viewPreferences.resultView ?? "grid"
+  );
   const [timelineBucket, _setTimelineBucket] = useState<
     "day" | "week" | "month"
-  >("day");
+  >(() => viewPreferences.timelineBucket ?? "day");
   const handleSetResultView = useCallback(
     (view: ResultView) => {
       _setResultView(view);
@@ -276,20 +256,23 @@ export default function App() {
         view as "grid" | "film" | "timeline" | "map"
       );
     },
-    [settingsActions, _setResultView]
+    [settingsActions]
   );
   const handleSetTimelineBucket = useCallback(
     (bucket: "day" | "week" | "month") => {
       _setTimelineBucket(bucket);
       settingsActions.setTimelineBucket?.(bucket);
     },
-    [settingsActions, _setTimelineBucket]
+    [settingsActions]
   );
+
+  useEffect(() => {
+    saveViewPreferences({ resultView, timelineBucket, gridSize });
+  }, [resultView, timelineBucket, gridSize]);
   const [currentFilter, setCurrentFilter] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [showShortcuts, setShowShortcuts] = useState(false);
   const { anyOpen: anyModalOpen } = useModalStatus();
   const modalControls = useModalControls();
   const enableDemoLibrary = useEnableDemoLibrary();
@@ -316,7 +299,7 @@ export default function App() {
   const [showRecentActivity, setShowRecentActivity] = useState(false);
   const [showSearchHistory, setShowSearchHistory] = useState(false);
   const layoutRowsRef = useRef(layoutRows);
-  const [_isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const lastSelectionCountRef = useRef<number>(selected.size);
   const [bottomNavTab, setBottomNavTab] = useState<
     "home" | "search" | "favorites" | "settings"
   >("home");
@@ -324,6 +307,25 @@ export default function App() {
   useEffect(() => {
     layoutRowsRef.current = layoutRows;
   }, [layoutRows]);
+
+  useEffect(() => {
+    const count = selected.size;
+    if (lastSelectionCountRef.current === count) return;
+    lastSelectionCountRef.current = count;
+    if (typeof window === "undefined") return;
+    const message =
+      count === 0
+        ? "Selection cleared."
+        : `${count} photo${count === 1 ? "" : "s"} selected.`;
+    window.dispatchEvent(
+      new CustomEvent("announce", {
+        detail: {
+          message,
+          priority: count > 0 ? "assertive" : "polite",
+        },
+      })
+    );
+  }, [selected]);
 
   const {
     showOnboardingTour,
@@ -349,8 +351,15 @@ export default function App() {
   const handleAccessibilitySettingsChange = useCallback(
     (settings: AccessibilitySettings) => {
       setAccessibilitySettings(settings);
-      // Apply accessibility settings to the app
-      console.log("Accessibility settings changed:", settings);
+      telemetryService.trackAccessibilityEvent(
+        "accessibility_settings_updated",
+        {
+          highContrast: settings.highContrast,
+          reducedMotion: settings.reducedMotion,
+          screenReaderMode: settings.screenReaderMode,
+          keyboardNavigation: settings.keyboardNavigation,
+        }
+      );
     },
     []
   );
@@ -359,7 +368,7 @@ export default function App() {
     setShowOnboardingTour(false);
     completeTour();
     uiActions.setNote("Welcome to Photo Search! 🎉");
-  }, [completeTour, uiActions]);
+  }, [completeTour, uiActions, setShowOnboardingTour]);
 
   // Placeholder for swipe handlers - will be defined after function declarations
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -468,12 +477,9 @@ export default function App() {
       settingsActions.setIsoMax,
       settingsActions.setFMin,
       settingsActions.setFMax,
-      setDateFrom,
-      setDateTo,
       settingsActions.setUseCaps,
       settingsActions.setUseOcr,
       settingsActions.setHasText,
-      setRatingMin,
     ]
   );
 
@@ -483,139 +489,14 @@ export default function App() {
   // Search Command Center
   const searchCommandCenter = useSearchCommandCenter();
 
-  const monitorOperation = useCallback(
-    (jobId: string, operation: "ocr" | "metadata" | "fast_index") => {
-      if (!dir) return () => {};
-      let cancelled = false;
-      let timeout: number | undefined;
-      const startedAt = Date.now();
+  const monitorOperation = useMonitorOperation(dir);
 
-      const poll = async () => {
-        try {
-          const status = await apiOperationStatus(dir, operation);
-          if (cancelled) return;
-          const state = String(status?.state ?? "").toLowerCase();
-          if (state === "error") {
-            jobsActions.update(jobId, {
-              status: "failed",
-              error:
-                typeof status?.error === "string" ? status.error : "Job failed",
-              endTime: new Date(),
-            } as Partial<Job>);
-            return;
-          }
-          if (state === "complete" || state === "completed") {
-            const total =
-              typeof status?.total === "number"
-                ? status.total
-                : typeof status?.done === "number"
-                ? status.done
-                : typeof status?.updated === "number"
-                ? status.updated
-                : undefined;
-            jobsActions.update(jobId, {
-              status: "completed",
-              progress: total,
-              total,
-              estimatedTimeRemaining: 0,
-              speed: undefined,
-              endTime: new Date(),
-            } as Partial<Job>);
-            return;
-          }
-          if (state === "failed") {
-            jobsActions.update(jobId, {
-              status: "failed",
-              error:
-                typeof status?.error === "string" ? status.error : "Job failed",
-              endTime: new Date(),
-            } as Partial<Job>);
-            return;
-          }
-
-          const isRunning =
-            state === "running" ||
-            state === "processing" ||
-            state === "scanning";
-          if (isRunning) {
-            const totalRaw =
-              typeof status?.total === "number"
-                ? status.total
-                : typeof status?.target === "number"
-                ? status.target
-                : undefined;
-            const doneRaw =
-              typeof status?.done === "number" ? status.done : undefined;
-            const patch: Partial<Job> = { status: "running" };
-            if (typeof status?.note === "string")
-              patch.description = status.note;
-            else if (typeof status?.state_detail === "string")
-              patch.description = status.state_detail;
-            else if (
-              typeof status?.kind === "string" &&
-              operation === "fast_index"
-            )
-              patch.description = `${status.kind}`;
-
-            if (typeof totalRaw === "number" && totalRaw >= 0)
-              patch.total = totalRaw;
-            if (typeof doneRaw === "number" && doneRaw >= 0)
-              patch.progress = doneRaw;
-
-            if (
-              typeof patch.total === "number" &&
-              patch.total > 0 &&
-              typeof patch.progress === "number" &&
-              patch.progress >= 0
-            ) {
-              const elapsedSeconds = Math.max(
-                1,
-                (Date.now() - startedAt) / 1000
-              );
-              if (patch.progress > 0) {
-                const rate = patch.progress / elapsedSeconds;
-                if (rate > 0) {
-                  const remaining = Math.max(0, patch.total - patch.progress);
-                  patch.estimatedTimeRemaining = Math.round(remaining / rate);
-                  const perMinute = rate * 60;
-                  patch.speed = `${
-                    perMinute >= 10
-                      ? perMinute.toFixed(0)
-                      : perMinute.toFixed(1)
-                  } items/min`;
-                }
-              }
-            } else {
-              patch.estimatedTimeRemaining = undefined;
-              patch.speed = undefined;
-            }
-
-            jobsActions.update(jobId, patch);
-          }
-        } catch (err) {
-          if (!cancelled) {
-            jobsActions.update(jobId, {
-              status: "failed",
-              error:
-                err instanceof Error ? err.message : "Failed to fetch status",
-              endTime: new Date(),
-            } as Partial<Job>);
-          }
-          return;
-        }
-
-        if (!cancelled) timeout = window.setTimeout(poll, 1200) as number;
-      };
-
-      poll();
-
-      return () => {
-        cancelled = true;
-        if (timeout) window.clearTimeout(timeout);
-      };
-    },
-    [dir, jobsActions]
-  );
+  // TanStack Query hooks for server state
+  const favoritesQuery = useFavoritesQuery(dir);
+  const savedSearchesQuery = useSavedSearchesQuery(dir);
+  const tagsQuery = useTagsQuery(dir);
+  const toggleFavoriteMutation = useToggleFavorite();
+  const updateTagsMutation = useUpdateTags();
 
   const [isConnected, setIsConnected] = useState(true);
   const [authRequired, setAuthRequired] = useState(false);
@@ -635,7 +516,9 @@ export default function App() {
     try {
       const pref = localStorage.getItem("ps_theme");
       if (pref === "dark") document.documentElement.classList.add("dark");
-    } catch {}
+    } catch (e) {
+      console.warn("Failed to initialize theme from localStorage:", e);
+    }
   }, []);
 
   // MonitoringService is automatically initialized via singleton instance
@@ -700,12 +583,13 @@ export default function App() {
 
   useQueryParamFilters({
     location,
-    isMounted,
     searchText,
     setSearchText,
     setDateFrom,
     setDateTo,
     setRatingMin,
+    resultView,
+    timelineBucket,
     setResultViewLocal: _setResultView,
     setTimelineBucketLocal: _setTimelineBucket,
     photoActions: {
@@ -740,7 +624,6 @@ export default function App() {
   });
 
   // Onboarding flows handled by useOnboardingFlows
-  const [_libOffset, _setLibOffset] = useState(0);
   const libLimit = 120;
 
   // Derived list to show: search results or library - memoized to prevent recreation
@@ -754,7 +637,9 @@ export default function App() {
     try {
       const f = await apiGetFavorites(dir);
       photoActions.setFavorites(f.favorites || []);
-    } catch {}
+    } catch (e) {
+      console.error("Failed to load favorites:", e);
+    }
   }, [dir, photoActions]);
 
   const loadSaved = useCallback(async () => {
@@ -762,14 +647,18 @@ export default function App() {
     try {
       const r = await apiGetSaved(dir);
       photoActions.setSaved(r.saved || []);
-    } catch {}
+    } catch (e) {
+      console.error("Failed to load saved searches:", e);
+    }
   }, [dir, photoActions]);
   const loadPresets = useCallback(async () => {
     if (!dir) return;
     try {
       const r = await apiGetPresets(dir);
       setPresets(r.presets || []);
-    } catch {}
+    } catch (e) {
+      console.error("Failed to load presets:", e);
+    }
   }, [dir]);
 
   // Index status polling moved to LibraryProvider
@@ -791,7 +680,9 @@ export default function App() {
       const r = await apiGetTags(dir);
       photoActions.setTagsMap(r.tags || {});
       photoActions.setAllTags(r.all || []);
-    } catch {}
+    } catch (e) {
+      console.error("Failed to load tags:", e);
+    }
   }, [dir, photoActions]);
 
   const loadDiag = useCallback(async () => {
@@ -804,7 +695,9 @@ export default function App() {
         needsHf ? hfToken : undefined
       );
       workspaceActions.setDiag(r);
-    } catch {}
+    } catch (e) {
+      console.error("Failed to load diagnostics:", e);
+    }
   }, [dir, engine, needsOAI, openaiKey, needsHf, hfToken, workspaceActions]);
 
   const loadFaces = useCallback(async () => {
@@ -812,7 +705,9 @@ export default function App() {
     try {
       const r = await apiFacesClusters(dir);
       workspaceActions.setClusters(r.clusters || []);
-    } catch {}
+    } catch (e) {
+      console.error("Failed to load faces:", e);
+    }
   }, [dir, workspaceActions]);
 
   const loadMap = useCallback(async () => {
@@ -820,13 +715,22 @@ export default function App() {
     try {
       const r = await apiMap(dir);
       workspaceActions.setPoints(r.points || []);
-    } catch {}
+    } catch (e) {
+      console.error("Failed to load map data:", e);
+    }
   }, [dir, workspaceActions]);
 
   const loadLibrary = useCallback(
     async (limit = 120, offset = 0, append = false) => {
       try {
         if (!dir) return;
+
+        // Validate directory before making API call
+        const dirPath = Path(dir);
+        if (!dirPath.isAbsolute()) {
+          console.warn("Directory path should be absolute:", dir);
+        }
+
         const r = await apiLibrary(dir, engine, limit, offset, {
           openaiKey: needsOAI ? openaiKey : undefined,
           hfToken: needsHf ? hfToken : undefined,
@@ -847,9 +751,26 @@ export default function App() {
         }
 
         photoActions.setLibHasMore(hasMore);
-      } catch {}
+      } catch (e) {
+        console.error("Failed to load library:", e);
+        // Show user-friendly error message
+        uiActions.setNote(
+          e instanceof Error
+            ? `Failed to load library: ${e.message}`
+            : "Failed to load library"
+        );
+      }
     },
-    [dir, engine, needsOAI, openaiKey, needsHf, hfToken, photoActions]
+    [
+      dir,
+      engine,
+      needsOAI,
+      openaiKey,
+      needsHf,
+      hfToken,
+      photoActions,
+      uiActions,
+    ]
   );
 
   const loadMetadata = useCallback(async () => {
@@ -865,10 +786,8 @@ export default function App() {
           const result = await apiMetadataBatch(dir, firstBatch);
 
           if (result.ok && result.meta) {
-            // Process batch metadata result
-            console.log(
-              `Loaded metadata for ${Object.keys(result.meta).length} images`
-            );
+            // Record successful metadata load for observability
+            telemetryService.trackUsage("metadata_batch_loaded");
           }
         } catch (batchError) {
           console.warn(
@@ -881,7 +800,9 @@ export default function App() {
       // Fallback to original method for basic metadata
       const r = await apiGetMetadata(dir);
       setMeta({ cameras: r.cameras || [], places: r.places || [] });
-    } catch {}
+    } catch (e) {
+      console.error("Failed to load metadata:", e);
+    }
   }, [dir, library]);
 
   // One-time OCR status check per directory
@@ -901,8 +822,9 @@ export default function App() {
             typeof r.count === "number" ? Math.max(0, r.count) : undefined
           );
         }
-      } catch {
+      } catch (e) {
         if (!cancelled) {
+          console.error("Failed to check OCR status:", e);
           setOcrReady(false);
           setOcrTextCount(undefined);
         }
@@ -918,6 +840,38 @@ export default function App() {
 
   const { doSearchImmediate: _doSearchImmediate } = useSearchOperations();
 
+  // Validate search inputs before executing search
+  const doSearchImmediate = useCallback(
+    async (text: string) => {
+      // Validate directory
+      if (!dir || dir.trim() === "") {
+        uiActions.setNote("Please select a photo library directory first");
+        return;
+      }
+
+      // Validate search query
+      if (!text || text.trim() === "") {
+        uiActions.setNote("Please enter a search query");
+        return;
+      }
+
+      // Validate directory path
+      try {
+        const dirPath = Path(dir);
+        if (!dirPath.isAbsolute()) {
+          uiActions.setNote("Directory path should be absolute");
+          return;
+        }
+      } catch (_e) {
+        uiActions.setNote("Invalid directory path");
+        return;
+      }
+
+      return await _doSearchImmediate(text);
+    },
+    [dir, _doSearchImmediate, uiActions]
+  );
+
   // Hook up advanced search apply events from ModalManager
   useEffect(() => {
     const onApply = (e: Event) => {
@@ -925,16 +879,12 @@ export default function App() {
       const q = e?.detail?.q as string | undefined;
       if (typeof q === "string") {
         setSearchText(q);
-        _doSearchImmediate(q);
+        doSearchImmediate(q);
       }
     };
-    window.addEventListener("advanced-search-apply", onApply as EventListener);
-    return () =>
-      window.removeEventListener(
-        "advanced-search-apply",
-        onApply as EventListener
-      );
-  }, [_doSearchImmediate]);
+    window.addEventListener("advanced-search-apply", onApply);
+    return () => window.removeEventListener("advanced-search-apply", onApply);
+  }, [doSearchImmediate]);
 
   const prepareFast = useCallback(
     async (kind: "annoy" | "faiss" | "hnsw") => {
@@ -1172,71 +1122,276 @@ export default function App() {
     pushToast,
   ]);
 
-  // Poll analytics when busy to surface progress notes
+  // Poll analytics when busy to surface progress notes (visibility-aware)
   useEffect(() => {
     if (!busy || !dir) return;
     let t: number;
     let last = "";
-    const summarize = (e: {
-      type?: string;
-      updated?: number;
-      ok?: boolean;
-      kind?: string;
-      made?: number;
-      trips?: number;
-      copied?: number;
-      skipped?: number;
-    }) => {
-      switch (e?.type) {
-        case "ocr_build":
-          return `OCR updated ${e.updated}`;
-        case "captions_build":
-          return `Captions updated ${e.updated}`;
-        case "fast_build":
-          return `${String(e.kind).toUpperCase()} ${e.ok ? "ready" : "failed"}`;
-        case "thumbs_build":
-          return `Thumbs made ${e.made}`;
-        case "trips_build":
-          return `Trips ${e.trips}`;
-        case "metadata_build":
-          return `Metadata updated ${e.updated}`;
-        case "export":
-          return `Exported ${e.copied}, skipped ${e.skipped}`;
-        default:
-          return "";
+    let isVisible = true;
+
+    // Visibility change handlers
+    const handleVisibilityChange = () => {
+      isVisible = !document.hidden;
+      if (isVisible) {
+        // Resume polling when page becomes visible
+        tick();
       }
     };
+
+    const handlePageHide = () => {
+      isVisible = false;
+    };
+
+    // Add visibility listeners
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    document.addEventListener("pagehide", handlePageHide);
+
+    const summarize = (e: Record<string, unknown>) => {
+      const type = e?.type as string | undefined;
+      if (!type)
+        return {
+          msg: "",
+          progress: undefined as
+            | undefined
+            | {
+                jobId?: string;
+                progress?: number;
+                total?: number;
+                status?: Job["status"];
+                description?: string;
+              },
+        };
+
+      // Helper to compute a friendly message
+      const fmt = (m: string) => m;
+
+      // Common job progress payload
+      const jobId = typeof e.job_id === "string" ? e.job_id : undefined;
+      const progressPatch: {
+        jobId?: string;
+        progress?: number;
+        total?: number;
+        status?: Job["status"];
+        description?: string;
+      } = { jobId };
+
+      switch (type) {
+        // Existing events
+        case "ocr_build":
+          return { msg: fmt(`OCR updated ${e.updated}`), progress: undefined };
+        case "captions_build":
+          return {
+            msg: fmt(`Captions updated ${e.updated}`),
+            progress: undefined,
+          };
+        case "fast_build":
+          return {
+            msg: fmt(
+              `${String(e.kind).toUpperCase()} ${e.ok ? "ready" : "failed"}`
+            ),
+            progress: undefined,
+          };
+        case "thumbs_build":
+          return { msg: fmt(`Thumbs made ${e.made}`), progress: undefined };
+        case "trips_build":
+          return { msg: fmt(`Trips ${e.trips}`), progress: undefined };
+        case "metadata_build":
+          return {
+            msg: fmt(`Metadata updated ${e.updated}`),
+            progress: undefined,
+          };
+        case "export":
+          return {
+            msg: fmt(`Exported ${e.copied}, skipped ${e.skipped}`),
+            progress: undefined,
+          };
+
+        // New embedding / indexing bridge events
+        case "embed_start": {
+          const total = Number(e.total) || 0;
+          progressPatch.total = total;
+          progressPatch.progress = 0;
+          progressPatch.status = "running";
+          progressPatch.description = `Embedding ${total} images…`;
+          return {
+            msg: fmt(`Embedding ${total} images…`),
+            progress: progressPatch,
+          };
+        }
+        case "embed_load": {
+          const done = Number(e.done) || 0;
+          const total = Number(e.total) || undefined;
+          progressPatch.progress = done;
+          if (total) progressPatch.total = total;
+          progressPatch.status = "running";
+          progressPatch.description = `Loaded ${done}${
+            total ? `/${total}` : ""
+          } images…`;
+          return {
+            msg: fmt(progressPatch.description),
+            progress: progressPatch,
+          };
+        }
+        case "embed_encode": {
+          const bs = e.batch_size ?? e.note;
+          progressPatch.status = "running";
+          progressPatch.description = `Encoding (bs=${bs}${
+            e.workers != null ? `, workers=${e.workers}` : ""
+          })…`;
+          return {
+            msg: fmt(progressPatch.description),
+            progress: progressPatch,
+          };
+        }
+        case "embed_encode_done": {
+          const valid = Number(e.valid) || undefined;
+          progressPatch.status = "running";
+          progressPatch.description = `Encoded${
+            valid ? ` ${valid}` : ""
+          } images`;
+          return {
+            msg: fmt(progressPatch.description),
+            progress: progressPatch,
+          };
+        }
+        case "index_add_chunk": {
+          const added = Number(e.added) || 0;
+          progressPatch.progress = added;
+          progressPatch.status = "running";
+          progressPatch.description = `Indexed ${added} vectors…`;
+          return {
+            msg: fmt(progressPatch.description),
+            progress: progressPatch,
+          };
+        }
+        case "index_done": {
+          const added = Number(e.added) || 0;
+          progressPatch.progress = added;
+          progressPatch.status = "completed";
+          progressPatch.description = `Index built (${added})`;
+          return {
+            msg: fmt(progressPatch.description),
+            progress: progressPatch,
+          };
+        }
+        case "job_status": {
+          const status = String(e.status || "").toLowerCase();
+          if (status === "failed") {
+            progressPatch.status = "failed";
+            progressPatch.description = `Job failed${
+              e.error ? `: ${e.error}` : ""
+            }`;
+            return {
+              msg: fmt(progressPatch.description),
+              progress: progressPatch,
+            };
+          }
+          if (status === "completed") {
+            progressPatch.status = "completed";
+            progressPatch.description = "Job completed";
+            return { msg: fmt("Job completed"), progress: progressPatch };
+          }
+          if (status === "cancelled" || status === "canceled") {
+            progressPatch.status = "failed"; // or a custom "cancelled" if your Job type supports it
+            progressPatch.description = "Job cancelled";
+            return { msg: fmt("Job cancelled"), progress: progressPatch };
+          }
+          return { msg: "", progress: undefined };
+        }
+        default:
+          return { msg: "", progress: undefined };
+      }
+    };
+
     const tick = async () => {
       try {
         const r = await apiAnalytics(dir, 10);
         const ev = (r.events || []).slice(-1)[0];
         if (ev && ev.time !== last) {
           last = ev.time;
-          const msg = summarize(ev);
+          const { msg, progress } = summarize(ev);
           if (msg) uiActions.setNote(msg);
+          if (progress?.jobId) {
+            jobsActions.update(progress.jobId, {
+              status: progress.status,
+              progress: progress.progress,
+              total: progress.total,
+              description: progress.description,
+            } as Partial<Job>);
+          }
         }
-      } catch {}
-      t = window.setTimeout(tick, 2000);
+      } catch (e) {
+        console.warn("Failed to poll analytics:", e);
+      }
+      // Only schedule next tick if page is still visible
+      if (isVisible) {
+        t = window.setTimeout(tick, 2000);
+      }
     };
-    tick();
+
+    // Start polling if page is visible
+    if (isVisible) {
+      tick();
+    }
+
     return () => {
       if (t) window.clearTimeout(t);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      document.removeEventListener("pagehide", handlePageHide);
     };
-  }, [busy, dir, uiActions]);
+  }, [busy, dir, uiActions, jobsActions]);
 
   // Index status polling moved to LibraryProvider
+
+  useEffect(() => {
+    try {
+      const sp = new URLSearchParams(location.search);
+      const rv = sp.get("rv");
+      if (
+        rv &&
+        RESULT_VIEW_VALUES.includes(rv as ResultView) &&
+        rv !== resultView
+      ) {
+        handleSetResultView(rv as ResultView);
+      }
+      const tb = sp.get("tb");
+      if (
+        tb &&
+        TIMELINE_BUCKET_VALUES.includes(tb as "day" | "week" | "month") &&
+        tb !== timelineBucket
+      ) {
+        handleSetTimelineBucket(tb as "day" | "week" | "month");
+      }
+    } catch (e) {
+      console.warn("Failed to parse view state from URL", e);
+    }
+  }, [
+    location.search,
+    handleSetResultView,
+    handleSetTimelineBucket,
+    resultView,
+    timelineBucket,
+  ]);
 
   // Keep URL in sync with resultView/timelineBucket (when in results view)
   useEffect(() => {
     try {
       const sp = new URLSearchParams(location.search);
-      sp.set("rv", resultView);
-      sp.set("tb", timelineBucket);
-      navigate(
-        { pathname: location.pathname, search: `?${sp.toString()}` },
-        { replace: true }
-      );
-    } catch {}
+      const currentRv = sp.get("rv");
+      const currentTb = sp.get("tb");
+
+      // Only update URL if values have actually changed
+      if (currentRv !== resultView || currentTb !== timelineBucket) {
+        sp.set("rv", resultView);
+        sp.set("tb", timelineBucket);
+        navigate(
+          { pathname: location.pathname, search: `?${sp.toString()}` },
+          { replace: true }
+        );
+      }
+    } catch (e) {
+      console.warn("Failed to sync URL with view state:", e);
+    }
   }, [
     resultView,
     timelineBucket,
@@ -1313,15 +1468,20 @@ export default function App() {
         .filter(Boolean);
       try {
         await Promise.all(
-          Array.from(selected).map((p) => apiSetTags(dir, p, tagList))
+          Array.from(selected).map((p) =>
+            updateTagsMutation.mutateAsync({
+              dir,
+              path: p,
+              tags: tagList,
+            })
+          )
         );
         uiActions.setNote(`Updated tags for ${selected.size} photos`);
-        await loadTags();
       } catch (e) {
         uiActions.setNote(e instanceof Error ? e.message : "Tag update failed");
       }
     },
-    [dir, selected, loadTags, uiActions]
+    [dir, selected, updateTagsMutation, uiActions]
   );
 
   // Swipe handlers - defined after all dependencies are declared
@@ -1356,9 +1516,16 @@ export default function App() {
         case "favorite":
           // Toggle favorite with haptic feedback
           if (photo.path) {
-            apiSetFavorite(dir, photo.path, !fav.includes(photo.path))
-              .then(loadFav)
-              .catch(() => {});
+            toggleFavoriteMutation.mutate({
+              dir,
+              path: photo.path,
+              favorite: !fav.includes(photo.path),
+            });
+            telemetryService.trackUsage("photo_action_favorite_toggled");
+            telemetryService.trackAccessibilityEvent("photo_action", {
+              action: "favorite",
+              hasPath: true,
+            });
           }
           hapticTrigger("light");
           break;
@@ -1366,16 +1533,23 @@ export default function App() {
           // Update rating
           if (photo.path) {
             const rating = photo.rating || 1;
-            // Implementation would go here
-            console.log(`Rate photo ${photo.path} with ${rating} stars`);
+            telemetryService.trackUsage("photo_action_rate_triggered");
+            telemetryService.trackAccessibilityEvent("photo_action", {
+              action: "rate",
+              rating,
+              hasPath: true,
+            });
           }
           break;
         case "delete":
           // Delete photo
           if (photo.path) {
             setSelected(new Set([photo.path]));
-            // Implementation would go here
-            console.log(`Delete photo ${photo.path}`);
+            telemetryService.trackUsage("photo_action_delete_triggered");
+            telemetryService.trackAccessibilityEvent("photo_action", {
+              action: "delete",
+              hasPath: true,
+            });
           }
           uiActions.setNote("Photo deleted");
           hapticTrigger("medium");
@@ -1387,16 +1561,30 @@ export default function App() {
               title: photo.title || "Photo",
               url: photo.path,
             });
+            telemetryService.trackUsage("photo_action_share_native");
+            telemetryService.trackAccessibilityEvent("photo_action", {
+              action: "share",
+              hasPath: true,
+              mode: "native",
+            });
           } else {
-            // Fallback share implementation
-            console.log(`Share photo ${photo.path}`);
+            telemetryService.trackUsage("photo_action_share_fallback");
+            telemetryService.trackAccessibilityEvent("photo_action", {
+              action: "share",
+              hasPath: Boolean(photo.path),
+              mode: "fallback",
+            });
           }
           break;
         default:
-          console.log(`Action ${action} on photo ${photo.path || photo.id}`);
+          telemetryService.trackUsage("photo_action_unknown");
+          telemetryService.trackAccessibilityEvent("photo_action", {
+            action,
+            hasPath: Boolean(photo.path || photo.id),
+          });
       }
     },
-    [dir, fav, loadFav, hapticTrigger, uiActions, isMobile]
+    [dir, fav, toggleFavoriteMutation, hapticTrigger, uiActions, isMobile]
   );
 
   const _setRatingSelected = useCallback(
@@ -1437,53 +1625,24 @@ export default function App() {
     []
   );
 
-  // Initial data load when directory changes. Keep deps minimal to avoid render loops.
-  useEffect(() => {
-    if (!dir) return;
-    (async () => {
-      try {
-        await Promise.all([
-          loadFav(),
-          loadSaved(),
-          loadTags(),
-          loadDiag(),
-          loadFaces(),
-          loadMetadata(),
-          loadPresets(),
-        ]);
-        await loadLibrary(libLimit, 0);
-      } catch {}
-    })();
-  }, [
-    dir,
-    loadDiag,
-    loadFaces,
-    loadFav,
-    loadLibrary,
-    loadMetadata,
-    loadPresets,
-    loadSaved,
-    loadTags,
-  ]);
+  // Initial data load when directory changes. TanStack Query handles this automatically.
 
   // Infinite scroll sentinel moved to top-level component
 
   // Reset focus when results change - depend on length only
   useEffect(() => {
-    if (!isMounted) return;
     const len = results?.length ?? 0;
     setFocusIdx((prev) => {
       const next =
         len > 0 ? (prev === null ? 0 : Math.min(prev, len - 1)) : null;
       return Object.is(prev, next) ? prev : next;
     });
-  }, [results?.length, isMounted]);
+  }, [results?.length]);
 
   // Results context keyboard shortcuts
   useResultsShortcuts({
     enabled: currentView === "results",
-    anyOverlayOpen:
-      Boolean(showShortcuts) || Boolean(showFilters) || anyModalOpen,
+    anyOverlayOpen: showFilters || anyModalOpen,
     results: (results || []).map((r) => ({ path: r.path })),
     dir,
     fav,
@@ -1507,208 +1666,351 @@ export default function App() {
     if (el) el.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [focusIdx]);
 
-  const layoutProps = {
-    isMobile,
-    showModernSidebar,
-    setShowModernSidebar,
-    handleSwipeLeft,
-    handleSwipeRight,
-    handlePullToRefresh,
-    accessibilitySettings,
-    showAccessibilityPanel,
-    setShowAccessibilityPanel,
-    prefersReducedMotion: Boolean(prefersReducedMotion),
-    themeMode,
-    setThemeMode: (mode: string) =>
-      setThemeMode(mode as "light" | "dark" | "auto"),
-    highContrast,
-  };
+  const layoutProps = useMemo(
+    () => ({
+      isMobile,
+      showModernSidebar,
+      setShowModernSidebar,
+      handleSwipeLeft,
+      handleSwipeRight,
+      handlePullToRefresh,
+      accessibilitySettings,
+      showAccessibilityPanel,
+      setShowAccessibilityPanel,
+      prefersReducedMotion: Boolean(prefersReducedMotion),
+      themeMode,
+      setThemeMode: (mode: string) =>
+        setThemeMode(mode as "light" | "dark" | "auto"),
+      highContrast,
+    }),
+    [
+      isMobile,
+      showModernSidebar,
+      handleSwipeLeft,
+      handleSwipeRight,
+      handlePullToRefresh,
+      accessibilitySettings,
+      showAccessibilityPanel,
+      prefersReducedMotion,
+      themeMode,
+      setThemeMode,
+      highContrast,
+    ]
+  );
 
-  const onboardingProps = {
-    showWelcome,
-    enableDemoLibrary: enableDemoLibrary || false,
-    handleWelcomeStartDemo,
-    showOnboarding,
-    setShowOnboarding,
-    handleFirstRunQuickStart,
-    handleFirstRunCustom,
-    handleFirstRunDemo,
-    handleOnboardingComplete,
-    showOnboardingTour,
-    setShowOnboardingTour,
-    showHelpHint,
-    dismissHelpHint,
-    userActions,
-    onboardingSteps,
-    completeOnboardingStep: (stepId: string) =>
-      completeOnboardingStep(stepId as OnboardingStep),
-    showContextualHelp,
-    setShowContextualHelp,
-    showOnboardingChecklist,
-    setShowOnboardingChecklist: (value: boolean) =>
-      setShowOnboardingChecklist(value),
-  };
+  const onboardingProps = useMemo(
+    () => ({
+      showWelcome,
+      enableDemoLibrary: enableDemoLibrary || false,
+      handleWelcomeStartDemo,
+      showOnboarding,
+      setShowOnboarding,
+      handleFirstRunQuickStart,
+      handleFirstRunCustom,
+      handleFirstRunDemo,
+      handleOnboardingComplete,
+      showOnboardingTour,
+      setShowOnboardingTour,
+      showHelpHint,
+      dismissHelpHint,
+      userActions,
+      onboardingSteps,
+      completeOnboardingStep: (stepId: string) =>
+        completeOnboardingStep(stepId as OnboardingStep),
+      showContextualHelp,
+      setShowContextualHelp,
+      showOnboardingChecklist,
+      setShowOnboardingChecklist: (value: boolean) =>
+        setShowOnboardingChecklist(value),
+    }),
+    [
+      showWelcome,
+      enableDemoLibrary,
+      handleWelcomeStartDemo,
+      showOnboarding,
+      handleFirstRunQuickStart,
+      handleFirstRunCustom,
+      handleFirstRunDemo,
+      handleOnboardingComplete,
+      showOnboardingTour,
+      setShowOnboardingTour,
+      showHelpHint,
+      dismissHelpHint,
+      userActions,
+      onboardingSteps,
+      completeOnboardingStep,
+      showContextualHelp,
+      setShowContextualHelp,
+      showOnboardingChecklist,
+      setShowOnboardingChecklist,
+    ]
+  );
 
-  const viewStateProps = {
-    searchText,
-    setSearchText,
-    selected,
-    setSelected,
-    toggleSelect,
-    gridSize,
-    setGridSize,
-    resultView,
-    setResultView: handleSetResultView,
-    timelineBucket,
-    setTimelineBucket: handleSetTimelineBucket,
-    currentFilter,
-    setCurrentFilter,
-    showFilters,
-    setShowFilters,
-    dateFrom,
-    setDateFrom,
-    dateTo,
-    setDateTo,
-    ratingMin,
-    setRatingMin,
-    detailIdx,
-    setDetailIdx,
-    focusIdx,
-    setFocusIdx,
-    layoutRows,
-    setLayoutRows,
-    setIsMobileMenuOpen,
-    showRecentActivity,
-    setShowRecentActivity,
-    showSearchHistory,
-    setShowSearchHistory,
-    bottomNavTab,
-    setBottomNavTab,
-    authRequired,
-    setAuthRequired,
-    authTokenInput,
-    setAuthTokenInput,
-    currentView,
-  };
+  const viewStateProps = useMemo(
+    () => ({
+      searchText,
+      setSearchText,
+      selected,
+      setSelected,
+      toggleSelect,
+      gridSize,
+      setGridSize,
+      resultView,
+      setResultView: handleSetResultView,
+      timelineBucket,
+      setTimelineBucket: handleSetTimelineBucket,
+      currentFilter,
+      setCurrentFilter,
+      showFilters,
+      setShowFilters,
+      dateFrom,
+      setDateFrom,
+      dateTo,
+      setDateTo,
+      ratingMin,
+      setRatingMin,
+      detailIdx,
+      setDetailIdx,
+      focusIdx,
+      setFocusIdx,
+      layoutRows,
+      setLayoutRows,
+      showRecentActivity,
+      setShowRecentActivity,
+      showSearchHistory,
+      setShowSearchHistory,
+      bottomNavTab,
+      setBottomNavTab,
+      authRequired,
+      setAuthRequired,
+      authTokenInput,
+      setAuthTokenInput,
+      currentView,
+    }),
+    [
+      searchText,
+      selected,
+      toggleSelect,
+      gridSize,
+      resultView,
+      handleSetResultView,
+      timelineBucket,
+      handleSetTimelineBucket,
+      currentFilter,
+      showFilters,
+      dateFrom,
+      dateTo,
+      ratingMin,
+      detailIdx,
+      focusIdx,
+      layoutRows,
+      showRecentActivity,
+      showSearchHistory,
+      bottomNavTab,
+      authRequired,
+      authTokenInput,
+      currentView,
+    ]
+  );
 
-  const dataProps = {
-    dir,
-    engine,
-    hfToken,
-    openaiKey,
-    useFast,
-    fastKind,
-    useCaps,
-    useOcr,
-    hasText,
-    place,
-    camera,
-    isoMin,
-    isoMax,
-    fMin,
-    fMax,
-    tagFilter,
-    allTags,
-    needsHf,
-    needsOAI,
-    results,
-    query,
-    fav,
-    favOnly,
-    topK,
-    saved,
-    collections,
-    smart,
-    library,
-    libHasMore: _libHasMore,
-    tagsMap,
-    persons,
-    clusters,
-    points,
-    diag,
-    meta,
-    busy,
-    note,
-    ocrReady,
-    ocrTextCount,
-    presets,
-    altSearch,
-    ratingMap,
-    jobs,
-    libState,
-    showInfoOverlay,
-    highContrast,
-    isConnected,
-    items,
-    hasAnyFilters,
-    indexCoverage: _indexCoverage,
-  };
+  const dataProps = useMemo(
+    () => ({
+      dir: dir ?? undefined,
+      engine,
+      hfToken,
+      openaiKey,
+      useFast,
+      fastKind,
+      useCaps,
+      useOcr,
+      hasText,
+      place,
+      camera,
+      isoMin,
+      isoMax,
+      fMin,
+      fMax,
+      tagFilter,
+      allTags: tagsQuery.data?.all || allTags,
+      needsHf,
+      needsOAI,
+      results,
+      query,
+      fav: favoritesQuery.data?.favorites || fav,
+      favOnly,
+      topK,
+      saved: savedSearchesQuery.data?.saved || saved,
+      collections,
+      smart,
+      library,
+      libHasMore: _libHasMore,
+      tagsMap: tagsQuery.data?.tags || tagsMap,
+      persons,
+      clusters,
+      points,
+      diag,
+      meta,
+      busy,
+      note,
+      ocrReady,
+      ocrTextCount,
+      presets,
+      altSearch,
+      ratingMap,
+      jobs,
+      libState,
+      showInfoOverlay,
+      highContrast,
+      isConnected,
+      items,
+      hasAnyFilters,
+      indexCoverage: _indexCoverage,
+    }),
+    [
+      dir,
+      engine,
+      hfToken,
+      openaiKey,
+      useFast,
+      fastKind,
+      useCaps,
+      useOcr,
+      hasText,
+      place,
+      camera,
+      isoMin,
+      isoMax,
+      fMin,
+      fMax,
+      tagFilter,
+      tagsQuery.data?.all,
+      allTags,
+      needsHf,
+      needsOAI,
+      results,
+      query,
+      favoritesQuery.data?.favorites,
+      fav,
+      favOnly,
+      topK,
+      savedSearchesQuery.data?.saved,
+      saved,
+      collections,
+      smart,
+      library,
+      _libHasMore,
+      tagsQuery.data?.tags,
+      tagsMap,
+      persons,
+      clusters,
+      points,
+      diag,
+      meta,
+      busy,
+      note,
+      ocrReady,
+      ocrTextCount,
+      presets,
+      altSearch,
+      ratingMap,
+      jobs,
+      libState,
+      showInfoOverlay,
+      highContrast,
+      isConnected,
+      items,
+      hasAnyFilters,
+      _indexCoverage,
+    ]
+  );
 
-  const actionProps = {
-    handleAccessibilitySettingsChange,
-    doSearchImmediate: async (text?: string) => {
-      await _doSearchImmediate(text ?? "");
-    },
-    loadFav,
-    loadSaved,
-    loadTags,
-    loadDiag,
-    loadFaces,
-    loadMap,
-    loadLibrary,
-    loadMetadata,
-    loadPresets,
-    prepareFast,
-    buildOCR,
-    buildMetadata,
-    monitorOperation,
-    openDetailByPath,
-    navDetail,
-    tagSelected,
-    exportSelected: _exportSelected,
-    handlePhotoOpen,
-    handlePhotoAction: _handlePhotoAction,
-    setRatingSelected: _setRatingSelected,
-    rowsEqual,
-  };
+  const actionProps = useMemo(
+    () => ({
+      handleAccessibilitySettingsChange,
+      doSearchImmediate: async (text?: string) => {
+        await doSearchImmediate(text ?? "");
+      },
+      loadFav,
+      loadSaved,
+      loadTags,
+      loadDiag,
+      loadFaces,
+      loadMap,
+      loadLibrary,
+      loadMetadata,
+      loadPresets,
+      prepareFast,
+      buildOCR,
+      buildMetadata,
+      monitorOperation,
+      openDetailByPath,
+      navDetail,
+      tagSelected,
+      exportSelected: _exportSelected,
+      handlePhotoOpen,
+      handlePhotoAction: _handlePhotoAction,
+      setRatingSelected: _setRatingSelected,
+      rowsEqual,
+    }),
+    [
+      handleAccessibilitySettingsChange,
+      doSearchImmediate,
+      loadFav,
+      loadSaved,
+      loadTags,
+      loadDiag,
+      loadFaces,
+      loadMap,
+      loadLibrary,
+      loadMetadata,
+      loadPresets,
+      prepareFast,
+      buildOCR,
+      buildMetadata,
+      monitorOperation,
+      openDetailByPath,
+      navDetail,
+      tagSelected,
+      _exportSelected,
+      handlePhotoOpen,
+      _handlePhotoAction,
+      _setRatingSelected,
+      rowsEqual,
+    ]
+  );
 
-  const contextProps = {
-    settingsActions,
-    photoActions,
-    uiActions,
-    workspaceActions,
-    modalControls,
-    lib,
-    jobsActions,
-    pushToast,
-    setToast,
-    filterPresets: filterPresets.map((p) => ({
-      name: p.name,
-      query: p.filters?.tagFilter ?? "",
-    })),
-    savePreset: (preset: { name: string; query: string }) => {
-      // preserve existing savePreset by creating a FilterPreset via helper
-      // We treat 'query' as tagFilter for the simple shape
-      const next = {
-        id: `preset_${Date.now()}`,
-        name: preset.name,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        filters: { tagFilter: preset.query },
-      } as const;
-      // Use existing savePreset for FilterPreset
-      // @ts-expect-error using narrowed shape to reuse implementation
-      savePreset(next);
-    },
-    loadPreset: (name: string) => {
-      const p = filterPresets.find((fp) => fp.name === name);
-      if (p) loadPreset(p);
-    },
-    deletePreset: (name: string) => {
-      const p = filterPresets.find((fp) => fp.name === name);
-      if (p) deletePreset(p.id);
-    },
-  };
+  const contextProps = useMemo(
+    () => ({
+      settingsActions,
+      photoActions,
+      uiActions,
+      workspaceActions,
+      modalControls,
+      lib,
+      jobsActions,
+      pushToast,
+      setToast,
+      filterPresets,
+      savePreset,
+      loadPreset: (preset: FilterPreset) => loadPreset(preset),
+      deletePreset,
+    }),
+    [
+      settingsActions,
+      photoActions,
+      uiActions,
+      workspaceActions,
+      modalControls,
+      lib,
+      jobsActions,
+      pushToast,
+      setToast,
+      filterPresets,
+      savePreset,
+      loadPreset,
+      deletePreset,
+    ]
+  );
 
   const refProps = {
     scrollContainerRef,
@@ -1719,17 +2021,22 @@ export default function App() {
 
   return (
     <AppProviders>
-      <AppChrome
-        location={location}
-        navigate={navigate}
-        layout={layoutProps}
-        onboarding={onboardingProps}
-        viewState={viewStateProps}
-        data={dataProps}
-        actions={actionProps}
-        context={contextProps}
-        refs={refProps}
-      />
+      <LayoutProvider value={layoutProps}>
+        <ViewStateProvider value={viewStateProps}>
+          <DataProvider value={dataProps}>
+            <ActionsProvider value={actionProps}>
+              <OnboardingProvider value={onboardingProps}>
+                <AppChrome
+                  location={location}
+                  navigate={navigate}
+                  context={contextProps}
+                  refs={refProps}
+                />
+              </OnboardingProvider>
+            </ActionsProvider>
+          </DataProvider>
+        </ViewStateProvider>
+      </LayoutProvider>
     </AppProviders>
   );
 }

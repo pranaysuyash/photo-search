@@ -16,7 +16,12 @@ export const useUIStore = create<UIStore>()(
 
 		// Actions
 		setBusy: (busy) => set({ busy }),
-		setNote: (note) => set({ note }),
+		setNote: (note) => {
+			// Limit note length to prevent UI issues
+			const truncatedNote =
+				note.length > 200 ? note.substring(0, 200) + "..." : note;
+			set({ note: truncatedNote });
+		},
 		setViewMode: (viewMode) => set({ viewMode }),
 		setShowWelcome: (showWelcome) => set({ showWelcome }),
 		setShowHelp: (showHelp) => set({ showHelp }),

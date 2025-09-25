@@ -1,4 +1,5 @@
 import { screen, waitFor } from "@testing-library/react";
+import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock the API module
@@ -34,7 +35,9 @@ vi.mock("./api", async (importOriginal) => {
 // Theme provider introduces CSS variable side effects that are
 // outside the scope of these integration tests. Mock it to a no-op.
 vi.mock("./components/ThemeProvider", () => ({
-	ThemeProvider: ({ children }: { children: any }) => <>{children}</>,
+	ThemeProvider: ({ children }: { children: React.ReactNode }) => (
+		<>{children}</>
+	),
 }));
 
 import App from "./App";

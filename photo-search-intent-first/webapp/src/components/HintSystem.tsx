@@ -1,6 +1,6 @@
 import type React from "react";
 import { createContext, useContext, useEffect, useState } from "react";
-import { useAccessibilitySettings } from "./AccessibilityPanel";
+import { useReducedMotion } from "../framework/AccessibilityFramework";
 import { ContextualHint } from "./OnboardingTour";
 
 interface HintContextType {
@@ -26,7 +26,7 @@ const HintContext = createContext<HintContextType | null>(null);
 
 export function HintProvider({ children }: { children: React.ReactNode }) {
 	const [activeHints, setActiveHints] = useState<HintConfig[]>([]);
-	const { settings } = useAccessibilitySettings();
+	const { isReducedMotion } = useReducedMotion();
 
 	const showHint = (hint: HintConfig) => {
 		// Respect dismissed hints stored by onboarding
@@ -37,7 +37,7 @@ export function HintProvider({ children }: { children: React.ReactNode }) {
 			if (Array.isArray(dismissed) && dismissed.includes(hint.id)) return;
 		} catch {}
 		// Don't show hints if reduced motion is enabled and it's not critical
-		if (settings.reducedMotion && hint.priority !== "high") return;
+		if (isReducedMotion && hint.priority !== "high") return;
 
 		// Check if hint condition is met
 		if (hint.condition && !hint.condition()) return;
@@ -209,7 +209,7 @@ export const HINTS = {
 export function useHintTriggers() {
 	const { showHint } = useHints();
 
-	const triggerHint = (action: string, _context?: unknown) => {
+	const triggerHint = (action: string, context?: unknown) => {
 		switch (action) {
 			case "app-loaded":
 				// Show welcome hint after a short delay, only if contextual and not already shown
@@ -235,29 +235,220 @@ export function useHintTriggers() {
 				break;
 
 			case "photos-uploaded":
-				showHint(HINTS.ORGANIZE_FOLDERS);
-				break;
-
-			case "search-success":
-				// Show advanced search hint after successful search
+				// Show organization hint after upload, but delay it to let user see results first
 				setTimeout(() => {
-					showHint(HINTS.ADVANCED_SEARCH);
-				}, 3000);
-				break;
-
-			case "photo-selected":
-				showHint(HINTS.BULK_SELECT);
-				break;
-
-			case "multiple-photos-selected":
-				showHint(HINTS.EXPORT_PHOTOS);
-				setTimeout(() => {
-					showHint(HINTS.SHARE_PHOTOS);
+					showHint(HINTS.ORGANIZE_FOLDERS);
 				}, 2000);
 				break;
 
-			case "keyboard-shortcut-used":
-				showHint(HINTS.KEYBOARD_SHORTCUTS);
+			case "search-success": {
+				// Show advanced search hint after successful search, but only if user hasn't seen it recently
+				const lastAdvancedHint = localStorage.getItem(
+					"last-advanced-search-hint",
+				);
+				const now = Date.now();
+				if (
+					!lastAdvancedHint ||
+					now - parseInt(lastAdvancedHint) > 24 * 60 * 60 * 1000
+				) {
+					// 24 hours
+					setTimeout(() => {
+						showHint(HINTS.ADVANCED_SEARCH);
+						localStorage.setItem("last-advanced-search-hint", now.toString());
+					}, 3000);
+				}
+				break;
+			}
+
+			case "photo-selected": {
+				// Only show bulk select hint if user hasn't selected multiple photos recently
+				const recentBulkSelect = localStorage.getItem("last-bulk-select-hint");
+				if (
+					!recentBulkSelect ||
+					Date.now() - parseInt(recentBulkSelect) > 7 * 24 * 60 * 60 * 1000
+				) {
+					// 7 days
+					setTimeout(() => {
+						showHint(HINTS.BULK_SELECT);
+						localStorage.setItem(
+							"last-bulk-select-hint",
+							Date.now().toString(),
+						);
+					}, 1500);
+				}
+				break;
+			}
+
+			case "multiple-photos-selected":
+				// Show export and share hints sequentially
+				setTimeout(() => {
+					showHint(HINTS.EXPORT_PHOTOS);
+					setTimeout(() => {
+						showHint(HINTS.SHARE_PHOTOS);
+					}, 4000);
+				}, 1000);
+				break;
+
+			case "keyboard-shortcut-used": {
+				// Show keyboard shortcuts hint, but throttle it
+				const lastKeyboardHint = localStorage.getItem(
+					"last-keyboard-shortcuts-hint",
+				);
+				if (
+					!lastKeyboardHint ||
+					Date.now() - parseInt(lastKeyboardHint) > 3 * 24 * 60 * 60 * 1000
+				) {
+					// 3 days
+					setTimeout(() => {
+						showHint(HINTS.KEYBOARD_SHORTCUTS);
+						localStorage.setItem(
+							"last-keyboard-shortcuts-hint",
+							Date.now().toString(),
+						);
+					}, 2000);
+				}
+				break;
+			}
+
+			case "search-no-results":
+				// Show helpful hint when search returns no results
+				showHint({
+					id: "search-no-results-help",
+					message: "Try broader search terms or check your spelling",
+					action: "Examples: 'beach' instead of 'ocean waves'",
+					position: "bottom",
+					target: '[data-tour="search-bar"]',
+					priority: "medium",
+					autoHide: 6,
+				});
+				break;
+
+			case "first-collection-created":
+				// Congratulate user on creating their first collection
+				setTimeout(() => {
+					showHint({
+						id: "collection-success",
+						message: "Great! You've created your first photo collection",
+						action: "Collections help you organize photos by events or themes",
+						position: "center",
+						priority: "medium",
+						autoHide: 8,
+					});
+				}, 1500);
+				break;
+
+			case "advanced-search-used":
+				// Encourage user after they try advanced search features
+				setTimeout(() => {
+					showHint({
+						id: "advanced-search-feedback",
+						message: "Nice! Advanced search gives you more precise results",
+						action: "Try combining filters like 'person:john AND place:beach'",
+						position: "bottom",
+						target: '[data-tour="search-bar"]',
+						priority: "low",
+						autoHide: 10,
+					});
+				}, 2000);
+				break;
+
+			case "long-search-time":
+				// Show hint when search takes longer than expected
+				showHint({
+					id: "search-performance-tip",
+					message: "Large photo libraries may take longer to search",
+					action: "Try more specific search terms for faster results",
+					position: "bottom",
+					target: '[data-tour="search-bar"]',
+					priority: "low",
+					autoHide: 5,
+				});
+				break;
+
+			case "first-favorite":
+				// Encourage favoriting photos
+				setTimeout(() => {
+					showHint({
+						id: "favorite-tip",
+						message: "💖 Favorited photos appear in your personal collection",
+						action: "Click the heart icon to favorite photos you love",
+						position: "top",
+						priority: "low",
+						autoHide: 6,
+					});
+				}, 1000);
+				break;
+
+			case "bulk-actions-available":
+				// Show hint when multiple photos are selected
+				showHint({
+					id: "bulk-actions",
+					message: "With multiple photos selected, you can:",
+					action: "Export, share, or organize them together",
+					position: "top",
+					priority: "medium",
+					autoHide: 8,
+				});
+				break;
+
+			case "workspace-switch":
+				// Show hint when user switches between workspaces
+				setTimeout(() => {
+					showHint({
+						id: "workspace-awareness",
+						message: "You're now viewing a different photo collection",
+						action: "Each workspace keeps its photos and settings separate",
+						position: "center",
+						priority: "medium",
+						autoHide: 6,
+					});
+				}, 500);
+				break;
+
+			case "offline-mode":
+				// Show hint when app goes offline
+				showHint({
+					id: "offline-mode",
+					message: "You're currently offline",
+					action: "Some features may be limited until connection returns",
+					position: "top",
+					priority: "high",
+					autoHide: 10,
+				});
+				break;
+
+			case "feature-discovery":
+				// Show hints for undiscovered features based on context
+				{
+					const contextObj = context as
+						| { feature?: string; view?: string }
+						| undefined;
+					if (contextObj?.feature === "map" && contextObj?.view === "results") {
+						setTimeout(() => {
+							showHint({
+								id: "map-view-discovery",
+								message: "📍 View your photos on a map",
+								action: "Click the map tab to see photo locations",
+								position: "right",
+								target: '[data-tour="map-tab"]',
+								priority: "low",
+								autoHide: 8,
+							});
+						}, 3000);
+					} else if (contextObj?.feature === "collections") {
+						setTimeout(() => {
+							showHint({
+								id: "collections-discovery",
+								message: "📁 Organize photos into collections",
+								action: "Create themed collections for events or trips",
+								position: "right",
+								target: '[data-tour="collections-tab"]',
+								priority: "low",
+								autoHide: 8,
+							});
+						}, 2500);
+					}
+				}
 				break;
 
 			default:

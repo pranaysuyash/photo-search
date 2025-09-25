@@ -1,64 +1,13 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { type ModalKey, useModalContext } from "../contexts/ModalContext";
-import {
-	useModalDataActions,
-	useModalDataContext,
-} from "../contexts/ModalDataContext";
-
-// Fallback data for when used outside ModalDataProvider
-const fallbackModalData = {
-	selected: new Set<string>(),
-	dir: "",
-	engine: "",
-	topK: 0,
-	highContrast: false,
-	useFast: false,
-	fastKind: "" as const,
-	useCaps: false,
-	useOcr: false,
-	hasText: false,
-	useOsTrash: false,
-	searchText: "",
-	query: "",
-	collections: {},
-	clusters: [],
-	allTags: [],
-	meta: null,
-};
-
-// Fallback actions for when used outside ModalDataProvider
-const fallbackModalActions = {
-	settingsActions: {
-		setDir: () => {},
-		setUseOsTrash: () => {},
-		setUseFast: () => {},
-		setFastKind: () => {},
-		setUseCaps: () => {},
-		setUseOcr: () => {},
-		setHasText: () => {},
-		setHighContrast: () => {},
-	},
-	uiActions: {
-		setBusy: () => {},
-		setNote: () => {},
-	},
-	photoActions: {
-		setResults: () => {},
-		setSaved: () => {},
-		setCollections: () => {},
-	},
-	libIndex: () => {},
-	prepareFast: () => {},
-	buildOCR: () => {},
-	buildMetadata: () => {},
-	tagSelected: () => {},
-};
+import { useModalDataContext } from "../contexts/ModalDataContext";
 
 export interface ModalControls {
 	openModal: (key: ModalKey) => void;
 	closeModal: (key: ModalKey) => void;
 	toggleModal: (key: ModalKey) => void;
 	closeAll: () => void;
+	isOpen: (key: ModalKey) => boolean;
 	openFolder: () => void;
 	openHelp: () => void;
 	openSearch: () => void;
@@ -75,16 +24,10 @@ export interface ModalControls {
 }
 
 export function useModalControls(): ModalControls {
-	const { actions } = useModalContext();
+	const { state, actions } = useModalContext();
+	const data = useModalDataContext();
 
-	// Safely get data with fallback
-	let data;
-	try {
-		data = useModalDataContext();
-	} catch (error) {
-		// Used outside ModalDataProvider context
-		data = fallbackModalData;
-	}
+	const isOpen = useCallback((key: ModalKey) => Boolean(state[key]), [state]);
 
 	return useMemo(
 		() => ({
@@ -92,6 +35,7 @@ export function useModalControls(): ModalControls {
 			closeModal: actions.close,
 			toggleModal: actions.toggle,
 			closeAll: actions.closeAll,
+			isOpen,
 			openFolder: () => actions.open("folder"),
 			openHelp: () => actions.open("help"),
 			openSearch: () => actions.open("search"),
@@ -107,7 +51,7 @@ export function useModalControls(): ModalControls {
 				data.selected.size > 0 && Object.keys(data.collections).length > 0,
 			hasSelectedItems: () => data.selected.size > 0,
 		}),
-		[actions, data],
+		[actions, data, isOpen],
 	);
 }
 

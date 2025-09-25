@@ -1,9 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List
-
-from fastapi.testclient import TestClient
 
 from infra.shares import create_share, load_share, list_shares, validate_password, is_expired, revoke_share, SHARES_DIR
 

@@ -25,6 +25,14 @@ def _load_excludes(root: Path) -> List[str]:
 
 def list_photos(root: Path) -> List[Photo]:
     root = Path(root).expanduser().resolve()
+    
+    # Check if root directory exists and is accessible
+    if not root.exists():
+        raise FileNotFoundError(f"Directory not found: {root}")
+    
+    if not root.is_dir():
+        raise NotADirectoryError(f"Path is not a directory: {root}")
+    
     excludes = _load_excludes(root)
     items: list[Photo] = []
     for dirpath, dirnames, filenames in os.walk(root):

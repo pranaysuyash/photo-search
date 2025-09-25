@@ -73,9 +73,23 @@ class IndexRequest(BaseModel):
     openai_key: Optional[str] = None
 
 
+class TagsRequest(BaseModel):
+    dir: str
+    path: str
+    tags: List[str]
+
+
+class FavoritesRequest(BaseModel):
+    dir: str
+    path: str
+    favorite: bool = True
+
+
 __all__ = [
     "SearchRequest",
     "SearchResponse",
     "SearchResultItem",
     "IndexRequest",
+    "TagsRequest",
+    "FavoritesRequest",
 ]
