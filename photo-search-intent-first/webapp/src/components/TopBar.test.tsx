@@ -188,6 +188,27 @@ describe("TopBar", () => {
 		expect(screen.getByTestId("search-bar")).toBeInTheDocument();
 	});
 
+	it("renders an accessible progress bar when busy", () => {
+		render(
+			<TopBar
+				{...defaultProps}
+				busy
+				progressPct={0.42}
+			/>
+		);
+		const progress = screen.getByLabelText("42% complete");
+		expect(progress).toHaveAttribute("role", "progressbar");
+		expect(progress).toHaveAttribute("aria-valuenow", "42");
+		expect(progress).toHaveAttribute("data-progress-state", "determinate");
+		expect(progress.closest(".top-bar")).toHaveAttribute("aria-busy", "true");
+		const fill = progress.querySelector(".progress-bar-fill");
+		expect(fill).not.toBeNull();
+		expect(fill).toHaveAttribute(
+			"style",
+			expect.stringContaining("--progress-bar-percent: 42%")
+		);
+	});
+
 	it("shows indexed chip when diag is provided", () => {
 		const props = {
 			...defaultProps,

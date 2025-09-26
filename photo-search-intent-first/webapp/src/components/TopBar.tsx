@@ -13,6 +13,7 @@ import { PrimarySearchControls } from "./topbar/pieces/PrimarySearchControls";
 import { IndexingAndViewControls } from "./topbar/pieces/IndexingAndViewControls";
 import { useIndexingSummary } from "./topbar/utils/useIndexingSummary";
 import { useSelectionSummary } from "./topbar/utils/useSelectionSummary";
+import { useBusyProgress } from "./topbar/utils/useBusyProgress";
 
 export type GridSize = "small" | "medium" | "large";
 export type ViewType =
@@ -165,6 +166,13 @@ export function TopBar({
   // Use centralized modal controls API for consistency & future instrumentation
   const modalControls = useModalControls();
   const {
+    hasDeterminateProgress,
+    ariaLabel: progressAriaText,
+    ariaValueNow: progressAriaValue,
+    dataState: progressDataState,
+    style: progressFillStyle,
+  } = useBusyProgress(progressPct);
+  const {
     rawIndexedCount,
     formattedIndexedCount,
     formattedTotal,
@@ -207,11 +215,27 @@ export function TopBar({
   };
 
   return (
-    <div className="top-bar bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-700/50">
+    <div
+      className="top-bar bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-700/50"
+      aria-busy={busy || undefined}
+    >
       {/* Busy progress bar */}
       {busy && (
-        <div className="progress-bar">
-          <div className="progress-bar-fill"></div>
+        <div
+          className="progress-bar"
+          role="progressbar"
+          aria-label={progressAriaText}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={hasDeterminateProgress ? progressAriaValue : undefined}
+          aria-valuetext={progressAriaText}
+          data-progress-state={progressDataState}
+        >
+          <div
+            className="progress-bar-fill"
+            aria-hidden="true"
+            style={progressFillStyle}
+          ></div>
         </div>
       )}
       <div className="top-bar-content">

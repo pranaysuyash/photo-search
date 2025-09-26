@@ -2,75 +2,110 @@
  * OfflineActionQueue.test.ts - Tests for the offline action queue system
  * This file contains unit tests for the offline action queue implementation.
  */
-import { OfflineActionQueue, errorFactory } from "../framework/EnhancedErrorHandling";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  OfflineActionQueue,
+  type OfflineAction,
+  type QueuePersistence,
+  type ConflictResolver,
+} from "../OfflineActionQueue";
+import {
+  errorFactory,
+  handleGlobalError,
+  AppError,
+} from "../EnhancedErrorHandling";
 
 // Mock persistence implementation
 class MockPersistence implements QueuePersistence {
   private data: OfflineAction[] = [];
-  
+
   async save(actions: OfflineAction[]): Promise<void> {
     this.data = [...actions];
   }
-  
+
   async load(): Promise<OfflineAction[]> {
     return [...this.data];
   }
-  
+
   async clear(): Promise<void> {
     this.data = [];
   }
-  
+
   async remove(id: string): Promise<void> {
-    this.data = this.data.filter(action => action.id !== id);
+    this.data = this.data.filter((action) => action.id !== id);
   }
 }
 
 // Mock conflict resolver
 const mockConflictResolver: ConflictResolver = {
-  resolve: async (local: OfflineAction, remote: OfflineAction): Promise<OfflineAction> => {
+  resolve: async (
+    local: OfflineAction,
+    remote: OfflineAction
+  ): Promise<OfflineAction> => {
     // Simple last-write-wins strategy
     if (local.metadata?.updatedAt && remote.metadata?.updatedAt) {
-      return local.metadata.updatedAt > remote.metadata.updatedAt ? local : remote;
+      return local.metadata.updatedAt > remote.metadata.updatedAt
+        ? local
+        : remote;
     }
     return local;
-  }
+  },
 };
 
 describe("OfflineActionQueue", () => {
   let queue: OfflineActionQueue;
   let mockPersistence: MockPersistence;
-  
+
   beforeEach(() => {
     mockPersistence = new MockPersistence();
+    // Create a fresh instance for each test to avoid interference
     queue = new OfflineActionQueue({
       persistence: mockPersistence,
       conflictResolver: mockConflictResolver,
       maxRetries: 3,
-      syncInterval: 5000, // 5 seconds for testing
-      maxQueueSize: 100
+      syncInterval: 999999999, // Disable periodic sync for tests
+      maxQueueSize: 100,
+    });
+
+    // Set queue to offline to prevent automatic processing during tests
+    Object.defineProperty(queue, "isOnline", { value: false, writable: true });
+
+    // Register a mock processor to prevent hanging during tests
+    queue.addProcessor("SEARCH", async () => {
+      // Mock processor - do nothing
+    });
+    queue.addProcessor("INDEX", async () => {
+      // Mock processor - do nothing
+    });
+    queue.addProcessor("TAG", async () => {
+      // Mock processor - do nothing
     });
   });
-  
+
   afterEach(() => {
     queue.destroy();
   });
-  
-  test("should create and queue actions", async () => {
+
+  it("should create and queue actions", async () => {
     // Create a test action
-    const actionId = await queue.createAction("SEARCH", {
-      query: "vacation photos",
-      top_k: 12
-    }, {
-      priority: "HIGH",
-      tags: ["search", "vacation"],
-      requiresNetwork: true,
-      requiresUserInteraction: false
-    });
-    
+    const actionId = await queue.createAction(
+      "SEARCH",
+      {
+        query: "vacation photos",
+        top_k: 12,
+      },
+      {
+        priority: "HIGH",
+        tags: ["search", "vacation"],
+        requiresNetwork: false, // Don't process immediately in tests
+        requiresUserInteraction: false,
+      }
+    );
+
     // Verify action was created
     expect(actionId).toBeDefined();
     expect(typeof actionId).toBe("string");
-    
+
     // Get the action from the queue
     const action = queue.getActionById(actionId);
     expect(action).toBeDefined();
@@ -78,24 +113,24 @@ describe("OfflineActionQueue", () => {
     expect(action?.payload.query).toBe("vacation photos");
     expect(action?.priority).toBe("HIGH");
     expect(action?.tags).toEqual(["search", "vacation"]);
-    expect(action?.metadata?.requiresNetwork).toBe(true);
+    expect(action?.metadata?.requiresNetwork).toBe(false);
     expect(action?.metadata?.requiresUserInteraction).toBe(false);
     expect(action?.status).toBe("QUEUED");
   });
-  
-  test("should handle network errors gracefully", async () => {
+
+  it("should handle network errors gracefully", async () => {
     // Simulate network error
     const networkError = errorFactory.networkError("Connection failed", {
       context: { url: "https://api.example.com/search" },
-      severity: "high"
+      severity: "high",
     });
-    
+
     // Handle the error
     const handledError = await handleGlobalError(networkError, {
       action: "search",
-      component: "SearchComponent"
+      component: "SearchComponent",
     });
-    
+
     // Verify error handling
     expect(handledError).toBeInstanceOf(AppError);
     expect(handledError.code).toBe("NETWORK_ERROR");
@@ -103,19 +138,23 @@ describe("OfflineActionQueue", () => {
     expect(handledError.severity).toBe("high");
     expect(handledError.category).toBe("NETWORK");
   });
-  
-  test("should persist actions to storage", async () => {
+
+  it("should persist actions to storage", async () => {
     // Create a test action
-    const actionId = await queue.createAction("INDEX", {
-      directory: "/photos/vacation",
-      recursive: true
-    }, {
-      priority: "NORMAL",
-      tags: ["index", "vacation"],
-      requiresNetwork: false,
-      requiresUserInteraction: false
-    });
-    
+    const actionId = await queue.createAction(
+      "INDEX",
+      {
+        directory: "/photos/vacation",
+        recursive: true,
+      },
+      {
+        priority: "NORMAL",
+        tags: ["index", "vacation"],
+        requiresNetwork: false,
+        requiresUserInteraction: false,
+      }
+    );
+
     // Verify action was persisted
     const persistedActions = await mockPersistence.load();
     expect(persistedActions).toHaveLength(1);
@@ -123,8 +162,8 @@ describe("OfflineActionQueue", () => {
     expect(persistedActions[0].type).toBe("INDEX");
     expect(persistedActions[0].payload.directory).toBe("/photos/vacation");
   });
-  
-  test("should initialize from persisted storage", async () => {
+
+  it("should initialize from persisted storage", async () => {
     // Create a test action and persist it
     const testAction: OfflineAction = {
       id: "test-action-1",
@@ -145,132 +184,175 @@ describe("OfflineActionQueue", () => {
         maxRetries: 3,
         requiresNetwork: true,
         requiresUserInteraction: false,
-        conflictResolutionStrategy: "LAST_WRITE_WINS"
+        conflictResolutionStrategy: "last-write-wins",
       },
       dependencies: [],
       groupId: "test-group",
       tags: ["test"],
-      syncAttempts: 0
     };
-    
+
     await mockPersistence.save([testAction]);
-    
+
     // Create a new queue to test initialization
     const newQueue = new OfflineActionQueue({
       persistence: mockPersistence,
-      conflictResolver: mockConflictResolver
+      conflictResolver: mockConflictResolver,
     });
-    
-    // Wait for initialization
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    // Verify action was loaded
-    const loadedAction = newQueue.getActionById("test-action-1");
-    expect(loadedAction).toBeDefined();
-    expect(loadedAction?.type).toBe("SEARCH");
-    expect(loadedAction?.payload.query).toBe("test photos");
-    
-    newQueue.destroy();
+
+    // Wait for initialization to complete by checking periodically
+    let attempts = 0;
+    while (attempts < 50) {
+      // Max 5 seconds
+      const loadedAction = newQueue.getActionById("test-action-1");
+      if (loadedAction) {
+        // Verify action was loaded
+        expect(loadedAction.type).toBe("SEARCH");
+        expect(loadedAction.payload.query).toBe("test photos");
+        newQueue.destroy();
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      attempts++;
+    }
+
+    // If we get here, initialization failed
+    throw new Error("Action was not loaded from persistence within timeout");
   });
-  
-  test("should handle action dependencies", async () => {
+
+  it("should handle action dependencies", async () => {
     // Create dependent actions
-    const action1Id = await queue.createAction("INDEX", {
-      directory: "/photos/vacation"
-    }, {
-      priority: "NORMAL"
-    });
-    
-    const action2Id = await queue.createAction("SEARCH", {
-      query: "beach photos"
-    }, {
-      priority: "HIGH",
-      dependencies: [action1Id]
-    });
-    
+    const action1Id = await queue.createAction(
+      "INDEX",
+      {
+        directory: "/photos/vacation",
+      },
+      {
+        priority: "NORMAL",
+        requiresNetwork: false,
+      }
+    );
+
+    const action2Id = await queue.createAction(
+      "SEARCH",
+      {
+        query: "beach photos",
+      },
+      {
+        priority: "HIGH",
+        dependencies: [action1Id],
+        requiresNetwork: false,
+      }
+    );
+
     // Verify dependencies were set
     const action1 = queue.getActionById(action1Id);
     const action2 = queue.getActionById(action2Id);
-    
+
     expect(action1).toBeDefined();
     expect(action2).toBeDefined();
     expect(action2?.dependencies).toEqual([action1Id]);
   });
-  
-  test("should handle action groups", async () => {
+
+  it("should handle action groups", async () => {
     const groupId = "batch-index-group";
-    
+
     // Create grouped actions
-    const action1Id = await queue.createAction("INDEX", {
-      directory: "/photos/vacation"
-    }, {
-      groupId,
-      priority: "NORMAL"
-    });
-    
-    const action2Id = await queue.createAction("INDEX", {
-      directory: "/photos/work"
-    }, {
-      groupId,
-      priority: "NORMAL"
-    });
-    
-    const action3Id = await queue.createAction("INDEX", {
-      directory: "/photos/family"
-    }, {
-      groupId,
-      priority: "NORMAL"
-    });
-    
+    const action1Id = await queue.createAction(
+      "INDEX",
+      {
+        directory: "/photos/vacation",
+      },
+      {
+        groupId,
+        priority: "NORMAL",
+        requiresNetwork: false,
+      }
+    );
+
+    const action2Id = await queue.createAction(
+      "INDEX",
+      {
+        directory: "/photos/work",
+      },
+      {
+        groupId,
+        priority: "NORMAL",
+        requiresNetwork: false,
+      }
+    );
+
+    const action3Id = await queue.createAction(
+      "INDEX",
+      {
+        directory: "/photos/family",
+      },
+      {
+        groupId,
+        priority: "NORMAL",
+        requiresNetwork: false,
+      }
+    );
+
     // Verify actions were grouped
     const groupActions = queue.getActions({ groupId });
     expect(groupActions).toHaveLength(3);
-    expect(groupActions.map(a => a.id)).toContain(action1Id);
-    expect(groupActions.map(a => a.id)).toContain(action2Id);
-    expect(groupActions.map(a => a.id)).toContain(action3Id);
+    expect(groupActions.map((a) => a.id)).toContain(action1Id);
+    expect(groupActions.map((a) => a.id)).toContain(action2Id);
+    expect(groupActions.map((a) => a.id)).toContain(action3Id);
   });
-  
-  test("should handle action cancellation", async () => {
+
+  it("should handle action cancellation", async () => {
     // Create a test action
-    const actionId = await queue.createAction("SEARCH", {
-      query: "test photos"
-    }, {
-      priority: "NORMAL"
-    });
-    
+    const actionId = await queue.createAction(
+      "SEARCH",
+      {
+        query: "test photos",
+      },
+      {
+        priority: "NORMAL",
+        requiresNetwork: false,
+      }
+    );
+
     // Cancel the action
     await queue.cancelAction(actionId);
-    
+
     // Verify action was cancelled
     const cancelledAction = queue.getActionById(actionId);
     expect(cancelledAction).toBeDefined();
     expect(cancelledAction?.status).toBe("CANCELLED");
   });
-  
-  test("should handle action retries", async () => {
+
+  it("should handle action retries", async () => {
     // Create a test action
-    const actionId = await queue.createAction("SEARCH", {
-      query: "test photos"
-    }, {
-      priority: "NORMAL"
-    });
-    
+    const actionId = await queue.createAction(
+      "SEARCH",
+      {
+        query: "test photos",
+      },
+      {
+        priority: "NORMAL",
+      }
+    );
+
     // Simulate a failed action
     const action = queue.getActionById(actionId);
     if (action) {
       action.status = "FAILED";
-      action.metadata!.retryCount = 1;
-      action.metadata!.lastError = {
-        message: "Network timeout",
-        code: "NETWORK_TIMEOUT",
-        timestamp: Date.now()
-      };
+      if (action.metadata) {
+        action.metadata.retryCount = 1;
+        action.metadata.lastError = {
+          message: "Network timeout",
+          code: "NETWORK_TIMEOUT",
+          timestamp: Date.now(),
+        };
+      }
       queue.updateActionStatus(actionId, "FAILED");
     }
-    
+
     // Retry the action
     await queue.retryAction(actionId);
-    
+
     // Verify action was reset for retry
     const retriedAction = queue.getActionById(actionId);
     expect(retriedAction).toBeDefined();
@@ -278,40 +360,59 @@ describe("OfflineActionQueue", () => {
     expect(retriedAction?.metadata?.retryCount).toBe(0);
     expect(retriedAction?.metadata?.lastError).toBeUndefined();
   });
-  
-  test("should clear completed actions", async () => {
+
+  it("should clear completed actions", async () => {
     // Create test actions
-    const action1Id = await queue.createAction("SEARCH", { query: "test1" });
-    const action2Id = await queue.createAction("SEARCH", { query: "test2" });
-    const action3Id = await queue.createAction("SEARCH", { query: "test3" });
-    
+    const action1Id = await queue.createAction("SEARCH", {
+      query: "test1",
+      requiresNetwork: false,
+    });
+    const action2Id = await queue.createAction("SEARCH", {
+      query: "test2",
+      requiresNetwork: false,
+    });
+    const action3Id = await queue.createAction("SEARCH", {
+      query: "test3",
+      requiresNetwork: false,
+    });
+
     // Mark some as completed
     queue.updateActionStatus(action1Id, "SYNCED");
     queue.updateActionStatus(action2Id, "CANCELLED");
-    
+
     // Clear completed actions
     queue.clearCompleted();
-    
+
     // Verify only incomplete actions remain
     const remainingActions = queue.getActions();
     expect(remainingActions).toHaveLength(1);
     expect(remainingActions[0].id).toBe(action3Id);
     expect(remainingActions[0].status).toBe("QUEUED");
   });
-  
-  test("should provide queue statistics", async () => {
+
+  it("should provide queue statistics", async () => {
     // Create test actions with different statuses
-    const action1Id = await queue.createAction("SEARCH", { query: "test1" });
-    const action2Id = await queue.createAction("INDEX", { directory: "/test" });
-    const action3Id = await queue.createAction("TAG", { path: "/test.jpg", tags: ["test"] });
-    
+    const action1Id = await queue.createAction("SEARCH", {
+      query: "test1",
+      requiresNetwork: false,
+    });
+    const action2Id = await queue.createAction("INDEX", {
+      directory: "/test",
+      requiresNetwork: false,
+    });
+    await queue.createAction("TAG", {
+      path: "/test.jpg",
+      tags: ["test"],
+      requiresNetwork: false,
+    });
+
     // Update statuses
     queue.updateActionStatus(action1Id, "SYNCED");
     queue.updateActionStatus(action2Id, "FAILED");
-    
+
     // Get statistics
     const stats = queue.getStatistics();
-    
+
     expect(stats.total).toBe(3);
     expect(stats.synced).toBe(1);
     expect(stats.failed).toBe(1);
@@ -321,8 +422,8 @@ describe("OfflineActionQueue", () => {
     expect(stats.byType.TAG).toBe(1);
     expect(stats.byPriority.NORMAL).toBe(3);
   });
-  
-  test("should handle conflict resolution", async () => {
+
+  it("should handle conflict resolution", async () => {
     // Create conflicting actions
     const localAction: OfflineAction = {
       id: "conflict-local",
@@ -343,12 +444,11 @@ describe("OfflineActionQueue", () => {
         maxRetries: 3,
         requiresNetwork: true,
         requiresUserInteraction: false,
-        conflictResolutionStrategy: "LAST_WRITE_WINS"
+        conflictResolutionStrategy: "last-write-wins",
       },
       dependencies: [],
-      syncAttempts: 0
     };
-    
+
     const remoteAction: OfflineAction = {
       id: "conflict-remote",
       type: "SEARCH",
@@ -368,19 +468,19 @@ describe("OfflineActionQueue", () => {
         maxRetries: 3,
         requiresNetwork: true,
         requiresUserInteraction: false,
-        conflictResolutionStrategy: "LAST_WRITE_WINS"
+        conflictResolutionStrategy: "last-write-wins",
       },
       dependencies: [],
-      syncAttempts: 0
     };
-    
+
     // Resolve conflict
-    const resolvedAction = await mockConflictResolver.resolve(localAction, remoteAction);
-    
+    const resolvedAction = await mockConflictResolver.resolve(
+      localAction,
+      remoteAction
+    );
+
     // Verify resolution (last-write-wins)
     expect(resolvedAction.id).toBe("conflict-remote");
     expect(resolvedAction.payload.query).toBe("remote version");
   });
 });
-
-export {};

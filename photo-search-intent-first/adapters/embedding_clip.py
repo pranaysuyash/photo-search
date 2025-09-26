@@ -421,14 +421,14 @@ class ClipEmbedding:
                 progress_cb=progress_cb,
             )
             if embs.size == 0 or len(valid_idx) == 0:
-            if progress_cb:
-                progress_cb(
-                    {
-                        "phase": "index_add_skip",
-                        "chunk_start": start,
-                        "chunk_end": end,
-                    }
-                )
+                if progress_cb:
+                    progress_cb(
+                        {
+                            "phase": "index_add_skip",
+                            "chunk_start": start,
+                            "chunk_end": end,
+                        }
+                    )
                 continue
             # add to index
             faiss_embs = embs.astype(np.float32, copy=False)

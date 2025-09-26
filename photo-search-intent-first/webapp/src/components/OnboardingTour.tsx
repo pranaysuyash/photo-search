@@ -291,6 +291,15 @@ export function OnboardingTour({
 	const timeoutRef = useRef<NodeJS.Timeout>();
 
 	const currentTourStep = tourSteps[step];
+	const totalSteps = tourSteps.length || 1;
+	const progressPercent = Math.min(
+		100,
+		Math.max(0, ((step + 1) / totalSteps) * 100),
+	);
+	const roundedProgress = Math.round(progressPercent);
+	const progressStyle = {
+		"--onboarding-progress": `${progressPercent}%`,
+	} as React.CSSProperties;
 
 	// Auto-advance logic
 	useEffect(() => {
@@ -521,23 +530,33 @@ export function OnboardingTour({
 						{/* Content */}
 						<div className="p-4">{currentTourStep?.content}</div>
 
-						{/* Progress Bar */}
-						<div className="px-4 pb-2">
-							<div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
-								<div
-									className="bg-blue-500 h-1.5 rounded-full transition-all duration-300"
-									style={{ width: `${((step + 1) / tourSteps.length) * 100}%` }}
-								/>
-							</div>
-							<div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
-								<span>
-									{step + 1} of {tourSteps.length}
-								</span>
-								<span>
-									{Math.round(((step + 1) / tourSteps.length) * 100)}% complete
-								</span>
-							</div>
+					{/* Progress Bar */}
+					<div className="px-4 pb-2">
+						<div
+							className="onboarding-progress-track w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5"
+							role="progressbar"
+							aria-valuemin={0}
+							aria-valuemax={100}
+							aria-valuenow={roundedProgress}
+							aria-label={`Onboarding progress ${roundedProgress}%`}
+							style={progressStyle}
+						>
+							<div
+								className={clsx(
+									"onboarding-progress-fill bg-blue-500 h-1.5 rounded-full",
+									!prefersReducedMotion && "transition-all duration-300",
+								)}
+							/>
 						</div>
+						<div className="onboarding-progress-summary flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+							<span>
+								{step + 1} of {tourSteps.length}
+							</span>
+							<span className="onboarding-progress-percent" aria-live="polite">
+								{roundedProgress}% complete
+							</span>
+						</div>
+					</div>
 
 						{/* Actions */}
 						<div className="flex items-center justify-between p-4 border-t border-gray-200 dark:border-gray-700">

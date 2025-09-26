@@ -64,18 +64,26 @@ test.describe("Onboarding Flow - Intent-First Validation", () => {
     // Start onboarding
     await page.click('button:has-text("Get Started")');
 
-    // Verify step indicators are visible
-    await expect(page.locator(".onboarding-steps")).toBeVisible();
+    const progressBar = page.locator(".onboarding-progress-track");
+    await expect(progressBar).toBeVisible();
+    await expect(progressBar).toHaveAttribute("role", "progressbar");
+    await expect(progressBar).toHaveAttribute("aria-valuemin", "0");
+    await expect(progressBar).toHaveAttribute("aria-valuemax", "100");
+    await expect(progressBar).toHaveAttribute("aria-valuenow", /\d+/);
 
-    // Verify current step is highlighted
-    const activeStep = page.locator(".step-active");
-    await expect(activeStep).toHaveCount(1);
+    const percentText = page.locator(".onboarding-progress-percent");
+    await expect(percentText).toBeVisible();
+    await expect(percentText).toContainText("% complete");
+
+    const initialPercent = (await percentText.textContent())?.trim();
 
     // Progress through steps
     await page.click('button:has-text("Use Demo Photos")');
 
-    // Verify progress updates
-    await expect(page.locator(".step-completed")).toHaveCount(1);
+    if (initialPercent) {
+      await expect(percentText).not.toHaveText(initialPercent);
+    }
+    await expect(percentText).toContainText("% complete");
   });
 
   test("should handle interruptions gracefully", async ({ page }) => {

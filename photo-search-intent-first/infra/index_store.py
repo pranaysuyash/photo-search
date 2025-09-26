@@ -28,6 +28,10 @@ def _sanitize_key(key: str) -> str:
 class IndexStore:
     def __init__(self, root: Path, index_key: Optional[str] = None) -> None:
         self.root = Path(root).expanduser().resolve()
+        # Backwards compatibility: some callers/tests expect `root_dir`
+        # referencing the canonical root path. Mirror the value so newer
+        # helpers can migrate without breaking legacy access patterns.
+        self.root_dir = self.root
         key = _sanitize_key(index_key or MODEL_NAME)
         # Optional app data dir override for central storage
         base = os.environ.get("PS_APPDATA_DIR", "").strip()
@@ -167,12 +171,11 @@ class IndexStore:
         """Update or insert only the specified paths; does not prune deletions.
         Returns (new_count, updated_count).
         """
-        from domain.models import Photo as _Photo
         self.load()
         existing_map = {p: i for i, p in enumerate(self.state.paths)}
         want = [Path(p) for p in paths]
         to_update_idx: list[int] = []
-        to_insert: list[_Photo] = []
+        to_insert: list[Photo] = []
         for wp in want:
             sp = str(wp)
             if sp in existing_map:
@@ -182,7 +185,7 @@ class IndexStore:
                     mt = wp.stat().st_mtime
                 except Exception:
                     continue
-                to_insert.append(_Photo(path=wp, mtime=mt))
+                to_insert.append(Photo(path=wp, mtime=mt))
         updated = 0
         if to_update_idx and self.state.embeddings is not None and len(self.state.embeddings) == len(self.state.paths):
             for start in range(0, len(to_update_idx), max(1, int(batch_size))):
@@ -246,12 +249,11 @@ class IndexStore:
         except ValueError:
             return []
         q = self.state.embeddings[i]
-        import numpy as _np
         E = self.state.embeddings if subset is None else self.state.embeddings[subset]
         sims = (E @ q).astype(float)
         k = max(1, min(top_k, len(sims)))
-        idx = _np.argpartition(-sims, k - 1)[:k]
-        idx = idx[_np.argsort(-sims[idx])]
+        idx = np.argpartition(-sims, k - 1)[:k]
+        idx = idx[np.argsort(-sims[idx])]
         if subset:
             idx = [subset[i] for i in idx]
         return [SearchResult(path=Path(self.state.paths[i]), score=float((self.state.embeddings @ q)[i])) for i in idx]
@@ -295,7 +297,7 @@ class IndexStore:
         updated = 0
         ocr_texts: list[str] = []
         done = 0
-        for p, mtime in zip(self.state.paths, self.state.mtimes):
+        for p in self.state.paths:
             t_prev = texts.get(p)
             if t_prev:
                 ocr_texts.append(t_prev)
@@ -420,16 +422,15 @@ class IndexStore:
         except Exception:
             pass
         # Save embeddings
-        import numpy as _np
-        vecs: list[_np.ndarray] = []
+        vecs: list[np.ndarray] = []
         for t in out_texts:
             if t:
                 vecs.append(embedder.embed_text(t))
             else:
                 dim = int(self.state.embeddings.shape[1]) if self.state.embeddings is not None else 0
-                vecs.append(_np.zeros((dim,), dtype=_np.float32))
-        C = _np.stack(vecs).astype(_np.float32)
-        _np.save(self.cap_embeds_file, C)
+                vecs.append(np.zeros((dim,), dtype=np.float32))
+        C = np.stack(vecs).astype(np.float32)
+        np.save(self.cap_embeds_file, C)
         return updated
 
     def search_with_captions(self, embedder, query: str, top_k: int = 12, subset: Optional[List[int]] = None, weight_img: float = 0.5, weight_cap: float = 0.5) -> List[SearchResult]:
@@ -437,10 +438,9 @@ class IndexStore:
         if not self.captions_available() or not self.state.paths:
             return base
         try:
-            import numpy as _np
             q = embedder.embed_text(query)
             E = self.state.embeddings
-            T = _np.load(self.cap_embeds_file)
+            T = np.load(self.cap_embeds_file)
             if subset is not None and len(subset) > 0:
                 E = E[subset]
                 T = T[subset]
@@ -448,12 +448,12 @@ class IndexStore:
             sims_txt = (T @ q).astype(float)
             sims = weight_img * sims_img + weight_cap * sims_txt
             k = max(1, min(top_k, len(sims)))
-            idx = _np.argpartition(-sims, k - 1)[:k]
-            idx = idx[_np.argsort(-sims[idx])]
+            idx = np.argpartition(-sims, k - 1)[:k]
+            idx = idx[np.argsort(-sims[idx])]
             if subset is not None and len(subset) > 0:
                 idx = [subset[i] for i in idx]
             # Return exact weighted scores for final ranking
-            full_T = _np.load(self.cap_embeds_file)
+            full_T = np.load(self.cap_embeds_file)
             exact_img = (self.state.embeddings @ q).astype(float)
             exact_txt = (full_T @ q).astype(float)
             return [SearchResult(path=Path(self.state.paths[i]), score=float(weight_img * exact_img[i] + weight_cap * exact_txt[i])) for i in idx]
@@ -462,7 +462,6 @@ class IndexStore:
 
     # HNSW (hnswlib) support
     def hnsw_status(self) -> dict:
-        import json
         status = {"exists": self.hnsw_file.exists() and self.hnsw_meta_file.exists()}
         if status["exists"]:
             try:
@@ -482,14 +481,12 @@ class IndexStore:
         if self.state.embeddings is None or len(self.state.embeddings) == 0:
             return False
         dim = int(self.state.embeddings.shape[1])
-        import numpy as _np
         E = self.state.embeddings.astype('float32')
         p = hnswlib.Index(space='cosine', dim=dim)
         p.init_index(max_elements=E.shape[0], ef_construction=ef_construction, M=M)
         p.add_items(E)
         p.set_ef(50)
         p.save_index(str(self.hnsw_file))
-        import json
         self.hnsw_meta_file.write_text(json.dumps({"dim": dim, "size": len(E), "M": M, "ef_construction": ef_construction}))
         return True
 
@@ -510,9 +507,8 @@ class IndexStore:
         p.set_ef(max(50, top_k))
         labels, distances = p.knn_query(q, k=min(top_k, status.get('size', top_k)))
         labs = labels[0].tolist()
-        dists = distances[0].tolist()
         # Convert cosine distance to similarity
-        sims = [1.0 - float(d) for d in dists]
+        sims = [1.0 - float(d) for d in distances[0].tolist()]
         # Re-rank with exact dot-product for stability
         if self.state.embeddings is not None:
             exact = (self.state.embeddings @ q).astype(float)
@@ -522,8 +518,15 @@ class IndexStore:
 
     # FAISS (optional) support
     def faiss_status(self) -> dict:
-        import json
-        status = {"exists": self.faiss_file.exists() and self.faiss_meta_file.exists()}
+        # Check both file existence AND library availability
+        has_library = False
+        try:
+            import faiss  # type: ignore
+            has_library = True
+        except Exception:
+            has_library = False
+
+        status = {"exists": self.faiss_file.exists() and self.faiss_meta_file.exists() and has_library}
         if status["exists"]:
             try:
                 meta = json.loads(self.faiss_meta_file.read_text())
@@ -546,7 +549,6 @@ class IndexStore:
         index = faiss.IndexFlatIP(dim)
         index.add(self.state.embeddings.astype('float32'))
         faiss.write_index(index, str(self.faiss_file))
-        import json
         self.faiss_meta_file.write_text(json.dumps({"dim": dim, "size": len(self.state.embeddings)}))
         return True
 
@@ -563,7 +565,7 @@ class IndexStore:
         if dim is None:
             return []
         index = faiss.read_index(str(self.faiss_file))
-        D, I = index.search(q.reshape(1, -1), min(max(1, top_k), status.get("size", top_k)))
+        _, I = index.search(q.reshape(1, -1), min(max(1, top_k), status.get("size", top_k)))
         candidates = I[0].tolist()
         # Apply subset filter if provided
         if subset:
@@ -580,8 +582,7 @@ class IndexStore:
         return [SearchResult(path=Path(self.state.paths[i]), score=float((self.state.embeddings @ q)[i])) for i in candidates]
 
     # Annoy (optional) support
-    def ann_status(self) -> dict:
-        import json
+    def annoy_status(self) -> dict:
         status = {"exists": self.ann_file.exists() and self.ann_meta_file.exists()}
         if status["exists"]:
             try:
@@ -607,7 +608,6 @@ class IndexStore:
             index.add_item(i, E[i].tolist())
         index.build(max(1, int(trees)))
         index.save(str(self.ann_file))
-        import json
         self.ann_meta_file.write_text(json.dumps({"dim": dim, "size": int(E.shape[0]), "trees": int(trees)}))
         return True
 
@@ -619,7 +619,7 @@ class IndexStore:
             from annoy import AnnoyIndex  # type: ignore
         except Exception:
             return self.search(embedder, query, top_k=top_k)
-        status = self.ann_status()
+        status = self.annoy_status()
         if not status.get('exists'):
             return self.search(embedder, query, top_k=top_k)
         dim = int(status.get('dim') or 0)

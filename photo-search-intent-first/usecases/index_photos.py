@@ -23,17 +23,17 @@ def index_photos(
     """
     embedder = embedder or get_provider(provider, hf_token=hf_token, openai_api_key=openai_api_key)
     store = IndexStore(folder, index_key=getattr(embedder, 'index_id', None))
-    
+
     # Generate job_id if not provided
     if job_id is None:
         job_id = f"index-{uuid.uuid4().hex[:8]}"
-    
+
     # List photos first
     photos = list_photos(folder)
-    
+
     # Create JobsBridge for real-time progress events
     jobs_bridge = JobsBridge("http://127.0.0.1:8000", str(folder), job_id)
-    
+
     # Emit job started event
     jobs_bridge.started("Indexing photos", f"Building search index for {folder.name}", total=len(photos))
 
@@ -68,7 +68,7 @@ def index_photos(
         if cancel_event and cancel_event.is_set():
             jobs_bridge.cancelled()
             raise Exception("Job cancelled by user")
-        
+
         try:
             # Update index_status.json with the latest chunk progress
             cur = {}
@@ -90,7 +90,6 @@ def index_photos(
             # Honor pause control between chunks
             try:
                 ctrl_path = store.index_dir / 'index_control.json'
-                wait_start = time.time()
                 while ctrl_path.exists():
                     cfg = {}
                     try:
@@ -136,10 +135,10 @@ def index_photos(
             status_path.write_text(json.dumps(status), encoding='utf-8')
         except Exception:
             pass
-        
+
         # Emit job completed event
         jobs_bridge.completed(success_count=new_count + updated_count, total=total)
-        
+
         return new_count, updated_count, total
     except Exception as e:
         # Emit job failed event

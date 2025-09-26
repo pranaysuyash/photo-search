@@ -1,4 +1,5 @@
 # photo-search
+
 ## Tech Stack
 
 - **Shell:** Electron (desktop)
@@ -9,8 +10,6 @@
 
 > **Note:** `photo-search-intent-first/ui` contains a legacy Streamlit proof-of-concept.  
 > The shipping application is `photo-search-intent-first/webapp` (React) + `photo-search-intent-first/electron` (shell) with a FastAPI backend in `photo-search-intent-first/api`
-
-
 
 What’s Included
 
@@ -132,3 +131,25 @@ Documentation
 - Visual Testing: `docs/VISUAL_TESTING.md`
 - Webapp Error Logging + Deep Links: `photo-search-intent-first/webapp/docs/error-logging-and-deeplinks.md`
 - Implementation Plan: `TODO_PLAN.md` (current cross-cutting TODOs, verification steps, acceptance criteria)
+
+Fast ANN Indexes
+
+The Intent-First backend supports optional accelerated search via FAISS, HNSW, or Annoy. These are **not required**; the system falls back to exact similarity if none are installed/built. A unified `FastIndexManager` abstraction manages build, status, and selection.
+
+Quick start:
+
+1. Build base embeddings first:
+   `python3 photo-search-intent-first/cli.py index --dir /path/to/photos --provider local`
+2. (Optional) Build a fast index (pick one you have libs for):
+   `python3 photo-search-intent-first/cli.py fast build --dir /path/to/photos --kind annoy`
+3. Inspect status:
+   `python3 photo-search-intent-first/cli.py fast status --dir /path/to/photos`
+4. Use fast search from API/UI by sending form fields `use_fast=1` and optional `fast_kind=auto|faiss|hnsw|annoy|exact`.
+
+API endpoints:
+
+- `POST /fast/build` – `{dir, kind}`
+- `GET  /fast/status?dir=...` – backend availability/build matrix
+- `POST /search` – adds `fast_backend`, `fast_fallback` keys when `use_fast=1`
+
+Details, status schema, fallback ordering, and troubleshooting: see `photo-search-intent-first/FAST_INDEXES.md`.

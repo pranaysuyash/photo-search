@@ -193,7 +193,6 @@ export function AppChrome({
     prefersReducedMotion,
     themeMode,
     setThemeMode,
-    highContrast,
   } = layout;
   const {
     showWelcome,
@@ -262,8 +261,6 @@ export function AppChrome({
     engine,
     hfToken: _hfToken,
     openaiKey: _openaiKey,
-    useFast,
-    fastKind,
     useCaps,
     useOcr,
     hasText,
@@ -322,12 +319,9 @@ export function AppChrome({
     loadMetadata: _loadMetadata,
     loadPresets: _loadPresets,
     prepareFast: _prepareFast,
-    buildOCR,
-    buildMetadata,
     monitorOperation: _monitorOperation,
     openDetailByPath,
     navDetail,
-    tagSelected,
     exportSelected: _exportSelected,
     handlePhotoOpen: _handlePhotoOpen,
     handlePhotoAction: _handlePhotoAction,
@@ -904,47 +898,7 @@ export function AppChrome({
             </main>
 
             {/* ModalManager moved outside main content to remain mounted across route changes */}
-            <ModalsHost
-              selected={selected}
-              dir={dir}
-              engine={engine}
-              topK={topK}
-              highContrast={highContrast}
-              useFast={useFast}
-              fastKind={fastKind as "" | "annoy" | "faiss" | "hnsw"}
-              useCaps={useCaps}
-              useOcr={useOcr}
-              hasText={hasText}
-              useOsTrash={Boolean(settingsActions.setUseOsTrash)}
-              searchText={searchText}
-              query={query}
-              collections={collections as Record<string, string[]>}
-              clusters={(clusters || []).map((c) => ({
-                id: c.name || "",
-                name: c.name || "",
-                count: 0,
-              }))}
-              allTags={allTags}
-              meta={{ cameras: meta?.cameras || [], places: [] }}
-              onSetBusy={uiActions.setBusy}
-              onSetNote={uiActions.setNote}
-              onSetResults={photoActions.setResults}
-              onSetSaved={photoActions.setSaved}
-              onSetCollections={photoActions.setCollections}
-              onSetDir={settingsActions.setDir}
-              onSetUseOsTrash={settingsActions.setUseOsTrash}
-              onSetUseFast={settingsActions.setUseFast}
-              onSetFastKind={settingsActions.setFastKind}
-              onSetUseCaps={settingsActions.setUseCaps}
-              onSetUseOcr={settingsActions.setUseOcr}
-              onSetHasText={settingsActions.setHasText}
-              onSetHighContrast={settingsActions.setHighContrast}
-              onIndex={() => lib.index()}
-              onPrepareFast={() => {}} // TODO: implement
-              onBuildOCR={buildOCR}
-              onBuildMetadata={buildMetadata}
-              onTagSelected={tagSelected}
-            />
+            <ModalsHost />
           </AppShell>
         </ResultsConfigProvider>
 

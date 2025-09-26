@@ -198,13 +198,52 @@ ps-intent search --dir /path/to/photos --query "friends having tea"
 ps-intent-ui  # Launch the UI (uses PS_INTENT_PORT env var if set)
 ```
 
-## Development Conventions
+### Debugging
+
+The application can be run and debugged without relying on IDE-specific extensions:
+
+1. **Standard execution with uvicorn**:
+   ```bash
+   cd photo-search-intent-first
+   source .venv/bin/activate
+   uvicorn api.server:app --host 127.0.0.1 --port 8000 --reload
+   ```
+
+2. **Python Debugger (pdb)** - Python's built-in interactive debugger:
+   ```bash
+   # Launch with pdb for debugging
+   python -c "import pdb; import sys; sys.path.insert(0, '.'); pdb.set_trace(); from api.server import app; import uvicorn; uvicorn.run(app, host='127.0.0.1', port=8000)"
+   ```
+   PDB allows you to:
+   - Set breakpoints in your code
+   - Step through execution line by line
+   - Inspect variables and their values
+   - Run Python expressions
+   - Control the flow of execution for debugging purposes
+
+3. **Debugpy for remote debugging** (install first with `pip install debugpy`):
+   ```bash
+   python -m debugpy --listen 5678 --wait-for-client -m uvicorn api.server:app --host 127.0.0.1 --port 8000 --reload
+   ```
+
+4. **Simple import testing** (for verifying functionality without starting the server):
+   ```bash
+   python -c "import sys; sys.path.insert(0, '.'); from api.server import app; print('Application loaded successfully')"
+   ```
+
+### Development Conventions
 
 ### Code Organization
 - Follow Clean Architecture principles with clear separation of layers
 - Use domain-driven design for business logic in usecases
 - Maintain backward compatibility in API endpoints
 - Document intent and design decisions in INTENT.md
+
+### Full App Scope Approach
+- Address the complete application state rather than MVP features only
+- Consider the full scope of all components and their interdependencies
+- Ensure all modules, not just core features, are properly functioning
+- Apply fixes systematically across the entire codebase to maintain consistency
 
 ### Frontend Development
 - Use TypeScript for all React components

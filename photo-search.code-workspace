@@ -1,0 +1,33 @@
+{
+    "folders": [
+        {
+            "name": "Root",
+            "path": "."
+        },
+        {
+            "name": "Photo Search Intent First",
+            "path": "./photo-search-intent-first"
+        },
+        {
+            "name": "Photo Search Classic",
+            "path": "./archive/photo-search-classic"
+        }
+    ],
+    "settings": {
+        "python.defaultInterpreterPath": "./photo-search-intent-first/.venv/bin/python"
+    },
+    "launch": {
+        "version": "0.2.0",
+        "configurations": [
+            {
+                "name": "Python: FastAPI Server (Intent First)",
+                "type": "debugpy",
+                "request": "launch",
+                "program": "${workspaceFolder}/photo-search-intent-first/api/server.py",
+                "console": "integratedTerminal",
+                "python": "${workspaceFolder}/photo-search-intent-first/.venv/bin/python",
+                "cwd": "${workspaceFolder}/photo-search-intent-first"
+            }
+        ]
+    }
+}

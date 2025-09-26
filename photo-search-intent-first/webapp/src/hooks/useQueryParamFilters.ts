@@ -1,191 +1,195 @@
 import { useEffect } from "react";
 import type { Location } from "react-router-dom";
 
+// Query param helpers
+function getFlag(sp: URLSearchParams, key: string): boolean {
+  return sp.get(key) === "1";
+}
+function getCSV(sp: URLSearchParams, key: string): string[] {
+  const raw = sp.get(key);
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+function getNumber(sp: URLSearchParams, key: string): number | undefined {
+  const v = sp.get(key);
+  if (!v) return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
+}
+function getString(sp: URLSearchParams, key: string): string | undefined {
+  const v = sp.get(key);
+  return v && v.length > 0 ? v : undefined;
+}
+
 interface UseQueryParamFiltersArgs {
-	location: Location;
-	searchText: string;
-	setSearchText: (value: string) => void;
-	setDateFrom: (value: string) => void;
-	setDateTo: (value: string) => void;
-	setRatingMin: (value: number) => void;
-	resultView?: string;
-	timelineBucket?: string;
-	setResultViewLocal?: (value: "grid" | "timeline") => void;
-	setTimelineBucketLocal?: (value: "day" | "week" | "month") => void;
-	photoActions: {
-		setFavOnly: (value: boolean) => void;
-		setTagFilter: (value: string) => void;
-	};
-	settingsActions: {
-		setPlace: (value: string) => void;
-		setHasText: (value: boolean) => void;
-		setCamera: (value: string) => void;
-		setIsoMin: (value: number) => void;
-		setIsoMax: (value: number) => void;
-		setFMin: (value: number) => void;
-		setFMax: (value: number) => void;
-		setUseFast?: (value: boolean) => void;
-		setFastKind?: (value: string) => void;
-		setUseCaps?: (value: boolean) => void;
-		setUseOcr?: (value: boolean) => void;
-		setResultView?: (value: string) => void;
-		setTimelineBucket?: (value: string) => void;
-	};
-	workspaceActions: {
-		setPersons: (value: string[]) => void;
-	};
+  location: Location;
+  searchText: string;
+  setSearchText: (value: string) => void;
+  setDateFrom: (value: string) => void;
+  setDateTo: (value: string) => void;
+  setRatingMin: (value: number) => void;
+  resultView?: string;
+  timelineBucket?: string;
+  setResultViewLocal?: (value: "grid" | "timeline") => void;
+  setTimelineBucketLocal?: (value: "day" | "week" | "month") => void;
+  photoActions: {
+    setFavOnly: (value: boolean) => void;
+    setTagFilter: (value: string) => void;
+  };
+  settingsActions: {
+    setPlace: (value: string) => void;
+    setHasText: (value: boolean) => void;
+    setCamera: (value: string) => void;
+    setIsoMin: (value: number) => void;
+    setIsoMax: (value: number) => void;
+    setFMin: (value: number) => void;
+    setFMax: (value: number) => void;
+    setUseFast?: (value: boolean) => void;
+    setFastKind?: (value: string) => void;
+    setUseCaps?: (value: boolean) => void;
+    setUseOcr?: (value: boolean) => void;
+    setResultView?: (value: string) => void;
+    setTimelineBucket?: (value: string) => void;
+  };
+  workspaceActions: {
+    setPersons: (value: string[]) => void;
+  };
 }
 
 export function useQueryParamFilters({
-	location,
-	searchText,
-	setSearchText,
-	setDateFrom,
-	setDateTo,
-	setRatingMin,
-	resultView,
-	timelineBucket,
-	setResultViewLocal,
-	setTimelineBucketLocal,
-	photoActions,
-	settingsActions,
-	workspaceActions,
+  location,
+  searchText,
+  setSearchText,
+  setDateFrom,
+  setDateTo,
+  setRatingMin,
+  resultView,
+  timelineBucket,
+  setResultViewLocal,
+  setTimelineBucketLocal,
+  photoActions,
+  settingsActions,
+  workspaceActions,
 }: UseQueryParamFiltersArgs) {
-	const { setFavOnly, setTagFilter } = photoActions;
-	const {
-		setPlace,
-		setHasText,
-		setCamera,
-		setIsoMin,
-		setIsoMax,
-		setFMin,
-		setFMax,
-		setUseFast,
-		setFastKind,
-		setUseCaps,
-		setUseOcr,
-		setResultView,
-		setTimelineBucket,
-	} = settingsActions;
-	const { setPersons } = workspaceActions;
+  const { setFavOnly, setTagFilter } = photoActions;
+  const {
+    setPlace,
+    setHasText,
+    setCamera,
+    setIsoMin,
+    setIsoMax,
+    setFMin,
+    setFMax,
+    setUseFast,
+    setFastKind,
+    setUseCaps,
+    setUseOcr,
+    setResultView,
+    setTimelineBucket,
+  } = settingsActions;
+  const { setPersons } = workspaceActions;
 
-	useEffect(() => {
-		const sp = new URLSearchParams(location.search);
-		const q = sp.get("q") || "";
-		if (q && q !== searchText) setSearchText(q);
+  useEffect(() => {
+    const sp = new URLSearchParams(location.search);
+    const q = (sp.get("q") || "").trim();
+    if (q && q !== searchText) setSearchText(q);
 
-		try {
-			const fav = sp.get("fav");
-			if (fav === "1") setFavOnly(true);
+    try {
+      // Favorites
+      if (getFlag(sp, "fav")) setFavOnly(true);
 
-			const tagsCSV = sp.get("tags") || "";
-			if (tagsCSV) setTagFilter(tagsCSV);
+      // Tags
+      const tags = getCSV(sp, "tags");
+      if (tags.length) setTagFilter(tags.join(","));
 
-			const df = sp.get("date_from");
-			const dt = sp.get("date_to");
-			if (df) setDateFrom(df);
-			if (dt) setDateTo(dt);
+      // Dates
+      const df = getString(sp, "date_from");
+      if (df) setDateFrom(df);
+      const dt = getString(sp, "date_to");
+      if (dt) setDateTo(dt);
 
-			const plc = sp.get("place");
-			if (plc) setPlace(plc);
+      // Simple text filters
+      const plc = getString(sp, "place");
+      if (plc) setPlace(plc);
+      if (getFlag(sp, "has_text")) setHasText(true);
+      const cam = getString(sp, "camera");
+      if (cam) setCamera(cam);
 
-			const ht = sp.get("has_text");
-			if (ht === "1") setHasText(true);
+      // Numeric ranges
+      const isoMin = getNumber(sp, "iso_min");
+      if (isoMin !== undefined) setIsoMin(isoMin);
+      const isoMax = getNumber(sp, "iso_max");
+      if (isoMax !== undefined) setIsoMax(isoMax);
+      const fmin = getNumber(sp, "f_min");
+      if (fmin !== undefined) setFMin(fmin);
+      const fmax = getNumber(sp, "f_max");
+      if (fmax !== undefined) setFMax(fmax);
 
-			const cam = sp.get("camera");
-			if (cam) setCamera(cam);
+      // Rating min clamped to [0,5]
+      const rmin = getNumber(sp, "rating_min");
+      if (rmin !== undefined)
+        setRatingMin(Math.max(0, Math.min(5, Math.trunc(rmin))));
 
-			const isoMinP = sp.get("iso_min");
-			if (isoMinP) setIsoMin(parseFloat(isoMinP));
-			const isoMaxP = sp.get("iso_max");
-			if (isoMaxP) setIsoMax(parseFloat(isoMaxP));
+      // People
+      const persons = getCSV(sp, "persons");
+      const person = getString(sp, "person");
+      if (persons.length) setPersons(persons);
+      else if (person) setPersons([person]);
 
-			const fmin = sp.get("f_min");
-			if (fmin) setFMin(parseFloat(fmin));
-			const fmax = sp.get("f_max");
-			if (fmax) setFMax(parseFloat(fmax));
+      // Feature flags
+      if (getFlag(sp, "fast")) setUseFast?.(true);
+      const fastKind = getString(sp, "fast_kind");
+      if (fastKind) setFastKind?.(fastKind);
+      if (getFlag(sp, "caps")) setUseCaps?.(true);
+      if (getFlag(sp, "ocr")) setUseOcr?.(true);
 
-			const rmin = sp.get("rating_min");
-			if (rmin) {
-				const parsed = parseInt(rmin, 10);
-				if (!Number.isNaN(parsed)) {
-					setRatingMin(Math.max(0, Math.min(5, parsed)));
-				}
-			}
+      // Result view toggles
+      const rv = getString(sp, "rv");
+      if (rv && rv !== resultView) {
+        setResultView?.(rv);
+        if (rv === "grid" || rv === "timeline") setResultViewLocal?.(rv);
+      }
 
-			const person = sp.get("person");
-			const personsCSV = sp.get("persons");
-			if (personsCSV) {
-				setPersons(
-					personsCSV
-						.split(",")
-						.map((s) => s.trim())
-						.filter(Boolean),
-				);
-			} else if (person) {
-				setPersons([person]);
-			}
-
-			const fast = sp.get("fast");
-			if (fast === "1") setUseFast?.(true);
-
-			const fastKind = sp.get("fast_kind");
-			if (fastKind) setFastKind?.(fastKind);
-
-			const caps = sp.get("caps");
-			if (caps === "1") setUseCaps?.(true);
-
-			const ocr = sp.get("ocr");
-			if (ocr === "1") setUseOcr?.(true);
-
-			const resultViewParam = sp.get("rv");
-			if (resultViewParam && resultViewParam !== resultView) {
-				setResultView?.(resultViewParam);
-				if (resultViewParam === "grid" || resultViewParam === "timeline") {
-					setResultViewLocal?.(resultViewParam);
-				}
-			}
-
-			const timelineBucketParam = sp.get("tb");
-			if (timelineBucketParam && timelineBucketParam !== timelineBucket) {
-				setTimelineBucket?.(timelineBucketParam);
-				if (
-					timelineBucketParam === "day" ||
-					timelineBucketParam === "week" ||
-					timelineBucketParam === "month"
-				) {
-					setTimelineBucketLocal?.(timelineBucketParam);
-				}
-			}
-		} catch {}
-	}, [
-		location.search,
-		searchText,
-		setSearchText,
-		setDateFrom,
-		setDateTo,
-		setRatingMin,
-		resultView,
-		timelineBucket,
-		setFavOnly,
-		setTagFilter,
-		setPlace,
-		setHasText,
-		setCamera,
-		setIsoMin,
-		setIsoMax,
-		setFMin,
-		setFMax,
-		setUseFast,
-		setFastKind,
-		setUseCaps,
-		setUseOcr,
-		setResultView,
-		setTimelineBucket,
-		setPersons,
-		setResultViewLocal,
-		setTimelineBucketLocal,
-	]);
+      const tb = getString(sp, "tb");
+      if (tb && tb !== timelineBucket) {
+        setTimelineBucket?.(tb);
+        if (tb === "day" || tb === "week" || tb === "month")
+          setTimelineBucketLocal?.(tb);
+      }
+    } catch {
+      /* noop: invalid query string or storage unavailable */
+    }
+  }, [
+    location.search,
+    searchText,
+    setSearchText,
+    setDateFrom,
+    setDateTo,
+    setRatingMin,
+    resultView,
+    timelineBucket,
+    setFavOnly,
+    setTagFilter,
+    setPlace,
+    setHasText,
+    setCamera,
+    setIsoMin,
+    setIsoMax,
+    setFMin,
+    setFMax,
+    setUseFast,
+    setFastKind,
+    setUseCaps,
+    setUseOcr,
+    setResultView,
+    setTimelineBucket,
+    setPersons,
+    setResultViewLocal,
+    setTimelineBucketLocal,
+  ]);
 }
 
 export default useQueryParamFilters;

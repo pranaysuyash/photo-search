@@ -50,7 +50,7 @@ export function PrimarySearchControls({
   const hasFilterTokens =
     !searchCommandCenter &&
     /(camera:|tag:|person:|has_text:|iso:|fnumber:|width:|height:|place:)/i.test(
-      searchText || "",
+      searchText || ""
     );
 
   const clearFilterTokens = () => {
@@ -71,7 +71,9 @@ export function PrimarySearchControls({
           whileTap={{ scale: 0.95 }}
         >
           <IconSearch className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-          <span className="text-sm text-gray-700 dark:text-gray-300">Search</span>
+          <span className="text-sm text-gray-700 dark:text-gray-300">
+            Search
+          </span>
         </MotionButton>
       ) : (
         <div className="flex items-center gap-2 w-full max-w-2xl">
@@ -83,18 +85,18 @@ export function PrimarySearchControls({
             allTags={allTags}
             meta={meta}
           />
-          <div
+          <button
+            type="button"
             className="hidden sm:flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 cursor-help hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
             title="Press ? to open keyboard shortcuts"
             onClick={() => openModal("help")}
-            role="button"
-            tabIndex={0}
+            aria-label="Open keyboard shortcuts"
           >
             <kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs border border-gray-200 dark:border-gray-600">
               ?
             </kbd>
             <span className="hidden md:inline">for shortcuts</span>
-          </div>
+          </button>
         </div>
       )}
 
@@ -111,16 +113,16 @@ export function PrimarySearchControls({
       <MotionButton
         type="button"
         className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
-        onClick={() =>
-          setShowFilters((value) => (typeof value === "boolean" ? !value : !value))
-        }
+        onClick={() => setShowFilters((prev) => !prev)}
         aria-label="Show filters"
         data-tour="filters-toggle"
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
       >
         <Filter className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-        <span className="text-sm text-gray-700 dark:text-gray-300">Filters</span>
+        <span className="text-sm text-gray-700 dark:text-gray-300">
+          Filters
+        </span>
       </MotionButton>
 
       {enableDemoLibrary !== undefined && onLibraryChange && (
@@ -141,7 +143,9 @@ export function PrimarySearchControls({
         whileTap={{ scale: 0.95 }}
       >
         <FolderOpen className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-        <span className="text-sm text-gray-700 dark:text-gray-300">Add Photos</span>
+        <span className="text-sm text-gray-700 dark:text-gray-300">
+          Add Photos
+        </span>
       </MotionButton>
 
       {hasFilterTokens && (
@@ -166,7 +170,9 @@ export function PrimarySearchControls({
         whileTap={{ scale: 0.95 }}
       >
         <BookmarkPlus className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-        <span className="text-sm text-gray-700 dark:text-gray-300">Remember</span>
+        <span className="text-sm text-gray-700 dark:text-gray-300">
+          Remember
+        </span>
       </MotionButton>
     </div>
   );

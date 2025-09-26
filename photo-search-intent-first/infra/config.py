@@ -90,7 +90,7 @@ def load_config() -> Config:
             "http://0.0.0.0:8000",
             "app://local",
         ]
-    
+
     return Config(
         api_token=os.environ.get("API_TOKEN") or None,
         dev_no_auth=os.environ.get("DEV_NO_AUTH", "").strip() == "1" or os.environ.get("ENV", "").strip().lower() in ("dev", "development"),

@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Optional, Tuple
 import os
 
-from PIL import Image
 
 from adapters.fs_scanner import safe_open_image
 

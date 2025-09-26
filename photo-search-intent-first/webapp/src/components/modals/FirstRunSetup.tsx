@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { API_BASE } from "../../api";
 import { useSimpleStore } from "../../stores/SimpleStore";
+import { FocusTrap } from "../../utils/accessibility";
 
 type ScanItem = {
 	path: string;
@@ -56,6 +57,10 @@ export default function FirstRunSetup({
 	const incVid = store.state.settings.includeVideos;
 	const setSettings = store.setSettings;
 	const [includeVideos, setIncludeVideos] = useState<boolean>(incVid);
+	const headingId = useId();
+	const descriptionId = useId();
+	const footnoteId = useId();
+	const headingRef = useRef<HTMLHeadingElement | null>(null);
 
 	const total = useMemo(
 		() => items.reduce((a, b) => a + (b.files || 0), 0),
@@ -63,6 +68,18 @@ export default function FirstRunSetup({
 	);
 	const [starting, setStarting] = useState(false);
 	const [status, setStatus] = useState("");
+
+	useEffect(() => {
+		if (!open) return;
+		const frame = requestAnimationFrame(() => {
+			const node = headingRef.current;
+			if (!node) return;
+			try {
+				node.focus();
+			} catch {}
+		});
+		return () => cancelAnimationFrame(frame);
+	}, [open]);
 
 	const chooseWithOS = async () => {
 		try {
@@ -160,21 +177,37 @@ export default function FirstRunSetup({
 
 	if (!open) return null;
 	return (
-		<div className="fixed inset-0 z-[1100] flex items-center justify-center">
-			<button
-				type="button"
+		<div className="fixed inset-0 z-[1100] flex items-center justify-center" role="presentation">
+			<div
 				className="absolute inset-0 bg-black/50"
 				onClick={onClose}
-				aria-label="Close"
+				aria-hidden="true"
+				role="presentation"
 			/>
-			<div className="relative z-[1101] bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-3xl p-5">
-				<div className="text-lg font-semibold mb-2">
-					Welcome — let’s find your photos
-				</div>
-				<div className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-					Get started fast (no cloud, local‑only).
-				</div>
-				<div className="grid md:grid-cols-2 gap-4">
+			<div className="relative z-[1101] w-full max-w-3xl">
+				<FocusTrap onEscape={onClose} autoFocus={false}>
+					<div
+						role="dialog"
+						aria-modal="true"
+						aria-labelledby={headingId}
+						aria-describedby={`${descriptionId} ${footnoteId}`}
+						className="bg-white dark:bg-gray-900 rounded-lg shadow-xl outline-none p-5"
+					>
+						<div
+							id={headingId}
+							ref={headingRef}
+							tabIndex={-1}
+							className="text-lg font-semibold mb-2 text-gray-900 dark:text-gray-100 focus:outline-none"
+						>
+							Welcome — let’s find your photos
+						</div>
+						<p
+							id={descriptionId}
+							className="text-sm text-gray-600 dark:text-gray-300 mb-4"
+						>
+							Get started fast (no cloud, local‑only).
+						</p>
+						<div className="grid md:grid-cols-2 gap-4">
 					<div className="border rounded-lg p-4">
 						<div className="font-medium mb-1">🚀 Quick Start (Recommended)</div>
 						<div className="text-xs text-gray-600 mb-2">
@@ -395,22 +428,24 @@ export default function FirstRunSetup({
 						</button>
 					</div>
 				</div>
-				<div className="mt-4 text-xs text-gray-600">
-					This runs locally; nothing leaves your device.
+					<div className="mt-4 text-xs text-gray-600">
+						This runs locally; nothing leaves your device.
+					</div>
+					<p id={footnoteId} className="text-xs text-gray-600">
+						You can add or remove folders anytime.
+					</p>
+					<div className="mt-3 text-right">
+						<button
+							type="button"
+							className="px-3 py-1 rounded border text-sm"
+							onClick={onClose}
+						>
+							Skip
+						</button>
+					</div>
 				</div>
-				<div className="text-xs text-gray-600">
-					You can add or remove folders anytime.
-				</div>
-				<div className="mt-3 text-right">
-					<button
-						type="button"
-						className="px-3 py-1 rounded border text-sm"
-						onClick={onClose}
-					>
-						Skip
-					</button>
-				</div>
-			</div>
+			</FocusTrap>
 		</div>
+	</div>
 	);
 }

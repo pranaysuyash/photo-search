@@ -671,11 +671,42 @@ body {
 	border-radius: var(--radius-sm);
 }
 
+.progress-bar[data-progress-state="determinate"] {
+	background: var(--color-primary-200);
+}
+
 .progress-bar-fill {
 	height: 100%;
 	background: var(--color-primary-500);
 	animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-	width: 33%;
+	width: var(--progress-bar-percent, 33%);
+	transform-origin: left center;
+}
+
+.progress-bar[data-progress-state="determinate"] .progress-bar-fill {
+	animation: none;
+	transition: width 200ms ease;
+}
+
+/* Onboarding progress indicator */
+.onboarding-progress-track {
+	position: relative;
+	overflow: hidden;
+}
+
+.onboarding-progress-fill {
+	width: var(--onboarding-progress, 0%);
+	transition: width 200ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.onboarding-progress-fill {
+		transition: none;
+	}
+}
+
+[data-reduced-motion="true"] .onboarding-progress-fill {
+	transition: none;
 }
 
 /* Indexed chip enhancements */

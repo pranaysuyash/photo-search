@@ -32,7 +32,7 @@ export async function apiPostAnalyticsEvent(payload: Record<string, unknown>) {
 
 // Import the search history service
 export { searchHistoryService } from "../services/SearchHistoryService";
-export { AuthAPI, apiAuthCheck, apiAuthStatus, apiPing } from "./auth";
+export { apiAuthCheck, apiAuthStatus, apiPing } from "./auth";
 // Utility functions
 export {
 	API_BASE,
@@ -53,10 +53,9 @@ export {
 	apiSavePreset,
 	apiSaveSearch,
 	apiSetCollection,
-	CollectionsAPI,
 } from "./collections";
-export { apiDemoDir, DemoAPI } from "./demo";
-export { apiExport, ExportAPI } from "./export";
+export { apiDemoDir } from "./demo";
+export { apiExport } from "./export";
 export {
 	apiBuildFast,
 	apiBuildMetadata,
@@ -72,9 +71,8 @@ export {
 	apiOcrStatus,
 	apiSetFavorite,
 	apiSetTags,
-	MetadataAPI,
 } from "./metadata";
-export { apiOperationStatus, OperationsAPI } from "./operations";
+export { apiOperationStatus } from "./operations";
 // API Classes (for advanced usage)
 // Backward compatible convenience functions
 export {
@@ -84,9 +82,8 @@ export {
 	apiSearchLikePlus,
 	apiSearchPaginated,
 	apiSearchWorkspace,
-	SearchAPI,
 } from "./search";
-export { apiCreateShare, ShareAPI } from "./share";
+export { apiCreateShare } from "./share";
 export type {
 	BuildParams,
 	CreateShareParams,
@@ -102,4 +99,4 @@ export type {
 	SearchWorkspaceParams,
 	WorkspaceParams,
 } from "./types";
-export { apiWorkspaceAdd, WorkspaceAPI } from "./workspace";
+export { apiWorkspaceAdd } from "./workspace";

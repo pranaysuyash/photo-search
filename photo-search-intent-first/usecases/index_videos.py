@@ -22,16 +22,16 @@ def index_videos(
     embedder = embedder or get_provider(provider, hf_token=hf_token, openai_api_key=openai_api_key)
     store = VideoIndexStore(folder, index_key=getattr(embedder, 'index_id', None))
     store.load()
-    
+
     videos = list_videos(folder)
     new_count = 0
     updated_count = 0
-    
+
     # Process each video
     for video in videos:
         video_path = str(video.path)
         thumbnail_path = store.get_thumbnail_path(video_path)
-        
+
         # Check if video is already indexed
         if video_path in store.state.paths:
             idx = store.state.paths.index(video_path)
@@ -47,17 +47,17 @@ def index_videos(
             # Add new video entry
             store.state.paths.append(video_path)
             store.state.mtimes.append(video.mtime)
-            
+
             # Generate thumbnail
             if extract_video_thumbnail(video.path, thumbnail_path):
                 store.state.thumbnails.append(str(thumbnail_path))
             else:
                 store.state.thumbnails.append("")
-                
+
             new_count += 1
-    
+
     # Save the updated index
     store.save()
     total = len(store.state.paths)
-    
+
     return new_count, updated_count, total

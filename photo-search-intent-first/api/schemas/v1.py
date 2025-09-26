@@ -9,6 +9,10 @@ from __future__ import annotations
 from typing import List, Optional, Annotated
 
 from pydantic import BaseModel, Field
+try:  # Pydantic v2
+    from pydantic import model_validator  # type: ignore
+except Exception:  # pragma: no cover
+    model_validator = None  # type: ignore
 
 
 class SearchRequest(BaseModel):
@@ -63,26 +67,90 @@ class SearchResponse(BaseModel):
     results: List[SearchResultItem] = []
     cached: bool = False
     cache_key: Optional[str] = None
+    fast_backend: Optional[str] = None
+    fast_fallback: Optional[bool] = None
 
 
 class IndexRequest(BaseModel):
-    dir: str
+    """Index build/update request.
+
+    Canonical field is now 'directory'; legacy clients still send 'dir'.
+    We accept either and normalize so existing code using `.dir` continues to work.
+    """
+
+    # Deprecated: prefer 'directory'
+    dir: Optional[str] = Field(default=None, description="Deprecated; use 'directory' instead")
+    directory: Optional[str] = Field(
+        default=None,
+        alias="directory",
+        description="Absolute path to the photo directory",
+    )
     provider: str = "local"
     batch_size: Annotated[int, Field(ge=1, le=2048)] = 32
     hf_token: Optional[str] = None
     openai_key: Optional[str] = None
 
+    if model_validator:  # Pydantic v2 path
+        @model_validator(mode="after")  # type: ignore
+        def _unify_directory(self):  # type: ignore
+            if not self.dir and self.directory:
+                self.dir = self.directory
+            if not self.dir:
+                raise ValueError("directory required")
+            return self
+
+    class Config:
+        allow_population_by_field_name = True  # pydantic v1
+        populate_by_name = True  # pydantic v2
+
 
 class TagsRequest(BaseModel):
-    dir: str
+    """Tag mutation request.
+
+    New canonical field is 'directory'; legacy clients still send 'dir'.
+    We accept either and normalize so existing code using `.dir` continues to work.
+    """
+
+    # Deprecated: prefer 'directory'
+    dir: Optional[str] = Field(default=None, description="Deprecated; use 'directory' instead")
+    directory: Optional[str] = Field(default=None, alias="directory", description="Absolute path to the photo directory")
     path: str
     tags: List[str]
 
+    if model_validator:  # Pydantic v2 path
+        @model_validator(mode="after")  # type: ignore
+        def _unify_directory(self):  # type: ignore
+            if not self.dir and self.directory:
+                self.dir = self.directory
+            if not self.dir:
+                raise ValueError("directory required")
+            return self
+
+    class Config:
+        allow_population_by_field_name = True  # pydantic v1
+        populate_by_name = True  # pydantic v2
+
 
 class FavoritesRequest(BaseModel):
-    dir: str
+    """Favorite toggle request with directory alias migration."""
+
+    dir: Optional[str] = Field(default=None, description="Deprecated; use 'directory'")
+    directory: Optional[str] = Field(default=None, alias="directory", description="Absolute path to the photo directory")
     path: str
     favorite: bool = True
+
+    if model_validator:  # Pydantic v2
+        @model_validator(mode="after")  # type: ignore
+        def _unify_directory(self):  # type: ignore
+            if not self.dir and self.directory:
+                self.dir = self.directory
+            if not self.dir:
+                raise ValueError("directory required")
+            return self
+
+    class Config:
+        allow_population_by_field_name = True
+        populate_by_name = True
 
 
 __all__ = [

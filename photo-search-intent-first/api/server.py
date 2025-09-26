@@ -4,13 +4,14 @@ import json
 import logging
 import os
 import shutil
+import platform
 import time
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, TypeVar
 
-from fastapi import Body, FastAPI, HTTPException
+from fastapi import Body, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, Response, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel
 from datetime import datetime, timezone
 
@@ -22,6 +23,12 @@ from api.schemas.v1 import (
     TagsRequest,
     FavoritesRequest,
 )
+from api.search_models import (
+    SearchRequest as UnifiedSearchRequest,
+    build_unified_request_from_flat,
+    PaginatedSearchRequest,
+    PaginatedSearchResponse,
+)
 from api.routers.analytics import router as analytics_router
 from api.routers.indexing import router as indexing_router
 from api.routers.config import router as config_router
@@ -29,6 +36,7 @@ from infra.analytics import log_search, _analytics_file, _write_event as _write_
 from infra.collections import load_collections, save_collections, load_smart_collections, save_smart_collections
 from infra.config import config
 from infra.index_store import IndexStore
+from infra.fast_index import FastIndexManager
 from infra.tags import load_tags, save_tags, all_tags
 from infra.trips import build_trips as _build_trips, load_trips as _load_trips
 from infra.faces import (
@@ -313,41 +321,95 @@ def _scan_media_counts(paths: List[str], include_videos: bool = True) -> Dict[st
     return {"items": items, "total_files": total_files, "total_bytes": total_bytes}
 @app.post("/search")
 def api_search(req: SearchRequest) -> SearchResponse:
-    """Search for photos using semantic similarity and advanced filtering."""
-    # Extract parameters from request model
-    dir_value = req.dir
-    query_value = req.query
-    top_k_value = req.top_k
-    provider_value = req.provider
-    hf_token_value = req.hf_token
-    openai_key_value = req.openai_key
-    use_fast_value = req.use_fast
-    fast_kind_value = req.fast_kind
-    use_captions_value = req.use_captions
-    use_ocr_value = req.use_ocr
-    favorites_only_value = req.favorites_only
-    tags_value = req.tags
-    date_from_value = req.date_from
-    date_to_value = req.date_to
-    camera_value = req.camera
-    iso_min_value = req.iso_min
-    iso_max_value = req.iso_max
-    f_min_value = req.f_min
-    f_max_value = req.f_max
-    flash_value = req.flash
-    wb_value = req.wb
-    metering_value = req.metering
-    alt_min_value = req.alt_min
-    alt_max_value = req.alt_max
-    heading_min_value = req.heading_min
-    heading_max_value = req.heading_max
-    place_value = req.place
-    has_text_value = req.has_text
-    person_value = req.person
-    persons_value = req.persons
-    sharp_only_value = req.sharp_only
-    exclude_under_value = req.exclude_underexp
-    exclude_over_value = req.exclude_overexp
+    """Search for photos using semantic similarity and advanced filtering.
+
+    Migration note: This endpoint is being refactored to use the unified
+    ``UnifiedSearchRequest`` model. For now we construct the unified model and
+    then operate directly on it (rather than duplicating per-field *_value
+    variables). A legacy dict bridge is retained temporarily for any code that
+    still expects the old flat names; this will be removed once downstream
+    helpers are updated.
+    """
+
+    # Build unified request (robust to unexpected legacy fields)
+    try:
+        unified_req = UnifiedSearchRequest.from_query_params(req.dict(by_alias=True))
+    except Exception:
+        # Fallback: wrap the original (should be rare); still proceed to avoid regression
+        unified_req = UnifiedSearchRequest(
+            directory=req.dir,
+            query=req.query,
+            top_k=req.top_k,
+            provider=req.provider or "local",
+            hf_token=req.hf_token,
+            openai_key=req.openai_key,
+            use_fast=req.use_fast,
+            fast_kind=req.fast_kind,
+            use_captions=req.use_captions,
+            use_ocr=req.use_ocr,
+            favorites_only=req.favorites_only,
+            tags=req.tags,
+            date_from=req.date_from,
+            date_to=req.date_to,
+            camera=req.camera,
+            iso_min=req.iso_min,
+            iso_max=req.iso_max,
+            f_min=req.f_min,
+            f_max=req.f_max,
+            flash=req.flash,
+            wb=req.wb,
+            metering=req.metering,
+            alt_min=req.alt_min,
+            alt_max=req.alt_max,
+            heading_min=req.heading_min,
+            heading_max=req.heading_max,
+            place=req.place,
+            has_text=req.has_text,
+            person=req.person,
+            persons=req.persons,
+            sharp_only=req.sharp_only,
+            exclude_underexp=req.exclude_underexp,
+            exclude_overexp=req.exclude_overexp,
+        )
+
+    # Temporary bridge (parity / potential logging)
+    # legacy_params = unified_req.to_legacy_param_dict()  # noqa: E800 (uncomment for debugging parity)
+
+    legacy_params = unified_req.to_legacy_param_dict()
+
+    dir_value = legacy_params.get("dir")
+    query_value = legacy_params.get("query")
+    top_k_value = legacy_params.get("top_k", 48)
+    provider_value = legacy_params.get("provider") or "local"
+    hf_token_value = legacy_params.get("hf_token")
+    openai_key_value = legacy_params.get("openai_key")
+    use_fast_value = bool(legacy_params.get("use_fast"))
+    fast_kind_value = legacy_params.get("fast_kind")
+    use_captions_value = bool(legacy_params.get("use_captions"))
+    use_ocr_value = bool(legacy_params.get("use_ocr"))
+    favorites_only_value = bool(legacy_params.get("favorites_only"))
+    tags_value = legacy_params.get("tags") or []
+    date_from_value = legacy_params.get("date_from")
+    date_to_value = legacy_params.get("date_to")
+    camera_value = legacy_params.get("camera")
+    iso_min_value = legacy_params.get("iso_min")
+    iso_max_value = legacy_params.get("iso_max")
+    f_min_value = legacy_params.get("f_min")
+    f_max_value = legacy_params.get("f_max")
+    flash_value = legacy_params.get("flash")
+    wb_value = legacy_params.get("wb")
+    metering_value = legacy_params.get("metering")
+    alt_min_value = legacy_params.get("alt_min")
+    alt_max_value = legacy_params.get("alt_max")
+    heading_min_value = legacy_params.get("heading_min")
+    heading_max_value = legacy_params.get("heading_max")
+    place_value = legacy_params.get("place")
+    has_text_value = legacy_params.get("has_text")
+    person_value = legacy_params.get("person")
+    persons_value = legacy_params.get("persons")
+    sharp_only_value = legacy_params.get("sharp_only")
+    exclude_under_value = legacy_params.get("exclude_underexp")
+    exclude_over_value = legacy_params.get("exclude_overexp")
 
     # Validate directory
     if not dir_value:
@@ -388,23 +450,11 @@ def api_search(req: SearchRequest) -> SearchResponse:
     bright_map: Dict[str, Optional[float]] = {}
 
     # Primary semantic search
+    fast_meta = None
     if use_fast_value:
+        fim = FastIndexManager(store)
         try:
-            if fast_kind_value and fast_kind_value.lower() == 'faiss' and store.faiss_status().get('exists'):
-                results = store.search_faiss(emb, query_value, top_k_value)
-            elif fast_kind_value and fast_kind_value.lower() == 'hnsw' and store.hnsw_status().get('exists'):
-                results = store.search_hnsw(emb, query_value, top_k_value)
-            elif fast_kind_value and fast_kind_value.lower() == 'annoy' and store.ann_status().get('exists'):
-                results = store.search_annoy(emb, query_value, top_k_value)
-            else:
-                if store.faiss_status().get('exists'):
-                    results = store.search_faiss(emb, query_value, top_k_value)
-                elif store.hnsw_status().get('exists'):
-                    results = store.search_hnsw(emb, query_value, top_k_value)
-                elif store.ann_status().get('exists'):
-                    results = store.search_annoy(emb, query_value, top_k_value)
-                else:
-                    results = store.search(emb, query_value, top_k_value)
+            results, fast_meta = fim.search(emb, query_value, top_k=top_k_value, use_fast=True, fast_kind_hint=fast_kind_value)
         except Exception:
             results = store.search(emb, query_value, top_k_value)
     else:
@@ -689,7 +739,8 @@ def api_search(req: SearchRequest) -> SearchResponse:
                     texts_map_local = {p: (t or '') for p, t in zip(d.get('paths', []), d.get('texts', []))}
                 except Exception:
                     pass
-                meta_maps: Dict[str, Dict[str, Optional[float]]] = {}
+                # Removed unused meta_maps assignment (was never referenced)
+                # meta_maps: Dict[str, Dict[str, Optional[float]]] = {}
                 mt_map: Dict[str, float] = {p: float(mt) for p, mt in zip(store.state.paths or [], store.state.mtimes or [])}
                 iso_map_local: Dict[str, Optional[int]] = {}
                 f_map_local: Dict[str, Optional[float]] = {}
@@ -847,11 +898,21 @@ def api_search(req: SearchRequest) -> SearchResponse:
     sid = log_search(store.index_dir, getattr(emb, 'index_id', 'default'), query_value, [(str(r.path), float(r.score)) for r in out])
 
     # Return structured response using SearchResponse schema
-    return SearchResponse(
+    resp = SearchResponse(
         search_id=sid,
         results=[SearchResultItem(path=str(r.path), score=float(r.score)) for r in out],
         cached=False
     )
+    if fast_meta:
+        try:
+            resp.fast_backend = fast_meta.get('backend', 'exact')
+            resp.fast_fallback = bool(fast_meta.get('fallback'))
+        except Exception:
+            pass
+    elif use_fast_value:
+        resp.fast_backend = resp.fast_backend or 'exact'
+        resp.fast_fallback = True
+    return resp
     # End search handler
 
 
@@ -911,7 +972,7 @@ def api_watch_status() -> Dict[str, Any]:
 # Sharing APIs
 @app.post("/share")
 def api_share(
-    dir: Optional[str] = None,
+    directory: Optional[str] = Query(None, alias="dir"),
     provider: Optional[str] = None,
     paths: Optional[List[str]] = None,
     expiry_hours: Optional[int] = None,
@@ -919,14 +980,16 @@ def api_share(
     view_only: Optional[bool] = None,
     body: Optional[Dict[str, Any]] = Body(None),
 ) -> Dict[str, Any]:
-    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    # Accept new 'directory' name or legacy 'dir' for backward compatibility
+    directory_value = _from_body(body, directory, "directory") or _from_body(body, directory, "dir")
+    directory_value = _require(directory_value, "directory")
     provider_value = _from_body(body, provider, "provider", default="local") or "local"
     paths_value = _from_body(body, paths, "paths", default=[], cast=_as_str_list) or []
     expiry_value = _from_body(body, expiry_hours, "expiry_hours", default=24, cast=lambda v: int(v))
     password_value = _from_body(body, password, "password")
     view_only_value = _from_body(body, view_only, "view_only", default=True, cast=_as_bool)
 
-    folder = Path(dir_value)
+    folder = Path(directory_value)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
     try:
@@ -945,9 +1008,9 @@ def api_share(
 
 
 @app.get("/share")
-def api_share_list(dir: Optional[str] = None) -> Dict[str, Any]:
+def api_share_list(directory: Optional[str] = Query(None, alias="dir")) -> Dict[str, Any]:
     try:
-        items = _share_list(dir_filter=dir)
+        items = _share_list(dir_filter=directory)
         out: List[Dict[str, Any]] = []
         for it in items:
             out.append({
@@ -1130,8 +1193,8 @@ async def _auth_middleware(request, call_next):
             response = await call_next(request)
             return response
         # Enforce Authorization for mutating methods and analytics endpoints
-        if (request.method in ("POST", "PUT", "PATCH", "DELETE") or 
-            path in {"/analytics", "/api/analytics"} or 
+        if (request.method in ("POST", "PUT", "PATCH", "DELETE") or
+            path in {"/analytics", "/api/analytics"} or
             path.startswith(("/analytics/", "/api/analytics/"))):
             auth = request.headers.get("authorization") or request.headers.get("Authorization")
             if not auth or auth != f"Bearer {config.api_token}":
@@ -1161,8 +1224,8 @@ async def _auth_middleware(request, call_next):
 
 # Exclude patterns per directory (privacy filters)
 @app.get("/settings/excludes")
-def api_get_excludes(dir: str) -> Dict[str, Any]:
-    folder = Path(dir)
+def api_get_excludes(directory: str = Query(..., alias="dir")) -> Dict[str, Any]:
+    folder = Path(directory)
     cfg = folder / ".photo_index" / "excludes.json"
     try:
         if cfg.exists():
@@ -1195,20 +1258,20 @@ class IndexRequest(BaseModel):
 @app.post("/index")
 def api_index(req: IndexRequest) -> Dict[str, Any]:
     folder = Path(req.dir)
-    
+
     # Validate folder path
     if not folder:
         raise HTTPException(400, "Folder path is required")
-    
+
     folder = folder.expanduser().resolve()
-    
+
     # Check if folder exists and is accessible
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
-    
+
     if not folder.is_dir():
         raise HTTPException(400, "Path is not a directory")
-    
+
     try:
         # Test if we can read the directory
         next(folder.iterdir(), None)
@@ -1216,16 +1279,16 @@ def api_index(req: IndexRequest) -> Dict[str, Any]:
         raise HTTPException(403, "Permission denied to access folder")
     except Exception as e:
         raise HTTPException(400, f"Cannot access folder: {str(e)}")
-    
+
     emb = _emb(req.provider, req.hf_token, req.openai_key)
-    
+
     # Generate unique job ID for this indexing operation
     import uuid
     job_id = f"index-{uuid.uuid4().hex[:8]}"
-    
+
     new_c, upd_c, total = index_photos(
-        folder, 
-        batch_size=req.batch_size, 
+        folder,
+        batch_size=req.batch_size,
         embedder=emb,
         job_id=job_id
     )
@@ -1273,11 +1336,11 @@ def api_watch_start(req: WatchReq) -> Dict[str, Any]:
 
 @app.post("/watch/stop")
 def api_watch_stop(
-    dir: Optional[str] = None,
+    directory: Optional[str] = Query(None, alias="dir"),
     body: Optional[Dict[str, Any]] = Body(None),
 ) -> Dict[str, Any]:
-    dir_value = _require(_from_body(body, dir, "dir"), "dir")
-    folder = Path(dir_value)
+    directory_value = _require(_from_body(body, directory, "directory") or _from_body(body, directory, "dir"), "directory")
+    folder = Path(directory_value)
     _WATCH.stop(folder)
     return {"ok": True}
 
@@ -1285,8 +1348,17 @@ def api_watch_stop(
 # Model management (minimal)
 @app.get("/models/capabilities")
 def api_models_capabilities() -> Dict[str, Any]:
+    """Report availability of optional ML libraries without importing heavy modules unnecessarily.
+
+    Uses importlib.util.find_spec to avoid triggering Pylint unused-import warnings while still
+    cheaply detecting whether packages are installed. Torch is imported (if present) to probe
+    CUDA/MPS capabilities which require runtime introspection.
+    """
+    import importlib.util
+
     caps: Dict[str, Any] = {"transformers": False, "torch": False, "cuda": False, "mps": False}
-    try:
+    # Torch (needed to check backend capabilities)
+    try:  # pragma: no cover - environment dependent
         import torch  # type: ignore
         caps["torch"] = True
         caps["cuda"] = bool(getattr(torch, "cuda", None) and torch.cuda.is_available())
@@ -1294,9 +1366,9 @@ def api_models_capabilities() -> Dict[str, Any]:
         caps["mps"] = bool(mps and mps.is_available())
     except Exception:
         pass
+    # Transformers (lightweight spec check to avoid importing large libs if not needed)
     try:
-        import transformers  # type: ignore
-        caps["transformers"] = True
+        caps["transformers"] = importlib.util.find_spec("transformers") is not None
     except Exception:
         pass
     return {"ok": True, "capabilities": caps}
@@ -1377,7 +1449,6 @@ def api_models_validate(req: ModelValidateReq) -> Dict[str, Any]:
         config_path = model_dir / "config.json"
         if config_path.exists():
             try:
-                import json
                 with open(config_path, 'r', encoding='utf-8') as f:
                     config = json.load(f)
                     model_info = {
@@ -1407,12 +1478,12 @@ def api_models_validate(req: ModelValidateReq) -> Dict[str, Any]:
 
 @app.post("/data/nuke")
 def api_data_nuke(
-    dir: Optional[str] = None,
-    all: Optional[bool] = None,
+    directory: Optional[str] = Query(None, alias="dir"),
+    all_data: Optional[bool] = None,
     body: Optional[Dict[str, Any]] = Body(None),
 ) -> Dict[str, Any]:
     try:
-        wipe_all = _from_body(body, all, "all", default=False, cast=_as_bool) or False
+        wipe_all = _from_body(body, all_data, "all", default=False, cast=_as_bool) or False
         if wipe_all:
             base = os.environ.get("PS_APPDATA_DIR", "").strip()
             if base:
@@ -1424,10 +1495,10 @@ def api_data_nuke(
                     raise HTTPException(400, "Unsafe app data path")
             else:
                 raise HTTPException(400, "PS_APPDATA_DIR not set")
-        dir_value = _from_body(body, dir, "dir")
-        if not dir_value:
-            raise HTTPException(400, "dir required unless all=1")
-        folder = Path(dir_value)
+        directory_value = _from_body(body, directory, "directory") or _from_body(body, directory, "dir")
+        if not directory_value:
+            raise HTTPException(400, "directory required unless all=1")
+        folder = Path(directory_value)
         emb = _emb("local", None, None)
         store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
         idx = store.index_dir
@@ -1440,9 +1511,43 @@ def api_data_nuke(
         raise HTTPException(500, f"Failed to clear data: {e}")
 
 
+# Fast index management -------------------------------------------------------
+@app.post("/fast/build")
+def api_fast_build(
+    dir: Optional[str] = None,
+    kind: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    kind_value = _require(_from_body(body, kind, "kind"), "kind").lower()
+    if kind_value not in {"faiss", "hnsw", "annoy"}:
+        raise HTTPException(400, "Invalid kind; expected faiss|hnsw|annoy")
+    folder = Path(dir_value)
+    if not folder.exists():
+        raise HTTPException(400, "Folder not found")
+    emb = _emb("local", None, None)
+    store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
+    store.load()
+    fim = FastIndexManager(store)
+    ok = fim.build(kind_value)
+    return {"ok": bool(ok), "kind": kind_value}
+
+
+@app.get("/fast/status")
+def api_fast_status(directory: str = Query(..., alias="dir"), provider: str = "local", hf_token: Optional[str] = None, openai_key: Optional[str] = None) -> Dict[str, Any]:
+    folder = Path(directory)
+    if not folder.exists():
+        raise HTTPException(400, "Folder not found")
+    emb = _emb(provider, hf_token, openai_key)
+    store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
+    store.load()
+    fim = FastIndexManager(store)
+    return fim.status()
+
+
 @app.get("/index/status")
-def api_index_status(dir: str, provider: str = "local", hf_token: Optional[str] = None, openai_key: Optional[str] = None) -> Dict[str, Any]:
-    folder = Path(dir)
+def api_index_status(directory: str = Query(..., alias="dir"), provider: str = "local", hf_token: Optional[str] = None, openai_key: Optional[str] = None) -> Dict[str, Any]:
+    folder = Path(directory)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
     emb = _emb(provider, hf_token, openai_key)
@@ -1568,7 +1673,7 @@ def api_index_resume(
 
 @app.post("/search/cached")
 def api_search_cached(
-    dir: Optional[str] = None,
+    directory: Optional[str] = None,
     query: Optional[str] = None,
     top_k: Optional[int] = None,
     provider: Optional[str] = None,
@@ -1582,9 +1687,9 @@ def api_search_cached(
     body: Optional[Dict[str, Any]] = Body(None),
 ) -> Dict[str, Any]:
     """Cached search that reuses previous results when possible."""
-    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    dir_value = _require(_from_body(body, directory, "dir"), "dir")
     query_value = _require(_from_body(body, query, "query"), "query")
-    top_k_value = _from_body(body, top_k, "top_k", default=12, cast=lambda v: int(v)) or 12
+    top_k_value = _from_body(body, top_k, "top_k", default=12, cast=int) or 12
     provider_value = _from_body(body, provider, "provider", default="local") or "local"
     cache_key_value = _from_body(body, cache_key, "cache_key")
     hf_token_value = _from_body(body, hf_token, "hf_token")
@@ -1728,8 +1833,8 @@ def api_build_faces(
 
 
 @app.get("/faces/clusters")
-def api_faces_clusters(dir: str) -> Dict[str, Any]:
-    store = IndexStore(Path(dir))
+def api_faces_clusters(directory: str = Query(..., alias="dir")) -> Dict[str, Any]:
+    store = IndexStore(Path(directory))
     items = _face_list(store.index_dir)
     return {"clusters": items}
 
@@ -1773,8 +1878,8 @@ def api_trips_build(
 
 
 @app.get("/trips")
-def api_trips_list(dir: str) -> Dict[str, Any]:
-    store = IndexStore(Path(dir))
+def api_trips_list(directory: str = Query(..., alias="dir")) -> Dict[str, Any]:
+    store = IndexStore(Path(directory))
     return {"trips": _load_trips(store.index_dir)}
 
 
@@ -1798,7 +1903,7 @@ def api_search_workspace(
 ) -> Dict[str, Any]:
     dir_value = _require(_from_body(body, dir, "dir"), "dir")
     query_value = _require(_from_body(body, query, "query"), "query")
-    top_k_value = _from_body(body, top_k, "top_k", default=12, cast=lambda v: int(v)) or 12
+    top_k_value = _from_body(body, top_k, "top_k", default=12, cast=int) or 12
     provider_value = _from_body(body, provider, "provider", default="local") or "local"
     hf_token_value = _from_body(body, hf_token, "hf_token")
     openai_key_value = _from_body(body, openai_key, "openai_key")
@@ -1817,7 +1922,6 @@ def api_search_workspace(
     emb = _emb(provider_value, hf_token_value, openai_key_value)
     primary = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
     primary.load()
-    from infra.workspace import load_workspace
     stores: List[IndexStore] = [primary]
     for f in load_workspace():
         p = Path(f)
@@ -1915,8 +2019,8 @@ def api_search_workspace(
 
 
 @app.get("/favorites")
-def api_get_favorites(dir: str) -> Dict[str, Any]:
-    store = IndexStore(Path(dir))
+def api_get_favorites(directory: str = Query(..., alias="dir")) -> Dict[str, Any]:
+    store = IndexStore(Path(directory))
     coll = load_collections(store.index_dir)
     return {"favorites": coll.get('Favorites', [])}
 
@@ -1937,8 +2041,8 @@ def api_set_favorite(req: FavoritesRequest) -> Dict[str, Any]:
 
 
 @app.get("/tags")
-def api_get_tags(dir: str) -> Dict[str, Any]:
-    store = IndexStore(Path(dir))
+def api_get_tags(directory: str = Query(..., alias="dir")) -> Dict[str, Any]:
+    store = IndexStore(Path(directory))
     return {"tags": load_tags(store.index_dir), "all": all_tags(store.index_dir)}
 
 
@@ -1952,8 +2056,8 @@ def api_set_tags(req: TagsRequest) -> Dict[str, Any]:
 
 
 @app.get("/saved")
-def api_get_saved(dir: str) -> Dict[str, Any]:
-    store = IndexStore(Path(dir))
+def api_get_saved(directory: str = Query(..., alias="dir")) -> Dict[str, Any]:
+    store = IndexStore(Path(directory))
     return {"saved": load_saved(store.index_dir)}
 
 
@@ -1968,7 +2072,7 @@ def api_add_saved(
     dir_value = _require(_from_body(body, dir, "dir"), "dir")
     name_value = _require(_from_body(body, name, "name"), "name")
     query_value = _require(_from_body(body, query, "query"), "query")
-    top_k_value = _from_body(body, top_k, "top_k", default=12, cast=lambda v: int(v)) or 12
+    top_k_value = _from_body(body, top_k, "top_k", default=12, cast=int) or 12
 
     store = IndexStore(Path(dir_value))
     saved = load_saved(store.index_dir)
@@ -1996,8 +2100,8 @@ def api_delete_saved(
 
 # Presets (boolean query templates)
 @app.get("/presets")
-def api_get_presets(dir: str) -> Dict[str, Any]:
-    store = IndexStore(Path(dir))
+def api_get_presets(directory: str = Query(..., alias="dir")) -> Dict[str, Any]:
+    store = IndexStore(Path(directory))
     return {"presets": load_presets(store.index_dir)}
 
 
@@ -2047,8 +2151,8 @@ def api_delete_preset(
 
 # Collections CRUD
 @app.get("/collections")
-def api_get_collections(dir: str) -> Dict[str, Any]:
-    store = IndexStore(Path(dir))
+def api_get_collections(directory: str = Query(..., alias="dir")) -> Dict[str, Any]:
+    store = IndexStore(Path(directory))
     return {"collections": load_collections(store.index_dir)}
 
 @app.post("/collections")
@@ -2088,8 +2192,8 @@ def api_delete_collection(
 
 # Smart Collections CRUD + resolve
 @app.get("/smart_collections")
-def api_get_smart_collections(dir: str) -> Dict[str, Any]:
-    store = IndexStore(Path(dir))
+def api_get_smart_collections(directory: str = Query(..., alias="dir")) -> Dict[str, Any]:
+    store = IndexStore(Path(directory))
     return {"smart": load_smart_collections(store.index_dir)}
 
 
@@ -2142,7 +2246,7 @@ def api_resolve_smart_collection(
     dir_value = _require(_from_body(body, dir, "dir"), "dir")
     name_value = _require(_from_body(body, name, "name"), "name")
     provider_value = _from_body(body, provider, "provider", default="local") or "local"
-    top_k_value = _from_body(body, top_k, "top_k", default=24, cast=lambda v: int(v)) or 24
+    top_k_value = _from_body(body, top_k, "top_k", default=24, cast=int) or 24
     hf_token_value = _from_body(body, hf_token, "hf_token")
     openai_key_value = _from_body(body, openai_key, "openai_key")
 
@@ -2163,7 +2267,7 @@ def api_resolve_smart_collection(
     date_from = rules.get('dateFrom'); date_to = rules.get('dateTo')
     use_captions = bool(rules.get('useCaptions'))
     use_ocr = bool(rules.get('useOcr'))
-    place = rules.get('place'); person = rules.get('person'); persons = rules.get('persons') or None; has_text = bool(rules.get('hasText'))
+    place = rules.get('place'); person = rules.get('person'); persons = rules.get('persons') or None
     camera = rules.get('camera'); iso_min = rules.get('isoMin'); iso_max = rules.get('isoMax')
     f_min = rules.get('fMin'); f_max = rules.get('fMax')
     flash = rules.get('flash'); wb = rules.get('wb'); metering = rules.get('metering')
@@ -2375,226 +2479,7 @@ def api_resolve_smart_collection(
     return {"search_id": sid, "results": [{"path": str(r.path), "score": float(r.score)} for r in out]}
 
 
-# Progressive Loading APIs
-@app.post("/search/paginated")
-def api_search_paginated(
-    dir: Optional[str] = None,
-    query: Optional[str] = None,
-    provider: Optional[str] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
-    hf_token: Optional[str] = None,
-    openai_key: Optional[str] = None,
-    favorites_only: Optional[bool] = None,
-    tags: Optional[List[str]] = None,
-    date_from: Optional[float] = None,
-    date_to: Optional[float] = None,
-    use_fast: Optional[bool] = None,
-    fast_kind: Optional[str] = None,
-    use_captions: Optional[bool] = None,
-    use_ocr: Optional[bool] = None,
-    camera: Optional[str] = None,
-    iso_min: Optional[int] = None,
-    iso_max: Optional[int] = None,
-    f_min: Optional[float] = None,
-    f_max: Optional[float] = None,
-    place: Optional[str] = None,
-    flash: Optional[str] = None,
-    wb: Optional[str] = None,
-    metering: Optional[str] = None,
-    alt_min: Optional[float] = None,
-    alt_max: Optional[float] = None,
-    heading_min: Optional[float] = None,
-    heading_max: Optional[float] = None,
-    sharp_only: Optional[bool] = None,
-    exclude_underexp: Optional[bool] = None,
-    exclude_overexp: Optional[bool] = None,
-    has_text: Optional[bool] = None,
-    person: Optional[str] = None,
-    persons: Optional[List[str]] = None,
-    body: Optional[Dict[str, Any]] = Body(None),
-) -> Dict[str, Any]:
-    """Paginated search with cursor support for large result sets."""
-    dir_value = _require(_from_body(body, dir, "dir"), "dir")
-    query_value = _require(_from_body(body, query, "query"), "query")
-    provider_value = _from_body(body, provider, "provider", default="local") or "local"
-    limit_value = _from_body(body, limit, "limit", default=24, cast=lambda v: int(v)) or 24
-    offset_value = _from_body(body, offset, "offset", default=0, cast=lambda v: int(v)) or 0
-    hf_token_value = _from_body(body, hf_token, "hf_token")
-    openai_key_value = _from_body(body, openai_key, "openai_key")
-    favorites_value = _from_body(body, favorites_only, "favorites_only", default=False, cast=_as_bool) or False
-    tags_value = _from_body(body, tags, "tags", default=[], cast=_as_str_list) or []
-    date_from_value = _from_body(body, date_from, "date_from")
-    date_to_value = _from_body(body, date_to, "date_to")
-    use_fast_value = _from_body(body, use_fast, "use_fast", default=False, cast=_as_bool) or False
-    fast_kind_value = _from_body(body, fast_kind, "fast_kind")
-    use_captions_value = _from_body(body, use_captions, "use_captions", default=False, cast=_as_bool) or False
-    use_ocr_value = _from_body(body, use_ocr, "use_ocr", default=False, cast=_as_bool) or False
-    camera_value = _from_body(body, camera, "camera")
-    iso_min_value = _from_body(body, iso_min, "iso_min")
-    iso_max_value = _from_body(body, iso_max, "iso_max")
-    f_min_value = _from_body(body, f_min, "f_min")
-    f_max_value = _from_body(body, f_max, "f_max")
-    place_value = _from_body(body, place, "place")
-    flash_value = _from_body(body, flash, "flash")
-    wb_value = _from_body(body, wb, "wb")
-    metering_value = _from_body(body, metering, "metering")
-    alt_min_value = _from_body(body, alt_min, "alt_min")
-    alt_max_value = _from_body(body, alt_max, "alt_max")
-    heading_min_value = _from_body(body, heading_min, "heading_min")
-    heading_max_value = _from_body(body, heading_max, "heading_max")
-    sharp_only_value = _from_body(body, sharp_only, "sharp_only", default=False, cast=_as_bool) or False
-    exclude_under_value = _from_body(body, exclude_underexp, "exclude_underexp", default=False, cast=_as_bool) or False
-    exclude_over_value = _from_body(body, exclude_overexp, "exclude_overexp", default=False, cast=_as_bool) or False
-    has_text_value = _from_body(body, has_text, "has_text", default=False, cast=_as_bool) or False
-    person_value = _from_body(body, person, "person")
-    persons_value = _from_body(body, persons, "persons", default=[], cast=_as_str_list) or []
-
-    folder = Path(dir_value)
-    if not folder.exists():
-        raise HTTPException(400, "Folder not found")
-
-    emb = _emb(provider_value, hf_token_value, openai_key_value)
-    store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
-    store.load()
-
-    # Get more results than needed for pagination
-    search_top_k = min(limit_value + offset_value + 50, len(store.state.paths or []))
-
-    if use_fast_value:
-        try:
-            if fast_kind_value and fast_kind_value.lower() == 'faiss' and store.faiss_status().get('exists'):
-                results = store.search_faiss(emb, query_value, top_k=search_top_k)
-            elif fast_kind_value and fast_kind_value.lower() == 'hnsw' and store.hnsw_status().get('exists'):
-                results = store.search_hnsw(emb, query_value, top_k=search_top_k)
-            elif fast_kind_value and fast_kind_value.lower() == 'annoy' and store.ann_status().get('exists'):
-                results = store.search_annoy(emb, query_value, top_k=search_top_k)
-            else:
-                if store.faiss_status().get('exists'):
-                    results = store.search_faiss(emb, query_value, top_k=search_top_k)
-                elif store.hnsw_status().get('exists'):
-                    results = store.search_hnsw(emb, query_value, top_k=search_top_k)
-                elif store.ann_status().get('exists'):
-                    results = store.search_annoy(emb, query_value, top_k=search_top_k)
-                else:
-                    results = store.search(emb, query_value, top_k=search_top_k)
-        except Exception:
-            results = store.search(emb, query_value, top_k=search_top_k)
-    else:
-        if use_captions_value and store.captions_available():
-            results = store.search_with_captions(emb, query_value, top_k=search_top_k)
-        elif use_ocr_value and store.ocr_available():
-            results = store.search_with_ocr(emb, query_value, top_k=search_top_k)
-        else:
-            results = store.search(emb, query_value, top_k=search_top_k)
-
-    out = results
-
-    # Apply filters (simplified version)
-    if favorites_value:
-        coll = load_collections(store.index_dir)
-        favs = set(coll.get('Favorites', []))
-        out = [r for r in out if str(r.path) in favs]
-
-    if tags_value:
-        tmap = load_tags(store.index_dir)
-        req = set(tags_value)
-        out = [r for r in out if req.issubset(set(tmap.get(str(r.path), [])))]
-
-    if date_from_value is not None and date_to_value is not None:
-        mmap = {sp: float(mt) for sp, mt in zip(store.state.paths or [], store.state.mtimes or [])}
-        out = [r for r in out if date_from_value <= mmap.get(str(r.path), 0.0) <= date_to_value]
-
-    # Apply pagination
-    total = len(out)
-    paginated_results = out[offset_value:offset_value + limit_value]
-
-    sid = log_search(store.index_dir, getattr(emb, 'index_id', 'default'), query_value, [(str(r.path), float(r.score)) for r in out])
-
-    return {
-        "search_id": sid,
-        "results": [{"path": str(r.path), "score": float(r.score)} for r in paginated_results],
-        "pagination": {
-            "offset": offset_value,
-            "limit": limit_value,
-            "total": total,
-            "has_more": offset_value + limit_value < total
-        }
-    }
-
-
-# Video Search API
-@app.post("/search_video")
-def api_search_video(
-    dir: Optional[str] = None,
-    query: Optional[str] = None,
-    top_k: Optional[int] = None,
-    provider: Optional[str] = None,
-    hf_token: Optional[str] = None,
-    openai_key: Optional[str] = None,
-    body: Optional[Dict[str, Any]] = Body(None),
-) -> Dict[str, Any]:
-    """Search for videos using semantic search on extracted metadata and keyframes."""
-    dir_value = _require(_from_body(body, dir, "dir"), "dir")
-    query_value = _require(_from_body(body, query, "query"), "query")
-    top_k_value = _from_body(body, top_k, "top_k", default=12, cast=lambda v: int(v)) or 12
-    provider_value = _from_body(body, provider, "provider", default="local") or "local"
-    hf_token_value = _from_body(body, hf_token, "hf_token")
-    openai_key_value = _from_body(body, openai_key, "openai_key")
-
-    folder = Path(dir_value)
-    if not folder.exists():
-        raise HTTPException(400, "Folder not found")
-
-    # Get video index store
-    video_store = VideoIndexStore(folder)
-    if not video_store.load():
-        return {"results": []}
-
-    # Embed query
-    emb = _emb(provider_value, hf_token_value, openai_key_value)
-    try:
-        qv = emb.embed_text(query_value)
-    except Exception:
-        raise HTTPException(500, "Embedding failed")
-
-    # Search in video store
-    results = video_store.search(qv, top_k=top_k_value)
-
-    return {"results": [{"path": r.path, "score": float(r.score)} for r in results]}
-
-
-@app.post("/search_video_like")
-def api_search_video_like(
-    dir: Optional[str] = None,
-    path: Optional[str] = None,
-    top_k: Optional[int] = None,
-    provider: Optional[str] = None,
-    hf_token: Optional[str] = None,
-    openai_key: Optional[str] = None,
-    body: Optional[Dict[str, Any]] = Body(None),
-) -> Dict[str, Any]:
-    """Find visually similar videos based on a reference video."""
-    dir_value = _require(_from_body(body, dir, "dir"), "dir")
-    path_value = _require(_from_body(body, path, "path"), "path")
-    top_k_value = _from_body(body, top_k, "top_k", default=12, cast=lambda v: int(v)) or 12
-    provider_value = _from_body(body, provider, "provider", default="local") or "local"
-    hf_token_value = _from_body(body, hf_token, "hf_token")
-    openai_key_value = _from_body(body, openai_key, "openai_key")
-
-    folder = Path(dir_value)
-    if not folder.exists():
-        raise HTTPException(400, "Folder not found")
-
-    # Get video index store
-    video_store = VideoIndexStore(folder)
-    if not video_store.load():
-        return {"results": []}
-
-    # Search for similar videos
-    results = video_store.search_like(path_value, top_k=top_k_value)
-
-    return {"results": [{"path": r.path, "score": float(r.score)} for r in results]}
+## Removed duplicate definitions of search_paginated, search_video, search_video_like (originals kept earlier in file)
 @app.post("/ocr/build")
 def api_build_ocr(
     dir: Optional[str] = None,
@@ -2634,7 +2519,7 @@ def api_build_fast(
 ) -> Dict[str, Any]:
     dir_value = _require(_from_body(body, dir, "dir"), "dir")
     kind_value = (_from_body(body, kind, "kind", default="faiss") or "faiss").lower()
-    trees_value = _from_body(body, trees, "trees", default=50, cast=lambda v: int(v)) or 50
+    trees_value = _from_body(body, trees, "trees", default=50, cast=int) or 50
     provider_value = _from_body(body, provider, "provider", default="local") or "local"
     hf_token_value = _from_body(body, hf_token, "hf_token")
     openai_key_value = _from_body(body, openai_key, "openai_key")
@@ -2675,7 +2560,7 @@ def api_build_thumbs(
     body: Optional[Dict[str, Any]] = Body(None),
 ) -> Dict[str, Any]:
     dir_value = _require(_from_body(body, dir, "dir"), "dir")
-    size_value = _from_body(body, size, "size", default=512, cast=lambda v: int(v)) or 512
+    size_value = _from_body(body, size, "size", default=512, cast=int) or 512
     provider_value = _from_body(body, provider, "provider", default="local") or "local"
     hf_token_value = _from_body(body, hf_token, "hf_token")
     openai_key_value = _from_body(body, openai_key, "openai_key")
@@ -2696,9 +2581,9 @@ def api_build_thumbs(
     return out
 
 @app.get("/status/{operation}")
-def api_operation_status(dir: str, operation: str) -> Dict[str, Any]:
+def api_operation_status(operation: str, directory: str = Query(..., alias="dir")) -> Dict[str, Any]:
     """Get status of long-running operations like indexing, caption building, etc."""
-    store = IndexStore(Path(dir))
+    store = IndexStore(Path(directory))
 
     status_files = {
         'index': 'index_status.json',
@@ -2724,8 +2609,8 @@ def api_operation_status(dir: str, operation: str) -> Dict[str, Any]:
 
 
 @app.get("/map")
-def api_map(dir: str, limit: int = 1000) -> Dict[str, Any]:
-    folder = Path(dir)
+def api_map(directory: str = Query(..., alias="dir"), limit: int = 1000) -> Dict[str, Any]:
+    folder = Path(directory)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
     inv = {v: k for k, v in ExifTags.TAGS.items()}
@@ -2773,7 +2658,7 @@ def api_thumb_batch(
     """Generate thumbnails for multiple images in batch to reduce API calls."""
     dir_value = _require(_from_body(body, dir, "dir"), "dir")
     paths_value = _from_body(body, paths, "paths", default=[], cast=_as_str_list) or []
-    size_value = _from_body(body, size, "size", default=256, cast=lambda v: int(v)) or 256
+    size_value = _from_body(body, size, "size", default=256, cast=int) or 256
     provider_value = _from_body(body, provider, "provider", default="local") or "local"
     hf_token_value = _from_body(body, hf_token, "hf_token")
     openai_key_value = _from_body(body, openai_key, "openai_key")
@@ -2809,9 +2694,9 @@ def api_thumb_batch(
 
 
 @app.get("/thumb_face")
-def api_thumb_face(dir: str, path: str, emb: int, provider: str = "local", size: int = 256, hf_token: Optional[str] = None, openai_key: Optional[str] = None):
+def api_thumb_face(directory: str = Query(..., alias="dir"), path: str = Query(...), emb: int = Query(...), provider: str = "local", size: int = 256, hf_token: Optional[str] = None, openai_key: Optional[str] = None):
     from fastapi.responses import FileResponse
-    folder = Path(dir)
+    folder = Path(directory)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
     embd = _emb(provider, hf_token, openai_key)
@@ -2859,7 +2744,7 @@ def api_search_like(
 ) -> Dict[str, Any]:
     dir_value = _require(_from_body(body, dir, "dir"), "dir")
     path_value = _require(_from_body(body, path, "path"), "path")
-    top_k_value = _from_body(body, top_k, "top_k", default=12, cast=lambda v: int(v)) or 12
+    top_k_value = _from_body(body, top_k, "top_k", default=12, cast=int) or 12
     provider_value = _from_body(body, provider, "provider", default="local") or "local"
     hf_token_value = _from_body(body, hf_token, "hf_token")
     openai_key_value = _from_body(body, openai_key, "openai_key")
@@ -2888,9 +2773,9 @@ def api_search_like_plus(
 ) -> Dict[str, Any]:
     dir_value = _require(_from_body(body, dir, "dir"), "dir")
     path_value = _require(_from_body(body, path, "path"), "path")
-    top_k_value = _from_body(body, top_k, "top_k", default=12, cast=lambda v: int(v)) or 12
+    top_k_value = _from_body(body, top_k, "top_k", default=12, cast=int) or 12
     text_value = _from_body(body, text, "text")
-    weight_value = _from_body(body, weight, "weight", default=0.5, cast=lambda v: float(v)) or 0.5
+    weight_value = _from_body(body, weight, "weight", default=0.5, cast=float) or 0.5
     provider_value = _from_body(body, provider, "provider", default="local") or "local"
     hf_token_value = _from_body(body, hf_token, "hf_token")
     openai_key_value = _from_body(body, openai_key, "openai_key")
@@ -2939,7 +2824,7 @@ def api_ocr_snippets(
 ) -> Dict[str, Any]:
     dir_value = _require(_from_body(body, dir, "dir"), "dir")
     paths_value = _from_body(body, paths, "paths", default=[], cast=_as_str_list) or []
-    limit_value = _from_body(body, limit, "limit", default=160, cast=lambda v: int(v)) or 160
+    limit_value = _from_body(body, limit, "limit", default=160, cast=int) or 160
 
     store = IndexStore(Path(dir_value))
     texts: Dict[str, str] = {}
@@ -2963,9 +2848,9 @@ def api_ocr_snippets(
     return {"snippets": texts}
 
 @app.get("/ocr/status")
-def api_ocr_status(dir: str) -> Dict[str, Any]:
+def api_ocr_status(directory: str = Query(..., alias="dir")) -> Dict[str, Any]:
     """Return whether OCR texts have been built for this index."""
-    store = IndexStore(Path(dir))
+    store = IndexStore(Path(directory))
     try:
         # If an OCR status file exists, surface its data (parity with index status)
         status_file = store.index_dir / 'ocr_status.json'
@@ -3012,15 +2897,14 @@ def api_open(
     p = Path(path_value)
     if not p.exists():
         raise HTTPException(404, "File not found")
-    import os as _os, platform as _pf
     try:
-        sysname = _pf.system()
+        sysname = platform.system()
         if sysname == 'Darwin':
-            _os.system(f"open -R '{p}'")
+            os.system(f"open -R '{p}'")
         elif sysname == 'Windows':
-            _os.system(f"explorer /select, {str(p)}")
+            os.system(f"explorer /select, {str(p)}")
         else:
-            _os.system(f"xdg-open '{p.parent}'")
+            os.system(f"xdg-open '{p.parent}'")
     except Exception:
         pass
     return {"ok": True}
@@ -3049,7 +2933,7 @@ def api_edit_ops(
 ) -> Dict[str, Any]:
     dir_value = _require(_from_body(body, dir, "dir"), "dir")
     path_value = _require(_from_body(body, path, "path"), "path")
-    rotate_value = _from_body(body, rotate, "rotate", default=0, cast=lambda v: int(v)) or 0
+    rotate_value = _from_body(body, rotate, "rotate", default=0, cast=int) or 0
     flip_value = _from_body(body, flip, "flip")
     crop_value = _from_body(body, crop, "crop")
 
@@ -3076,7 +2960,7 @@ def api_edit_upscale(
 ) -> Dict[str, Any]:
     dir_value = _require(_from_body(body, dir, "dir"), "dir")
     path_value = _require(_from_body(body, path, "path"), "path")
-    scale_value = _from_body(body, scale, "scale", default=2, cast=lambda v: int(v)) or 2
+    scale_value = _from_body(body, scale, "scale", default=2, cast=int) or 2
     engine_value = _from_body(body, engine, "engine", default="pil") or "pil"
 
     folder = Path(dir_value)
@@ -3132,7 +3016,6 @@ def api_export(
                     pass
             if strip_exif_value:
                 try:
-                    from PIL import Image
                     with Image.open(src) as img:
                         img = img.convert('RGB') if img.mode not in ('RGB','L') else img
                         img.save(out)
@@ -3148,8 +3031,8 @@ def api_export(
 
 
 @app.get("/diagnostics")
-def api_diagnostics(dir: str, provider: Optional[str] = None, hf_token: Optional[str] = None, openai_key: Optional[str] = None) -> Dict[str, Any]:
-    folder = Path(dir)
+def api_diagnostics(directory: str = Query(..., alias="dir"), provider: Optional[str] = None, hf_token: Optional[str] = None, openai_key: Optional[str] = None) -> Dict[str, Any]:
+    folder = Path(directory)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
     # If provider specified, report its index; else list indexes under .photo_index
@@ -3177,22 +3060,20 @@ def api_diagnostics(dir: str, provider: Optional[str] = None, hf_token: Optional
                 p = sub / "paths.json"
                 cnt = 0
                 try:
-                    import json
                     if p.exists():
                         data = json.loads(p.read_text())
                         cnt = len(data.get("paths", []))
                 except Exception:
                     cnt = 0
                 items.append({"key": sub.name, "index_dir": str(sub), "count": cnt})
-    import shutil, platform
     free_gb = shutil.disk_usage(Path.home()).free / (1024**3)
     return {"folder": str(folder), "engines": items, "free_gb": round(free_gb, 1), "os": platform.system()}
 
 
 @app.get("/library")
-def api_library(dir: str, provider: str = "local", limit: int = 120, offset: int = 0, hf_token: Optional[str] = None, openai_key: Optional[str] = None) -> Dict[str, Any]:
+def api_library(directory: str = Query(..., alias="dir"), provider: str = "local", limit: int = 120, offset: int = 0, hf_token: Optional[str] = None, openai_key: Optional[str] = None) -> Dict[str, Any]:
     """Return a slice of the indexed library paths for quick browse grids."""
-    folder = Path(dir)
+    folder = Path(directory)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
     emb = _emb(provider, hf_token, openai_key)
@@ -3267,7 +3148,7 @@ def api_workspace_remove(data: WorkspacePath) -> Dict[str, Any]:
 
 
 def _build_exif_index(index_dir: Path, paths: List[str]) -> Dict[str, Any]:
-    from PIL import Image, ExifTags
+    # Reuse top-level PIL imports to avoid re-import warnings
     inv = {v: k for k, v in ExifTags.TAGS.items()}
     out = {
         "paths": [], "camera": [], "iso": [], "fnumber": [], "exposure": [], "focal": [], "width": [], "height": [],
@@ -3489,8 +3370,8 @@ def api_build_metadata(
     return out
 
 @app.get("/metadata")
-def api_get_metadata(dir: str) -> Dict[str, Any]:
-    store = IndexStore(Path(dir))
+def api_get_metadata(directory: str = Query(..., alias="dir")) -> Dict[str, Any]:
+    store = IndexStore(Path(directory))
     p = store.index_dir / 'exif_index.json'
     if not p.exists():
         return {"cameras": []}
@@ -3504,9 +3385,9 @@ def api_get_metadata(dir: str) -> Dict[str, Any]:
 
 
 @app.get("/metadata/batch")
-def api_metadata_batch(dir: str, paths: str) -> Dict[str, Any]:
+def api_metadata_batch(directory: str = Query(..., alias="dir"), paths: str = Query(...)) -> Dict[str, Any]:
     """Return EXIF/derived metadata for multiple photos in batch to reduce API calls."""
-    folder = Path(dir)
+    folder = Path(directory)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
 
@@ -3515,7 +3396,7 @@ def api_metadata_batch(dir: str, paths: str) -> Dict[str, Any]:
     if not path_list:
         return {"ok": False, "meta": {}}
 
-    store = IndexStore(Path(dir))
+    store = IndexStore(Path(directory))
     p = store.index_dir / 'exif_index.json'
     if not p.exists():
         return {"ok": False, "meta": {}}
@@ -3580,8 +3461,8 @@ def api_autotag(
     """
     dir_value = _require(_from_body(body, dir, "dir"), "dir")
     provider_value = _from_body(body, provider, "provider", default="local") or "local"
-    min_len_value = _from_body(body, min_len, "min_len", default=4, cast=lambda v: int(v)) or 4
-    max_tags_value = _from_body(body, max_tags_per_image, "max_tags_per_image", default=8, cast=lambda v: int(v)) or 8
+    min_len_value = _from_body(body, min_len, "min_len", default=4, cast=int) or 4
+    max_tags_value = _from_body(body, max_tags_per_image, "max_tags_per_image", default=8, cast=int) or 8
 
     folder = Path(dir_value)
     emb = _emb(provider_value, None, None)
@@ -3711,7 +3592,7 @@ def api_undo_delete(
         src = Path(item.get('dst')); dst = Path(item.get('src'))
         try:
             dst.parent.mkdir(parents=True, exist_ok=True)
-            import shutil as _sh; _sh.move(str(src), str(dst))
+            shutil.move(str(src), str(dst))
             restored += 1
         except Exception:
             continue
@@ -3724,9 +3605,9 @@ def api_undo_delete(
 
 
 @app.get("/analytics")
-def api_analytics(dir: str, limit: int = 200) -> Dict[str, Any]:
+def api_analytics(directory: str = Query(..., alias="dir"), limit: int = 200) -> Dict[str, Any]:
     """Return recent analytics events from JSONL log."""
-    store = IndexStore(Path(dir))
+    store = IndexStore(Path(directory))
     events: List[Dict[str, Any]] = []
     try:
         p = _analytics_file(store.index_dir)
@@ -3779,12 +3660,12 @@ def api_analytics_log(
 
 # Video Processing APIs
 @app.get("/videos")
-def api_list_videos(dir: str) -> Dict[str, Any]:
+def api_list_videos(directory: str = Query(..., alias="dir")) -> Dict[str, Any]:
     """List all video files in a directory."""
-    folder = Path(dir)
+    folder = Path(directory)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
-    
+
     videos = list_videos(folder)
     video_data = []
     for video in videos:
@@ -3793,67 +3674,81 @@ def api_list_videos(dir: str) -> Dict[str, Any]:
             "mtime": video.mtime,
             "size": video.path.stat().st_size if video.path.exists() else 0
         })
-    
+
     return {"videos": video_data, "count": len(video_data)}
 
 
 @app.get("/video/metadata")
-def api_get_video_metadata(dir: str, path: str) -> Dict[str, Any]:
+def api_get_video_metadata(directory: str = Query(..., alias="dir"), path: str = Query(...)) -> Dict[str, Any]:
     """Get metadata for a specific video file."""
-    folder = Path(dir)
+    folder = Path(directory)
     video_path = Path(path)
-    
+
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
     if not video_path.exists():
         raise HTTPException(404, "Video file not found")
-    
+
     metadata = get_video_metadata(video_path)
     if not metadata:
         raise HTTPException(500, "Could not extract video metadata")
-    
+
     return {"metadata": metadata}
 
 
 @app.get("/video/thumbnail")
-def api_get_video_thumbnail(dir: str, path: str, frame_time: float = 1.0, size: int = 256):
+def api_get_video_thumbnail(directory: str = Query(..., alias="dir"), path: str = Query(...), frame_time: float = 1.0, size: int = 256):
     """Generate and return a thumbnail for a video file."""
     from fastapi.responses import FileResponse
-    folder = Path(dir)
+    folder = Path(directory)
     video_path = Path(path)
-    
+
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
     if not video_path.exists():
         raise HTTPException(404, "Video file not found")
-    
+
     # Create thumbnail in cache directory
     store = IndexStore(folder)
     thumb_dir = store.index_dir / "video_thumbs"
     thumb_dir.mkdir(exist_ok=True)
-    
-    # Generate unique filename for thumbnail
+
+    # Generate unique filename for thumbnail (migration: switched MD5 -> SHA256 for stronger hashing)
     import hashlib
-    video_hash = hashlib.md5(str(video_path).encode()).hexdigest()
+    video_hash = hashlib.sha256(str(video_path).encode()).hexdigest()
     thumb_path = thumb_dir / f"{video_hash}_{size}.jpg"
-    
+
+    # Backward compatibility: if an older MD5-named thumbnail exists, reuse it to avoid regeneration.
+    # Legacy MD5 only used here for lookup (not for generating new hashes).
+    legacy_hash = hashlib.md5(str(video_path).encode()).hexdigest()  # nosec: legacy migration path
+    legacy_thumb = thumb_dir / f"{legacy_hash}_{size}.jpg"
+    if not thumb_path.exists() and legacy_thumb.exists():
+        try:
+            legacy_thumb.rename(thumb_path)
+        except Exception:
+            # Fallback copy if rename fails (e.g., cross-device)
+            try:
+                shutil.copy2(legacy_thumb, thumb_path)
+            except Exception:
+                pass
+
     # Generate thumbnail if it doesn't exist
     if not thumb_path.exists():
         success = extract_video_thumbnail(video_path, thumb_path, frame_time)
         if not success:
             raise HTTPException(500, "Could not generate video thumbnail")
-    
+
     return FileResponse(str(thumb_path))
 
 
 @app.post("/videos/index")
 def api_index_videos(
-    dir: Optional[str] = None,
+    directory: Optional[str] = None,
     provider: Optional[str] = None,
     body: Optional[Dict[str, Any]] = Body(None),
 ) -> Dict[str, Any]:
     """Index video files for search (extract metadata and generate thumbnails)."""
-    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    dir_value = _require(_from_body(body, directory, "directory") or _from_body(body, None, "dir"), "directory")
     provider_value = _from_body(body, provider, "provider", default="local") or "local"
 
     folder = Path(dir_value)
@@ -3884,13 +3779,13 @@ def api_index_videos(
 # Batch Operations APIs
 @app.post("/batch/delete")
 def api_batch_delete(
-    dir: Optional[str] = None,
+    directory: Optional[str] = None,
     paths: Optional[List[str]] = None,
     os_trash: Optional[bool] = None,
     body: Optional[Dict[str, Any]] = Body(None),
 ) -> Dict[str, Any]:
     """Delete multiple files in batch."""
-    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    dir_value = _require(_from_body(body, directory, "directory") or _from_body(body, None, "dir"), "directory")
     paths_value = _from_body(body, paths, "paths", default=[], cast=_as_str_list) or []
     os_trash_value = _from_body(body, os_trash, "os_trash", default=False, cast=_as_bool) or False
 
@@ -3977,9 +3872,9 @@ def api_batch_add_to_collection(
 
 # Face Clustering Enhancement APIs
 @app.get("/faces/photos")
-def api_get_face_photos(dir: str, cluster_id: str) -> Dict[str, Any]:
+def api_get_face_photos(directory: str = Query(..., alias="dir"), cluster_id: str = Query(...)) -> Dict[str, Any]:
     """Get all photos containing faces from a specific cluster."""
-    store = IndexStore(Path(dir))
+    store = IndexStore(Path(directory))
     try:
         photos = _face_photos(store.index_dir, cluster_id)
         return {"cluster_id": cluster_id, "photos": photos, "count": len(photos)}
@@ -4032,138 +3927,307 @@ def api_split_face_cluster(
 # Progressive Loading APIs
 @app.post("/search/paginated")
 def api_search_paginated(
-    dir: Optional[str] = None,
-    query: Optional[str] = None,
-    provider: Optional[str] = None,
     limit: Optional[int] = None,
     offset: Optional[int] = None,
-    hf_token: Optional[str] = None,
-    openai_key: Optional[str] = None,
-    favorites_only: Optional[bool] = None,
-    tags: Optional[List[str]] = None,
-    date_from: Optional[float] = None,
-    date_to: Optional[float] = None,
-    use_fast: Optional[bool] = None,
-    fast_kind: Optional[str] = None,
-    use_captions: Optional[bool] = None,
-    use_ocr: Optional[bool] = None,
-    camera: Optional[str] = None,
-    iso_min: Optional[int] = None,
-    iso_max: Optional[int] = None,
-    f_min: Optional[float] = None,
-    f_max: Optional[float] = None,
-    place: Optional[str] = None,
-    flash: Optional[str] = None,
-    wb: Optional[str] = None,
-    metering: Optional[str] = None,
-    alt_min: Optional[float] = None,
-    alt_max: Optional[float] = None,
-    heading_min: Optional[float] = None,
-    heading_max: Optional[float] = None,
-    sharp_only: Optional[bool] = None,
-    exclude_underexp: Optional[bool] = None,
-    exclude_overexp: Optional[bool] = None,
-    has_text: Optional[bool] = None,
-    person: Optional[str] = None,
-    persons: Optional[List[str]] = None,
     body: Optional[Dict[str, Any]] = Body(None),
 ) -> Dict[str, Any]:
-    """Paginated search with cursor support for large result sets."""
-    dir_value = _require(_from_body(body, dir, "dir"), "dir")
-    query_value = _require(_from_body(body, query, "query"), "query")
-    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+    """Paginated search with cursor support for large result sets.
+
+    Accepts SearchRequest parameters in the request body, plus pagination
+    parameters as query parameters or body fields.
+    """
+    # Extract pagination parameters
     limit_value = _from_body(body, limit, "limit", default=24, cast=lambda v: int(v)) or 24
     offset_value = _from_body(body, offset, "offset", default=0, cast=lambda v: int(v)) or 0
-    hf_token_value = _from_body(body, hf_token, "hf_token")
-    openai_key_value = _from_body(body, openai_key, "openai_key")
-    favorites_value = _from_body(body, favorites_only, "favorites_only", default=False, cast=_as_bool) or False
-    tags_value = _from_body(body, tags, "tags", default=[], cast=_as_str_list) or []
-    date_from_value = _from_body(body, date_from, "date_from")
-    date_to_value = _from_body(body, date_to, "date_to")
-    use_fast_value = _from_body(body, use_fast, "use_fast", default=False, cast=_as_bool) or False
-    fast_kind_value = _from_body(body, fast_kind, "fast_kind")
-    use_captions_value = _from_body(body, use_captions, "use_captions", default=False, cast=_as_bool) or False
-    use_ocr_value = _from_body(body, use_ocr, "use_ocr", default=False, cast=_as_bool) or False
-    camera_value = _from_body(body, camera, "camera")
-    iso_min_value = _from_body(body, iso_min, "iso_min")
-    iso_max_value = _from_body(body, iso_max, "iso_max")
-    f_min_value = _from_body(body, f_min, "f_min")
-    f_max_value = _from_body(body, f_max, "f_max")
-    place_value = _from_body(body, place, "place")
-    flash_value = _from_body(body, flash, "flash")
-    wb_value = _from_body(body, wb, "wb")
-    metering_value = _from_body(body, metering, "metering")
-    alt_min_value = _from_body(body, alt_min, "alt_min")
-    alt_max_value = _from_body(body, alt_max, "alt_max")
-    heading_min_value = _from_body(body, heading_min, "heading_min")
-    heading_max_value = _from_body(body, heading_max, "heading_max")
-    sharp_only_value = _from_body(body, sharp_only, "sharp_only", default=False, cast=_as_bool) or False
-    exclude_under_value = _from_body(body, exclude_underexp, "exclude_underexp", default=False, cast=_as_bool) or False
-    exclude_over_value = _from_body(body, exclude_overexp, "exclude_overexp", default=False, cast=_as_bool) or False
-    has_text_value = _from_body(body, has_text, "has_text", default=False, cast=_as_bool) or False
-    person_value = _from_body(body, person, "person")
-    persons_value = _from_body(body, persons, "persons", default=[], cast=_as_str_list) or []
 
-    folder = Path(dir_value)
+    # Build unified search request from body parameters
+    try:
+        search_req = SearchRequest.from_query_params(body or {})
+    except Exception as e:
+        raise HTTPException(400, f"Invalid search parameters: {e}")
+
+    # Override top_k to get enough results for pagination
+    search_req.top_k = min(limit_value + offset_value + 50, search_req.top_k)
+
+    # Validate directory
+    if not search_req.dir:
+        raise HTTPException(400, "Directory path is required")
+
+    folder = Path(search_req.dir).expanduser().resolve()
+
+    # Check if folder exists and is accessible
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
 
-    emb = _emb(provider_value, hf_token_value, openai_key_value)
+    if not folder.is_dir():
+        raise HTTPException(400, "Path is not a directory")
+
+    try:
+        # Test if we can read the directory
+        next(folder.iterdir(), None)
+    except PermissionError:
+        raise HTTPException(403, "Permission denied to access folder")
+    except Exception as e:
+        raise HTTPException(400, f"Cannot access folder: {str(e)}")
+
+    emb = _emb(search_req.provider, search_req.hf_token, search_req.openai_key)
     store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
     store.load()
 
-    # Get more results than needed for pagination
-    search_top_k = min(limit_value + offset_value + 50, len(store.state.paths or []))
+    # Initialize metadata maps to avoid NameErrors in later logic
+    cam_map: Dict[str, str] = {}
+    place_map: Dict[str, str] = {}
+    wb_map: Dict[str, Optional[int]] = {}
+    met_map: Dict[str, Optional[int]] = {}
+    iso_map: Dict[str, Optional[int]] = {}
+    f_map: Dict[str, Optional[float]] = {}
+    flash_map: Dict[str, Optional[int]] = {}
+    alt_map: Dict[str, Optional[float]] = {}
+    head_map: Dict[str, Optional[float]] = {}
+    sharp_map: Dict[str, Optional[float]] = {}
+    bright_map: Dict[str, Optional[float]] = {}
 
-    if use_fast_value:
+    # Primary semantic search (adapted from api_search)
+    fast_meta = None
+    if search_req.use_fast:
+        fim = FastIndexManager(store)
         try:
-            if fast_kind_value and fast_kind_value.lower() == 'faiss' and store.faiss_status().get('exists'):
-                results = store.search_faiss(emb, query_value, top_k=search_top_k)
-            elif fast_kind_value and fast_kind_value.lower() == 'hnsw' and store.hnsw_status().get('exists'):
-                results = store.search_hnsw(emb, query_value, top_k=search_top_k)
-            elif fast_kind_value and fast_kind_value.lower() == 'annoy' and store.ann_status().get('exists'):
-                results = store.search_annoy(emb, query_value, top_k=search_top_k)
-            else:
-                if store.faiss_status().get('exists'):
-                    results = store.search_faiss(emb, query_value, top_k=search_top_k)
-                elif store.hnsw_status().get('exists'):
-                    results = store.search_hnsw(emb, query_value, top_k=search_top_k)
-                elif store.ann_status().get('exists'):
-                    results = store.search_annoy(emb, query_value, top_k=search_top_k)
-                else:
-                    results = store.search(emb, query_value, top_k=search_top_k)
+            results, fast_meta = fim.search(emb, search_req.query, top_k=search_req.top_k, use_fast=True, fast_kind_hint=search_req.fast_kind)
         except Exception:
-            results = store.search(emb, query_value, top_k=search_top_k)
+            results = store.search(emb, search_req.query, search_req.top_k)
     else:
-        if use_captions_value and store.captions_available():
-            results = store.search_with_captions(emb, query_value, top_k=search_top_k)
-        elif use_ocr_value and store.ocr_available():
-            results = store.search_with_ocr(emb, query_value, top_k=search_top_k)
+        if search_req.use_captions and store.captions_available():
+            results = store.search_with_captions(emb, search_req.query, search_req.top_k)
+        elif search_req.use_ocr and store.ocr_available():
+            results = store.search_with_ocr(emb, search_req.query, search_req.top_k)
         else:
-            results = store.search(emb, query_value, top_k=search_top_k)
+            results = store.search(emb, search_req.query, search_req.top_k)
 
     out = results
 
-    # Apply filters (simplified version)
-    if favorites_value:
-        coll = load_collections(store.index_dir)
-        favs = set(coll.get('Favorites', []))
-        out = [r for r in out if str(r.path) in favs]
+    # Favorites filter
+    if search_req.favorites_only:
+        try:
+            coll = load_collections(store.index_dir)
+            favs = set(coll.get('Favorites', []))
+            out = [r for r in out if str(r.path) in favs]
+        except Exception:
+            pass
 
-    if tags_value:
-        tmap = load_tags(store.index_dir)
-        req = set(tags_value)
-        out = [r for r in out if req.issubset(set(tmap.get(str(r.path), [])))]
+    # Tags filter
+    if search_req.tags:
+        try:
+            tmap = load_tags(store.index_dir)
+            req_tags = set(search_req.tags)
+            out = [r for r in out if req_tags.issubset(set(tmap.get(str(r.path), [])))]
+        except Exception:
+            pass
 
-    if date_from_value is not None and date_to_value is not None:
-        mmap = {sp: float(mt) for sp, mt in zip(store.state.paths or [], store.state.mtimes or [])}
-        out = [r for r in out if date_from_value <= mmap.get(str(r.path), 0.0) <= date_to_value]
+    # People filter
+    try:
+        if search_req.filters.persons and isinstance(search_req.filters.persons, list) and len(search_req.filters.persons) > 0:
+            sets: List[set] = []
+            for nm in search_req.filters.persons:
+                try:
+                    sets.append(set(_face_photos(store.index_dir, str(nm))))
+                except Exception:
+                    sets.append(set())
+            if sets:
+                inter = set.intersection(*sets) if len(sets) > 1 else sets[0]
+                out = [r for r in out if str(r.path) in inter]
+        elif search_req.filters.person:
+            ppl = set(_face_photos(store.index_dir, str(search_req.filters.person)))
+            out = [r for r in out if str(r.path) in ppl]
+    except Exception:
+        pass
+
+    # Date range filter
+    if search_req.date_from is not None and search_req.date_to is not None:
+        try:
+            mmap = {
+                sp: float(mt)
+                for sp, mt in zip(store.state.paths or [], store.state.mtimes or [])
+            }
+            out = [
+                r
+                for r in out
+                if search_req.date_from <= mmap.get(str(r.path), 0.0) <= search_req.date_to
+            ]
+        except Exception:
+            pass
+
+    # EXIF and quality filters (adapted from api_search)
+    try:
+        meta_p = store.index_dir / 'exif_index.json'
+        if meta_p.exists() and any([
+            search_req.filters.camera,
+            search_req.filters.iso_min is not None, search_req.filters.iso_max is not None,
+            search_req.filters.f_min is not None, search_req.filters.f_max is not None,
+            search_req.filters.place,
+            search_req.filters.flash, search_req.filters.wb, search_req.filters.metering,
+            search_req.filters.alt_min is not None, search_req.filters.alt_max is not None,
+            search_req.filters.heading_min is not None, search_req.filters.heading_max is not None,
+        ]):
+            m = json.loads(meta_p.read_text())
+            cam_map = {
+                p: (c or '')
+                for p, c in zip(m.get('paths', []), m.get('camera', []))
+            }
+            iso_map = {
+                p: (i if isinstance(i, int) else None)
+                for p, i in zip(m.get('paths', []), m.get('iso', []))
+            }
+            f_map = {
+                p: (float(x) if isinstance(x, (int, float)) else None)
+                for p, x in zip(m.get('paths', []), m.get('fnumber', []))
+            }
+            place_map = {
+                p: (s or '')
+                for p, s in zip(m.get('paths', []), m.get('place', []))
+            }
+            flash_map = {
+                p: (int(x) if isinstance(x, (int, float)) else None)
+                for p, x in zip(m.get('paths', []), m.get('flash', []))
+            }
+            wb_map = {
+                p: (int(x) if isinstance(x, (int, float)) else None)
+                for p, x in zip(m.get('paths', []), m.get('white_balance', []))
+            }
+            met_map = {
+                p: (int(x) if isinstance(x, (int, float)) else None)
+                for p, x in zip(m.get('paths', []), m.get('metering', []))
+            }
+            alt_map = {
+                p: (float(x) if isinstance(x, (int, float)) else None)
+                for p, x in zip(m.get('paths', []), m.get('gps_altitude', []))
+            }
+            head_map = {
+                p: (float(x) if isinstance(x, (int, float)) else None)
+                for p, x in zip(m.get('paths', []), m.get('gps_heading', []))
+            }
+            sharp_map = {
+                p: (float(x) if isinstance(x, (int, float)) else None)
+                for p, x in zip(m.get('paths', []), m.get('sharpness', []))
+            }
+            bright_map = {
+                p: (float(x) if isinstance(x, (int, float)) else None)
+                for p, x in zip(m.get('paths', []), m.get('brightness', []))
+            }
+
+            def _matches_meta(p: str) -> bool:
+                if search_req.filters.camera and search_req.filters.camera.strip():
+                    if search_req.filters.camera.strip().lower() not in (cam_map.get(p,'') or '').lower():
+                        return False
+                if search_req.filters.iso_min is not None:
+                    v = iso_map.get(p)
+                    if v is None or v < int(search_req.filters.iso_min):
+                        return False
+                if search_req.filters.iso_max is not None:
+                    v = iso_map.get(p)
+                    if v is None or v > int(search_req.filters.iso_max):
+                        return False
+                if search_req.filters.f_min is not None:
+                    v = f_map.get(p)
+                    if v is None or v < float(search_req.filters.f_min):
+                        return False
+                if search_req.filters.f_max is not None:
+                    v = f_map.get(p)
+                    if v is None or v > float(search_req.filters.f_max):
+                        return False
+                if search_req.filters.place and search_req.filters.place.strip():
+                    if search_req.filters.place.strip().lower() not in (place_map.get(p,'') or '').lower():
+                        return False
+                if search_req.filters.flash:
+                    fv = flash_map.get(p)
+                    if fv is None:
+                        return False
+                    fired = 1 if fv & 1 else 0
+                    if search_req.filters.flash == 'fired' and fired != 1:
+                        return False
+                    if search_req.filters.flash in ('no','noflash') and fired != 0:
+                        return False
+                if search_req.filters.wb:
+                    wv = wb_map.get(p)
+                    if wv is None:
+                        return False
+                    if search_req.filters.wb == 'auto' and wv != 0:
+                        return False
+                    if search_req.filters.wb == 'manual' and wv != 1:
+                        return False
+                if search_req.filters.metering:
+                    mv = met_map.get(p)
+                    if mv is None:
+                        return False
+                    name = str(search_req.filters.metering).lower()
+                    mm = {0: 'unknown', 1: 'average', 2: 'center', 3: 'spot', 4: 'multispot', 5: 'pattern', 6: 'partial', 255: 'other'}
+                    label = mm.get(int(mv), 'other')
+                    if name not in (label, 'any'):
+                        if not (name == 'matrix' and label == 'pattern'):
+                            return False
+                if search_req.filters.alt_min is not None or search_req.filters.alt_max is not None:
+                    av = alt_map.get(p)
+                    if av is None:
+                        return False
+                    if search_req.filters.alt_min is not None and av < float(search_req.filters.alt_min):
+                        return False
+                    if search_req.filters.alt_max is not None and av > float(search_req.filters.alt_max):
+                        return False
+                if search_req.filters.heading_min is not None or search_req.filters.heading_max is not None:
+                    hv = head_map.get(p)
+                    if hv is None:
+                        return False
+                    try:
+                        hh = float(hv) % 360.0
+                    except Exception:
+                        hh = hv
+                    if search_req.filters.heading_min is not None and hh < float(search_req.filters.heading_min):
+                        return False
+                    if search_req.filters.heading_max is not None and hh > float(search_req.filters.heading_max):
+                        return False
+                if search_req.filters.sharp_only:
+                    sv = sharp_map.get(p)
+                    if sv is None or sv < 60.0:
+                        return False
+                if search_req.filters.exclude_underexp:
+                    bv = bright_map.get(p)
+                    if bv is not None and bv < 50.0:
+                        return False
+                if search_req.filters.exclude_overexp:
+                    bv = bright_map.get(p)
+                    if bv is not None and bv > 205.0:
+                        return False
+                return True
+
+            out = [r for r in out if _matches_meta(str(r.path))]
+    except Exception:
+        pass
+
+    # OCR and quoted text filters
+    try:
+        texts_map: Dict[str, str] = {}
+        if hasattr(store, 'ocr_texts_file') and store.ocr_texts_file.exists():
+            d = json.loads(store.ocr_texts_file.read_text())
+            texts_map = {p: (t or '') for p, t in zip(d.get('paths', []), d.get('texts', []))}
+        if search_req.filters.has_text:
+            out = [r for r in out if (texts_map.get(str(r.path), '').strip() != '')]
+        import re as _re
+        d_parts = _re.findall(r'"([^"]+)"', search_req.query)
+        s_parts = _re.findall(r"'([^']+)'", search_req.query)
+        req = (d_parts or []) + (s_parts or [])
+        if req:
+            low = {p: texts_map.get(p, '').lower() for p in texts_map.keys()}
+            def _has_all(pth: str) -> bool:
+                s = low.get(pth, '')
+                return all(x.lower() in s for x in req)
+            out = [r for r in out if _has_all(str(r.path))]
+    except Exception:
+        pass
 
     # Apply pagination
     total = len(out)
     paginated_results = out[offset_value:offset_value + limit_value]
 
-    sid = log_search(store.index_dir, getattr(emb, 'index_id', 'default'), query_value, [(str(r.path), float(r.score)) for r in out])
+    sid = log_search(store.index_dir, getattr(emb, 'index_id', 'default'), search_req.query, [(str(r.path), float(r.score)) for r in out])
 
     return {
         "search_id": sid,
@@ -4223,29 +4287,24 @@ def api_search_video_like(
     dir: Optional[str] = None,
     path: Optional[str] = None,
     top_k: Optional[int] = None,
-    provider: Optional[str] = None,
-    hf_token: Optional[str] = None,
-    openai_key: Optional[str] = None,
     body: Optional[Dict[str, Any]] = Body(None),
 ) -> Dict[str, Any]:
-    """Find visually similar videos based on a reference video."""
+    """Find visually similar videos based on a reference video.
+
+    Provider / token parameters were unused; removed to reduce noise. If future
+    embedding-based re-ranking is added we can reintroduce via unified schema.
+    """
     dir_value = _require(_from_body(body, dir, "dir"), "dir")
     path_value = _require(_from_body(body, path, "path"), "path")
     top_k_value = _from_body(body, top_k, "top_k", default=12, cast=lambda v: int(v)) or 12
-    provider_value = _from_body(body, provider, "provider", default="local") or "local"
-    hf_token_value = _from_body(body, hf_token, "hf_token")
-    openai_key_value = _from_body(body, openai_key, "openai_key")
 
     folder = Path(dir_value)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
 
-    # Get video index store
     video_store = VideoIndexStore(folder)
     if not video_store.load():
         return {"results": []}
 
-    # Search for similar videos
     results = video_store.search_like(path_value, top_k=top_k_value)
-
     return {"results": [{"path": r.path, "score": float(r.score)} for r in results]}

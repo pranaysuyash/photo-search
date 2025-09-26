@@ -84,7 +84,7 @@ def _embed_faces_insightface(paths: List[str]) -> Tuple[Dict[str, List[Dict[str,
 
 
 def build_faces(index_dir: Path, photo_paths: List[str]) -> Dict[str, Any]:
-    FaceAnalysis, ok = _try_insightface()
+    _, ok = _try_insightface()
     if not ok:
         # No face engine available
         return {"updated": 0, "faces": 0, "clusters": 0}

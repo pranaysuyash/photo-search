@@ -49,7 +49,7 @@ class VideoIndexStore:
             self.state.paths = data.get("paths", [])
             self.state.mtimes = data.get("mtimes", [0.0] * len(self.state.paths))
             self.state.thumbnails = data.get("thumbnails", [])
-            
+
         if self.embeddings_file.exists():
             try:
                 self.state.embeddings = np.load(self.embeddings_file)
@@ -64,7 +64,7 @@ class VideoIndexStore:
                 "mtimes": self.state.mtimes,
                 "thumbnails": self.state.thumbnails
             }, f)
-            
+
         if self.state.embeddings is not None:
             np.save(self.embeddings_file, self.state.embeddings)
 
@@ -72,19 +72,19 @@ class VideoIndexStore:
         """Get the path where a video's thumbnail should be stored."""
         video_name = Path(video_path).stem
         return self.index_dir / f"{video_name}_thumb.jpg"
-        
+
     def upsert(self, embedder, videos: List[Video], batch_size: int = 32) -> Tuple[int, int]:
         """Upsert videos into the index, computing embeddings if needed.
-        
+
         Returns (new_count, updated_count)
         """
         self.load()
         existing_map = {p: i for i, p in enumerate(self.state.paths)}
-        
+
         new_items: List[Video] = []
         modified_indices: List[int] = []
         path_new_mtime: Dict[str, float] = {}
-        
+
         # Determine which videos are new or modified
         for video in videos:
             sp = str(video.path)
@@ -95,7 +95,7 @@ class VideoIndexStore:
                 idx = existing_map[sp]
                 if idx < len(self.state.mtimes) and video.mtime > float(self.state.mtimes[idx]) + 1e-6:
                     modified_indices.append(idx)
-        
+
         # Update modified videos
         updated_count = 0
         if modified_indices and self.state.embeddings is not None and len(self.state.embeddings) == len(self.state.paths):
@@ -105,7 +105,7 @@ class VideoIndexStore:
             for idx in modified_indices:
                 sp = self.state.paths[idx]
                 self.state.mtimes[idx] = path_new_mtime.get(sp, Path(sp).stat().st_mtime)
-        
+
         # Insert new videos
         new_count = 0
         if new_items:
@@ -116,7 +116,7 @@ class VideoIndexStore:
                 self.state.mtimes.append(video.mtime)
                 self.state.thumbnails.append(str(self.get_thumbnail_path(str(video.path))))
             new_count = len(new_items)
-        
+
         # Prune removed files
         video_set = {str(v.path) for v in videos}
         if self.state.paths and video_set:
@@ -127,10 +127,10 @@ class VideoIndexStore:
                 self.state.thumbnails = [self.state.thumbnails[i] for i in keep]
                 if self.state.embeddings is not None:
                     self.state.embeddings = self.state.embeddings[keep]
-        
+
         self.save()
         return new_count, updated_count
-        
+
     def add_video(self, video_path: str, metadata: dict, mtime: float) -> None:
         """Add a single video to the index with metadata."""
         if video_path not in self.state.paths:
@@ -141,12 +141,12 @@ class VideoIndexStore:
             # Update existing video
             idx = self.state.paths.index(video_path)
             self.state.mtimes[idx] = mtime
-            
+
     def search(self, embedder, query: str, top_k: int = 12) -> List[Video]:
         """Search for videos semantically similar to the query."""
         if not self.state.paths or self.state.embeddings is None or len(self.state.embeddings) == 0:
             return []
-        
+
         try:
             q = embedder.embed_text(query)
             E = self.state.embeddings

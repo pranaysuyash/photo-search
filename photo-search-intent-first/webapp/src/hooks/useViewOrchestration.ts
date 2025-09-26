@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import type { ResultView } from "../contexts/ResultsConfigContext";
 import { useEnableDemoLibrary } from "../stores/settingsStore";
-import { useAppLifecycle } from "./useAppLifecycle";
+import { useAppLifecycle } from "./useAppLifecycle.tsx";
 import { useDemoLibraryHandlers } from "./useDemoLibraryHandlers";
 import { useModalControls } from "./useModalControls";
 import { useOnboardingFlows } from "./useOnboardingFlows";

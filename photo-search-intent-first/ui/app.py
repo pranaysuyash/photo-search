@@ -446,7 +446,7 @@ with tab_build:
                 except Exception:
                     st.info(str(ws_base))
 
-        
+
         # Convenience: open the index folder
         sysname = platform.system()
         if st.button("Open Index Folder"):
@@ -1231,7 +1231,7 @@ with tab_preflight:
         except Exception:
             st.info(str(ws_base))
 
-    
+
     # Reset app settings
     if st.button("Reset app settings"):
         for k, v in DEFAULTS.items():

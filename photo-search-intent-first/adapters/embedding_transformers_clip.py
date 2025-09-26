@@ -24,7 +24,7 @@ def _auto_device():
 class TransformersClipEmbedding:
     def __init__(self, model_name: str = "openai/clip-vit-base-patch32", device: Optional[str] = None) -> None:
         self.device = torch.device(device) if device else _auto_device()
-        
+
         # Honor offline mode and local cache directory if provided
         offline = os.getenv("OFFLINE_MODE", "").lower() in ("1", "true", "yes")
         local_dir = os.getenv("PHOTOVAULT_MODEL_DIR") or os.getenv("TRANSFORMERS_CACHE")
@@ -33,7 +33,7 @@ class TransformersClipEmbedding:
         if offline:
             os.environ.setdefault("HF_HUB_OFFLINE", "1")
             os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
-        
+
         # Prefer fast processor; fallback to slow if unavailable (e.g., no torchvision)
         try_names = [model_name]
         if local_dir:
@@ -63,7 +63,7 @@ class TransformersClipEmbedding:
                     self.processor = None
         if self.processor is None:
             raise RuntimeError(f"Failed to load CLIP processor for {model_name}. If offline, ensure model is cached locally. Last error: {last_err}")
-        
+
         # Load model
         for name in try_names:
             try:
@@ -74,7 +74,7 @@ class TransformersClipEmbedding:
                 self.model = None
         if self.model is None:
             raise RuntimeError(f"Failed to load CLIP model for {model_name}. If offline, ensure model is cached locally. Last error: {last_err}")
-        
+
         self.model.to(self.device)
         self.model.eval()
         self._index_id = f"hf-{model_name}{'-fast' if self._fast else ''}"

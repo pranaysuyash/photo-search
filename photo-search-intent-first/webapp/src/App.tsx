@@ -1,6 +1,7 @@
-import { useReducedMotion } from "framer-motion";
+import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useReducedMotion } from "framer-motion";
 // API layer
 import {
   apiAnalytics,
@@ -94,7 +95,6 @@ export type View =
   | "tasks"
   | "videos";
 
-import { AppProviders } from "./AppProviders";
 import type { AccessibilitySettings } from "./components/AccessibilityPanel";
 import { AppChrome } from "./components/AppChrome";
 import type { Job } from "./components/JobsCenter";
@@ -113,6 +113,7 @@ import type { ModalKey } from "./contexts/ModalContext";
 import { OnboardingProvider } from "./contexts/OnboardingContext";
 import type { ResultView } from "./contexts/ResultsConfigContext";
 import { ViewStateProvider } from "./contexts/ViewStateContext";
+
 import { useToast } from "./hooks/use-toast";
 import { useConnectivityAndAuth } from "./hooks/useConnectivityAndAuth";
 import {
@@ -154,9 +155,12 @@ const TIMELINE_BUCKET_VALUES: Array<"day" | "week" | "month"> = [
 
 // (Removed) Local ScrollLoader in favor of shared utils/loading ScrollLoader
 
-export default function App() {
-  // Skip to content link for keyboard users (reserved)
-  // const _skipToContentRef = useRef<HTMLAnchorElement>(null);
+/**
+ * App component that uses modal controls from hook
+ */
+function AppWithModalControls() {
+  // Get modal controls from hook
+  const modalControls = useModalControls();
 
   // Modern UX Integration - Mobile detection and haptic feedback
   const { isMobile } = useMobileDetection();
@@ -274,9 +278,9 @@ export default function App() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const { anyOpen: anyModalOpen } = useModalStatus();
-  const modalControls = useModalControls();
   const enableDemoLibrary = useEnableDemoLibrary();
   const [showOnboarding, setShowOnboarding] = useState(false);
+
   const {
     handleWelcomeStartDemo,
     handleFirstRunQuickStart,
@@ -529,7 +533,9 @@ export default function App() {
 
   // Onboarding tour action listeners ("Do it for me")
   useOnboardingActions({
-    openModal: (key: string) => modalControls.openModal(key as ModalKey),
+    openModal: (key: string) => {
+      modalControls.openModal(key as ModalKey);
+    },
     openFilters: () => setShowFilters(true),
   });
 
@@ -716,7 +722,7 @@ export default function App() {
       const r = await apiMap(dir);
       workspaceActions.setPoints(r.points || []);
     } catch (e) {
-      console.error("Failed to load map data:", e);
+      console.error("Failed to map data:", e);
     }
   }, [dir, workspaceActions]);
 
@@ -726,8 +732,9 @@ export default function App() {
         if (!dir) return;
 
         // Validate directory before making API call
-        const dirPath = Path(dir);
-        if (!dirPath.isAbsolute()) {
+        // In web context, check if path appears to be absolute (starts with / on Unix or C:\\ on Windows)
+        const isAbsolutePath = dir.startsWith("/") || /^[A-Za-z]:\\/.test(dir);
+        if (!isAbsolutePath) {
           console.warn("Directory path should be absolute:", dir);
         }
 
@@ -857,8 +864,10 @@ export default function App() {
 
       // Validate directory path
       try {
-        const dirPath = Path(dir);
-        if (!dirPath.isAbsolute()) {
+        // In web context, check if path appears to be absolute (starts with / on Unix or C:\ on Windows)
+        const isAbsolutePath =
+          dir.startsWith("/") || /^[A-Za-z]:[\\/]/.test(dir);
+        if (!isAbsolutePath) {
           uiActions.setNote("Directory path should be absolute");
           return;
         }
@@ -918,7 +927,9 @@ export default function App() {
           null;
         try {
           finalStatus = await apiOperationStatus(dir, "fast_index");
-        } catch {}
+        } catch (statusErr) {
+          console.warn("Unable to read fast index status", statusErr);
+        }
         jobsActions.update(jobId, {
           status: "completed",
           endTime: new Date(),
@@ -987,7 +998,9 @@ export default function App() {
         null;
       try {
         finalStatus = await apiOperationStatus(dir, "ocr");
-      } catch {}
+      } catch (statusErr) {
+        console.warn("Unable to read OCR status", statusErr);
+      }
       const finalTotal =
         typeof finalStatus?.total === "number"
           ? finalStatus.total
@@ -1072,7 +1085,9 @@ export default function App() {
         null;
       try {
         finalStatus = await apiOperationStatus(dir, "metadata");
-      } catch {}
+      } catch (statusErr) {
+        console.warn("Unable to read metadata status", statusErr);
+      }
       const finalTotal =
         typeof finalStatus?.total === "number"
           ? finalStatus.total
@@ -1126,7 +1141,7 @@ export default function App() {
   useEffect(() => {
     if (!busy || !dir) return;
     let t: number;
-    let last = "";
+    let last = 0;
     let isVisible = true;
 
     // Visibility change handlers
@@ -1308,7 +1323,7 @@ export default function App() {
         const r = await apiAnalytics(dir, 10);
         const ev = (r.events || []).slice(-1)[0];
         if (ev && ev.time !== last) {
-          last = ev.time;
+          last = ev.time || 0;
           const { msg, progress } = summarize(ev);
           if (msg) uiActions.setNote(msg);
           if (progress?.jobId) {
@@ -2020,23 +2035,23 @@ export default function App() {
   };
 
   return (
-    <AppProviders>
-      <LayoutProvider value={layoutProps}>
-        <ViewStateProvider value={viewStateProps}>
-          <DataProvider value={dataProps}>
-            <ActionsProvider value={actionProps}>
-              <OnboardingProvider value={onboardingProps}>
-                <AppChrome
-                  location={location}
-                  navigate={navigate}
-                  context={contextProps}
-                  refs={refProps}
-                />
-              </OnboardingProvider>
-            </ActionsProvider>
-          </DataProvider>
-        </ViewStateProvider>
-      </LayoutProvider>
-    </AppProviders>
+    <LayoutProvider value={layoutProps}>
+      <ViewStateProvider value={viewStateProps}>
+        <DataProvider value={dataProps}>
+          <ActionsProvider value={actionProps}>
+            <OnboardingProvider value={onboardingProps}>
+              <AppChrome
+                location={location}
+                navigate={navigate}
+                context={contextProps}
+                refs={refProps}
+              />
+            </OnboardingProvider>
+          </ActionsProvider>
+        </DataProvider>
+      </ViewStateProvider>
+    </LayoutProvider>
   );
 }
+
+export default AppWithModalControls;

@@ -63,6 +63,7 @@ function sameOrigin(url) {
 }
 
 // Simple helpers to decide caching strategy
+// nosemgrep: ESLint8_security_detect-unsafe-regex -- Safe regex for file extension matching
 function isStaticAsset(url) {
   return /(\.((css|js|mjs|wasm|map|png|jpg|jpeg|gif|svg|webp|ico|ttf|woff2?)))(\?.*)?$/i.test(url);
 }

@@ -10,7 +10,7 @@ import {
   Upload,
   Wand2,
 } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { EmptyStateQuickActions } from "./EmptyStateQuickActions";
 
 interface EnhancedEmptyStateProps {
@@ -61,6 +61,15 @@ export function EnhancedEmptyState({
   onTryDemo,
   context = "search",
 }: EnhancedEmptyStateProps) {
+  const headingId = useId();
+  const sectionA11yProps =
+    type === "indexing"
+      ? ({
+          role: "status",
+          "aria-live": "polite",
+          "aria-labelledby": headingId,
+        } as const)
+      : ({ "aria-labelledby": headingId } as const);
   const [showTips, setShowTips] = useState(false);
   const defaultSamples = [
     "beach sunset",
@@ -195,12 +204,22 @@ export function EnhancedEmptyState({
   };
 
   const content = getContent();
+  // Clamp progress to [0, 100] and ensure it's a number for ARIA/width
+  const progressNow =
+    typeof content.progress === "number" && Number.isFinite(content.progress)
+      ? Math.max(0, Math.min(100, Math.round(content.progress)))
+      : undefined;
+
+  // Normalize tips to a safe array for type-narrowing and ARIA use
+  const tips: readonly string[] = Array.isArray((content as any).tips)
+    ? ((content as any).tips as string[])
+    : [];
+  const hasTips = tips.length > 0;
 
   return (
-    <div
+    <section
       className="flex flex-col items-center justify-center min-h-[500px] px-4 py-8 text-center sm:min-h-[420px] sm:px-6 sm:py-10"
-      role={type === "indexing" ? "status" : "region"}
-      aria-live={type === "indexing" ? "polite" : undefined}
+      {...sectionA11yProps}
     >
       <div className="w-full max-w-4xl">
         <div className="relative overflow-hidden rounded-3xl border border-blue-100/50 bg-gradient-to-br from-blue-50 via-white to-indigo-50 shadow-xl dark:border-slate-700/60 dark:from-slate-900/60 dark:via-slate-900 dark:to-slate-950">
@@ -226,7 +245,10 @@ export function EnhancedEmptyState({
                   {content.badge}
                 </span>
               )}
-              <h2 className="text-3xl font-semibold text-gray-900 dark:text-white">
+              <h2
+                id={headingId}
+                className="text-3xl font-semibold text-gray-900 dark:text-white"
+              >
                 {content.title}
               </h2>
               {content.subtitle && (
@@ -241,14 +263,33 @@ export function EnhancedEmptyState({
               )}
             </div>
 
-            {content.progress !== undefined && (
+            {progressNow !== undefined && (
               <div className="w-full max-w-xl text-left">
-                <div className="h-2 w-full overflow-hidden rounded-full bg-blue-100 dark:bg-slate-700">
-                  <div
-                    className="h-full rounded-full bg-blue-500 transition-all duration-500"
-                    style={{ width: `${content.progress}%` }}
-                  />
-                </div>
+                {(() => {
+                  const now = Number(progressNow);
+                  const max = 100;
+                  return (
+                    <>
+                      {/* Semantic progress for assistive tech */}
+                      <progress
+                        value={now}
+                        max={max}
+                        aria-label="Indexing progress"
+                        className="sr-only"
+                      />
+                      {/* Visual progress bar, presentational only */}
+                      <div
+                        aria-hidden="true"
+                        className="h-2 w-full overflow-hidden rounded-full bg-blue-100 dark:bg-slate-700"
+                      >
+                        <div
+                          className="h-full rounded-full bg-blue-500 transition-all duration-500"
+                          style={{ width: `${now}%` }}
+                        />
+                      </div>
+                    </>
+                  );
+                })()}
                 {content.estimatedTime && (
                   <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                     Estimated time remaining: {content.estimatedTime}
@@ -442,33 +483,29 @@ export function EnhancedEmptyState({
         </div>
       )}
 
-      {content.tips && (
+      {hasTips && (
         <div className="mt-10 w-full max-w-3xl text-left">
-          <button
-            type="button"
-            onClick={() => setShowTips(!showTips)}
-            className="flex items-center gap-2 text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-            aria-expanded={showTips}
-            aria-controls="tips-content"
+          <details
+            className="group"
+            open={showTips}
+            onToggle={(e) =>
+              setShowTips((e.currentTarget as HTMLDetailsElement).open)
+            }
           >
-            {showTips ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
-            {showTips ? "Hide tips" : "Show tips"}
-          </button>
-
-          {showTips && (
-            <div
-              id="tips-content"
-              className="mt-4 rounded-2xl border border-blue-100 bg-blue-50/80 p-5 shadow-sm dark:border-blue-900/40 dark:bg-blue-900/20"
-            >
+            <summary className="flex cursor-pointer list-none items-center gap-2 text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+              {showTips ? (
+                <ChevronUp className="h-4 w-4" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )}
+              {showTips ? "Hide tips" : "Show tips"}
+            </summary>
+            <section className="mt-4 rounded-2xl border border-blue-100 bg-blue-50/80 p-5 shadow-sm dark:border-blue-900/40 dark:bg-blue-900/20">
               <h4 className="mb-3 font-medium text-blue-900 dark:text-blue-100">
                 💡 Tips
               </h4>
               <ul className="space-y-2 text-sm text-blue-800 dark:text-blue-100">
-                {content.tips.map((tip, index) => (
+                {tips.map((tip, index) => (
                   <li
                     key={`tip-${tip.substring(0, 10)}-${index}`}
                     className="flex items-start gap-2"
@@ -478,8 +515,8 @@ export function EnhancedEmptyState({
                   </li>
                 ))}
               </ul>
-            </div>
-          )}
+            </section>
+          </details>
         </div>
       )}
 
@@ -494,6 +531,6 @@ export function EnhancedEmptyState({
         sampleQueries={samples}
         context={context}
       />
-    </div>
+    </section>
   );
 }
