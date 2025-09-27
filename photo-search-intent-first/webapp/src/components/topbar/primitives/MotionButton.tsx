@@ -28,7 +28,7 @@ export const MotionButton = forwardRef<HTMLButtonElement, MotionButtonProps>((pr
       ...rest
     } = props as MotionButtonProps & Record<string, unknown>;
 
-    return <button ref={ref} {...rest} />;
+    return <button type="button" ref={ref} {...rest} />;
   }
 
   return <motion.button {...props} ref={ref} />;

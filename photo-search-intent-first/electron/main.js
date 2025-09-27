@@ -2,10 +2,10 @@
 /* global URL, require, process, __dirname, setTimeout, console */
 const { app, BrowserWindow, dialog, Menu, ipcMain, protocol } = require('electron')
 const isDev = process.env.NODE_ENV === 'development'
-const isProd = !isDev && app.isPackaged
+// Move isProd check inside functions where app is guaranteed to be ready
+const getIsProd = () => !isDev && app.isPackaged
 const path = require('path')
 const { spawn } = require('child_process')
-const { autoUpdater } = require('electron-updater')
 const net = require('net')
 const http = require('http')
 const crypto = require('crypto')
@@ -49,6 +49,12 @@ let modelStatus = {
   source: null,
   destination: null,
   lastChecked: null,
+}
+
+// Global updater handler so menu callbacks can always resolve it
+let checkForUpdates = async (_userTriggered = false) => {
+  // Will be reassigned after app is ready
+  log.warn('checkForUpdates called before updater initialization')
 }
 
 function updateModelStatus(partial) {
@@ -318,7 +324,7 @@ function startAPI({ enableProdLogging = false, port = 8000 } = {}) {
   const env = { ...process.env, API_TOKEN: apiToken, API_PORT: String(port) }
 
   // In production, capture logs to a file for diagnostics
-  if (isProd && enableProdLogging) {
+  if (getIsProd() && enableProdLogging) {
     try {
       const userData = app.getPath('userData')
       const logsDir = path.join(userData, 'logs')
@@ -346,15 +352,28 @@ function startAPI({ enableProdLogging = false, port = 8000 } = {}) {
 }
 
 function createWindow() {
+  // Resolve preload from common build locations
+  const preloadCandidates = [
+    path.join(__dirname, 'preload.js'),
+    path.join(__dirname, 'dist', 'preload.js'),
+    path.join(__dirname, '../dist', 'preload.js')
+  ]
+  const preloadPath = preloadCandidates.find((p) => {
+    try { return fs.existsSync(p) } catch { return false }
+  })
+  if (!preloadPath) {
+    log.warn('[Boot] preload.js not found in any of:', preloadCandidates.join(', '), '\nRenderer bridges will be unavailable. Check your build output or BrowserWindow preload path.')
+  }
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js'),
+      preload: preloadPath,
       // In production, keep webSecurity enabled. During dev we may relax for local testing.
-      webSecurity: isProd ? true : false
+      webSecurity: getIsProd() ? true : false
     },
     show: false // Don't show until page is loaded
   })
@@ -369,7 +388,7 @@ function httpPing(url) {
   return new Promise((resolve) => {
     try {
       const req = http.get(url, (res) => {
-        resolve(res.statusCode && res.statusCode >= 200 && res.statusCode < 500)
+        resolve(res.statusCode && res.statusCode >= 200 && res.statusCode < 300)
       })
       req.on('error', () => resolve(false))
       req.setTimeout(1000, () => { req.destroy(); resolve(false) })
@@ -381,14 +400,11 @@ function httpPing(url) {
 
 function resolveBuiltUiCandidates() {
   const candidates = []
-  // If packaged and copied via extraResources
   if (process.resourcesPath) {
     candidates.push(path.join(process.resourcesPath, 'web', 'index.html'))
-    candidates.push(path.join(process.resourcesPath, 'api_web', 'index.html'))
   }
-  // Repo-relative dev/build locations
+  // Repo-relative dev/build location copied by build:ui
   candidates.push(path.resolve(__dirname, '../api/web/index.html'))
-  candidates.push(path.resolve(__dirname, '../webapp/dist/index.html'))
   return candidates
 }
 
@@ -396,10 +412,8 @@ function isAllowedBuiltUiPath(p) {
   const roots = []
   if (process.resourcesPath) {
     roots.push(path.join(process.resourcesPath, 'web'))
-    roots.push(path.join(process.resourcesPath, 'api_web'))
   }
   roots.push(path.resolve(__dirname, '../api/web'))
-  roots.push(path.resolve(__dirname, '../webapp/dist'))
   return roots.some((r) => containsPath(r, p))
 }
 
@@ -407,25 +421,20 @@ async function determineUiTarget() {
   const devUrl = 'http://127.0.0.1:5173/'
   const apiUrl = `http://127.0.0.1:${selectedPort}/app/`
   const builtCandidates = resolveBuiltUiCandidates()
-  // nosemgrep: codacy.tools-configs.javascript_pathtraversal_rule-non-literal-fs-filename -- Only considering paths from known candidates and after isAllowedBuiltUiPath(root containment) check
   const builtIndex = builtCandidates.find((p) => isAllowedBuiltUiPath(p) && fs.existsSync(p))
-  // In production, prefer built UI for stability & clarity
-  // nosemgrep: codacy.tools-configs.javascript_pathtraversal_rule-non-literal-fs-filename -- builtIndex validated by isAllowedBuiltUiPath and existence check
-  if (isProd && builtIndex && fs.existsSync(builtIndex) && isAllowedBuiltUiPath(builtIndex)) {
+
+  if (getIsProd() && builtIndex) {
     return { type: 'file', file: builtIndex }
   }
-  // Dev quality-of-life: if API serves the SPA, it's acceptable
-  if (!isProd && await httpPing(apiUrl)) {
+  if (!getIsProd() && await httpPing(apiUrl)) {
     return { type: 'http', url: apiUrl }
   }
-  // Prefer built UI if present for offline/stable loading
-  if (builtIndex && fs.existsSync(builtIndex) && isAllowedBuiltUiPath(builtIndex)) {
+  if (builtIndex) {
     log.info('Found built UI; loading from file for stability')
     return { type: 'file', file: builtIndex }
   }
-  // Otherwise, if dev server already running, use it
   if (await httpPing(devUrl)) return { type: 'dev', url: devUrl }
-  // Try to start Vite dev server
+
   try {
     const cwd = path.resolve(__dirname, '../webapp')
     log.info('Starting Vite dev server...')
@@ -433,43 +442,26 @@ async function determineUiTarget() {
   } catch (e) {
     log.warn('Failed to spawn Vite dev server:', e?.message)
   }
-  // Wait up to ~15s for Vite to become available
   for (let i = 0; i < 30; i++) {
     if (await httpPing(devUrl)) return { type: 'dev', url: devUrl }
     await new Promise((r) => setTimeout(r, 500))
   }
-  // Final fallback to first candidate path (may not exist; will be handled later)
-  return { type: 'file', file: builtCandidates[0] || path.resolve(__dirname, '../api/web/index.html') }
+  return { type: 'file', file: builtCandidates[0] }
 }
 
 function loadUI(target) {
   if (!mainWindow) return
+  log.info('[Loader] Target →', JSON.stringify(target))
   currentTarget = target
   if (target.type === 'dev' || target.type === 'http') {
     mainWindow.loadURL(target.url)
   } else {
-    const fs = require('fs')
     // Guard against unexpected paths
     // nosemgrep: codacy.tools-configs.javascript_pathtraversal_rule-non-literal-fs-filename -- Path validated by isAllowedBuiltUiPath and existence check
     if (target.file && isAllowedBuiltUiPath(target.file) && fs.existsSync(target.file)) {
-      log.info('Loading built UI via app:// from', target.file)
-      // Use custom app:// scheme to avoid file:// module/CORS issues.
-      // Always prefix with a host segment so path parsing is consistent across platforms.
-      // nosemgrep: codacy.tools-configs.javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal -- target.file previously validated; resolution here is for normalization only
-      const abs = path.resolve(target.file)
-      const asPosix = process.platform === 'win32' ? abs.replace(/\\/g, '/') : abs
-      const pathWithLeadingSlash = asPosix.startsWith('/') ? asPosix : `/${asPosix}`
-      const url = `app://local${encodeURI(pathWithLeadingSlash)}`
-      log.debug('[Loader] Navigating to', url)
-      // Automatically restrict protocol serving to the built UI root in production
-      try {
-        if (isProd) {
-          const rootDir = path.dirname(abs)
-          process.env.PHOTOVAULT_ALLOWED_ROOT = rootDir
-          log.debug('[Protocol] Auto-set allowed root to', rootDir)
-        }
-      } catch { }
-      mainWindow.loadURL(url)
+      log.info('Loading built UI directly from file://:', target.file)
+      // For debugging: Load directly from file:// instead of app:// to avoid module loading issues
+      mainWindow.loadFile(target.file)
     } else {
       dialog.showErrorBox('UI Not Available', 'Vite dev server is not running and no built UI was found. Run "npm --prefix ../webapp run dev" or "npm --prefix ../webapp run build" and try again.')
     }
@@ -478,8 +470,16 @@ function loadUI(target) {
   mainWindow.webContents.on('did-finish-load', () => {
     log.info('Page finished loading')
     mainWindow.show()
-    // Open DevTools immediately to see errors
-    mainWindow.webContents.openDevTools()
+    // Only open DevTools in dev with proper options for console interaction
+    if (isDev) {
+      // Open dev tools immediately with proper configuration
+      mainWindow.webContents.openDevTools({
+        mode: 'undocked', // Separate window for better console access
+        activate: true,   // Bring to front
+        show: true        // Ensure it's visible
+      })
+      log.info('Developer tools opened for debugging')
+    }
     if (isDev) {
       log.debug('[Boot] Shell: Electron, UI: React+Vite, API: FastAPI, Streamlit: false')
     }
@@ -505,6 +505,15 @@ function loadUI(target) {
         if (target.file && isAllowedBuiltUiPath(target.file) && fs.existsSync(target.file)) {
           log.warn('Retrying direct file load for', target.file)
           mainWindow.loadFile(target.file)
+          return
+        }
+      } else if (target?.type === 'http') {
+        // If HTTP load fails (e.g., API doesn't serve UI), fall back to built files
+        // nosemgrep: codacy.tools-configs.javascript_pathtraversal_rule-non-literal-fs-filename -- builtIndex is a fixed, repo-relative path
+        if (isAllowedBuiltUiPath(builtIndex) && fs.existsSync(builtIndex)) {
+          log.warn('HTTP load failed, falling back to built UI at', builtIndex)
+          currentTarget = { type: 'file', file: builtIndex }
+          mainWindow.loadFile(builtIndex)
           return
         }
       }
@@ -559,6 +568,24 @@ function setupMenu() {
         },
         { type: 'separator' },
         {
+          label: 'Toggle Developer Tools',
+          accelerator: 'CmdOrCtrl+Shift+I',
+          click: () => {
+            if (mainWindow?.webContents) {
+              if (mainWindow.webContents.isDevToolsOpened()) {
+                mainWindow.webContents.closeDevTools()
+              } else {
+                mainWindow.webContents.openDevTools({
+                  mode: 'undocked',
+                  activate: true,
+                  show: true
+                })
+              }
+            }
+          }
+        },
+        { type: 'separator' },
+        {
           label: 'Restart Backend API',
           click: async () => {
             await restartBackend()
@@ -596,59 +623,6 @@ async function manageLicense() {
   }
 }
 
-// IPC handler for folder selection
-ipcMain.handle('select-folder', async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
-    title: 'Select Photo Folder',
-    properties: ['openDirectory'],
-    buttonLabel: 'Select Folder'
-  })
-
-  if (!result.canceled && result.filePaths.length > 0) {
-    return result.filePaths[0]
-  }
-  return null
-})
-
-// IPC handler to expose API token to the renderer (preload bridges it safely)
-ipcMain.handle('get-api-token', async () => {
-  return apiToken || ''
-})
-
-// IPC handler to provide API base and token to the renderer for dynamic port wiring
-ipcMain.handle('get-api-config', async () => {
-  try {
-    const base = `http://127.0.0.1:${selectedPort}`
-    return { base, token: apiToken || '' }
-  } catch {
-    return { base: 'http://127.0.0.1:8000', token: apiToken || '' }
-  }
-})
-
-// IPC to set allowed root for app:// protocol restriction (production)
-ipcMain.handle('set-allowed-root', async (_e, p) => {
-  try {
-    if (typeof p === 'string' && p.trim()) {
-      process.env.PHOTOVAULT_ALLOWED_ROOT = p
-      log.debug('[Protocol] Allowed root set to:', p)
-      return true
-    }
-  } catch { }
-  return false
-})
-
-ipcMain.handle('models:get-status', async () => modelStatus)
-
-ipcMain.handle('models:refresh', async () => {
-  const ok = await ensureBundledModels({ force: true })
-  return { ok, status: modelStatus }
-})
-
-ipcMain.handle('backend:restart', async () => {
-  await restartBackend()
-  return true
-})
-
 async function restartBackend() {
   try {
     if (apiProc) {
@@ -664,18 +638,20 @@ async function restartBackend() {
   }
 }
 
-async function checkForUpdates(userTriggered = false) {
-  try {
-    const { updateInfo } = await autoUpdater.checkForUpdatesAndNotify()
-    if (userTriggered && !updateInfo) {
-      dialog.showMessageBox({ type: 'info', message: 'You are up to date.' })
-    }
-  } catch (e) {
-    if (userTriggered) dialog.showErrorBox('Update Error', e.message)
-  }
-}
-
 app.whenReady().then(async () => {
+  // Import autoUpdater here where app is guaranteed to be ready
+  const { autoUpdater } = require('electron-updater')
+
+  checkForUpdates = async (userTriggered = false) => {
+    try {
+      const { updateInfo } = await autoUpdater.checkForUpdatesAndNotify()
+      if (userTriggered && !updateInfo) {
+        dialog.showMessageBox({ type: 'info', message: 'You are up to date.' })
+      }
+    } catch (e) {
+      if (userTriggered) dialog.showErrorBox('Update Error', e.message)
+    }
+  }
   // License check: non-blocking gate with user prompt
   try {
     const appVersion = app.getVersion ? (app.getVersion() || '0.0.0') : '0.0.0'
@@ -720,19 +696,21 @@ app.whenReady().then(async () => {
       log.debug('[Protocol Handler] Resolved file path:', filePath)
       const fs = require('fs')
       // nosemgrep: codacy.tools-configs.javascript_pathtraversal_rule-non-literal-fs-filename -- filePath comes from app:// URL; will be constrained below by allowedRoot; this mapping attempts to serve relative assets alongside validated currentTarget
-      if (!fs.existsSync(filePath) && currentTarget?.type === 'file') {
-        const rootDir = path.dirname(path.resolve(currentTarget.file))
-        const trimmed = filePath.replace(/^[/\\]+/, '')
-        const candidate = path.join(rootDir, trimmed)
-        // nosemgrep: codacy.tools-configs.javascript_pathtraversal_rule-non-literal-fs-filename -- candidate path is under rootDir; final check below enforces allowedRoot containment in production
-        if (fs.existsSync(candidate)) {
-          filePath = candidate
-          log.debug('[Protocol Handler] Re-mapped relative path to:', filePath)
+      if (!fs.existsSync(filePath)) {
+        const allowedRoot = process.env.PHOTOVAULT_ALLOWED_ROOT
+        if (allowedRoot) {
+          const trimmed = filePath.replace(/^[/\\]+/, '')
+          const candidate = path.join(allowedRoot, trimmed)
+          // nosemgrep: codacy.tools-configs.javascript_pathtraversal_rule-non-literal-fs-filename -- candidate path is under allowedRoot; final check below enforces allowedRoot containment
+          if (fs.existsSync(candidate)) {
+            filePath = candidate
+            log.debug('[Protocol Handler] Re-mapped relative path to:', filePath)
+          }
         }
       }
       // Restrict served files to an allowed root in production
       const allowedRoot = process.env.PHOTOVAULT_ALLOWED_ROOT
-      if (isProd && allowedRoot) {
+      if (getIsProd() && allowedRoot) {
         const root = path.resolve(allowedRoot) + path.sep
         const target = path.resolve(filePath)
         if (!target.startsWith(root)) {
@@ -765,6 +743,12 @@ app.whenReady().then(async () => {
   // Choose port: fixed 8000 in dev, random free in prod for isolation
   selectedPort = isDev ? 8000 : await findFreePort(8000)
   const isApiRunning = await checkAPIRunning(selectedPort)
+
+  // Always generate an API token for this session, even if API is already running
+  if (!apiToken) {
+    apiToken = crypto.randomBytes(24).toString('hex')
+  }
+
   if (!isApiRunning) {
     log.info('Starting API server...')
     startAPI({ enableProdLogging: true, port: selectedPort })
@@ -776,6 +760,60 @@ app.whenReady().then(async () => {
   } else {
     log.info(`API server already running on port ${selectedPort}`)
   }
+
+  // IPC handlers must be set up after app is ready
+  // IPC handler for folder selection
+  ipcMain.handle('select-folder', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Select Photo Folder',
+      properties: ['openDirectory'],
+      buttonLabel: 'Select Folder'
+    })
+
+    if (!result.canceled && result.filePaths.length > 0) {
+      return result.filePaths[0]
+    }
+    return null
+  })
+
+  // IPC handler to expose API token to the renderer (preload bridges it safely)
+  ipcMain.handle('get-api-token', async () => {
+    return apiToken || ''
+  })
+
+  // IPC handler to provide API base and token to the renderer for dynamic port wiring
+  ipcMain.handle('get-api-config', async () => {
+    try {
+      const base = `http://127.0.0.1:${selectedPort}`
+      return { base, token: apiToken || '' }
+    } catch {
+      return { base: 'http://127.0.0.1:8000', token: apiToken || '' }
+    }
+  })
+
+  // IPC to set allowed root for app:// protocol restriction (production)
+  ipcMain.handle('set-allowed-root', async (_e, p) => {
+    try {
+      if (typeof p === 'string' && p.trim()) {
+        process.env.PHOTOVAULT_ALLOWED_ROOT = p
+        log.debug('[Protocol] Allowed root set to:', p)
+        return true
+      }
+    } catch { }
+    return false
+  })
+
+  ipcMain.handle('models:get-status', async () => modelStatus)
+
+  ipcMain.handle('models:refresh', async () => {
+    const ok = await ensureBundledModels({ force: true })
+    return { ok, status: modelStatus }
+  })
+
+  ipcMain.handle('backend:restart', async () => {
+    await restartBackend()
+    return true
+  })
 
   setupMenu()
   createWindow()
@@ -797,6 +835,8 @@ app.whenReady().then(async () => {
       }
     }
   })
+
+  try { await autoUpdater.checkForUpdatesAndNotify() } catch (e) { log.warn('AutoUpdater init failed:', e?.message) }
 })
 
 app.on('window-all-closed', () => {
@@ -834,4 +874,3 @@ protocol.registerSchemesAsPrivileged([
   }
 ])
 
-autoUpdater.checkForUpdatesAndNotify()

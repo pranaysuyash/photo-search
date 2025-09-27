@@ -312,8 +312,9 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
         <div className="search-input-wrapper">
           <IconSearch className="search-icon" aria-hidden="true" />
           <input
-            type="text"
+            type="search"
             placeholder="What are you looking for? Try 'kids at the park' or 'last summer'"
+            data-testid="search-input"
             value={searchText}
             onChange={(e) => {
               setSearchText(e.target.value);

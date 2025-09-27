@@ -48,7 +48,7 @@ export function ResultsGrid({
 					>
 						<ProgressiveImage
 							src={thumbUrl(dir, engine, p, 256)}
-							alt={p.split("/").pop() || p}
+							alt={`Photo: ${p.split("/").pop() || p}`}
 							className="w-full h-24 object-cover rounded pointer-events-none select-none"
 							thumbSize={96}
 							mediumSize={256}

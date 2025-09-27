@@ -20,6 +20,8 @@
     "visual:ci": "npm run -s visual:ci:classic && npm run -s visual:ci:if"
   },
   "devDependencies": {
+    "@playwright/test": "^1.55.1",
+    "playwright": "^1.55.1",
     "react-scan": "^0.4.3",
     "rollup-plugin-visualizer": "^6.0.3",
     "vite-plugin-compression": "^0.5.1"

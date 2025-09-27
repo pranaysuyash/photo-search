@@ -108,7 +108,14 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
 						</Button>
 					</div>
 
-					<div className="px-4 md:px-6 py-4 md:py-6 space-y-4">
+					<form
+						className="px-4 md:px-6 py-4 md:py-6 space-y-4"
+						onSubmit={async (e) => {
+							e.preventDefault();
+							await doSearch(q);
+							onClose();
+						}}
+					>
 						<SearchBar
 							searchText={q}
 							setSearchText={setQ}
@@ -141,184 +148,184 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
 								if (next !== (q || "").trim()) doSearch(next);
 							}}
 						/>
+					</form>
 
-						{/* Quick scopes – minimal, more in Filters Drawer in later phases */}
-						<div className="mt-3 flex flex-wrap gap-2">
+					{/* Quick scopes – minimal, more in Filters Drawer in later phases */}
+					<div className="mt-3 flex flex-wrap gap-2">
 							{["All", "Today", "This Week", "This Month"].map((label) => (
+							<button
+								key={label}
+								type="button"
+								className={cn(
+									buttonVariants({ variant: "pillOutline", size: "pill" }),
+									"justify-start",
+								)}
+								onClick={() => {
+									const now = new Date();
+									const startOfDay = new Date(
+										now.getFullYear(),
+										now.getMonth(),
+										now.getDate(),
+									);
+									const startOfWeek = new Date(startOfDay);
+									// Make Monday the start of week
+									const day = startOfWeek.getDay();
+									const diffToMonday = (day === 0 ? -6 : 1) - day; // 0(Sun)->-6, 1(Mon)->0, ...
+									startOfWeek.setDate(startOfWeek.getDate() + diffToMonday);
+									const startOfMonth = new Date(
+										now.getFullYear(),
+										now.getMonth(),
+										1,
+									);
+
+									// Compute token
+									let tok = "";
+									if (label === "Today")
+										tok = `mtime:>=${Math.floor(
+											startOfDay.getTime() / 1000,
+										)}`;
+									else if (label === "This Week")
+										tok = `mtime:>=${Math.floor(
+											startOfWeek.getTime() / 1000,
+										)}`;
+									else if (label === "This Month")
+										tok = `mtime:>=${Math.floor(
+											startOfMonth.getTime() / 1000,
+										)}`;
+
+									// Remove existing mtime tokens to avoid duplication
+									const base = (q || "")
+										.replace(/\bmtime:[^\s)]+/gi, "")
+										.replace(/\s{2,}/g, " ")
+										.trim();
+									const next =
+										label === "All" ? base : base ? `${base} ${tok}` : tok;
+									setQ(next);
+									doSearch(next);
+									onClose();
+								}}
+							>
+								{label}
+							</button>
+						))}
+					</div>
+
+					{/* Controls row */}
+					<div className="mt-4 flex items-center gap-2">
+						<button
+							type="button"
+							className={buttonVariants({
+								variant: "pillOutline",
+								size: "pill",
+							})}
+							onClick={() => setShowFilters((v) => !v)}
+							aria-expanded={showFilters ? "true" : "false"}
+							aria-controls="overlay-filters"
+						>
+							Filters
+						</button>
+						<button
+							type="button"
+							className={buttonVariants({
+								variant: "pillOutline",
+								size: "pill",
+							})}
+							onClick={() => setShowAdvanced((v) => !v)}
+							aria-expanded={showAdvanced ? "true" : "false"}
+							aria-controls="overlay-advanced"
+						>
+							Advanced
+						</button>
+						<div className="ml-auto text-xs text-gray-500">
+							Tip: press / to open search
+						</div>
+					</div>
+
+					{/* Filters Drawer */}
+					{showFilters && (
+						<div id="overlay-filters" className="mt-3 flex flex-wrap gap-2">
+							{[
+								{ label: "Text in Image", expr: "has_text:true" },
+								{ label: "High ISO", expr: "iso:>=1600" },
+								{ label: "Shallow DoF", expr: "fnumber:<2.8" },
+								{ label: "Large", expr: "width:>=3000 height:>=2000" },
+								{ label: "Underexposed", expr: "brightness:<50" },
+								{ label: "Sharp Only", expr: "sharpness:>=60" },
+							].map((p) => (
 								<button
-									key={label}
+									key={p.label}
 									type="button"
 									className={cn(
 										buttonVariants({ variant: "pillOutline", size: "pill" }),
 										"justify-start",
 									)}
+									title={p.expr}
 									onClick={() => {
-										const now = new Date();
-										const startOfDay = new Date(
-											now.getFullYear(),
-											now.getMonth(),
-											now.getDate(),
-										);
-										const startOfWeek = new Date(startOfDay);
-										// Make Monday the start of week
-										const day = startOfWeek.getDay();
-										const diffToMonday = (day === 0 ? -6 : 1) - day; // 0(Sun)->-6, 1(Mon)->0, ...
-										startOfWeek.setDate(startOfWeek.getDate() + diffToMonday);
-										const startOfMonth = new Date(
-											now.getFullYear(),
-											now.getMonth(),
-											1,
-										);
-
-										// Compute token
-										let tok = "";
-										if (label === "Today")
-											tok = `mtime:>=${Math.floor(
-												startOfDay.getTime() / 1000,
-											)}`;
-										else if (label === "This Week")
-											tok = `mtime:>=${Math.floor(
-												startOfWeek.getTime() / 1000,
-											)}`;
-										else if (label === "This Month")
-											tok = `mtime:>=${Math.floor(
-												startOfMonth.getTime() / 1000,
-											)}`;
-
-										// Remove existing mtime tokens to avoid duplication
-										const base = (q || "")
-											.replace(/\bmtime:[^\s)]+/gi, "")
-											.replace(/\s{2,}/g, " ")
-											.trim();
-										const next =
-											label === "All" ? base : base ? `${base} ${tok}` : tok;
-										setQ(next);
-										doSearch(next);
+										const tok = p.expr;
+										const next = (searchText || "").trim();
+										const q = next ? `${next} ${tok}` : tok;
+										if (setSearchText) setSearchText(q);
+										if (onSearch) onSearch(q);
 										onClose();
 									}}
 								>
-									{label}
+									{p.label}
 								</button>
 							))}
-						</div>
 
-						{/* Controls row */}
-						<div className="mt-4 flex items-center gap-2">
-							<button
-								type="button"
-								className={buttonVariants({
-									variant: "pillOutline",
-									size: "pill",
-								})}
-								onClick={() => setShowFilters((v) => !v)}
-								aria-expanded={showFilters}
-								aria-controls="overlay-filters"
-							>
-								Filters
-							</button>
-							<button
-								type="button"
-								className={buttonVariants({
-									variant: "pillOutline",
-									size: "pill",
-								})}
-								onClick={() => setShowAdvanced((v) => !v)}
-								aria-expanded={showAdvanced}
-								aria-controls="overlay-advanced"
-							>
-								Advanced
-							</button>
-							<div className="ml-auto text-xs text-gray-500">
-								Tip: press / to open search
-							</div>
-						</div>
-
-						{/* Filters Drawer */}
-						{showFilters && (
-							<div id="overlay-filters" className="mt-3 flex flex-wrap gap-2">
-								{[
-									{ label: "Text in Image", expr: "has_text:true" },
-									{ label: "High ISO", expr: "iso:>=1600" },
-									{ label: "Shallow DoF", expr: "fnumber:<2.8" },
-									{ label: "Large", expr: "width:>=3000 height:>=2000" },
-									{ label: "Underexposed", expr: "brightness:<50" },
-									{ label: "Sharp Only", expr: "sharpness:>=60" },
-								].map((p) => (
-									<button
-										key={p.label}
-										type="button"
-										className={cn(
-											buttonVariants({ variant: "pillOutline", size: "pill" }),
-											"justify-start",
-										)}
-										title={p.expr}
-										onClick={() => {
-											const tok = p.expr;
-											const next = (searchText || "").trim();
-											const q = next ? `${next} ${tok}` : tok;
-											if (setSearchText) setSearchText(q);
-											if (onSearch) onSearch(q);
-											onClose();
-										}}
-									>
-										{p.label}
-									</button>
-								))}
-
-								{/* Video filters dropdown */}
-								<VideoFilterDropdown
-									value={selectedVideoFilter?.label || null}
-									onValueChange={(filter) => {
-										setSelectedVideoFilter(filter);
-										if (filter) {
-											const next = (searchText || "").trim();
-											const q = next ? `${next} ${filter.expr}` : filter.expr;
-											if (setSearchText) setSearchText(q);
-											if (onSearch) onSearch(q);
-											onClose();
-										}
-									}}
-									currentQuery={searchText || ""}
-									setQuery={(newQuery) => {
-										if (setSearchText) setSearchText(newQuery);
-										if (onSearch) onSearch(newQuery);
+							{/* Video filters dropdown */}
+							<VideoFilterDropdown
+								value={selectedVideoFilter?.label || null}
+								onValueChange={(filter) => {
+									setSelectedVideoFilter(filter);
+									if (filter) {
+										const next = (searchText || "").trim();
+										const q = next ? `${next} ${filter.expr}` : filter.expr;
+										if (setSearchText) setSearchText(q);
+										if (onSearch) onSearch(q);
 										onClose();
-									}}
-									placeholder="Video filters..."
-									className="w-40"
-								/>
-							</div>
-						)}
+									}
+								}}
+								currentQuery={searchText || ""}
+								setQuery={(newQuery) => {
+									if (setSearchText) setSearchText(newQuery);
+									if (onSearch) onSearch(newQuery);
+									onClose();
+								}}
+								placeholder="Video filters..."
+								className="w-40"
+							/>
+						</div>
+					)}
 
-						{/* Advanced help/DSL */}
-						{showAdvanced && (
-							<div
-								id="overlay-advanced"
-								className="mt-4 p-3 rounded-md border border-gray-200 dark:border-gray-800 text-[13px] text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/40"
-							>
-								<div className="font-semibold mb-2">Boolean query syntax</div>
-								<div>Use AND, OR, NOT and parentheses ( ).</div>
-								<div className="mt-1">
-									Fields: camera:, place:, tag:, rating:, person:, has_text:,
-									filetype:
-								</div>
-								<div className="mt-1">
-									Numeric: iso:, fnumber:, width:, height:, mtime:, brightness:,
-									sharpness:, exposure:, focal:, duration: (supports &gt;=,
-									&lt;=, &gt;, &lt;, =)
-								</div>
-								<div className="mt-2">Examples:</div>
-								<ul className="list-disc ml-5 mt-1">
-									<li>birthday AND person:"Alex"</li>
-									<li>camera:"iPhone" AND iso:&lt;=800</li>
-									<li>(tag:sunset OR tag:golden) AND sharpness:&gt;=60</li>
-								</ul>
-								<div className="mt-3 text-xs text-gray-500">
-									Tip: Start typing to see people, tags, and camera suggestions.
-								</div>
+					{/* Advanced help/DSL */}
+					{showAdvanced && (
+						<div
+							id="overlay-advanced"
+							className="mt-4 p-3 rounded-md border border-gray-200 dark:border-gray-800 text-[13px] text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/40"
+						>
+							<div className="font-semibold mb-2">Boolean query syntax</div>
+							<div>Use AND, OR, NOT and parentheses ( ).</div>
+							<div className="mt-1">
+								Fields: camera:, place:, tag:, rating:, person:, has_text:,
+								filetype:
 							</div>
-						)}
-					</div>
+							<div className="mt-1">
+								Numeric: iso:, fnumber:, width:, height:, mtime:, brightness:,
+								sharpness:, exposure:, focal:, duration: (supports &gt;=,
+								&lt;=, &gt;, &lt;, =)
+							</div>
+							<div className="mt-2">Examples:</div>
+							<ul className="list-disc ml-5 mt-1">
+								<li>birthday AND person:"Alex"</li>
+								<li>camera:"iPhone" AND iso:&lt;=800</li>
+								<li>(tag:sunset OR tag:golden) AND sharpness:&gt;=60</li>
+							</ul>
+							<div className="mt-3 text-xs text-gray-500">
+								Tip: Start typing to see people, tags, and camera suggestions.
+							</div>
+						</div>
+					)}
 				</div>
 			</FocusTrap>
 		</div>

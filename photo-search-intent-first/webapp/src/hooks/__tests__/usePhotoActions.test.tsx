@@ -12,13 +12,17 @@ vi.mock("@/hooks/use-toast", () => ({
 }));
 
 // Mock the API module
-vi.mock("../../api", () => ({
-	apiSetTags: vi.fn(),
-	apiExport: vi.fn(),
-	apiDelete: vi.fn(),
-	apiUndoDelete: vi.fn(),
-	apiSetFavorite: vi.fn(),
-}));
+vi.mock("../../api", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../../api")>();
+	return {
+		...actual,
+		apiSetTags: vi.fn(),
+		apiExport: vi.fn(),
+		apiDelete: vi.fn(),
+		apiUndoDelete: vi.fn(),
+		apiSetFavorite: vi.fn(),
+	};
+});
 
 describe("usePhotoActions", () => {
 	const mockDir = "/test/photos";

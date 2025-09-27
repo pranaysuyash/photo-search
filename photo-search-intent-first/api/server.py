@@ -12,6 +12,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, TypeVar
 from fastapi import Body, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from datetime import datetime, timezone
 
@@ -114,6 +115,11 @@ app.add_middleware(
 app.include_router(analytics_router)
 app.include_router(indexing_router)
 app.include_router(config_router)
+
+# Mount static files for React app
+web_dir = Path(__file__).parent / "web"
+if web_dir.exists():
+    app.mount("/app", StaticFiles(directory=str(web_dir), html=True), name="static")
 
 T = TypeVar("T")
 

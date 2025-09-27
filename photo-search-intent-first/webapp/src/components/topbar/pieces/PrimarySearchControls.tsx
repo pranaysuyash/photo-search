@@ -67,6 +67,7 @@ export function PrimarySearchControls({
           className="ml-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
           onClick={onOpenSearchOverlay}
           aria-label="Open search"
+          data-testid="open-search"
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
@@ -76,7 +77,13 @@ export function PrimarySearchControls({
           </span>
         </MotionButton>
       ) : (
-        <div className="flex items-center gap-2 w-full max-w-2xl">
+        <form
+          className="flex items-center gap-2 w-full max-w-2xl"
+          onSubmit={(e) => {
+            e.preventDefault();
+            doSearch(searchText);
+          }}
+        >
           <SearchBar
             searchText={searchText}
             setSearchText={setSearchText}
@@ -97,7 +104,7 @@ export function PrimarySearchControls({
             </kbd>
             <span className="hidden md:inline">for shortcuts</span>
           </button>
-        </div>
+        </form>
       )}
 
       <QuickFilters

@@ -234,27 +234,30 @@ export function Lightbox({
   if (!path) return null;
 
   return (
-    <div
-      className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center"
-      onClick={onClose}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") {
-          e.stopPropagation();
-          onClose();
-        }
-      }}
-      role="presentation"
-    >
+    <div className="fixed inset-0">
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center"
+        aria-label="Close lightbox"
+        onClick={onClose}
+        onKeyDown={(e) => {
+          if (e.key === "Escape" || e.key === "Enter" || e.key === " ") {
+            e.stopPropagation();
+            onClose();
+          }
+        }}
+        style={{ all: "unset" }}
+      />
       <div
         className="relative max-w-6xl w-full p-4"
         onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
         ref={containerRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={headingId}
         tabIndex={-1}
         onKeyDown={(e) => {
+          e.stopPropagation();
           if (e.key === "ArrowLeft") onPrev();
           else if (e.key === "ArrowRight") onNext();
           else if (e.key === "+" || e.key === "=") zoomIn();
@@ -512,7 +515,7 @@ export function Lightbox({
         {showEditor && (
           <ImageEditor
             imagePath={path}
-            onSave={(_editedPath) => {
+            onSave={() => {
               // Parent can react to edited image via higher-level state; we just close the editor here
               setShowEditor(false);
             }}

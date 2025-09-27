@@ -30,8 +30,8 @@ export default function MapView({
 			const hasLeaflet =
 				typeof window !== "undefined" &&
 				"L" in window &&
-				typeof (window as any).L === "object" &&
-				"map" in (window as any).L;
+				typeof (window as unknown).L === "object" &&
+				"map" in (window as unknown).L;
 			setUseEnhancedMap(hasLeaflet);
 		} catch {
 			setUseEnhancedMap(false);

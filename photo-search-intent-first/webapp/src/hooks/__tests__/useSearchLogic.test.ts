@@ -5,11 +5,15 @@ import { networkErrors } from "../../utils/errors";
 import { useSearchLogic } from "../useSearchLogic";
 
 // Mock the API module
-vi.mock("../../api", () => ({
-	apiSearchLike: vi.fn(),
-	apiSetFavorite: vi.fn(),
-	apiOpen: vi.fn(),
-}));
+vi.mock("../../api", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../../api")>();
+	return {
+		...actual,
+		apiSearchLike: vi.fn(),
+		apiSetFavorite: vi.fn(),
+		apiOpen: vi.fn(),
+	};
+});
 
 // Mock the errors utility
 vi.mock("../../utils/errors", () => ({

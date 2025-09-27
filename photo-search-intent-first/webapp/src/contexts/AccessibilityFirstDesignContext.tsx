@@ -709,8 +709,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
     }, [variant, size]);
     
     return (
-      <button
-        {...props}
+      <button type="button" {...props}
         {...ariaAttributes.getAriaAttributes("button")}
         className={`${buttonClasses} ${props.className || ""}`}
         onClick={handleClick}
@@ -1376,7 +1375,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
             className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
             aria-hidden="true"
             onClick={handleClose}
-          />
+          / role="button" tabIndex={0}>
           
           {/* Dialog panel */}
           <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
@@ -1730,8 +1729,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
     }, [announceSelect, selected, children, announcer]);
     
     return (
-      <button
-        id={id}
+      <button type="button" id={id}
         className={`px-4 py-2 text-sm font-medium rounded-md ${
           selected
             ? "bg-indigo-100 text-indigo-700"

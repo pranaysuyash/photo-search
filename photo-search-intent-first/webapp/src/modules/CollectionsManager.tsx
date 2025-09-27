@@ -164,6 +164,8 @@ export function CollectionsManager() {
 							type="button"
 							onClick={() => setViewMode("grid")}
 							className={viewMode === "grid" ? "active" : ""}
+							aria-label="Switch to grid view"
+							title="Grid view"
 						>
 							<Grid className="w-4 h-4" />
 						</button>
@@ -171,6 +173,8 @@ export function CollectionsManager() {
 							type="button"
 							onClick={() => setViewMode("list")}
 							className={viewMode === "list" ? "active" : ""}
+							aria-label="Switch to list view"
+							title="List view"
 						>
 							<List className="w-4 h-4" />
 						</button>

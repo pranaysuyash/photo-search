@@ -113,6 +113,7 @@ import type { ModalKey } from "./contexts/ModalContext";
 import { OnboardingProvider } from "./contexts/OnboardingContext";
 import type { ResultView } from "./contexts/ResultsConfigContext";
 import { ViewStateProvider } from "./contexts/ViewStateContext";
+import { ModalDataBridgeProvider } from "./providers/ModalDataBridgeProvider";
 
 import { useToast } from "./hooks/use-toast";
 import { useConnectivityAndAuth } from "./hooks/useConnectivityAndAuth";
@@ -2039,14 +2040,22 @@ function AppWithModalControls() {
       <ViewStateProvider value={viewStateProps}>
         <DataProvider value={dataProps}>
           <ActionsProvider value={actionProps}>
-            <OnboardingProvider value={onboardingProps}>
-              <AppChrome
-                location={location}
-                navigate={navigate}
-                context={contextProps}
-                refs={refProps}
-              />
-            </OnboardingProvider>
+            <ModalDataBridgeProvider>
+              <OnboardingProvider value={onboardingProps}>
+                {/* Temporary cast: contextProps type mismatch (workspaceActions.setWorkspace signature). */}
+                <AppChrome
+                  location={location}
+                  navigate={navigate}
+                  // Type shim: workspaceActions.setWorkspace signature divergence; narrow cast to unknown then ContextProps
+                  context={
+                    contextProps as unknown as Parameters<
+                      typeof AppChrome
+                    >[0]["context"]
+                  }
+                  refs={refProps}
+                />
+              </OnboardingProvider>
+            </ModalDataBridgeProvider>
           </ActionsProvider>
         </DataProvider>
       </ViewStateProvider>

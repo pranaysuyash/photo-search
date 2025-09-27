@@ -5,19 +5,23 @@ import { networkErrors } from "../../utils/errors";
 import { useDataLoading } from "../useDataLoading";
 
 // Mock the API module
-vi.mock("../../api", () => ({
-	apiGetFavorites: vi.fn(),
-	apiGetSaved: vi.fn(),
-	apiGetPresets: vi.fn(),
-	apiGetTags: vi.fn(),
-	apiDiagnostics: vi.fn(),
-	apiFacesClusters: vi.fn(),
-	apiMap: vi.fn(),
-	apiLibrary: vi.fn(),
-	apiGetMetadata: vi.fn(),
-	apiWatchStatus: vi.fn(),
-	apiWatchStart: vi.fn(),
-}));
+vi.mock("../../api", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../../api")>();
+	return {
+		...actual,
+		apiGetFavorites: vi.fn(),
+		apiGetSaved: vi.fn(),
+		apiGetPresets: vi.fn(),
+		apiGetTags: vi.fn(),
+		apiDiagnostics: vi.fn(),
+		apiFacesClusters: vi.fn(),
+		apiMap: vi.fn(),
+		apiLibrary: vi.fn(),
+		apiGetMetadata: vi.fn(),
+		apiWatchStatus: vi.fn(),
+		apiWatchStart: vi.fn(),
+	};
+});
 
 // Mock the errors utility
 let mockSetNote: ((message: string) => void) | undefined;

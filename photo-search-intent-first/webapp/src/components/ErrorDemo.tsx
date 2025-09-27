@@ -529,7 +529,7 @@ export class OfflineActionQueue {
         action.metadata!.updatedAt = Date.now();
         action.metadata!.lastError = {
           message: error instanceof Error ? error.message : String(error),
-          code: (error as any).code || "UNKNOWN",
+          code: (error as unknown).code || "UNKNOWN",
           timestamp: Date.now(),
           stack: error instanceof Error ? error.stack : undefined
         };
@@ -628,7 +628,7 @@ export class OfflineActionQueue {
         action.status = "PENDING_SYNC";
         action.metadata!.lastError = {
           message: error instanceof Error ? error.message : String(error),
-          code: (error as any).code || "SYNC_FAILED",
+          code: (error as unknown).code || "SYNC_FAILED",
           timestamp: Date.now(),
           stack: error instanceof Error ? error.stack : undefined
         };
@@ -1718,7 +1718,7 @@ export class OfflineActionQueue {
         action.status = "PENDING_SYNC";
         action.metadata!.lastError = {
           message: error instanceof Error ? error.message : String(error),
-          code: (error as any).code || "FORCE_SYNC_FAILED",
+          code: (error as unknown).code || "FORCE_SYNC_FAILED",
           timestamp: Date.now(),
           stack: error instanceof Error ? error.stack : undefined
         };

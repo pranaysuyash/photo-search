@@ -211,8 +211,8 @@ export function EnhancedEmptyState({
       : undefined;
 
   // Normalize tips to a safe array for type-narrowing and ARIA use
-  const tips: readonly string[] = Array.isArray((content as any).tips)
-    ? ((content as any).tips as string[])
+  const tips: readonly string[] = Array.isArray((content as unknown).tips)
+    ? ((content as unknown).tips as string[])
     : [];
   const hasTips = tips.length > 0;
 

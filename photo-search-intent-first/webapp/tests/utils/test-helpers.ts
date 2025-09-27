@@ -29,6 +29,12 @@ export async function waitForAppReady(
         localStorage.setItem("hasSeenOnboarding", "true");
         localStorage.setItem("onboardingComplete", "true");
         localStorage.setItem("showWelcome", "false");
+        localStorage.setItem("showOnboardingTour", "false");
+        localStorage.setItem("showOnboardingChecklist", "false");
+        // Also set sessionStorage
+        sessionStorage.setItem("hasSeenOnboarding", "true");
+        sessionStorage.setItem("onboardingComplete", "true");
+        sessionStorage.setItem("showWelcome", "false");
       } catch (e) {
         console.warn("Failed to set localStorage:", e);
       }
@@ -36,7 +42,7 @@ export async function waitForAppReady(
   }
 
   // Navigate to the app
-  await page.goto("http://localhost:5174");
+  await page.goto("/");
   await page.waitForLoadState("networkidle");
 
   // Wait for React to be ready - check for functional app rather than global React
@@ -57,14 +63,46 @@ export async function waitForAppReady(
   // Wait for main app content to be visible
   await page.waitForSelector("#root", { state: "visible", timeout });
 
-  // Dismiss any overlays that might be blocking interaction
+  // Dismiss any overlays that might be blocking interaction - do this multiple times as needed
+  await dismissOverlays(page);
+  // Additional wait for any transitions to complete after dismissing overlays
+  await page.waitForTimeout(500);
+  // Dismiss overlays again as they might appear after first dismissal
   await dismissOverlays(page);
 
   // Wait for the main content area to be ready
-  await page.waitForSelector("#main-content", {
-    state: "visible",
-    timeout: 10000,
-  });
+  // Try multiple possible selectors in case the element ID changes
+  const mainContentSelectors = [
+    "#main-content",
+    "#root",
+    "[data-testid='main-content']",
+    "[class*='main-content' i]",
+    "[class*='App' i]",
+    "main",
+    "[data-testid='app-container']",
+    "[class*='container' i]",
+  ];
+
+  let mainContentFound = false;
+  for (const selector of mainContentSelectors) {
+    try {
+      await page.waitForSelector(selector, {
+        state: "visible",
+        timeout: 5000, // Increased timeout to 5 seconds
+      });
+      mainContentFound = true;
+      debugLog(`Found main content with selector: ${selector}`);
+      break;
+    } catch (error) {
+      // Continue to next selector
+    }
+  }
+
+  if (!mainContentFound) {
+    console.warn(
+      "None of the main content selectors were found. Continuing anyway..."
+    );
+  }
 
   // Additional wait for any async operations
   await page.waitForTimeout(1000);
@@ -75,57 +113,65 @@ export async function waitForAppReady(
  */
 export async function dismissOverlays(page: Page): Promise<void> {
   const overlays = [
-    // Welcome/onboarding screens
+    // Welcome/onboarding screens - be more specific and defensive
     {
-      locator: page
-        .locator(
-          '[data-testid="welcome-screen"], .welcome-screen, [class*="welcome"]'
-        )
-        .first(),
-      buttonSelector:
-        'button:has-text("Maybe later"), button:has-text("Skip"), button:has-text("Close"), button:has-text("Demo")',
+      locator: page.locator(".fixed.inset-0.bg-black\\/80.z-50").first(),
+      buttonSelector: 'button:has-text("Maybe later")',
     },
     // First run setup
     {
-      locator: page
-        .locator(
-          '[data-testid="first-run-setup"], .first-run-setup, [class*="first-run"]'
-        )
-        .first(),
-      buttonSelector:
-        'button:has-text("Skip"), button:has-text("Maybe later"), button:has-text("Demo")',
+      locator: page.locator('[data-testid="first-run-setup"]').first(),
+      buttonSelector: 'button:has-text("Skip")',
     },
     // Onboarding tour
     {
-      locator: page
-        .locator('[data-testid="onboarding-tour"], .onboarding-tour')
-        .first(),
-      buttonSelector: 'button:has-text("Skip"), button:has-text("Close")',
+      locator: page.locator('[data-testid="onboarding-tour"]').first(),
+      buttonSelector: 'button:has-text("Skip")',
     },
     // Help hints
     {
-      locator: page.locator('[data-testid="help-hint"], .help-hint').first(),
-      buttonSelector: 'button:has-text("Got it"), button:has-text("Close")',
+      locator: page.locator('[data-testid="help-hint"]').first(),
+      buttonSelector: 'button:has-text("Got it")',
     },
   ];
 
   for (const overlay of overlays) {
     try {
-      if (
-        await overlay.locator.isVisible({ timeout: 2000 }).catch(() => false)
-      ) {
-        debugLog("Dismissing overlay");
-        const buttons = page.locator(overlay.buttonSelector);
-        const visibleButton = buttons.locator("visible=true").first();
-        if (
-          await visibleButton.isVisible({ timeout: 1000 }).catch(() => false)
-        ) {
-          await visibleButton.click();
-          await page.waitForTimeout(300);
-        }
+      // Check if overlay exists and is visible with shorter timeout
+      const isVisible = await overlay.locator
+        .isVisible({ timeout: 1000 })
+        .catch(() => false);
+      if (!isVisible) continue;
+
+      debugLog("Found overlay, attempting to dismiss");
+
+      // Try to find and click the dismiss button
+      const button = overlay.locator
+        .page()
+        .locator(overlay.buttonSelector)
+        .first();
+      const buttonVisible = await button
+        .isVisible({ timeout: 500 })
+        .catch(() => false);
+
+      if (buttonVisible) {
+        // Use evaluate to click to avoid potential WebKit issues with locator.click()
+        await button
+          .evaluate((el: HTMLElement) => el.click())
+          .catch((err) => {
+            debugLog("Failed to click button via evaluate:", err.message);
+            // Fallback to regular click
+            return button.click({ timeout: 1000 }).catch(() => {
+              debugLog("Failed to click button via locator");
+            });
+          });
+
+        // Wait a bit for the overlay to disappear
+        await page.waitForTimeout(200);
       }
-    } catch {
-      // Continue if overlay not found
+    } catch (error) {
+      debugLog("Error dismissing overlay:", (error as Error).message);
+      // Continue to next overlay
     }
   }
 }
