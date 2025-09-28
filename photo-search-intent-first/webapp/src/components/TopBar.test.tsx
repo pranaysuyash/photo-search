@@ -189,13 +189,7 @@ describe("TopBar", () => {
 	});
 
 	it("renders an accessible progress bar when busy", () => {
-		render(
-			<TopBar
-				{...defaultProps}
-				busy
-				progressPct={0.42}
-			/>
-		);
+		render(<TopBar {...defaultProps} busy progressPct={0.42} />);
 		const progress = screen.getByLabelText("42% complete");
 		expect(progress).toHaveAttribute("role", "progressbar");
 		expect(progress).toHaveAttribute("aria-valuenow", "42");
@@ -205,7 +199,7 @@ describe("TopBar", () => {
 		expect(fill).not.toBeNull();
 		expect(fill).toHaveAttribute(
 			"style",
-			expect.stringContaining("--progress-bar-percent: 42%")
+			expect.stringContaining("--progress-bar-percent: 42%"),
 		);
 	});
 

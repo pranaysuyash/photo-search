@@ -1,13 +1,18 @@
 import type React from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiGetCollections, apiSetCollection } from "../../api";
-import { announce, FocusTrap } from "../../utils/accessibility";
+import { announce } from "../../utils/accessibility";
+import { Button } from "@/components/ui/shadcn/Button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/shadcn/Dialog";
+import { Input } from "@/components/ui/shadcn/Input";
+import { Label } from "@/components/ui/label";
 
 interface CollectionModalProps {
+	isOpen: boolean;
+	onClose: () => void;
 	selected: Set<string>;
 	dir: string;
 	collections: Record<string, string[]> | null;
-	onClose: () => void;
 	photoActions: {
 		setCollections: (collections: Record<string, string[]>) => void;
 	};
@@ -17,85 +22,72 @@ interface CollectionModalProps {
 }
 
 export const CollectionModal: React.FC<CollectionModalProps> = ({
+	isOpen,
+	onClose,
 	selected,
 	dir,
 	collections,
-	onClose,
 	photoActions,
 	uiActions,
 }) => {
 	const { toast } = useToast();
 	return (
-		<div
-			className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
-			onKeyDown={(e) => {
-				if (e.key === "Escape") onClose();
-			}}
-			role="dialog"
-			aria-modal="true"
-		>
-			<FocusTrap onEscape={onClose}>
-				<div className="bg-white rounded-lg p-4 w-full max-w-md">
-					<div className="font-semibold mb-2">Add to Collection</div>
-					<form
-						onSubmit={async (e) => {
-							e.preventDefault();
-							const form = e.target as HTMLFormElement;
-							const name = (
-								form.elements.namedItem("name") as HTMLInputElement
-							).value.trim();
-							if (!name) return;
-							try {
-								await apiSetCollection(dir, name, Array.from(selected));
-								const r = await apiGetCollections(dir);
-								photoActions.setCollections(r.collections || {});
-								toast({ description: `Added ${selected.size} to ${name}` });
-								announce(`Added ${selected.size} to ${name}`, "polite");
-							} catch (e) {
-								uiActions.setNote(
-									e instanceof Error ? e.message : "Collection update failed",
-								);
-							}
-							onClose();
-						}}
-					>
-						<label className="block text-sm mb-1" htmlFor="col-name">
-							Collection
-						</label>
-						<input
-							id="col-name"
-							name="name"
-							list="collections-list"
-							className="w-full border rounded px-2 py-1"
-							placeholder="Type or choose…"
-						/>
-						<datalist id="collections-list">
-							{Object.keys(collections || {}).map((n) => (
-								<option key={n} value={n}>
-									{n}
-								</option>
-							))}
-						</datalist>
-						<div className="mt-3 flex justify-end gap-2">
-							<button
-								type="button"
-								className="px-3 py-1 rounded border"
-								onClick={onClose}
-								aria-label="Cancel adding to collection"
-							>
-								Cancel
-							</button>
-							<button
-								type="submit"
-								className="px-3 py-1 rounded bg-blue-600 text-white"
-								aria-label="Add to collection"
-							>
-								Add
-							</button>
+		<Dialog open={isOpen} onOpenChange={onClose}>
+			<DialogContent className="sm:max-w-md">
+				<DialogHeader>
+					<DialogTitle className="text-lg font-semibold">Add to Collection</DialogTitle>
+				</DialogHeader>
+				<form
+					onSubmit={async (e) => {
+						e.preventDefault();
+						const form = e.target as HTMLFormElement;
+						const name = (
+							form.elements.namedItem("name") as HTMLInputElement
+						).value.trim();
+						if (!name) return;
+						try {
+							await apiSetCollection(dir, name, Array.from(selected));
+							const r = await apiGetCollections(dir);
+							photoActions.setCollections(r.collections || {});
+							toast({ description: `Added ${selected.size} to ${name}` });
+							announce(`Added ${selected.size} to ${name}`, "polite");
+						} catch (e) {
+							uiActions.setNote(
+								e instanceof Error ? e.message : "Collection update failed",
+							);
+						}
+						onClose();
+					}}
+				>
+					<div className="grid gap-4 py-4">
+						<div className="grid gap-2">
+							<Label htmlFor="col-name">Collection</Label>
+							<Input
+								id="col-name"
+								name="name"
+								list="collections-list"
+								placeholder="Type or choose…"
+								required
+							/>
+							<datalist id="collections-list">
+								{Object.keys(collections || {}).map((n) => (
+									<option key={n} value={n}>
+										{n}
+									</option>
+								))}
+							</datalist>
 						</div>
-					</form>
-				</div>
-			</FocusTrap>
-		</div>
+					</div>
+					<div className="flex justify-end gap-2">
+						<Button type="button" variant="outline" onClick={onClose}>
+							Cancel
+						</Button>
+						<Button type="submit">
+							Add
+						</Button>
+					</div>
+				</form>
+			</DialogContent>
+		</Dialog>
 	);
 };

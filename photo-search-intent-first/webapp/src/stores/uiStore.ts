@@ -19,7 +19,7 @@ export const useUIStore = create<UIStore>()(
 		setNote: (note) => {
 			// Limit note length to prevent UI issues
 			const truncatedNote =
-				note.length > 200 ? note.substring(0, 200) + "..." : note;
+				note.length > 200 ? `${note.substring(0, 200)}...` : note;
 			set({ note: truncatedNote });
 		},
 		setViewMode: (viewMode) => set({ viewMode }),

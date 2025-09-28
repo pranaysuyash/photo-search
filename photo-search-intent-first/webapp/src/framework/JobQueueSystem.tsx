@@ -618,7 +618,7 @@ export const JobQueueProvider: React.FC<JobQueueProviderProps> = ({
 				pollTimerRef.current = null;
 			}
 		};
-	}, [dir, pollInterval]);
+	}, [dir, pollInterval, state.jobs.get]);
 
 	// Create scheduler
 	const scheduler = useMemo<JobScheduler>(() => {
@@ -676,7 +676,7 @@ export const JobQueueProvider: React.FC<JobQueueProviderProps> = ({
 
 			cancel: async (jobId: string): Promise<void> => {
 				const job = state.jobs.get(jobId);
-				if (job && job.cancellable) {
+				if (job?.cancellable) {
 					dispatch({ type: "SET_STATUS", id: jobId, status: "cancelled" });
 				}
 			},
@@ -762,8 +762,8 @@ export const JobQueueProvider: React.FC<JobQueueProviderProps> = ({
 						const tags = Array.isArray(filters.tags)
 							? filters.tags
 							: [filters.tags];
-						jobs = jobs.filter(
-							(job) => job.tags && job.tags.some((tag) => tags.includes(tag)),
+						jobs = jobs.filter((job) =>
+							job.tags?.some((tag) => tags.includes(tag)),
 						);
 					}
 
@@ -856,7 +856,7 @@ export const JobQueueProvider: React.FC<JobQueueProviderProps> = ({
 			dispatch,
 			scheduler,
 		}),
-		[state, dispatch, scheduler],
+		[state, scheduler],
 	);
 
 	return (
@@ -926,8 +926,8 @@ export const useJobs = (filters?: JobFilters) => {
 				const tags = Array.isArray(filters.tags)
 					? filters.tags
 					: [filters.tags];
-				jobs = jobs.filter(
-					(job) => job.tags && job.tags.some((tag) => tags.includes(tag)),
+				jobs = jobs.filter((job) =>
+					job.tags?.some((tag) => tags.includes(tag)),
 				);
 			}
 

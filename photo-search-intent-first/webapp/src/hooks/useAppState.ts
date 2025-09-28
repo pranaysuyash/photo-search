@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useJobsContext } from "../contexts/JobsContext";
 import { useLibraryContext } from "../contexts/LibraryContext";
@@ -225,7 +225,7 @@ export function useAppState() {
 				view as "grid" | "film" | "timeline" | "map",
 			);
 		},
-		[settingsActions, setResultView],
+		[settingsActions],
 	);
 
 	const handleSetTimelineBucket = useCallback(
@@ -233,7 +233,7 @@ export function useAppState() {
 			setTimelineBucket(bucket);
 			settingsActions.setTimelineBucket?.(bucket);
 		},
-		[settingsActions, setTimelineBucket],
+		[settingsActions],
 	);
 
 	// Grid size options

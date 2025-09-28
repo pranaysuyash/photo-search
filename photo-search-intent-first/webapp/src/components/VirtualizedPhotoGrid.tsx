@@ -174,7 +174,7 @@ export function VirtualizedPhotoGrid({
 	const renderPhotoItem = (photo: Photo, index: number) => {
 		const isSelected = selectedPhotos.has(photo.id);
 		const isHovered = hoveredPhoto === photo.id;
-		const isLoaded = loadedImages.has(photo.thumbnail || photo.path);
+		const _isLoaded = loadedImages.has(photo.thumbnail || photo.path);
 
 		// Calculate match reasons if searching
 		const matchReasons =

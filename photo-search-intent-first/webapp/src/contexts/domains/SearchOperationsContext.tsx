@@ -7,7 +7,6 @@ import type React from "react";
 import { createContext, useContext, useMemo } from "react";
 import type { SearchResult } from "../api";
 import {
-	useAccessibilityContext,
 	useAnnouncer,
 	useFocusManager,
 	useKeyboardNavigation,
@@ -209,15 +208,10 @@ export const SearchOperationsProvider: React.FC<
 		announceAction,
 		announceProgress,
 		announceError,
-		announceSuccess,
 		focusNext,
 		focusPrevious,
-		focusFirst,
-		focusLast,
-		trapFocus,
 		enableKeyboardNavigation,
 		disableKeyboardNavigation,
-		isKeyboardNavigationEnabled,
 	]);
 
 	return (

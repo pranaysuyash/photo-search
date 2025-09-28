@@ -5,7 +5,6 @@
  */
 import type React from "react";
 import { createContext, useContext, useMemo } from "react";
-import type { SearchResult } from "../../api";
 
 // Define the shape of our data management context
 interface DataManagementContextType {

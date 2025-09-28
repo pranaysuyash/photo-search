@@ -5,25 +5,25 @@ import { useEffect } from "react";
 import type { AdvancedSearchApplyEvent } from "../utils/lifecycleTypes";
 
 export interface UseAdvancedSearchApplyProps {
-  setSearchText: (query: string) => void;
+	setSearchText: (query: string) => void;
 }
 
 export function useAdvancedSearchApply({
-  setSearchText,
+	setSearchText,
 }: UseAdvancedSearchApplyProps): void {
-  useEffect(() => {
-    const onApply = (e: Event) => {
-      const evt = e as AdvancedSearchApplyEvent;
-      const q = evt.detail?.q;
-      if (typeof q === "string") {
-        setSearchText(q);
-      }
-    };
+	useEffect(() => {
+		const onApply = (e: Event) => {
+			const evt = e as AdvancedSearchApplyEvent;
+			const q = evt.detail?.q;
+			if (typeof q === "string") {
+				setSearchText(q);
+			}
+		};
 
-    window.addEventListener("advanced-search-apply", onApply);
+		window.addEventListener("advanced-search-apply", onApply);
 
-    return () => {
-      window.removeEventListener("advanced-search-apply", onApply);
-    };
-  }, [setSearchText]);
+		return () => {
+			window.removeEventListener("advanced-search-apply", onApply);
+		};
+	}, [setSearchText]);
 }

@@ -118,6 +118,25 @@ export async function dismissOverlays(page: Page): Promise<void> {
       locator: page.locator(".fixed.inset-0.bg-black\\/80.z-50").first(),
       buttonSelector: 'button:has-text("Maybe later")',
     },
+    // Welcome screen with specific heading
+    {
+      locator: page
+        .locator('h1:has-text("Find any photo instantly")')
+        .locator("..")
+        .locator("..")
+        .locator("..")
+        .first(),
+      buttonSelector: 'button:has-text("Maybe later")',
+    },
+    // Onboarding tour welcome
+    {
+      locator: page
+        .locator('h3:has-text("Welcome to Photo Search!")')
+        .locator("..")
+        .locator("..")
+        .first(),
+      buttonSelector: 'button:has-text("Skip")',
+    },
     // First run setup
     {
       locator: page.locator('[data-testid="first-run-setup"]').first(),

@@ -374,8 +374,7 @@ export const useActionProgress = (
 		const updateProgress = () => {
 			const action = getActionById(actionId);
 			if (
-				action &&
-				action.payload &&
+				action?.payload &&
 				"progress" in action.payload &&
 				"total" in action.payload
 			) {
@@ -421,7 +420,7 @@ export const useActionError = (actionId: string): string | undefined => {
 	React.useEffect(() => {
 		const updateError = () => {
 			const action = getActionById(actionId);
-			if (action && action.metadata?.lastError) {
+			if (action?.metadata?.lastError) {
 				setError(action.metadata.lastError.message);
 			} else {
 				setError(undefined);

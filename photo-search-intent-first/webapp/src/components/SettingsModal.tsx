@@ -9,7 +9,12 @@ import {
 	apiWatchStatus,
 	apiWatchStop,
 } from "../api";
-import { FocusTrap } from "../utils";
+import { Button } from "@/components/ui/shadcn/Button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/shadcn/Dialog";
+import { Input } from "@/components/ui/shadcn/Input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 
 interface SettingsModalProps {
 	isOpen: boolean;
@@ -68,33 +73,18 @@ export function SettingsModal({
 		};
 	}, [isOpen, dir]);
 
-	if (!isOpen) return null;
 	return (
-		<div
-			role="dialog"
-			className="fixed inset-0 z-[1200] bg-black/40 flex items-center justify-center"
-			onKeyDown={(e) => {
-				if (e.key === "Escape") onClose();
-			}}
-			tabIndex={-1}
-		>
-			<FocusTrap onEscape={onClose}>
-				<div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-3xl p-4">
-					<div className="flex items-center justify-between mb-3">
-						<div className="font-semibold text-lg">Settings</div>
-						<button
-							type="button"
-							className="px-2 py-1 border rounded"
-							onClick={onClose}
-						>
-							Close
-						</button>
-					</div>
+		<Dialog open={isOpen} onOpenChange={onClose}>
+			<DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+				<DialogHeader>
+					<DialogTitle className="text-lg font-semibold">Settings</DialogTitle>
+				</DialogHeader>
 
+				<div className="space-y-6">
 					{/* Watcher */}
-					<section className="mb-4">
+					<section>
 						<div className="flex items-center justify-between mb-2">
-							<div className="font-medium">File Watcher</div>
+							<Label className="text-base font-medium">File Watcher</Label>
 							<div className="text-sm text-gray-600">
 								{watchAvail === null
 									? "checking…"
@@ -103,10 +93,10 @@ export function SettingsModal({
 										: "unavailable"}
 							</div>
 						</div>
-						<div className="bg-gray-50 dark:bg-gray-800 border rounded p-3 flex items-center gap-2">
-							<button
-								type="button"
-								className="px-3 py-1 rounded bg-blue-600 text-white text-sm disabled:opacity-50"
+						<div className="bg-gray-50 dark:bg-gray-800 border rounded-lg p-4 flex items-center gap-2">
+							<Button
+								variant="default"
+								size="sm"
 								disabled={!canManage || !watchAvail || watchBusy}
 								onClick={async () => {
 									if (!dir) return;
@@ -119,10 +109,10 @@ export function SettingsModal({
 								}}
 							>
 								Start
-							</button>
-							<button
-								type="button"
-								className="px-3 py-1 rounded bg-gray-200 text-sm disabled:opacity-50"
+							</Button>
+							<Button
+								variant="outline"
+								size="sm"
 								disabled={!canManage || watchBusy}
 								onClick={async () => {
 									if (!dir) return;
@@ -135,32 +125,34 @@ export function SettingsModal({
 								}}
 							>
 								Stop
-							</button>
+							</Button>
 							<div className="text-xs text-gray-600 ml-2">
 								Keeps index up-to-date as files change.
 							</div>
 						</div>
 					</section>
 
+					<Separator />
+
 					{/* Excludes */}
-					<section className="mb-4">
-						<div className="font-medium mb-2">Excluded Folders / Patterns</div>
-						<div className="bg-gray-50 dark:bg-gray-800 border rounded p-3">
-							<div className="text-xs text-gray-600 mb-2">
-								Examples: <code>**/Screenshots/**</code>, <code>*.heic</code>,{" "}
-								<code>**/.trash/**</code>
+					<section>
+						<Label className="text-base font-medium mb-2">Excluded Folders / Patterns</Label>
+						<div className="bg-gray-50 dark:bg-gray-800 border rounded-lg p-4">
+							<div className="text-xs text-gray-600 mb-3">
+								Examples: <code className="bg-gray-100 px-1 rounded">**/Screenshots/**</code>, <code className="bg-gray-100 px-1 rounded">*.heic</code>,{" "}
+								<code className="bg-gray-100 px-1 rounded">**/.trash/**</code>
 							</div>
-							<div className="flex items-center gap-2 mb-2">
-								<input
+							<div className="flex items-center gap-2 mb-3">
+								<Input
 									type="text"
 									value={exclInput}
 									onChange={(e) => setExclInput(e.target.value)}
 									placeholder="Add a glob pattern"
-									className="flex-1 border rounded px-2 py-1 text-sm"
+									className="flex-1"
 								/>
-								<button
-									type="button"
-									className="px-3 py-1 rounded bg-gray-200 text-sm disabled:opacity-50"
+								<Button
+									variant="outline"
+									size="sm"
 									disabled={!exclInput.trim() || !canManage}
 									onClick={() => {
 										const p = exclInput.trim();
@@ -172,10 +164,10 @@ export function SettingsModal({
 									}}
 								>
 									Add
-								</button>
-								<button
-									type="button"
-									className="px-3 py-1 rounded bg-blue-600 text-white text-sm disabled:opacity-50"
+								</Button>
+								<Button
+									variant="default"
+									size="sm"
 									disabled={!canManage}
 									onClick={async () => {
 										if (!dir) return;
@@ -185,21 +177,18 @@ export function SettingsModal({
 									}}
 								>
 									Save
-								</button>
+								</Button>
 							</div>
 							{excludes.length === 0 ? (
 								<div className="text-sm text-gray-600">No excludes set.</div>
 							) : (
 								<div className="flex flex-wrap gap-2">
 									{excludes.map((p, i) => (
-										<span
-											key={p}
-											className="inline-flex items-center gap-1 text-xs bg-white dark:bg-gray-900 border rounded px-2 py-1"
-										>
-											<code>{p}</code>
+										<Badge key={p} variant="secondary" className="text-xs">
+											<code className="mr-1">{p}</code>
 											<button
 												type="button"
-												className="text-gray-500 hover:text-red-600"
+												className="text-gray-500 hover:text-red-600 ml-1"
 												title="Remove"
 												onClick={() =>
 													setExcludes((prev) =>
@@ -209,7 +198,7 @@ export function SettingsModal({
 											>
 												×
 											</button>
-										</span>
+										</Badge>
 									))}
 								</div>
 							)}
@@ -238,9 +227,9 @@ export function SettingsModal({
 									"Checking…"
 								)}
 							</div>
-							<button
-								type="button"
-								className="px-3 py-1 rounded bg-blue-600 text-white text-sm disabled:opacity-50"
+							<Button
+								variant="default"
+								size="sm"
 								disabled={modelBusy}
 								onClick={async () => {
 									try {
@@ -252,17 +241,19 @@ export function SettingsModal({
 								}}
 							>
 								{modelBusy ? "Downloading…" : "Download CLIP Base"}
-							</button>
+							</Button>
 						</div>
 					</section>
+
+					<Separator />
 
 					{/* Danger */}
 					<section>
 						<div className="font-medium mb-2">Danger Zone</div>
 						<div className="bg-red-50 border border-red-200 rounded p-3 flex items-center gap-2">
-							<button
-								type="button"
-								className="px-3 py-1 rounded bg-red-600 text-white text-sm disabled:opacity-50"
+							<Button
+								variant="destructive"
+								size="sm"
 								disabled={!canManage || nukeBusy}
 								onClick={async () => {
 									if (!dir) return;
@@ -279,10 +270,10 @@ export function SettingsModal({
 								}}
 							>
 								{nukeBusy ? "Clearing…" : "Clear Current Folder Index"}
-							</button>
-							<button
-								type="button"
-								className="px-3 py-1 rounded bg-white text-red-700 border border-red-300 text-sm disabled:opacity-50"
+							</Button>
+							<Button
+								variant="outline"
+								size="sm"
 								disabled={nukeBusy}
 								onClick={async () => {
 									const ok = window.confirm(
@@ -298,11 +289,11 @@ export function SettingsModal({
 								}}
 							>
 								Clear All App Data
-							</button>
+							</Button>
 						</div>
 					</section>
 				</div>
-			</FocusTrap>
-		</div>
+			</DialogContent>
+		</Dialog>
 	);
 }

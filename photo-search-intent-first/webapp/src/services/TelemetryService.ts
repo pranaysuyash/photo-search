@@ -1,9 +1,3 @@
-/**
- * TelemetryService - Provides telemetry and observability for application actions
- * This service collects metrics, tracks performance, and enables debugging capabilities.
- */
-import type { SearchResult } from "../api";
-
 // Action telemetry interface
 export interface ActionTelemetry {
 	id: string;
@@ -298,7 +292,7 @@ class TelemetryServiceImpl implements TelemetryService {
 	// Accessibility tracking
 	trackAccessibilityEvent(
 		event: string,
-		details?: Record<string, unknown>,
+		_details?: Record<string, unknown>,
 	): void {
 		if (!this.enabled) return;
 

@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import type { ResultView } from "../contexts/ResultsConfigContext";
 import { useEnableDemoLibrary } from "../stores/settingsStore";
 import { useAppLifecycle } from "./useAppLifecycle.tsx";
 import { useDemoLibraryHandlers } from "./useDemoLibraryHandlers";
@@ -210,7 +209,7 @@ export function useViewOrchestration() {
 				navigate(view.path);
 			}
 		},
-		[availableViews, navigate],
+		[availableViews, navigate, shouldShowView],
 	);
 
 	const navigateBack = useCallback(() => {

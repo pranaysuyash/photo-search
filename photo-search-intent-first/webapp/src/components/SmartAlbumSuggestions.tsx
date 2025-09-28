@@ -290,7 +290,10 @@ export function SmartAlbumSuggestions({
 								</button>
 
 								{isExpanded && (
-									<div id={sectionId} className="space-y-2 px-3 pb-3 sm:px-4 sm:pb-4">
+									<div
+										id={sectionId}
+										className="space-y-2 px-3 pb-3 sm:px-4 sm:pb-4"
+									>
 										{sectionSuggestions.map((suggestion) => (
 											<button
 												key={suggestion.id}

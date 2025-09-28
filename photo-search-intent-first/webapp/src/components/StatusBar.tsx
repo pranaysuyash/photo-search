@@ -8,8 +8,6 @@ import {
 	HardDrive,
 	Image,
 	Search,
-	Wifi,
-	WifiOff,
 	Zap,
 } from "lucide-react";
 import { useEffect, useState } from "react";

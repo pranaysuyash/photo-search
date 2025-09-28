@@ -32,8 +32,6 @@ if (typeof (globalThis as unknown).ResizeObserver === "undefined") {
 // jsdom lacks IntersectionObserver; provide a minimal stub for components that use it
 if (typeof (globalThis as unknown).IntersectionObserver === "undefined") {
 	class IntersectionObserver {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		constructor(_cb: any, _options?: any) {}
 		observe() {
 			/* no-op */
 		}

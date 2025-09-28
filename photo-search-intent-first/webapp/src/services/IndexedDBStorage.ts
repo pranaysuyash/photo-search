@@ -55,7 +55,7 @@ export class IndexedDBStorage {
 		}
 
 		return new Promise((resolve, reject) => {
-			const transaction = this.db!.transaction([STORE_NAME], "readwrite");
+			const transaction = this.db?.transaction([STORE_NAME], "readwrite");
 			const store = transaction.objectStore(STORE_NAME);
 			const request = store.add(action);
 
@@ -76,7 +76,7 @@ export class IndexedDBStorage {
 		}
 
 		return new Promise((resolve, reject) => {
-			const transaction = this.db!.transaction([STORE_NAME], "readonly");
+			const transaction = this.db?.transaction([STORE_NAME], "readonly");
 			const store = transaction.objectStore(STORE_NAME);
 			const request = store.getAll();
 
@@ -100,7 +100,7 @@ export class IndexedDBStorage {
 		}
 
 		return new Promise((resolve, reject) => {
-			const transaction = this.db!.transaction([STORE_NAME], "readwrite");
+			const transaction = this.db?.transaction([STORE_NAME], "readwrite");
 			const store = transaction.objectStore(STORE_NAME);
 			const request = store.put(action);
 
@@ -121,7 +121,7 @@ export class IndexedDBStorage {
 		}
 
 		return new Promise((resolve, reject) => {
-			const transaction = this.db!.transaction([STORE_NAME], "readwrite");
+			const transaction = this.db?.transaction([STORE_NAME], "readwrite");
 			const store = transaction.objectStore(STORE_NAME);
 			const request = store.delete(id);
 
@@ -142,7 +142,7 @@ export class IndexedDBStorage {
 		}
 
 		return new Promise((resolve, reject) => {
-			const transaction = this.db!.transaction([STORE_NAME], "readwrite");
+			const transaction = this.db?.transaction([STORE_NAME], "readwrite");
 			const store = transaction.objectStore(STORE_NAME);
 
 			let completed = 0;
@@ -181,7 +181,7 @@ export class IndexedDBStorage {
 		}
 
 		return new Promise((resolve, reject) => {
-			const transaction = this.db!.transaction([STORE_NAME], "readwrite");
+			const transaction = this.db?.transaction([STORE_NAME], "readwrite");
 			const store = transaction.objectStore(STORE_NAME);
 			const request = store.clear();
 
@@ -202,7 +202,7 @@ export class IndexedDBStorage {
 		}
 
 		return new Promise((resolve, reject) => {
-			const transaction = this.db!.transaction([STORE_NAME], "readonly");
+			const transaction = this.db?.transaction([STORE_NAME], "readonly");
 			const store = transaction.objectStore(STORE_NAME);
 			const request = store.count();
 

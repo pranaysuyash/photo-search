@@ -18,43 +18,10 @@ from infra.analytics import _write_event as _write_event_infra
 from infra.watcher import WatchManager
 from usecases.index_photos import index_photos
 from api.auth import require_auth
+from api.utils import _from_body, _require, _emb
 
 
 router = APIRouter(prefix="/api", tags=["indexing"])
-
-
-# Local helpers (duplicated temporarily during incremental extraction)
-def _require(value: Optional[Any], name: str) -> Any:
-    if value is None:
-        raise HTTPException(status_code=422, detail=f"Missing required field: {name}")
-    return value
-
-
-def _from_body(
-    body: Optional[Dict[str, Any]],
-    current: Optional[Any],
-    key: str,
-    *,
-    default: Optional[Any] = None,
-    cast=None,
-):
-    if current is not None:
-        return current
-    if body is not None and key in body:
-        value = body[key]
-        if value is None:
-            return default
-        if cast is not None:
-            try:
-                return cast(value)
-            except Exception:
-                return default
-        return value
-    return default
-
-
-def _emb(provider: str, hf_token: Optional[str], openai_key: Optional[str]) -> Any:
-    return get_provider(provider, hf_token=hf_token, openai_api_key=openai_key)
 
 
 class IndexRequest(BaseModel):

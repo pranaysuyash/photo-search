@@ -173,7 +173,7 @@ export class OfflineActionQueue {
 					if (!this.groups.has(action.groupId)) {
 						this.groups.set(action.groupId, new Set());
 					}
-					this.groups.get(action.groupId)!.add(action.id);
+					this.groups.get(action.groupId)?.add(action.id);
 				}
 
 				// Rebuild dependencies
@@ -182,7 +182,7 @@ export class OfflineActionQueue {
 						if (!this.dependencies.has(depId)) {
 							this.dependencies.set(depId, new Set());
 						}
-						this.dependencies.get(depId)!.add(action.id);
+						this.dependencies.get(depId)?.add(action.id);
 					});
 				}
 			});
@@ -308,7 +308,7 @@ export class OfflineActionQueue {
 			if (!this.groups.has(action.groupId)) {
 				this.groups.set(action.groupId, new Set());
 			}
-			this.groups.get(action.groupId)!.add(action.id);
+			this.groups.get(action.groupId)?.add(action.id);
 		}
 
 		// Add dependencies
@@ -317,7 +317,7 @@ export class OfflineActionQueue {
 				if (!this.dependencies.has(depId)) {
 					this.dependencies.set(depId, new Set());
 				}
-				this.dependencies.get(depId)!.add(action.id);
+				this.dependencies.get(depId)?.add(action.id);
 			});
 		}
 
@@ -424,7 +424,7 @@ export class OfflineActionQueue {
 				priorityOrder[a.priority] - priorityOrder[b.priority];
 			if (priorityDiff !== 0) return priorityDiff;
 
-			return a.metadata!.createdAt - b.metadata!.createdAt;
+			return a.metadata?.createdAt - b.metadata?.createdAt;
 		});
 
 		// Check dependencies
@@ -461,14 +461,14 @@ export class OfflineActionQueue {
 			await processor(action);
 		} catch (error) {
 			// Handle retry logic
-			if (action.metadata!.retryCount < action.metadata!.maxRetries) {
+			if (action.metadata?.retryCount < action.metadata?.maxRetries) {
 				action.metadata!.retryCount++;
 				action.metadata!.updatedAt = Date.now();
 				action.status = "QUEUED"; // Reset status to queued for retry
 				this.actions.set(action.id, action);
 
 				// Exponential backoff
-				const backoffDelay = 2 ** action.metadata!.retryCount * 1000;
+				const backoffDelay = 2 ** action.metadata?.retryCount * 1000;
 				await new Promise((resolve) => setTimeout(resolve, backoffDelay));
 
 				throw error; // Re-throw to retry
@@ -603,9 +603,8 @@ export class OfflineActionQueue {
 				const tags = Array.isArray(filters.tags)
 					? filters.tags
 					: [filters.tags];
-				actions = actions.filter(
-					(action) =>
-						action.tags && action.tags.some((tag) => tags.includes(tag)),
+				actions = actions.filter((action) =>
+					action.tags?.some((tag) => tags.includes(tag)),
 				);
 			}
 

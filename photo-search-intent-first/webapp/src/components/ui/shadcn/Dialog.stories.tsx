@@ -2,13 +2,10 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { Button } from "./Button";
 import {
 	Dialog,
-	DialogClose,
 	DialogContent,
 	DialogDescription,
 	DialogFooter,
 	DialogHeader,
-	DialogOverlay,
-	DialogPortal,
 	DialogTitle,
 	DialogTrigger,
 } from "./Dialog";

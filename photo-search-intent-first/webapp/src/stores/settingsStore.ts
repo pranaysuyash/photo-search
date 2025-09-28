@@ -270,10 +270,11 @@ export const useSettingsActions = () => {
 	const setFMin = useSettingsStore((s) => s.setFMin);
 	const setFMax = useSettingsStore((s) => s.setFMax);
 	const setPlace = useSettingsStore((s) => s.setPlace);
-	
+
 	// Optional methods that may not be implemented in all contexts
 	const setResultView = useSettingsStore((s) => s.setResultView) || (() => {});
-	const setTimelineBucket = useSettingsStore((s) => s.setTimelineBucket) || (() => {});
+	const setTimelineBucket =
+		useSettingsStore((s) => s.setTimelineBucket) || (() => {});
 
 	return useMemo(
 		() => ({

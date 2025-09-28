@@ -46,7 +46,7 @@ export function VideoFilterDropdown({
 }: VideoFilterDropdownProps) {
 	const [open, setOpen] = useState(false);
 
-	const handleSelect = (filterLabel: string) => {
+	const _handleSelect = (filterLabel: string) => {
 		const filter = videoFilters.find((f) => f.label === filterLabel);
 		if (filter) {
 			const next = currentQuery.trim();

@@ -202,6 +202,8 @@ export function ProgressiveImage({
 		imageTiers.thumb,
 		imageTiers.medium,
 		imageTiers.full,
+		loadImageDirectly,
+		preloadImageDirectly,
 	]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	// Handle manual upgrade to full quality (e.g., on hover/focus)

@@ -74,7 +74,7 @@ export class ModalActionsService {
 	// Collection management helpers
 	static validateCollectionOperation(
 		selected: Set<string>,
-		collections: Record<string, string[]>,
+		_collections: Record<string, string[]>,
 	): { isValid: boolean; error?: string } {
 		if (selected.size === 0) {
 			return { isValid: false, error: "Select photos to add to collection" };
@@ -120,7 +120,7 @@ export class ModalActionsService {
 		isValid: boolean;
 		error?: string;
 	} {
-		if (isNaN(expiryHours) || expiryHours < 1) {
+		if (Number.isNaN(expiryHours) || expiryHours < 1) {
 			return { isValid: false, error: "Expiry time must be at least 1 hour" };
 		}
 		if (expiryHours > 8760) {

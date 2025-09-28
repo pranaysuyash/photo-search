@@ -28,7 +28,7 @@ export class IndexedDBPersistence implements QueuePersistence {
 				resolve(this.db);
 			};
 
-			request.onupgradeneeded = (event) => {
+			request.onupgradeneeded = (_event) => {
 				const db = request.result;
 
 				// Create object store for actions
@@ -271,7 +271,7 @@ export class HybridPersistence implements QueuePersistence {
 				db.close();
 				indexedDB.deleteDatabase("__test_db");
 			};
-		} catch (error) {
+		} catch (_error) {
 			this.useFallback = true;
 		}
 	}

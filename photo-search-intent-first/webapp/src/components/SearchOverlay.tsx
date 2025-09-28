@@ -152,7 +152,7 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
 
 					{/* Quick scopes – minimal, more in Filters Drawer in later phases */}
 					<div className="mt-3 flex flex-wrap gap-2">
-							{["All", "Today", "This Week", "This Month"].map((label) => (
+						{["All", "Today", "This Week", "This Month"].map((label) => (
 							<button
 								key={label}
 								type="button"
@@ -181,13 +181,9 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
 									// Compute token
 									let tok = "";
 									if (label === "Today")
-										tok = `mtime:>=${Math.floor(
-											startOfDay.getTime() / 1000,
-										)}`;
+										tok = `mtime:>=${Math.floor(startOfDay.getTime() / 1000)}`;
 									else if (label === "This Week")
-										tok = `mtime:>=${Math.floor(
-											startOfWeek.getTime() / 1000,
-										)}`;
+										tok = `mtime:>=${Math.floor(startOfWeek.getTime() / 1000)}`;
 									else if (label === "This Month")
 										tok = `mtime:>=${Math.floor(
 											startOfMonth.getTime() / 1000,
@@ -312,8 +308,8 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
 							</div>
 							<div className="mt-1">
 								Numeric: iso:, fnumber:, width:, height:, mtime:, brightness:,
-								sharpness:, exposure:, focal:, duration: (supports &gt;=,
-								&lt;=, &gt;, &lt;, =)
+								sharpness:, exposure:, focal:, duration: (supports &gt;=, &lt;=,
+								&gt;, &lt;, =)
 							</div>
 							<div className="mt-2">Examples:</div>
 							<ul className="list-disc ml-5 mt-1">

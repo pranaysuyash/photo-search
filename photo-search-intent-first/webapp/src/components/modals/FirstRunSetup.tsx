@@ -177,7 +177,10 @@ export default function FirstRunSetup({
 
 	if (!open) return null;
 	return (
-		<div className="fixed inset-0 z-[1100] flex items-center justify-center" role="presentation">
+		<div
+			className="fixed inset-0 z-[1100] flex items-center justify-center"
+			role="presentation"
+		>
 			<div
 				className="absolute inset-0 bg-black/50"
 				onClick={onClose}
@@ -208,244 +211,249 @@ export default function FirstRunSetup({
 							Get started fast (no cloud, local‑only).
 						</p>
 						<div className="grid md:grid-cols-2 gap-4">
-					<div className="border rounded-lg p-4">
-						<div className="font-medium mb-1">🚀 Quick Start (Recommended)</div>
-						<div className="text-xs text-gray-600 mb-2">
-							Index common locations (local only)
-						</div>
-						<ul className="text-xs text-gray-700 mb-2 space-y-1">
-							{items.map((it) => (
-								<li key={it.path} className="flex justify-between gap-3">
-									<div className="flex flex-col">
-										<span className="font-medium text-gray-800 dark:text-gray-100">
-											{it.label ?? it.path}
-										</span>
-										{it.label ? (
-											<span className="text-[11px] text-gray-500 dark:text-gray-400">
-												{it.path}
+							<div className="border rounded-lg p-4">
+								<div className="font-medium mb-1">
+									🚀 Quick Start (Recommended)
+								</div>
+								<div className="text-xs text-gray-600 mb-2">
+									Index common locations (local only)
+								</div>
+								<ul className="text-xs text-gray-700 mb-2 space-y-1">
+									{items.map((it) => (
+										<li key={it.path} className="flex justify-between gap-3">
+											<div className="flex flex-col">
+												<span className="font-medium text-gray-800 dark:text-gray-100">
+													{it.label ?? it.path}
+												</span>
+												{it.label ? (
+													<span className="text-[11px] text-gray-500 dark:text-gray-400">
+														{it.path}
+													</span>
+												) : null}
+											</div>
+											<span className="text-right">
+												{it.exists
+													? `${it.files} • ${formatBytes(it.bytes)} (Found)`
+													: "Not found"}
 											</span>
-										) : null}
-									</div>
-									<span className="text-right">
-										{it.exists
-											? `${it.files} • ${formatBytes(it.bytes)} (Found)`
-											: "Not found"}
-									</span>
-								</li>
-							))}
-						</ul>
-						<div className="flex items-center gap-2 text-xs text-gray-700 mb-2">
-							<input
-								id="incl-videos"
-								type="checkbox"
-								checked={includeVideos}
-								onChange={(e) => {
-									setIncludeVideos(e.target.checked);
-									try {
-										setSettings({ includeVideos: e.target.checked });
-									} catch {}
-								}}
-							/>
-							<label htmlFor="incl-videos">
-								Include videos (may take longer)
-							</label>
-						</div>
-						<button
-							type="button"
-							className="px-3 py-1 rounded bg-blue-600 text-white text-sm disabled:opacity-50"
-							disabled={loading || starting}
-							onClick={async () => {
-								setStarting(true);
-								setStatus("Starting indexing…");
-								try {
-									onQuickStart(paths);
-									const first = items.find((it) => it.exists)?.path || paths[0];
-									const until = Date.now() + 7000;
-									while (Date.now() < until) {
+										</li>
+									))}
+								</ul>
+								<div className="flex items-center gap-2 text-xs text-gray-700 mb-2">
+									<input
+										id="incl-videos"
+										type="checkbox"
+										checked={includeVideos}
+										onChange={(e) => {
+											setIncludeVideos(e.target.checked);
+											try {
+												setSettings({ includeVideos: e.target.checked });
+											} catch {}
+										}}
+									/>
+									<label htmlFor="incl-videos">
+										Include videos (may take longer)
+									</label>
+								</div>
+								<button
+									type="button"
+									className="px-3 py-1 rounded bg-blue-600 text-white text-sm disabled:opacity-50"
+									disabled={loading || starting}
+									onClick={async () => {
+										setStarting(true);
+										setStatus("Starting indexing…");
 										try {
-											const r = await fetch(
-												`${API_BASE}/analytics?dir=${encodeURIComponent(
-													first,
-												)}&limit=5`,
-											);
-											if (r.ok) {
-												const js = (await r.json()) as unknown;
-												const ev = (js.events || []).find(
-													(e: unknown) => e.type === "index",
-												);
-												if (ev) {
-													setStatus(
-														`Indexed ${ev.new}+${ev.updated} (total ${ev.total})`,
+											onQuickStart(paths);
+											const first =
+												items.find((it) => it.exists)?.path || paths[0];
+											const until = Date.now() + 7000;
+											while (Date.now() < until) {
+												try {
+													const r = await fetch(
+														`${API_BASE}/analytics?dir=${encodeURIComponent(
+															first,
+														)}&limit=5`,
 													);
-													break;
+													if (r.ok) {
+														const js = (await r.json()) as unknown;
+														const ev = (js.events || []).find(
+															(e: unknown) => e.type === "index",
+														);
+														if (ev) {
+															setStatus(
+																`Indexed ${ev.new}+${ev.updated} (total ${ev.total})`,
+															);
+															break;
+														}
+													}
+												} catch {}
+												await new Promise((res) => setTimeout(res, 1000));
+											}
+										} finally {
+											setTimeout(() => {
+												setStarting(false);
+												onClose();
+											}, 1000);
+										}
+									}}
+								>
+									{loading
+										? "Calculating…"
+										: starting
+											? status || "Starting…"
+											: `Start indexing (${total} files • ${formatBytes(
+													items.reduce((a, b) => a + (b.bytes || 0), 0),
+												)})`}
+								</button>
+								{!starting && !loading && (
+									<div className="mt-2 text-[11px] text-gray-600">
+										Runs in the background; you can start searching.
+									</div>
+								)}
+							</div>
+							<div className="border rounded-lg p-4">
+								<div className="font-medium mb-1">🎯 Custom Setup</div>
+								<div className="text-xs text-gray-600 mb-2">
+									Choose specific folders to index
+								</div>
+								<button
+									type="button"
+									className="px-3 py-1 rounded border text-sm"
+									onClick={onCustom}
+								>
+									Select Folders…
+								</button>
+								{typeof (window as unknown).electronAPI?.selectFolder ===
+									"function" && (
+									<button
+										type="button"
+										className="ml-2 px-3 py-1 rounded border text-sm"
+										onClick={chooseWithOS}
+										title="Choose a folder with the system dialog"
+									>
+										Choose with OS…
+									</button>
+								)}
+								<div className="mt-4 font-medium mb-1">📂 Demo Mode</div>
+								<div className="text-xs text-gray-600 mb-2">
+									Try with sample photos first
+								</div>
+								<button
+									type="button"
+									className="px-3 py-1 rounded border text-sm"
+									onClick={onDemo}
+								>
+									Try Demo
+								</button>
+								<div className="mt-4 font-medium mb-1">🤖 Import Models</div>
+								<div className="text-xs text-gray-600 mb-2">
+									Import local AI models for offline use
+								</div>
+								<button
+									type="button"
+									className="px-3 py-1 rounded border text-sm"
+									onClick={async () => {
+										try {
+											const modelDir = await (
+												window as unknown
+											).electronAPI?.selectFolder?.();
+											if (typeof modelDir === "string" && modelDir.trim()) {
+												setStatus("Validating model directory...");
+												setStarting(true);
+
+												try {
+													// Validate the directory contains models
+													const validateResp = await fetch(
+														`${API_BASE}/models/validate?dir=${encodeURIComponent(
+															modelDir,
+														)}`,
+													);
+													const validateData = await validateResp.json();
+
+													if (validateData.valid) {
+														// Set the model directory
+														await fetch(
+															`${API_BASE}/config/set?key=PHOTOVAULT_MODEL_DIR&value=${encodeURIComponent(
+																modelDir,
+															)}`,
+															{ method: "POST" },
+														);
+
+														// Enable offline mode
+														await fetch(
+															`${API_BASE}/config/set?key=TRANSFORMERS_OFFLINE&value=1`,
+															{ method: "POST" },
+														);
+
+														setStatus("Models imported successfully!");
+														setTimeout(() => {
+															alert(
+																`Models imported from: ${modelDir}\n\nYou can now use offline search with the 'local' provider.`,
+															);
+															setStarting(false);
+														}, 1000);
+													} else {
+														setStatus("");
+														setStarting(false);
+														alert(
+															`No valid models found in: ${modelDir}\n\nPlease download CLIP models first:\n• HuggingFace: openai/clip-vit-base-patch32\n• Local: Save to ~/.cache/huggingface/hub/`,
+														);
+													}
+												} catch (error) {
+													setStatus("");
+													setStarting(false);
+													alert(
+														`Failed to validate models: ${error}\n\nPlease ensure you have downloaded CLIP models to the selected directory.`,
+													);
 												}
 											}
-										} catch {}
-										await new Promise((res) => setTimeout(res, 1000));
-									}
-								} finally {
-									setTimeout(() => {
-										setStarting(false);
-										onClose();
-									}, 1000);
-								}
-							}}
-						>
-							{loading
-								? "Calculating…"
-								: starting
-									? status || "Starting…"
-									: `Start indexing (${total} files • ${formatBytes(
-											items.reduce((a, b) => a + (b.bytes || 0), 0),
-										)})`}
-						</button>
-						{!starting && !loading && (
-							<div className="mt-2 text-[11px] text-gray-600">
-								Runs in the background; you can start searching.
-							</div>
-						)}
-					</div>
-					<div className="border rounded-lg p-4">
-						<div className="font-medium mb-1">🎯 Custom Setup</div>
-						<div className="text-xs text-gray-600 mb-2">
-							Choose specific folders to index
-						</div>
-						<button
-							type="button"
-							className="px-3 py-1 rounded border text-sm"
-							onClick={onCustom}
-						>
-							Select Folders…
-						</button>
-						{typeof (window as unknown).electronAPI?.selectFolder ===
-							"function" && (
-							<button
-								type="button"
-								className="ml-2 px-3 py-1 rounded border text-sm"
-								onClick={chooseWithOS}
-								title="Choose a folder with the system dialog"
-							>
-								Choose with OS…
-							</button>
-						)}
-						<div className="mt-4 font-medium mb-1">📂 Demo Mode</div>
-						<div className="text-xs text-gray-600 mb-2">
-							Try with sample photos first
-						</div>
-						<button
-							type="button"
-							className="px-3 py-1 rounded border text-sm"
-							onClick={onDemo}
-						>
-							Try Demo
-						</button>
-						<div className="mt-4 font-medium mb-1">🤖 Import Models</div>
-						<div className="text-xs text-gray-600 mb-2">
-							Import local AI models for offline use
-						</div>
-						<button
-							type="button"
-							className="px-3 py-1 rounded border text-sm"
-							onClick={async () => {
-								try {
-									const modelDir = await (
-										window as unknown
-									).electronAPI?.selectFolder?.();
-									if (typeof modelDir === "string" && modelDir.trim()) {
-										setStatus("Validating model directory...");
-										setStarting(true);
-
-										try {
-											// Validate the directory contains models
-											const validateResp = await fetch(
-												`${API_BASE}/models/validate?dir=${encodeURIComponent(
-													modelDir,
-												)}`,
-											);
-											const validateData = await validateResp.json();
-
-											if (validateData.valid) {
-												// Set the model directory
-												await fetch(
-													`${API_BASE}/config/set?key=PHOTOVAULT_MODEL_DIR&value=${encodeURIComponent(
-														modelDir,
-													)}`,
-													{ method: "POST" },
-												);
-
-												// Enable offline mode
-												await fetch(
-													`${API_BASE}/config/set?key=TRANSFORMERS_OFFLINE&value=1`,
-													{ method: "POST" },
-												);
-
-												setStatus("Models imported successfully!");
-												setTimeout(() => {
-													alert(
-														`Models imported from: ${modelDir}\n\nYou can now use offline search with the 'local' provider.`,
-													);
-													setStarting(false);
-												}, 1000);
-											} else {
-												setStatus("");
-												setStarting(false);
-												alert(
-													`No valid models found in: ${modelDir}\n\nPlease download CLIP models first:\n• HuggingFace: openai/clip-vit-base-patch32\n• Local: Save to ~/.cache/huggingface/hub/`,
-												);
-											}
-										} catch (error) {
+										} catch {
 											setStatus("");
 											setStarting(false);
 											alert(
-												`Failed to validate models: ${error}\n\nPlease ensure you have downloaded CLIP models to the selected directory.`,
+												"Failed to select model directory. Please try again.",
 											);
 										}
-									}
-								} catch {
-									setStatus("");
-									setStarting(false);
-									alert("Failed to select model directory. Please try again.");
-								}
-							}}
-							disabled={starting}
-						>
-							{starting ? "Importing..." : "Import Models…"}
-						</button>
-						<div className="mt-1 text-[10px] text-gray-500">
-							Need models? Download from HuggingFace or use existing local
-							cache.
+									}}
+									disabled={starting}
+								>
+									{starting ? "Importing..." : "Import Models…"}
+								</button>
+								<div className="mt-1 text-[10px] text-gray-500">
+									Need models? Download from HuggingFace or use existing local
+									cache.
+								</div>
+								<div className="mt-4 font-medium mb-1">🎓 Guided Tour</div>
+								<div className="text-xs text-gray-600 mb-2">
+									Learn the basics in under a minute
+								</div>
+								<button
+									type="button"
+									className="px-3 py-1 rounded border text-sm"
+									onClick={() => onTour?.()}
+								>
+									Start Tour
+								</button>
+							</div>
 						</div>
-						<div className="mt-4 font-medium mb-1">🎓 Guided Tour</div>
-						<div className="text-xs text-gray-600 mb-2">
-							Learn the basics in under a minute
+						<div className="mt-4 text-xs text-gray-600">
+							This runs locally; nothing leaves your device.
 						</div>
-						<button
-							type="button"
-							className="px-3 py-1 rounded border text-sm"
-							onClick={() => onTour?.()}
-						>
-							Start Tour
-						</button>
+						<p id={footnoteId} className="text-xs text-gray-600">
+							You can add or remove folders anytime.
+						</p>
+						<div className="mt-3 text-right">
+							<button
+								type="button"
+								className="px-3 py-1 rounded border text-sm"
+								onClick={onClose}
+							>
+								Skip
+							</button>
+						</div>
 					</div>
-				</div>
-					<div className="mt-4 text-xs text-gray-600">
-						This runs locally; nothing leaves your device.
-					</div>
-					<p id={footnoteId} className="text-xs text-gray-600">
-						You can add or remove folders anytime.
-					</p>
-					<div className="mt-3 text-right">
-						<button
-							type="button"
-							className="px-3 py-1 rounded border text-sm"
-							onClick={onClose}
-						>
-							Skip
-						</button>
-					</div>
-				</div>
-			</FocusTrap>
+				</FocusTrap>
+			</div>
 		</div>
-	</div>
 	);
 }

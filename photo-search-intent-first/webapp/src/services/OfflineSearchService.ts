@@ -56,7 +56,7 @@ export class OfflineSearchService {
 			if (!this.searchIndex.has(term)) {
 				this.searchIndex.set(term, new Set());
 			}
-			this.searchIndex.get(term)!.add(metadata.path);
+			this.searchIndex.get(term)?.add(metadata.path);
 		}
 	}
 

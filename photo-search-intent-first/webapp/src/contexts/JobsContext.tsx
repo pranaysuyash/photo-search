@@ -8,7 +8,6 @@ import type { Job } from "../components/JobsCenter";
 import {
 	createJob,
 	type ExtendedJob,
-	type JobPriority,
 	JobQueueProvider,
 	type JobStatus,
 	useJobQueue,
@@ -96,7 +95,7 @@ const JobsContextWrapper: React.FC<{ children: React.ReactNode }> = ({
 	// Map jobs to legacy format
 	const legacyJobs = useMemo(() => {
 		return jobs.map(convertToLegacyJob);
-	}, [jobs]);
+	}, [jobs, convertToLegacyJob]);
 
 	// Create backward compatible actions
 	const actions = useMemo<JobsActions>(

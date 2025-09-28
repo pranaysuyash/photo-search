@@ -530,33 +530,36 @@ export function OnboardingTour({
 						{/* Content */}
 						<div className="p-4">{currentTourStep?.content}</div>
 
-					{/* Progress Bar */}
-					<div className="px-4 pb-2">
-						<div
-							className="onboarding-progress-track w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5"
-							role="progressbar"
-							aria-valuemin={0}
-							aria-valuemax={100}
-							aria-valuenow={roundedProgress}
-							aria-label={`Onboarding progress ${roundedProgress}%`}
-							style={progressStyle}
-						>
+						{/* Progress Bar */}
+						<div className="px-4 pb-2">
 							<div
-								className={clsx(
-									"onboarding-progress-fill bg-blue-500 h-1.5 rounded-full",
-									!prefersReducedMotion && "transition-all duration-300",
-								)}
-							/>
+								className="onboarding-progress-track w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5"
+								role="progressbar"
+								aria-valuemin={0}
+								aria-valuemax={100}
+								aria-valuenow={roundedProgress}
+								aria-label={`Onboarding progress ${roundedProgress}%`}
+								style={progressStyle}
+							>
+								<div
+									className={clsx(
+										"onboarding-progress-fill bg-blue-500 h-1.5 rounded-full",
+										!prefersReducedMotion && "transition-all duration-300",
+									)}
+								/>
+							</div>
+							<div className="onboarding-progress-summary flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+								<span>
+									{step + 1} of {tourSteps.length}
+								</span>
+								<span
+									className="onboarding-progress-percent"
+									aria-live="polite"
+								>
+									{roundedProgress}% complete
+								</span>
+							</div>
 						</div>
-						<div className="onboarding-progress-summary flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
-							<span>
-								{step + 1} of {tourSteps.length}
-							</span>
-							<span className="onboarding-progress-percent" aria-live="polite">
-								{roundedProgress}% complete
-							</span>
-						</div>
-					</div>
 
 						{/* Actions */}
 						<div className="flex items-center justify-between p-4 border-t border-gray-200 dark:border-gray-700">

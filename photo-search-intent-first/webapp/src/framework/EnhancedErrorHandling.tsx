@@ -901,13 +901,13 @@ export class ErrorBoundary extends React.Component<
 					</p>
 
 					{this.state.error.getRecoveryOptions() &&
-						this.state.error.getRecoveryOptions()!.length > 0 && (
+						this.state.error.getRecoveryOptions()?.length > 0 && (
 							<div className="mb-4">
 								<h3 className="font-medium text-gray-700 mb-2">
 									Suggested actions:
 								</h3>
 								<div className="flex flex-wrap gap-2">
-									{this.state.error.getRecoveryOptions()!.map((option) => (
+									{this.state.error.getRecoveryOptions()?.map((option) => (
 										<button
 											type="button"
 											key={option.id}

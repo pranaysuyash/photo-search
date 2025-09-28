@@ -15,50 +15,50 @@ import { SimpleStoreProvider } from "./stores/SimpleStore";
 
 // Create a client
 const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      gcTime: 10 * 60 * 1000, // 10 minutes
-      retry: (failureCount, error) => {
-        // Don't retry on 4xx errors
-        if (error instanceof Error && error.message.includes("4")) {
-          return false;
-        }
-        return failureCount < 3;
-      },
-    },
-  },
+	defaultOptions: {
+		queries: {
+			staleTime: 5 * 60 * 1000, // 5 minutes
+			gcTime: 10 * 60 * 1000, // 10 minutes
+			retry: (failureCount, error) => {
+				// Don't retry on 4xx errors
+				if (error instanceof Error && error.message.includes("4")) {
+					return false;
+				}
+				return failureCount < 3;
+			},
+		},
+	},
 });
 
 export function RootProviders({ children }: { children: React.ReactNode }) {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <HashRouter
-        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-      >
-        <SimpleStoreProvider>
-          <SettingsProvider>
-            <UIProvider>
-              <PhotoVaultAPIProvider>
-                <JobsProvider>
-                  <LibraryProvider>
-                    <SearchProvider>
-                      <ModalProvider>
-                        <AccessibilityProvider>
-                          <HintProvider>
-                            {children}
-                            <GlobalAnnouncer />
-                          </HintProvider>
-                        </AccessibilityProvider>
-                      </ModalProvider>
-                    </SearchProvider>
-                  </LibraryProvider>
-                </JobsProvider>
-              </PhotoVaultAPIProvider>
-            </UIProvider>
-          </SettingsProvider>
-        </SimpleStoreProvider>
-      </HashRouter>
-    </QueryClientProvider>
-  );
+	return (
+		<QueryClientProvider client={queryClient}>
+			<HashRouter
+				future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+			>
+				<SimpleStoreProvider>
+					<SettingsProvider>
+						<UIProvider>
+							<PhotoVaultAPIProvider>
+								<JobsProvider>
+									<LibraryProvider>
+										<SearchProvider>
+											<ModalProvider>
+												<AccessibilityProvider>
+													<HintProvider>
+														{children}
+														<GlobalAnnouncer />
+													</HintProvider>
+												</AccessibilityProvider>
+											</ModalProvider>
+										</SearchProvider>
+									</LibraryProvider>
+								</JobsProvider>
+							</PhotoVaultAPIProvider>
+						</UIProvider>
+					</SettingsProvider>
+				</SimpleStoreProvider>
+			</HashRouter>
+		</QueryClientProvider>
+	);
 }

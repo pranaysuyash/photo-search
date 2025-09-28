@@ -61,7 +61,7 @@ export function createObservableAction<T, Args extends any[]>(
 		}
 
 		let result: ActionResult<T>;
-		let error: Error | undefined;
+		let _error: Error | undefined;
 
 		try {
 			// Execute the action with optional timeout
@@ -117,7 +117,7 @@ export function createObservableAction<T, Args extends any[]>(
 				};
 			}
 		} catch (err) {
-			error = err as Error;
+			_error = err as Error;
 			result = {
 				success: false,
 				error: err as Error,
@@ -332,8 +332,8 @@ export function announceAction(
 export function withPerformanceMonitoring<
 	T extends (...args: unknown[]) => Promise<any>,
 >(
-	target: Object,
-	propertyKey: string,
+	_target: Object,
+	_propertyKey: string,
 	descriptor: TypedPropertyDescriptor<T>,
 ): void {
 	const originalMethod = descriptor.value;
@@ -344,7 +344,7 @@ export function withPerformanceMonitoring<
 		const startTime = performance.now();
 
 		try {
-			const result = await originalMethod!.apply(this, args);
+			const result = await originalMethod?.apply(this, args);
 
 			const endTime = performance.now();
 			const duration = endTime - startTime;
