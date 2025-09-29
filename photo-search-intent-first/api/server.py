@@ -58,6 +58,7 @@ from api.routers.collections import router as collections_router
 from api.routers.data_management import router as data_management_router
 from api.routers.diagnostics import router as diagnostics_router
 from api.routers.editing import router as editing_router
+from api.routers.faces import router as faces_router
 from api.routers.fast_index import router as fast_index_router
 from api.routers.favorites import router as favorites_router
 from api.routers.file_management import router as file_management_router
@@ -165,6 +166,7 @@ app.include_router(collections_router)
 app.include_router(data_management_router)
 app.include_router(diagnostics_router)
 app.include_router(editing_router)
+app.include_router(faces_router)
 app.include_router(fast_index_router)
 app.include_router(favorites_router)
 app.include_router(file_management_router)

@@ -178,30 +178,6 @@
   "missing": [
     {
       "method": "POST",
-      "path": "/faces/build"
-    },
-    {
-      "method": "GET",
-      "path": "/faces/clusters"
-    },
-    {
-      "method": "POST",
-      "path": "/faces/merge"
-    },
-    {
-      "method": "POST",
-      "path": "/faces/name"
-    },
-    {
-      "method": "GET",
-      "path": "/faces/photos"
-    },
-    {
-      "method": "POST",
-      "path": "/faces/split"
-    },
-    {
-      "method": "POST",
       "path": "/open"
     },
     {
@@ -247,9 +223,9 @@
   ],
   "summary": {
     "base_count": 124,
-    "candidate_count": 157,
+    "candidate_count": 163,
     "changed": 4,
     "extra": 35,
-    "missing": 17
+    "missing": 11
   }
 }
