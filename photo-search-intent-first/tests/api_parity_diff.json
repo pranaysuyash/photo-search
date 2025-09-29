@@ -7,18 +7,18 @@
         "base": "typing.Dict",
         "candidate": "api.schemas.v1.SearchResponse"
       }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/status",
+      "response_model": {
+        "base": "api.schemas.v1.BaseResponse",
+        "candidate": "typing.Dict"
+      }
     }
   ],
   "extra": [],
   "missing": [
-    {
-      "method": "POST",
-      "path": "/auth/check"
-    },
-    {
-      "method": "GET",
-      "path": "/auth/status"
-    },
     {
       "method": "POST",
       "path": "/autotag"
@@ -350,9 +350,9 @@
   ],
   "summary": {
     "base_count": 124,
-    "candidate_count": 55,
-    "changed": 1,
+    "candidate_count": 57,
+    "changed": 2,
     "extra": 0,
-    "missing": 84
+    "missing": 82
   }
 }

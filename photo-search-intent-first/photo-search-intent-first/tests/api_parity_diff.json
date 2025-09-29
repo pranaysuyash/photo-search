@@ -21,10 +21,6 @@
   "missing": [
     {
       "method": "POST",
-      "path": "/autotag"
-    },
-    {
-      "method": "POST",
       "path": "/batch/collections"
     },
     {
@@ -350,9 +346,9 @@
   ],
   "summary": {
     "base_count": 124,
-    "candidate_count": 57,
+    "candidate_count": 58,
     "changed": 2,
     "extra": 0,
-    "missing": 82
+    "missing": 81
   }
 }

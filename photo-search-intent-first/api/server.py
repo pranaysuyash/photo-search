@@ -54,6 +54,7 @@ from api.routers.analytics import router as analytics_router, legacy_router as a
 from api.routers.auth import router as auth_router
 from api.routers.indexing import router as indexing_router
 from api.routers.config import router as config_router
+from api.routers.tagging import router as tagging_router
 from api.attention import router as attention_router  # NEW: adaptive attention (scaffold)
 from api.routes.health import router as health_router  # Extracted health & root endpoints
 from infra.analytics import log_search, _analytics_file, _write_event as _write_event_infra
@@ -135,6 +136,7 @@ app.include_router(health_router)
 # Mount legacy routers for parity with original_server.py
 app.include_router(analytics_legacy_router)
 app.include_router(auth_router)
+app.include_router(tagging_router)
 
 # Mount versioned API router
 app.include_router(api_v1)
