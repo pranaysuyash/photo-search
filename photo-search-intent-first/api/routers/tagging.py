@@ -5,11 +5,12 @@ import re
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, Body, Query
 
+from api.schemas.v1 import TagsRequest
 from api.utils import _from_body, _require, _emb
 from infra.index_store import IndexStore
-from infra.tags import load_tags, save_tags
+from infra.tags import load_tags, save_tags, all_tags
 
 # Legacy router without prefix for parity with original_server.py routes
 router = APIRouter(tags=["tagging"])
@@ -65,3 +66,20 @@ def api_autotag(
             updated += 1
     save_tags(store.index_dir, tmap)
     return {"updated": updated}
+
+
+@router.get("/tags")
+def api_get_tags(directory: str = Query(..., alias="dir")) -> Dict[str, Any]:
+    """Get all tags for a directory."""
+    store = IndexStore(Path(directory))
+    return {"tags": load_tags(store.index_dir), "all": all_tags(store.index_dir)}
+
+
+@router.post("/tags")
+def api_set_tags(req: TagsRequest) -> Dict[str, Any]:
+    """Set tags for a specific photo."""
+    store = IndexStore(Path(req.dir))
+    t = load_tags(store.index_dir)
+    t[req.path] = sorted({s.strip() for s in req.tags if s.strip()})
+    save_tags(store.index_dir, t)
+    return {"ok": True, "tags": t[req.path]}

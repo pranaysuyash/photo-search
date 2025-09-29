@@ -43,6 +43,18 @@
       "path": "/api/v1/auth/status"
     },
     {
+      "method": "POST",
+      "path": "/api/v1/batch/collections"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/batch/delete"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/batch/tag"
+    },
+    {
       "method": "GET",
       "path": "/api/v1/collections/"
     },
@@ -71,12 +83,84 @@
       "path": "/api/v1/collections/smart/resolve"
     },
     {
+      "method": "POST",
+      "path": "/api/v1/faces/build"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/faces/clusters"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/faces/merge"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/faces/name"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/faces/photos"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/faces/split"
+    },
+    {
       "method": "GET",
       "path": "/api/v1/favorites/"
     },
     {
       "method": "POST",
       "path": "/api/v1/favorites/"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/metadata/"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/metadata/batch"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/metadata/build"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/ocr/build"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/ocr/snippets"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/ocr/status"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/presets/"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/presets/"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/presets/delete"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/saved/"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/saved/"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/saved/delete"
     },
     {
       "method": "GET",
@@ -92,30 +176,6 @@
     }
   ],
   "missing": [
-    {
-      "method": "POST",
-      "path": "/batch/collections"
-    },
-    {
-      "method": "POST",
-      "path": "/batch/delete"
-    },
-    {
-      "method": "POST",
-      "path": "/batch/tag"
-    },
-    {
-      "method": "GET",
-      "path": "/collections"
-    },
-    {
-      "method": "POST",
-      "path": "/collections"
-    },
-    {
-      "method": "POST",
-      "path": "/collections/delete"
-    },
     {
       "method": "POST",
       "path": "/faces/build"
@@ -142,22 +202,6 @@
     },
     {
       "method": "POST",
-      "path": "/fast/build"
-    },
-    {
-      "method": "GET",
-      "path": "/fast/status"
-    },
-    {
-      "method": "GET",
-      "path": "/favorites"
-    },
-    {
-      "method": "POST",
-      "path": "/favorites"
-    },
-    {
-      "method": "POST",
       "path": "/index"
     },
     {
@@ -171,14 +215,6 @@
     {
       "method": "GET",
       "path": "/index/status"
-    },
-    {
-      "method": "GET",
-      "path": "/library"
-    },
-    {
-      "method": "GET",
-      "path": "/library/defaults"
     },
     {
       "method": "GET",
@@ -219,30 +255,6 @@
     {
       "method": "POST",
       "path": "/open"
-    },
-    {
-      "method": "GET",
-      "path": "/presets"
-    },
-    {
-      "method": "POST",
-      "path": "/presets"
-    },
-    {
-      "method": "POST",
-      "path": "/presets/delete"
-    },
-    {
-      "method": "GET",
-      "path": "/saved"
-    },
-    {
-      "method": "POST",
-      "path": "/saved"
-    },
-    {
-      "method": "POST",
-      "path": "/saved/delete"
     },
     {
       "method": "POST",
@@ -309,14 +321,6 @@
       "path": "/smart_collections/resolve"
     },
     {
-      "method": "GET",
-      "path": "/tags"
-    },
-    {
-      "method": "POST",
-      "path": "/tags"
-    },
-    {
       "method": "POST",
       "path": "/thumb/batch"
     },
@@ -327,30 +331,6 @@
     {
       "method": "POST",
       "path": "/thumbs"
-    },
-    {
-      "method": "GET",
-      "path": "/trips"
-    },
-    {
-      "method": "POST",
-      "path": "/trips/build"
-    },
-    {
-      "method": "GET",
-      "path": "/video/metadata"
-    },
-    {
-      "method": "GET",
-      "path": "/video/thumbnail"
-    },
-    {
-      "method": "GET",
-      "path": "/videos"
-    },
-    {
-      "method": "POST",
-      "path": "/videos/index"
     },
     {
       "method": "POST",
@@ -379,9 +359,9 @@
   ],
   "summary": {
     "base_count": 124,
-    "candidate_count": 82,
+    "candidate_count": 129,
     "changed": 4,
-    "extra": 14,
-    "missing": 71
+    "extra": 35,
+    "missing": 45
   }
 }

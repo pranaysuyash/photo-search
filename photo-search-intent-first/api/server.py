@@ -52,15 +52,24 @@ from api.search_models import (
 )
 from api.routers.analytics import router as analytics_router, legacy_router as analytics_legacy_router
 from api.routers.auth import router as auth_router
+from api.routers.batch import router as batch_router
 from api.routers.captions import router as captions_router
+from api.routers.collections import router as collections_router
 from api.routers.data_management import router as data_management_router
 from api.routers.diagnostics import router as diagnostics_router
 from api.routers.editing import router as editing_router
+from api.routers.fast_index import router as fast_index_router
+from api.routers.favorites import router as favorites_router
 from api.routers.file_management import router as file_management_router
 from api.routers.indexing import router as indexing_router
 from api.routers.config import router as config_router
+from api.routers.library import router as library_router
+from api.routers.presets import router as presets_router
+from api.routers.saved import router as saved_router
 from api.routers.tagging import router as tagging_router
+from api.routers.trips import router as trips_router
 from api.routers.utilities import router as utilities_router
+from api.routers.videos import router as videos_router
 from api.attention import router as attention_router  # NEW: adaptive attention (scaffold)
 from api.routes.health import router as health_router  # Extracted health & root endpoints
 from infra.analytics import log_search, _analytics_file, _write_event as _write_event_infra
@@ -142,13 +151,22 @@ app.include_router(health_router)
 # Mount legacy routers for parity with original_server.py
 app.include_router(analytics_legacy_router)
 app.include_router(auth_router)
+app.include_router(batch_router)
 app.include_router(captions_router)
+app.include_router(collections_router)
 app.include_router(data_management_router)
 app.include_router(diagnostics_router)
 app.include_router(editing_router)
+app.include_router(fast_index_router)
+app.include_router(favorites_router)
 app.include_router(file_management_router)
+app.include_router(library_router)
+app.include_router(presets_router)
+app.include_router(saved_router)
 app.include_router(tagging_router)
+app.include_router(trips_router)
 app.include_router(utilities_router)
+app.include_router(videos_router)
 
 # Mount versioned API router
 app.include_router(api_v1)

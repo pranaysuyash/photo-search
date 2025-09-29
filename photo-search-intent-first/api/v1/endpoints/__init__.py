@@ -14,6 +14,9 @@ from .video import video_router
 from .docs import router as docs_router
 from .auth import auth_router
 from .favorites import favorites_router
+from .batch import batch_router
+from .saved import saved_router
+from .presets import presets_router
 
 __all__ = [
     "search_router",
@@ -29,4 +32,7 @@ __all__ = [
     "docs_router",
     "auth_router",
     "favorites_router",
+    "batch_router",
+    "saved_router",
+    "presets_router",
 ]
