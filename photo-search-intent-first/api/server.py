@@ -57,6 +57,7 @@ from api.routers.file_management import router as file_management_router
 from api.routers.indexing import router as indexing_router
 from api.routers.config import router as config_router
 from api.routers.tagging import router as tagging_router
+from api.routers.utilities import router as utilities_router
 from api.attention import router as attention_router  # NEW: adaptive attention (scaffold)
 from api.routes.health import router as health_router  # Extracted health & root endpoints
 from infra.analytics import log_search, _analytics_file, _write_event as _write_event_infra
@@ -141,6 +142,7 @@ app.include_router(auth_router)
 app.include_router(diagnostics_router)
 app.include_router(file_management_router)
 app.include_router(tagging_router)
+app.include_router(utilities_router)
 
 # Mount versioned API router
 app.include_router(api_v1)

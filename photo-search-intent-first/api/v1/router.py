@@ -6,7 +6,7 @@ APIRouter to provide versioned access to the photo search functionality.
 """
 from fastapi import APIRouter
 
-from .endpoints import search_router, indexing_router, sharing_router, analytics_router, faces_router, metadata_router, tags_router, collections_router, ocr_router, video_router, docs_router, auth_router
+from .endpoints import search_router, indexing_router, sharing_router, analytics_router, faces_router, metadata_router, tags_router, collections_router, ocr_router, video_router, docs_router, auth_router, favorites_router
 
 # Main API v1 router
 api_v1 = APIRouter(prefix="/api/v1", tags=["v1"])
@@ -24,3 +24,4 @@ api_v1.include_router(ocr_router)
 api_v1.include_router(video_router)
 api_v1.include_router(docs_router)
 api_v1.include_router(auth_router)
+api_v1.include_router(favorites_router)

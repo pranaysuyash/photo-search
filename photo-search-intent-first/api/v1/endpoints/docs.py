@@ -143,15 +143,33 @@ async def get_api_docs():
             response_schema="",
             example='{}'
         ),
-        # Tags endpoints (stubs - no actual endpoints yet)
+        # Tags endpoints (fully implemented)
         EndpointDocumentation(
-            method="N/A",
+            method="GET",
             path="/api/v1/tags",
-            summary="Tagging operations",
-            description="Manage tags for photos (endpoints to be implemented)",
+            summary="Get all tags",
+            description="Get all tags for the specified directory",
             request_schema="",
-            response_schema="",
-            example='{}'
+            response_schema="Dict",
+            example='{"directory": "/path/to/photos"}'
+        ),
+        EndpointDocumentation(
+            method="POST",
+            path="/api/v1/tags",
+            summary="Add tags to photo",
+            description="Add tags to a specific photo",
+            request_schema="TagsRequest",
+            response_schema="TagResponse",
+            example='{"directory": "/path/to/photos", "path": "/path/to/photo.jpg", "tags": ["vacation", "beach"]}'
+        ),
+        EndpointDocumentation(
+            method="POST",
+            path="/api/v1/tags/autotag",
+            summary="Auto-tag photos",
+            description="Automatically tag photos based on captions",
+            request_schema="",
+            response_schema="Dict",
+            example='{"directory": "/path/to/photos", "provider": "local", "min_len": 4, "max_tags_per_image": 8}'
         ),
         # Collections endpoints (stubs - no actual endpoints yet)
         EndpointDocumentation(

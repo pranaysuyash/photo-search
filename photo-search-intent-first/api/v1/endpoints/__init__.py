@@ -13,6 +13,7 @@ from .ocr import ocr_router
 from .video import video_router
 from .docs import router as docs_router
 from .auth import auth_router
+from .favorites import favorites_router
 
 __all__ = [
     "search_router",
@@ -27,4 +28,5 @@ __all__ = [
     "video_router",
     "docs_router",
     "auth_router",
+    "favorites_router",
 ]
