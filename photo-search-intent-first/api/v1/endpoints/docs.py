@@ -171,15 +171,69 @@ async def get_api_docs():
             response_schema="Dict",
             example='{"directory": "/path/to/photos", "provider": "local", "min_len": 4, "max_tags_per_image": 8}'
         ),
-        # Collections endpoints (stubs - no actual endpoints yet)
+        # Collections endpoints (fully implemented)
         EndpointDocumentation(
-            method="N/A",
+            method="GET",
             path="/api/v1/collections",
-            summary="Collections operations",
-            description="Manage photo collections (endpoints to be implemented)",
+            summary="Get all collections",
+            description="Get all photo collections for the specified directory",
             request_schema="",
-            response_schema="",
-            example='{}'
+            response_schema="Dict",
+            example='{"directory": "/path/to/photos"}'
+        ),
+        EndpointDocumentation(
+            method="POST",
+            path="/api/v1/collections",
+            summary="Create/update collection",
+            description="Create or update a photo collection",
+            request_schema="",
+            response_schema="Dict",
+            example='{"dir": "/path/to/photos", "name": "Vacation 2023", "paths": ["/path/to/photo1.jpg", "/path/to/photo2.jpg"]}'
+        ),
+        EndpointDocumentation(
+            method="POST",
+            path="/api/v1/collections/delete",
+            summary="Delete collection",
+            description="Delete a photo collection",
+            request_schema="",
+            response_schema="Dict",
+            example='{"dir": "/path/to/photos", "name": "Vacation 2023"}'
+        ),
+        EndpointDocumentation(
+            method="GET",
+            path="/api/v1/collections/smart",
+            summary="Get smart collections",
+            description="Get all smart photo collections for the specified directory",
+            request_schema="",
+            response_schema="Dict",
+            example='{"directory": "/path/to/photos"}'
+        ),
+        EndpointDocumentation(
+            method="POST",
+            path="/api/v1/collections/smart",
+            summary="Create/update smart collection",
+            description="Create or update a smart photo collection with rules",
+            request_schema="",
+            response_schema="Dict",
+            example='{"dir": "/path/to/photos", "name": "Beach Photos", "rules": {"query": "beach ocean", "tags": ["vacation"]}}'
+        ),
+        EndpointDocumentation(
+            method="POST",
+            path="/api/v1/collections/smart/delete",
+            summary="Delete smart collection",
+            description="Delete a smart photo collection",
+            request_schema="",
+            response_schema="Dict",
+            example='{"dir": "/path/to/photos", "name": "Beach Photos"}'
+        ),
+        EndpointDocumentation(
+            method="POST",
+            path="/api/v1/collections/smart/resolve",
+            summary="Resolve smart collection",
+            description="Execute rules in a smart collection to find matching photos",
+            request_schema="",
+            response_schema="Dict",
+            example='{"dir": "/path/to/photos", "name": "Beach Photos", "provider": "local", "top_k": 50}'
         ),
         # OCR endpoints (stubs - no actual endpoints yet)
         EndpointDocumentation(

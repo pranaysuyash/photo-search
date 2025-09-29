@@ -44,6 +44,42 @@
     },
     {
       "method": "GET",
+      "path": "/api/v1/collections/"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/collections/"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/collections/delete"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/collections/smart"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/collections/smart"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/collections/smart/delete"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/collections/smart/resolve"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/favorites/"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/favorites/"
+    },
+    {
+      "method": "GET",
       "path": "/api/v1/tags/"
     },
     {
@@ -69,10 +105,6 @@
       "path": "/batch/tag"
     },
     {
-      "method": "POST",
-      "path": "/captions/build"
-    },
-    {
       "method": "GET",
       "path": "/collections"
     },
@@ -83,10 +115,6 @@
     {
       "method": "POST",
       "path": "/collections/delete"
-    },
-    {
-      "method": "POST",
-      "path": "/data/nuke"
     },
     {
       "method": "POST",
@@ -359,9 +387,9 @@
   ],
   "summary": {
     "base_count": 124,
-    "candidate_count": 69,
+    "candidate_count": 80,
     "changed": 4,
-    "extra": 5,
-    "missing": 75
+    "extra": 14,
+    "missing": 73
   }
 }

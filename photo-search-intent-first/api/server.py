@@ -52,6 +52,8 @@ from api.search_models import (
 )
 from api.routers.analytics import router as analytics_router, legacy_router as analytics_legacy_router
 from api.routers.auth import router as auth_router
+from api.routers.captions import router as captions_router
+from api.routers.data_management import router as data_management_router
 from api.routers.diagnostics import router as diagnostics_router
 from api.routers.file_management import router as file_management_router
 from api.routers.indexing import router as indexing_router
@@ -139,6 +141,8 @@ app.include_router(health_router)
 # Mount legacy routers for parity with original_server.py
 app.include_router(analytics_legacy_router)
 app.include_router(auth_router)
+app.include_router(captions_router)
+app.include_router(data_management_router)
 app.include_router(diagnostics_router)
 app.include_router(file_management_router)
 app.include_router(tagging_router)
