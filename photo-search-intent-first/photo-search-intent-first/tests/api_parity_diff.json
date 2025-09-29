@@ -253,22 +253,6 @@
       "path": "/share/{token}/view"
     },
     {
-      "method": "GET",
-      "path": "/smart_collections"
-    },
-    {
-      "method": "POST",
-      "path": "/smart_collections"
-    },
-    {
-      "method": "POST",
-      "path": "/smart_collections/delete"
-    },
-    {
-      "method": "POST",
-      "path": "/smart_collections/resolve"
-    },
-    {
       "method": "POST",
       "path": "/thumb/batch"
     },
@@ -283,9 +267,9 @@
   ],
   "summary": {
     "base_count": 124,
-    "candidate_count": 148,
+    "candidate_count": 152,
     "changed": 4,
     "extra": 35,
-    "missing": 26
+    "missing": 22
   }
 }

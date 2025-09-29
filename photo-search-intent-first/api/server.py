@@ -70,6 +70,7 @@ from api.routers.models import router as models_router
 from api.routers.ocr import router as ocr_router
 from api.routers.presets import router as presets_router
 from api.routers.saved import router as saved_router
+from api.routers.smart_collections import router as smart_collections_router
 from api.routers.tagging import router as tagging_router
 from api.routers.trips import router as trips_router
 from api.routers.utilities import router as utilities_router
@@ -173,6 +174,7 @@ app.include_router(models_router)
 app.include_router(ocr_router)
 app.include_router(presets_router)
 app.include_router(saved_router)
+app.include_router(smart_collections_router)
 app.include_router(tagging_router)
 app.include_router(trips_router)
 app.include_router(utilities_router)
