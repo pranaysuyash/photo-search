@@ -55,6 +55,7 @@ from api.routers.auth import router as auth_router
 from api.routers.captions import router as captions_router
 from api.routers.data_management import router as data_management_router
 from api.routers.diagnostics import router as diagnostics_router
+from api.routers.editing import router as editing_router
 from api.routers.file_management import router as file_management_router
 from api.routers.indexing import router as indexing_router
 from api.routers.config import router as config_router
@@ -144,6 +145,7 @@ app.include_router(auth_router)
 app.include_router(captions_router)
 app.include_router(data_management_router)
 app.include_router(diagnostics_router)
+app.include_router(editing_router)
 app.include_router(file_management_router)
 app.include_router(tagging_router)
 app.include_router(utilities_router)

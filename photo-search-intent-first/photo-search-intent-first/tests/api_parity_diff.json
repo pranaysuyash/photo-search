@@ -118,14 +118,6 @@
     },
     {
       "method": "POST",
-      "path": "/edit/ops"
-    },
-    {
-      "method": "POST",
-      "path": "/edit/upscale"
-    },
-    {
-      "method": "POST",
       "path": "/faces/build"
     },
     {
@@ -387,9 +379,9 @@
   ],
   "summary": {
     "base_count": 124,
-    "candidate_count": 80,
+    "candidate_count": 82,
     "changed": 4,
     "extra": 14,
-    "missing": 73
+    "missing": 71
   }
 }
