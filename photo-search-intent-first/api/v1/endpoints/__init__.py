@@ -11,6 +11,7 @@ from .tags import tags_router
 from .collections import collections_router
 from .ocr import ocr_router
 from .video import video_router
+from .docs import router as docs_router
 
 __all__ = [
     "search_router",
@@ -23,4 +24,5 @@ __all__ = [
     "collections_router",
     "ocr_router",
     "video_router",
+    "docs_router",
 ]

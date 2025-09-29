@@ -1,9 +1,14 @@
 import type React from "react";
-import { apiAddSaved, apiGetSaved } from "../../api";
-import { Button } from "@/components/ui/shadcn/Button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/shadcn/Dialog";
-import { Input } from "@/components/ui/shadcn/Input";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/shadcn/Button";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/shadcn/Dialog";
+import { Input } from "@/components/ui/shadcn/Input";
+import { apiAddSaved, apiGetSaved } from "../../api";
 
 interface SaveModalProps {
 	isOpen: boolean;
@@ -38,7 +43,9 @@ export const SaveModal: React.FC<SaveModalProps> = ({
 		<Dialog open={isOpen} onOpenChange={onClose}>
 			<DialogContent className="sm:max-w-md">
 				<DialogHeader>
-					<DialogTitle className="text-lg font-semibold">Save Search</DialogTitle>
+					<DialogTitle className="text-lg font-semibold">
+						Save Search
+					</DialogTitle>
 				</DialogHeader>
 				<form
 					onSubmit={async (e) => {
@@ -54,9 +61,7 @@ export const SaveModal: React.FC<SaveModalProps> = ({
 							photoActions.setSaved(r.saved || []);
 							setSelectedView("saved");
 						} catch (e) {
-							uiActions.setNote(
-								e instanceof Error ? e.message : "Save failed",
-							);
+							uiActions.setNote(e instanceof Error ? e.message : "Save failed");
 						}
 						onClose();
 					}}
@@ -76,9 +81,7 @@ export const SaveModal: React.FC<SaveModalProps> = ({
 						<Button type="button" variant="outline" onClick={onClose}>
 							Cancel
 						</Button>
-						<Button type="submit">
-							Save
-						</Button>
+						<Button type="submit">Save</Button>
 					</div>
 				</form>
 			</DialogContent>

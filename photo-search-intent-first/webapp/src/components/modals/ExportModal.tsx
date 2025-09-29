@@ -81,7 +81,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 										quality = Number.isNaN(cq) ? undefined : cq;
 									}
 									const r = await apiExport(
-										dir!,
+										dir || "",
 										paths,
 										dest,
 										"copy",

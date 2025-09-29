@@ -18,6 +18,7 @@ import {
 	Sparkles,
 	Sun,
 	Users,
+	Zap,
 } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
@@ -52,6 +53,7 @@ interface ModernSidebarProps {
 	darkMode?: boolean;
 	onDarkModeToggle?: () => void;
 	onSettingsClick?: () => void;
+	onPowerUserClick?: () => void;
 	onSelectLibrary?: () => void;
 }
 
@@ -66,6 +68,7 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 	darkMode = false,
 	onDarkModeToggle,
 	onSettingsClick,
+	onPowerUserClick,
 	onSelectLibrary,
 }) => {
 	const [isCollapsed, setIsCollapsed] = useState(false);

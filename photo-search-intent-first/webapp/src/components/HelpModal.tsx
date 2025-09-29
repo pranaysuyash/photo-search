@@ -13,11 +13,16 @@ import {
 	Zap,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/shadcn/Button";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/shadcn/Dialog";
 import { searchHistoryService } from "../services/SearchHistoryService";
 import { KeyboardShortcutsPanel } from "./KeyboardShortcutsPanel";
 import { SearchHistoryPrivacy } from "./SearchHistoryPrivacy";
-import { Button } from "@/components/ui/shadcn/Button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/shadcn/Dialog";
 
 interface HelpModalProps {
 	isOpen: boolean;
@@ -512,8 +517,8 @@ export function HelpModal({
 							Help Center
 						</DialogTitle>
 					</div>
-					<Button 
-						variant="ghost" 
+					<Button
+						variant="ghost"
 						onClick={onClose}
 						aria-label="Close help"
 						className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"

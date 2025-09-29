@@ -1713,3 +1713,26 @@ export async function apiWatchStop(_dir: string): Promise<void> {
 export async function apiCancelJob(jobId: string) {
 	return post<{ ok: boolean }>("/jobs/cancel", { job_id: jobId });
 }
+
+export async function apiModelStatus(): Promise<{
+	ok: boolean;
+	models: Record<
+		string,
+		{
+			name: string;
+			size_mb?: number;
+			loaded: boolean;
+			loading?: boolean;
+			error?: string;
+		}
+	>;
+	offline_mode: boolean;
+	model_dir?: string;
+	capabilities: Record<string, boolean>;
+}> {
+	const response = await apiFetch("/api/model/status");
+	if (!response.ok) {
+		throw new Error(`Failed to get model status: ${response.statusText}`);
+	}
+	return response.json();
+}

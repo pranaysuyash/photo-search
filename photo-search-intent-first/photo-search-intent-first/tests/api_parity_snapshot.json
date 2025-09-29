@@ -1,0 +1,873 @@
+{
+  "count": 124,
+  "routes": [
+    {
+      "method": "GET",
+      "name": "api_root",
+      "path": "/",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_analytics",
+      "path": "/analytics",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_analytics_log",
+      "path": "/analytics/log",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_analytics",
+      "path": "/api/analytics",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_analytics_event",
+      "path": "/api/analytics/event",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_data_nuke",
+      "path": "/api/data/nuke",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_health_api",
+      "path": "/api/health",
+      "response_model": "api.schemas.v1.HealthResponse",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_index",
+      "path": "/api/index",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_index_pause",
+      "path": "/api/index/pause",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_index_resume",
+      "path": "/api/index/resume",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_index_status",
+      "path": "/api/index/status",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_jobs_cancel",
+      "path": "/api/jobs/cancel",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_monitoring_api_get",
+      "path": "/api/monitoring",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_monitoring_api_post",
+      "path": "/api/monitoring",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_ping",
+      "path": "/api/ping",
+      "response_model": "api.schemas.v1.HealthResponse",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "get_api_docs",
+      "path": "/api/v1/docs",
+      "response_model": "api.v1.endpoints.docs.APIDocsResponse",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "search_v1",
+      "path": "/api/v1/search/",
+      "response_model": "api.schemas.v1.SearchResponse",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "search_cached_v1",
+      "path": "/api/v1/search/cached",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_watch_start",
+      "path": "/api/watch/start",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_watch_status",
+      "path": "/api/watch/status",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_watch_stop",
+      "path": "/api/watch/stop",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_attention_clear",
+      "path": "/attention/clear",
+      "response_model": null,
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_attention_dupes",
+      "path": "/attention/dupes",
+      "response_model": null,
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_attention_dupes_resolve",
+      "path": "/attention/dupes/{group_id}/resolve",
+      "response_model": null,
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_attention_forgotten",
+      "path": "/attention/forgotten",
+      "response_model": null,
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_attention_popularity",
+      "path": "/attention/popularity",
+      "response_model": null,
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_attention_related",
+      "path": "/attention/related",
+      "response_model": null,
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_attention_seasonal",
+      "path": "/attention/seasonal",
+      "response_model": null,
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_attention_shuffle",
+      "path": "/attention/shuffle",
+      "response_model": null,
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_auth_check",
+      "path": "/auth/check",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_auth_status",
+      "path": "/auth/status",
+      "response_model": "api.schemas.v1.BaseResponse",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_autotag",
+      "path": "/autotag",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_batch_add_to_collection",
+      "path": "/batch/collections",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_batch_delete",
+      "path": "/batch/delete",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_batch_tag",
+      "path": "/batch/tag",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_build_captions",
+      "path": "/captions/build",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_get_collections",
+      "path": "/collections",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_set_collection",
+      "path": "/collections",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_delete_collection",
+      "path": "/collections/delete",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_config_set",
+      "path": "/config/set",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_data_nuke",
+      "path": "/data/nuke",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_delete",
+      "path": "/delete",
+      "response_model": "builtins.dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_demo_dir",
+      "path": "/demo/dir",
+      "response_model": "api.schemas.v1.BaseResponse",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_diagnostics",
+      "path": "/diagnostics",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_edit_ops",
+      "path": "/edit/ops",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_edit_upscale",
+      "path": "/edit/upscale",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_export",
+      "path": "/export",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_build_faces",
+      "path": "/faces/build",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_faces_clusters",
+      "path": "/faces/clusters",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_merge_face_clusters",
+      "path": "/faces/merge",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_faces_name",
+      "path": "/faces/name",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_get_face_photos",
+      "path": "/faces/photos",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_split_face_cluster",
+      "path": "/faces/split",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_fast_build",
+      "path": "/fast/build",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_build_fast",
+      "path": "/fast/build",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_fast_status",
+      "path": "/fast/status",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_get_favorites",
+      "path": "/favorites",
+      "response_model": "api.schemas.v1.SuccessResponse",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_set_favorite",
+      "path": "/favorites",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_health",
+      "path": "/health",
+      "response_model": "api.schemas.v1.HealthResponse",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_index",
+      "path": "/index",
+      "response_model": "api.schemas.v1.IndexResponse",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_index_pause",
+      "path": "/index/pause",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_index_resume",
+      "path": "/index/resume",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_index_status",
+      "path": "/index/status",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_library",
+      "path": "/library",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_library_defaults",
+      "path": "/library/defaults",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_map",
+      "path": "/map",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_get_metadata",
+      "path": "/metadata",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_metadata_batch",
+      "path": "/metadata/batch",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_build_metadata",
+      "path": "/metadata/build",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_models_capabilities",
+      "path": "/models/capabilities",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_models_download",
+      "path": "/models/download",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_models_validate",
+      "path": "/models/validate",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_monitoring_get",
+      "path": "/monitoring",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_monitoring_post",
+      "path": "/monitoring",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_build_ocr",
+      "path": "/ocr/build",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_ocr_snippets",
+      "path": "/ocr/snippets",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_ocr_status",
+      "path": "/ocr/status",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_open",
+      "path": "/open",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_get_presets",
+      "path": "/presets",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_add_preset",
+      "path": "/presets",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_delete_preset",
+      "path": "/presets/delete",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_get_saved",
+      "path": "/saved",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_add_saved",
+      "path": "/saved",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_delete_saved",
+      "path": "/saved/delete",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_scan_count",
+      "path": "/scan_count",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_search",
+      "path": "/search",
+      "response_model": "api.schemas.v1.SearchResponse",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_search_cached",
+      "path": "/search/cached",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_search_paginated",
+      "path": "/search/paginated",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_search_like",
+      "path": "/search_like",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_search_like_plus",
+      "path": "/search_like_plus",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_search_video",
+      "path": "/search_video",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_search_video_like",
+      "path": "/search_video_like",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_search_workspace",
+      "path": "/search_workspace",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_get_excludes",
+      "path": "/settings/excludes",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_set_excludes",
+      "path": "/settings/excludes",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_share_list",
+      "path": "/share",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_share",
+      "path": "/share",
+      "response_model": "api.schemas.v1.ShareResponse",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_share_detail",
+      "path": "/share/detail",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_share_revoke",
+      "path": "/share/revoke",
+      "response_model": "api.schemas.v1.BaseResponse",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_share_view",
+      "path": "/share/{token}/view",
+      "response_model": null,
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_get_smart_collections",
+      "path": "/smart_collections",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_set_smart_collection",
+      "path": "/smart_collections",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_delete_smart_collection",
+      "path": "/smart_collections/delete",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_resolve_smart_collection",
+      "path": "/smart_collections/resolve",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_operation_status",
+      "path": "/status/{operation}",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_get_tags",
+      "path": "/tags",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_set_tags",
+      "path": "/tags",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "tech_manifest",
+      "path": "/tech.json",
+      "response_model": null,
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_thumb_batch",
+      "path": "/thumb/batch",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_thumb_face",
+      "path": "/thumb_face",
+      "response_model": null,
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_build_thumbs",
+      "path": "/thumbs",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_trips_list",
+      "path": "/trips",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_trips_build",
+      "path": "/trips/build",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_undo_delete",
+      "path": "/undo_delete",
+      "response_model": "builtins.dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_get_video_metadata",
+      "path": "/video/metadata",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_get_video_thumbnail",
+      "path": "/video/thumbnail",
+      "response_model": null,
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_list_videos",
+      "path": "/videos",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_index_videos",
+      "path": "/videos/index",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_watch_start",
+      "path": "/watch/start",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_watch_status",
+      "path": "/watch/status",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_watch_stop",
+      "path": "/watch/stop",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "GET",
+      "name": "api_workspace_list",
+      "path": "/workspace",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_workspace_add",
+      "path": "/workspace/add",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    },
+    {
+      "method": "POST",
+      "name": "api_workspace_remove",
+      "path": "/workspace/remove",
+      "response_model": "typing.Dict",
+      "status_code": 200
+    }
+  ]
+}

@@ -17,12 +17,6 @@ interface ProgressiveImageProps {
 	enableLazyLoading?: boolean;
 }
 
-interface ImageTier {
-	thumb: string;
-	medium: string;
-	full: string;
-}
-
 // Helper functions for direct image loading
 async function loadImageDirectly(src: string): Promise<void> {
 	return new Promise((resolve, reject) => {
@@ -40,12 +34,6 @@ async function preloadImageDirectly(src: string): Promise<void> {
 		img.onerror = () => reject(new Error(`Failed to preload image: ${src}`));
 		img.src = src;
 	});
-}
-
-interface ImageTier {
-	thumb: string;
-	medium: string;
-	full: string;
 }
 
 export function ProgressiveImage({

@@ -296,6 +296,24 @@ const DEFAULT_SHORTCUTS: KeyboardShortcut[] = [
 			peopleBtn?.click();
 		},
 	},
+	{
+		key: "p",
+		ctrl: true,
+		shift: true,
+		description: "Open power user panel",
+		action: () => {
+			// Trigger power user panel
+			const powerUserBtn = document.querySelector(
+				'[aria-label*="Power user"]',
+			) as HTMLElement;
+			if (!powerUserBtn) {
+				// Create and dispatch custom event if no button exists
+				window.dispatchEvent(new CustomEvent("open-power-user-panel"));
+			} else {
+				powerUserBtn.click();
+			}
+		},
+	},
 ];
 
 export function useKeyboardShortcuts(customShortcuts?: KeyboardShortcut[]) {

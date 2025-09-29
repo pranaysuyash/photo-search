@@ -1,11 +1,16 @@
 import type React from "react";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/shadcn/Button";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/shadcn/Dialog";
+import { Input } from "@/components/ui/shadcn/Input";
 import { useToast } from "@/hooks/use-toast";
 import { apiGetCollections, apiSetCollection } from "../../api";
 import { announce } from "../../utils/accessibility";
-import { Button } from "@/components/ui/shadcn/Button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/shadcn/Dialog";
-import { Input } from "@/components/ui/shadcn/Input";
-import { Label } from "@/components/ui/label";
 
 interface CollectionModalProps {
 	isOpen: boolean;
@@ -35,7 +40,9 @@ export const CollectionModal: React.FC<CollectionModalProps> = ({
 		<Dialog open={isOpen} onOpenChange={onClose}>
 			<DialogContent className="sm:max-w-md">
 				<DialogHeader>
-					<DialogTitle className="text-lg font-semibold">Add to Collection</DialogTitle>
+					<DialogTitle className="text-lg font-semibold">
+						Add to Collection
+					</DialogTitle>
 				</DialogHeader>
 				<form
 					onSubmit={async (e) => {
@@ -82,9 +89,7 @@ export const CollectionModal: React.FC<CollectionModalProps> = ({
 						<Button type="button" variant="outline" onClick={onClose}>
 							Cancel
 						</Button>
-						<Button type="submit">
-							Add
-						</Button>
+						<Button type="submit">Add</Button>
 					</div>
 				</form>
 			</DialogContent>

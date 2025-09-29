@@ -29,7 +29,7 @@ export function StatusBar({
 	indexedCount = 0,
 	searchProvider = "local",
 	isIndexing = false,
-	isConnected = true,
+	isConnected = true, // eslint-disable-line @typescript-eslint/no-unused-params
 	currentDirectory = "",
 	lastSync,
 	activeJobs = 0,

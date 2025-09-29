@@ -239,6 +239,12 @@ The application can be run and debugged without relying on IDE-specific extensio
 - Maintain backward compatibility in API endpoints
 - Document intent and design decisions in INTENT.md
 
+### API Design Standards
+- **API Versioning**: Use URL prefixes (e.g., `/api/v1/`) to ensure backward compatibility
+- **Response Models**: Use Pydantic models for consistent API responses (BaseResponse, SuccessResponse, etc.)
+- **Error Handling**: Implement global exception handlers for consistent error responses
+- **Request Validation**: Use Pydantic models for request validation
+
 ### Full App Scope Approach
 - Address the complete application state rather than MVP features only
 - Consider the full scope of all components and their interdependencies

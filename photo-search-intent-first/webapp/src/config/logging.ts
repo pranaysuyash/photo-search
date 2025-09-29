@@ -2,11 +2,12 @@ export type LogEnvGate = "prod" | "all";
 
 // Lightweight central logging configuration and helpers
 // Prefer Vite env but merge with Node env for tests and non-Vite contexts
-const viteEnv = ((import.meta as unknown as { env?: Record<string, any> })
-	?.env || {}) as Record<string, any>;
+const viteEnv = ((
+	import.meta as unknown as { env?: Record<string, string | number | boolean> }
+)?.env || {}) as Record<string, string | number | boolean>;
 // Resolve env dynamically so tests can tweak process.env between calls
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getEnv(): Record<string, any> {
+function getEnv(): Record<string, string | number | boolean> {
 	return {
 		...(typeof process !== "undefined" ? (process as unknown).env : {}),
 		...viteEnv,

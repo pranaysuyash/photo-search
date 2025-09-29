@@ -81,43 +81,48 @@ class HealthResponse(BaseResponse):
 class SearchRequest(BaseModel):
     dir: str = Field(..., description="Absolute path to the photo directory")
     query: str = Field(..., description="Text query to search for")
-    top_k: Annotated[int, Field(ge=1, le=500)] = 12
-    provider: str = "local"
-    hf_token: Optional[str] = None
-    openai_key: Optional[str] = None
+    top_k: Annotated[int, Field(ge=1, le=500, description="Number of results to return")] = 12
+    provider: Annotated[str, Field(pattern="^(local|huggingface|openai)$", description="Provider for embeddings")] = "local"
+    hf_token: Optional[str] = Field(None, description="Hugging Face API token")
+    openai_key: Optional[str] = Field(None, description="OpenAI API key")
 
     # Search strategy flags
-    use_fast: bool = False
-    fast_kind: Optional[str] = Field(
-        None, description="Optional ANN backend hint: faiss|hnsw|annoy"
+    use_fast: bool = Field(default=False, description="Use fast approximate search")
+    fast_kind: Optional[Annotated[str, Field(pattern="^(faiss|hnsw|annoy|auto)$")]] = Field(
+        None, description="Optional ANN backend hint: faiss|hnsw|annoy|auto"
     )
-    use_captions: bool = False
-    use_ocr: bool = False
+    use_captions: bool = Field(default=False, description="Use captions for search")
+    use_ocr: bool = Field(default=False, description="Use OCR text for search")
 
     # Post-filters
-    favorites_only: bool = False
-    tags: List[str] = Field(default_factory=list)
-    date_from: Optional[float] = None
-    date_to: Optional[float] = None
-    camera: Optional[str] = None
-    iso_min: Optional[int] = None
-    iso_max: Optional[int] = None
-    f_min: Optional[float] = None
-    f_max: Optional[float] = None
-    flash: Optional[str] = None
-    wb: Optional[str] = None
-    metering: Optional[str] = None
-    alt_min: Optional[float] = None
-    alt_max: Optional[float] = None
-    heading_min: Optional[float] = None
-    heading_max: Optional[float] = None
-    place: Optional[str] = None
-    has_text: bool = False
-    person: Optional[str] = None
-    persons: List[str] = Field(default_factory=list)
-    sharp_only: bool = False
-    exclude_underexp: bool = False
-    exclude_overexp: bool = False
+    favorites_only: bool = Field(default=False, description="Only return favorite photos")
+    tags: List[Annotated[str, Field(min_length=1)]] = Field(default_factory=list, description="Filter by tags")
+    date_from: Optional[float] = Field(None, description="Filter photos from this date (Unix timestamp)")
+    date_to: Optional[float] = Field(None, description="Filter photos until this date (Unix timestamp)")
+    camera: Optional[str] = Field(None, description="Filter by camera model")
+    iso_min: Optional[Annotated[int, Field(ge=0)]] = Field(None, description="Minimum ISO value")
+    iso_max: Optional[Annotated[int, Field(ge=0)]] = Field(None, description="Maximum ISO value")
+    f_min: Optional[Annotated[float, Field(ge=0.0)]] = Field(None, description="Minimum f-number")
+    f_max: Optional[Annotated[float, Field(ge=0.0)]] = Field(None, description="Maximum f-number")
+    flash: Optional[Annotated[str, Field(pattern="^(fired|no|noflash)$")]] = Field(None, description="Flash mode filter")
+    wb: Optional[Annotated[str, Field(pattern="^(auto|manual)$")]] = Field(None, description="White balance filter")
+    metering: Optional[str] = Field(None, description="Metering mode filter")
+    alt_min: Optional[Annotated[float, Field(ge=0.0)]] = Field(None, description="Minimum altitude")
+    alt_max: Optional[Annotated[float, Field(ge=0.0)]] = Field(None, description="Maximum altitude")
+    heading_min: Optional[Annotated[float, Field(ge=0.0, le=360.0)]] = Field(None, description="Minimum GPS heading in degrees")
+    heading_max: Optional[Annotated[float, Field(ge=0.0, le=360.0)]] = Field(None, description="Maximum GPS heading in degrees")
+    place: Optional[str] = Field(None, description="Filter by place name")
+    has_text: bool = Field(default=False, description="Filter photos that have OCR-extracted text")
+    person: Optional[Annotated[str, Field(min_length=1)]] = Field(None, description="Filter by a specific person")
+    persons: List[Annotated[str, Field(min_length=1)]] = Field(default_factory=list, description="Filter by multiple persons (all must be present)")
+    sharp_only: bool = Field(default=False, description="Only return sharp photos")
+    exclude_underexp: bool = Field(default=False, description="Exclude underexposed photos")
+    exclude_overexp: bool = Field(default=False, description="Exclude overexposed photos")
+
+    class Config:
+        # Support both pydantic v1 and v2
+        allow_population_by_field_name = True  # pydantic v1
+        populate_by_name = True  # pydantic v2
 
 
 class SearchResultItem(BaseModel):

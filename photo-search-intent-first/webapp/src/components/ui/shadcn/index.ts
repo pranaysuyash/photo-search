@@ -1,16 +1,16 @@
 // shadcn UI Component Library Exports
 
+export * from "../badge";
+export * from "../checkbox";
+export * from "../command";
+export * from "../dropdown-menu";
+export * from "../label";
+export * from "../separator";
+export * from "../sheet";
+export * from "../switch";
+export * from "../textarea";
 export * from "./Button";
 export * from "./Card";
 export * from "./Dialog";
 export * from "./Input";
 export * from "./Select";
-export * from "../switch";
-export * from "../checkbox";
-export * from "../textarea";
-export * from "../sheet";
-export * from "../dropdown-menu";
-export * from "../command";
-export * from "../separator";
-export * from "../label";
-export * from "../badge";

@@ -390,7 +390,7 @@ export class OfflineActionQueue {
 
 			// Update action status
 			nextAction.status = "PROCESSING";
-			nextAction.metadata!.updatedAt = Date.now();
+			nextAction.metadata?.updatedAt = Date.now();
 			this.actions.set(nextAction.id, nextAction);
 			this.notifyQueueChangeListeners();
 
@@ -400,7 +400,7 @@ export class OfflineActionQueue {
 			// Mark as synced if successful and online
 			if (this.isOnline) {
 				nextAction.status = "SYNCED";
-				nextAction.metadata!.updatedAt = Date.now();
+				nextAction.metadata?.updatedAt = Date.now();
 				this.actions.set(nextAction.id, nextAction);
 				this.notifyQueueChangeListeners();
 
@@ -433,7 +433,7 @@ export class OfflineActionQueue {
 			} else {
 				// Mark as pending sync if offline
 				nextAction.status = "PENDING_SYNC";
-				nextAction.metadata!.updatedAt = Date.now();
+				nextAction.metadata?.updatedAt = Date.now();
 				this.actions.set(nextAction.id, nextAction);
 				this.notifyQueueChangeListeners();
 			}
@@ -468,7 +468,7 @@ export class OfflineActionQueue {
 		// If offline, only process actions that don't require network
 		if (!this.isOnline) {
 			const offlineReadyActions = queuedActions.filter(
-				(action) => !action.metadata?.requiresNetwork,
+				(action) => !action.metadata.requiresNetwork,
 			);
 			if (offlineReadyActions.length === 0) {
 				return null;
@@ -530,22 +530,22 @@ export class OfflineActionQueue {
 			await processor(action);
 		} catch (error) {
 			// Handle retry logic
-			if (action.metadata?.retryCount < action.metadata?.maxRetries) {
-				action.metadata!.retryCount++;
-				action.metadata!.updatedAt = Date.now();
+			if (action.metadata.retryCount < action.metadata.maxRetries) {
+				action.metadata.retryCount++;
+				action.metadata.updatedAt = Date.now();
 				action.status = "QUEUED"; // Reset status to queued for retry
 				this.actions.set(action.id, action);
 
 				// Exponential backoff
-				const backoffDelay = 2 ** action.metadata?.retryCount * 1000;
+				const backoffDelay = 2 ** action.metadata.retryCount * 1000;
 				await new Promise((resolve) => setTimeout(resolve, backoffDelay));
 
 				throw error; // Re-throw to retry
 			} else {
 				// Max retries exceeded, mark as failed
 				action.status = "FAILED";
-				action.metadata!.updatedAt = Date.now();
-				action.metadata!.lastError = {
+				action.metadata.updatedAt = Date.now();
+				action.metadata.lastError = {
 					message: error instanceof Error ? error.message : String(error),
 					code: (error as unknown).code || "UNKNOWN",
 					timestamp: Date.now(),
@@ -593,7 +593,7 @@ export class OfflineActionQueue {
 			// For demonstration, we'll simulate successful sync
 			actionsToSync.forEach((action) => {
 				action.status = "SYNCED";
-				action.metadata!.updatedAt = Date.now();
+				action.metadata.updatedAt = Date.now();
 				this.actions.set(action.id, action);
 			});
 
@@ -647,7 +647,7 @@ export class OfflineActionQueue {
 
 			actionsToSync.forEach((action) => {
 				action.status = "PENDING_SYNC";
-				action.metadata!.lastError = {
+				action.metadata.lastError = {
 					message: error instanceof Error ? error.message : String(error),
 					code: (error as unknown).code || "SYNC_FAILED",
 					timestamp: Date.now(),
@@ -729,7 +729,7 @@ export class OfflineActionQueue {
 				actions = actions.filter(
 					(action) =>
 						action.metadata &&
-						new Date(action.metadata.createdAt) < filters.before!,
+						new Date(action.metadata.createdAt) < filters.before,
 				);
 			}
 
@@ -737,21 +737,21 @@ export class OfflineActionQueue {
 				actions = actions.filter(
 					(action) =>
 						action.metadata &&
-						new Date(action.metadata.createdAt) > filters.after!,
+						new Date(action.metadata.createdAt) > filters.after,
 				);
 			}
 
 			if (filters.requiresNetwork !== undefined) {
 				actions = actions.filter(
 					(action) =>
-						action.metadata?.requiresNetwork === filters.requiresNetwork,
+						action.metadata.requiresNetwork === filters.requiresNetwork,
 				);
 			}
 
 			if (filters.requiresUserInteraction !== undefined) {
 				actions = actions.filter(
 					(action) =>
-						action.metadata?.requiresUserInteraction ===
+						action.metadata.requiresUserInteraction ===
 						filters.requiresUserInteraction,
 				);
 			}
@@ -775,10 +775,10 @@ export class OfflineActionQueue {
 		if (!action) return;
 
 		action.status = status;
-		action.metadata!.updatedAt = Date.now();
+		action.metadata.updatedAt = Date.now();
 
 		if (error) {
-			action.metadata!.lastError = {
+			action.metadata.lastError = {
 				message: error.message,
 				code: error.code,
 				timestamp: Date.now(),
@@ -805,7 +805,7 @@ export class OfflineActionQueue {
 		if (!action) return;
 
 		action.status = "CANCELLED";
-		action.metadata!.updatedAt = Date.now();
+		action.metadata.updatedAt = Date.now();
 		this.actions.set(id, action);
 		this.notifyQueueChangeListeners();
 
@@ -825,9 +825,9 @@ export class OfflineActionQueue {
 		if (!action || action.status !== "FAILED") return;
 
 		action.status = "QUEUED";
-		action.metadata!.retryCount = 0;
-		action.metadata!.lastError = undefined;
-		action.metadata!.updatedAt = Date.now();
+		action.metadata.retryCount = 0;
+		action.metadata.lastError = undefined;
+		action.metadata.updatedAt = Date.now();
 		this.actions.set(id, action);
 		this.notifyQueueChangeListeners();
 
@@ -1424,7 +1424,7 @@ export class OfflineActionQueue {
 		if (!group) return [];
 
 		return Array.from(group)
-			.map((id) => this.actions.get(id)!)
+			.map((id) => this.actions.get(id) || {})
 			.filter(Boolean);
 	}
 
@@ -1453,7 +1453,7 @@ export class OfflineActionQueue {
 
 		if (!action.tags.includes(tag)) {
 			action.tags.push(tag);
-			action.metadata!.updatedAt = Date.now();
+			action.metadata.updatedAt = Date.now();
 			this.actions.set(id, action);
 			this.notifyQueueChangeListeners();
 
@@ -1476,7 +1476,7 @@ export class OfflineActionQueue {
 		const index = action.tags.indexOf(tag);
 		if (index !== -1) {
 			action.tags.splice(index, 1);
-			action.metadata!.updatedAt = Date.now();
+			action.metadata.updatedAt = Date.now();
 			this.actions.set(id, action);
 			this.notifyQueueChangeListeners();
 
@@ -1505,14 +1505,14 @@ export class OfflineActionQueue {
 	// Get actions that require network
 	getNetworkRequiredActions(): OfflineAction[] {
 		return Array.from(this.actions.values()).filter(
-			(action) => action.metadata?.requiresNetwork,
+			(action) => action.metadata.requiresNetwork,
 		);
 	}
 
 	// Get actions that require user interaction
 	getUserInteractionRequiredActions(): OfflineAction[] {
 		return Array.from(this.actions.values()).filter(
-			(action) => action.metadata?.requiresUserInteraction,
+			(action) => action.metadata.requiresUserInteraction,
 		);
 	}
 
@@ -1644,7 +1644,7 @@ export class OfflineActionQueue {
 		if (!action) return;
 
 		action.priority = priority;
-		action.metadata!.updatedAt = Date.now();
+		action.metadata.updatedAt = Date.now();
 		this.actions.set(id, action);
 		this.notifyQueueChangeListeners();
 
@@ -1678,7 +1678,7 @@ export class OfflineActionQueue {
 	refreshStaleActions(olderThan: number): void {
 		const staleActions = this.getStaleActions(olderThan);
 		staleActions.forEach((action) => {
-			action.metadata!.updatedAt = Date.now();
+			action.metadata.updatedAt = Date.now();
 			this.actions.set(action.id, action);
 		});
 
@@ -1718,7 +1718,7 @@ export class OfflineActionQueue {
 		action.syncAttempts = 0;
 		action.lastSyncAttempt = undefined;
 		action.nextSyncAttempt = undefined;
-		action.metadata!.updatedAt = Date.now();
+		action.metadata.updatedAt = Date.now();
 		this.actions.set(id, action);
 		this.notifyQueueChangeListeners();
 
@@ -1773,7 +1773,7 @@ export class OfflineActionQueue {
 			// For demonstration, we'll simulate successful sync
 			actionsToSync.forEach((action) => {
 				action.status = "SYNCED";
-				action.metadata!.updatedAt = Date.now();
+				action.metadata.updatedAt = Date.now();
 				this.actions.set(action.id, action);
 			});
 
@@ -1823,7 +1823,7 @@ export class OfflineActionQueue {
 			// Mark failed sync actions for retry
 			actionsToSync.forEach((action) => {
 				action.status = "PENDING_SYNC";
-				action.metadata!.lastError = {
+				action.metadata.lastError = {
 					message: error instanceof Error ? error.message : String(error),
 					code: (error as unknown).code || "FORCE_SYNC_FAILED",
 					timestamp: Date.now(),
@@ -1853,7 +1853,7 @@ export class OfflineActionQueue {
 
 		// Sum estimated execution times
 		return pendingActions.reduce((total, action) => {
-			return total + (action.metadata?.estimatedExecutionTime || 1000);
+			return total + (action.metadata.estimatedExecutionTime || 1000);
 		}, 0);
 	}
 
@@ -1861,7 +1861,7 @@ export class OfflineActionQueue {
 	getSlowActions(threshold: number): OfflineAction[] {
 		return Array.from(this.actions.values()).filter(
 			(action) =>
-				action.metadata?.estimatedExecutionTime &&
+				action.metadata.estimatedExecutionTime &&
 				Date.now() - action.metadata.createdAt > threshold,
 		);
 	}
@@ -1873,7 +1873,7 @@ export class OfflineActionQueue {
 			// Check if action has been in the same state for too long
 			const timeInState =
 				Date.now() -
-				(action.metadata?.updatedAt || action.metadata?.createdAt || 0);
+				(action.metadata.updatedAt || action.metadata.createdAt || 0);
 			return timeInState > threshold;
 		});
 	}
@@ -1884,9 +1884,9 @@ export class OfflineActionQueue {
 		stuckActions.forEach((action) => {
 			// Reset action to queued state to restart processing
 			action.status = "QUEUED";
-			action.metadata!.retryCount = 0;
-			action.metadata!.lastError = undefined;
-			action.metadata!.updatedAt = Date.now();
+			action.metadata.retryCount = 0;
+			action.metadata.lastError = undefined;
+			action.metadata.updatedAt = Date.now();
 			this.actions.set(action.id, action);
 		});
 

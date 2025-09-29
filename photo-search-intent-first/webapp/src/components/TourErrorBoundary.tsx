@@ -1,4 +1,4 @@
-// biome-ignore lint/complexity/noStaticOnlyClass: <explanation>
+// biome-ignore lint/complexity/noStaticOnlyClass: Required for error boundary component
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertCircle, RefreshCw, X } from "lucide-react";
 import type React from "react";

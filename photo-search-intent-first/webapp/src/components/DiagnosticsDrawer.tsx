@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { usePhotoVaultAPI } from "../services/PhotoVaultAPIProvider";
 import { handleError } from "../utils/errors";
+import { ConnectivityHistory } from "./ConnectivityHistory";
 
 type Diagnostics = {
 	folder: string;
@@ -147,6 +148,12 @@ export default function DiagnosticsDrawer({
 						</div>
 					</div>
 				)}
+
+				{/* Connectivity History */}
+				<div className="p-3 border rounded">
+					<div className="font-semibold mb-2">Connectivity History</div>
+					<ConnectivityHistory />
+				</div>
 			</div>
 		</div>
 	);

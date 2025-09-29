@@ -293,11 +293,58 @@ GET /search/enrich?search_id={id}&include=faces,exif,location
 ```
 *Adds detailed metadata progressively*
 
+## API Versioning
+
+### Version Strategy
+The API implements versioning using URL prefixes to ensure backward compatibility:
+- **Current Version**: `/api/v1/`
+- **Legacy Endpoints**: Continue to work at original paths for backward compatibility
+- **New Development**: Should target versioned endpoints (`/api/v1/`)
+
+### Version 1 Endpoints
+Current v1 endpoints include:
+- `/api/v1/search/` - Photo semantic search
+- `/api/v1/search/cached` - Cached photo search
+- Additional endpoints will be added in future development
+
+## Response Models
+
+### Standardized Response Structure
+All API responses use Pydantic models for consistency:
+
+#### Base Response Models
+- `BaseResponse`: Core response with `ok` status and optional `message`
+- `ErrorResponse`: Error responses with detailed error information  
+- `SuccessResponse`: Successful responses with optional `data` field
+- Endpoint-specific models like `HealthResponse`, `ShareResponse`, `IndexResponse`, etc.
+
+#### Example Response Structures
+```json
+// Success Response
+{
+  "ok": true,
+  "data": {
+    // endpoint-specific data
+  }
+}
+
+// Error Response
+{
+  "ok": false,
+  "error": {
+    "type": "error_type",
+    "message": "error_message",
+    "details": [...]
+  }
+}
+```
+
 ## Error Handling (Intent-First)
 
 ### User-Friendly Error Responses
 ```json
 {
+  "ok": false,
   "error": {
     "type": "user_action_needed",
     "message": "We need access to your photo folder. Please check the path and try again.",
@@ -316,11 +363,14 @@ GET /search/enrich?search_id={id}&include=faces,exif,location
 ### Graceful Degradation
 ```json
 {
-  "status": "partial_success",
-  "message": "Found 24 photos, but some results may be missing due to a temporary issue.",
-  "results": [...],
-  "missing_features": ["face_detection", "location_data"],
-  "retry_after": "5 minutes"
+  "ok": false,
+  "error": {
+    "type": "partial_success",
+    "message": "Found 24 photos, but some results may be missing due to a temporary issue.",
+    "missing_features": ["face_detection", "location_data"],
+    "retry_after": "5 minutes"
+  },
+  "results": [...]
 }
 ```
 

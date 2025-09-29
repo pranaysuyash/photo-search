@@ -1,6 +1,6 @@
 import clsx from "clsx";
 import type { MutableRefObject, RefObject } from "react";
-import { lazy, memo, Suspense, useEffect } from "react";
+import { lazy, memo, Suspense, useEffect, useState } from "react";
 import type { Location, NavigateFunction } from "react-router-dom";
 import type { LibraryActions } from "../contexts/LibraryContext";
 import { ResultsConfigProvider } from "../contexts/ResultsConfigContext";
@@ -53,6 +53,9 @@ import { useDataContext } from "../contexts/DataContext";
 import { useLayoutContext } from "../contexts/LayoutContext";
 import { useOnboardingContext } from "../contexts/OnboardingContext";
 import { useViewStateContext } from "../contexts/ViewStateContext";
+import { useOnboardingProgress, useWelcomeState } from "../hooks/useOnboardingProgress";
+import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
+import { PowerUserPanel } from "./PowerUserPanel";
 import type { FilterPreset } from "../models/FilterPreset";
 import {
 	isMobileTestPath,
@@ -68,16 +71,18 @@ import { ContextualHelp } from "./ContextualHelp";
 import {
 	AuthTokenBar,
 	JobsFab,
-	ModalsHost,
 	PanelsHost,
 	RoutesHost,
 } from "./chrome";
+import { ModalSystemWrapper } from "./ModalSystemWrapper";
 import ErrorBoundary from "./ErrorBoundary";
 import { HintManager, useHintTriggers } from "./HintSystem";
 import { type Job, JobsCenter } from "./JobsCenter";
 import { MobileOptimizations } from "./MobileOptimizations";
 import MobilePWATest from "./MobilePWATest";
+import { ModelStatusIndicator } from "./ModelStatusIndicator";
 import FirstRunSetup from "./modals/FirstRunSetup";
+import { EnhancedFirstRunOnboarding } from "./onboarding";
 import { OfflineIndicator } from "./OfflineIndicator";
 import { OnboardingChecklist } from "./OnboardingChecklist";
 import { OnboardingTour } from "./OnboardingTour";
@@ -178,7 +183,28 @@ export function AppChrome({
 	const actions = useActionsContext();
 	const onboarding = useOnboardingContext();
 
+	// Enhanced onboarding state
+	const {
+		shouldShowOnboarding: shouldShowEnhancedOnboarding,
+		hasCompletedOnboarding,
+		markStepComplete,
+	} = useOnboardingProgress();
+	const { markWelcomeSeen } = useWelcomeState();
+
+	const [showEnhancedOnboarding, setShowEnhancedOnboarding] = useState(false);
+	const [showPowerUserPanel, setShowPowerUserPanel] = useState(false);
+
 	const { triggerHint } = useHintTriggers();
+
+	// Initialize keyboard shortcuts system
+	useKeyboardShortcuts();
+
+	// Listen for power user panel events
+	useEffect(() => {
+		const handleOpenPowerUserPanel = () => setShowPowerUserPanel(true);
+		window.addEventListener("open-power-user-panel", handleOpenPowerUserPanel);
+		return () => window.removeEventListener("open-power-user-panel", handleOpenPowerUserPanel);
+	}, []);
 
 	const {
 		isMobile,
@@ -393,6 +419,57 @@ export function AppChrome({
 		}
 	}, [collections, triggerHint]);
 
+	// Enhanced onboarding integration
+	useEffect(() => {
+		// Show enhanced onboarding if:
+		// 1. User hasn't completed onboarding
+		// 2. No directory is selected (first time setup)
+		// 3. Enhanced onboarding should be shown based on progress tracking
+		if (!hasCompletedOnboarding && !dir && shouldShowEnhancedOnboarding()) {
+			setShowEnhancedOnboarding(true);
+		}
+	}, [hasCompletedOnboarding, dir, shouldShowEnhancedOnboarding]);
+
+	const handleEnhancedOnboardingComplete = (data: unknown) => {
+		// Mark onboarding as completed
+		markStepComplete('welcome');
+		markStepComplete('directory-selection');
+		markStepComplete('options');
+		markStepComplete('demo');
+		markStepComplete('complete');
+
+		// Handle the setup data from enhanced onboarding
+		if (data.directory) {
+			// Set the selected directory
+			settingsActions.setDir(data.directory);
+		}
+
+		if (data.includeVideos !== undefined) {
+			// Update video preferences
+			settingsActions.setIncludeVideos(data.includeVideos);
+		}
+
+		if (data.enableDemo) {
+			// Enable demo library
+			handleWelcomeStartDemo();
+		}
+
+		// Close enhanced onboarding and mark welcome as seen
+		setShowEnhancedOnboarding(false);
+		markWelcomeSeen();
+
+		// Show success message
+		pushToast({
+			message: "Setup complete!",
+			description: "You're ready to start searching your photos.",
+		});
+	};
+
+	const handleEnhancedOnboardingClose = () => {
+		setShowEnhancedOnboarding(false);
+		// Don't mark as completed - user can come back later
+	};
+
 	const chrome = (
 		<MobileOptimizations
 			onSwipeLeft={handleSwipeLeft}
@@ -423,6 +500,7 @@ export function AppChrome({
 					Skip to main content
 				</a>
 				<OfflineIndicator />
+				<ModelStatusIndicator />
 				{showWelcome && (
 					<Welcome
 						onStartDemo={handleWelcomeStartDemo}
@@ -435,7 +513,7 @@ export function AppChrome({
 				)}
 
 				<FirstRunSetup
-					open={!dir && showOnboarding}
+					open={!dir && showOnboarding && !showEnhancedOnboarding}
 					onClose={() => {
 						setShowOnboarding(false);
 						try {
@@ -446,6 +524,17 @@ export function AppChrome({
 					onCustom={handleFirstRunCustom}
 					onDemo={handleFirstRunDemo}
 					onTour={modalControls.openHelp}
+				/>
+
+				<EnhancedFirstRunOnboarding
+					isOpen={showEnhancedOnboarding}
+					onClose={handleEnhancedOnboardingClose}
+					onComplete={handleEnhancedOnboardingComplete}
+				/>
+
+				<PowerUserPanel
+					isOpen={showPowerUserPanel}
+					onClose={() => setShowPowerUserPanel(false)}
 				/>
 
 				<ResultsConfigProvider
@@ -470,6 +559,7 @@ export function AppChrome({
 							setThemeMode(themeMode === "dark" ? "light" : "dark")
 						}
 						onSettingsClick={() => setShowAccessibilityPanel(true)}
+						onPowerUserClick={() => setShowPowerUserPanel(true)}
 						selectedView={viewToPath(location.pathname) as View}
 						onViewChange={(view) => navigate(viewToPath(view as View))}
 						onSelectLibrary={modalControls.openFolder}
@@ -899,8 +989,8 @@ export function AppChrome({
 							</ResultsUIProvider>
 						</main>
 
-						{/* ModalManager moved outside main content to remain mounted across route changes */}
-						<ModalsHost />
+						{/* ModalSystemWrapper provides enhanced modal system with fallback to legacy */}
+						<ModalSystemWrapper />
 					</AppShell>
 				</ResultsConfigProvider>
 

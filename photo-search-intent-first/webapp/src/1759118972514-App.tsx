@@ -1173,7 +1173,7 @@ function AppWithModalControls() {
 								total?: number;
 								status?: Job["status"];
 								description?: string;
-						},
+						  },
 				};
 
 			// Helper to compute a friendly message

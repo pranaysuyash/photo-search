@@ -461,6 +461,7 @@ import {
 } from "../api";
 import { serviceEnabled } from "../config/logging";
 import { handleError } from "../utils/errors";
+import { connectivityHistoryService } from "./ConnectivityHistory";
 import { indexedDBStorage } from "./IndexedDBStorage";
 
 const OFFLINE_DEBUG =
@@ -736,6 +737,8 @@ class OfflineService {
 		}
 
 		this.syncInProgress = true;
+		const syncStartTime = Date.now();
+		connectivityHistoryService.logSyncStart();
 		const queue = await this.getQueue();
 		const successfullySynced: string[] = [];
 		const remaining: OfflineAction[] = [];
@@ -818,6 +821,15 @@ class OfflineService {
 			// Retry failed actions after delay
 			setTimeout(() => this.syncQueue(), 60000);
 		}
+
+		// Log sync completion
+		const syncDuration = Date.now() - syncStartTime;
+		const failedCount = queue.length - successfullySynced.length;
+		connectivityHistoryService.logSyncComplete(
+			successfullySynced.length,
+			failedCount,
+			syncDuration,
+		);
 
 		this.syncInProgress = false;
 	}

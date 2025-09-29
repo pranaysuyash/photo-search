@@ -1,5 +1,6 @@
 import clsx from "clsx";
 import type React from "react";
+import { useResponsiveSpacing } from "../hooks/useResponsiveSpacing";
 import {
 	HeaderQuickActions,
 	type HeaderQuickActionsProps,
@@ -21,6 +22,7 @@ interface AppShellProps {
 	darkMode: boolean;
 	onDarkModeToggle: () => void;
 	onSettingsClick: () => void;
+	onPowerUserClick: () => void;
 	selectedView: string;
 	onViewChange: (v: string) => void;
 	onSelectLibrary: () => void;
@@ -47,6 +49,7 @@ export const AppShell: React.FC<AppShellProps> = ({
 	darkMode,
 	onDarkModeToggle,
 	onSettingsClick,
+	onPowerUserClick,
 	selectedView,
 	onViewChange,
 	onSelectLibrary,
@@ -57,13 +60,13 @@ export const AppShell: React.FC<AppShellProps> = ({
 	quickActions,
 	children,
 }) => {
+	const { classes, getLayout, getComponentSpacing } = useResponsiveSpacing();
+
 	return (
 		<div
 			className={clsx(
 				"flex w-full min-h-screen bg-background text-foreground",
-				{
-					"overflow-hidden": true,
-				},
+				"overflow-hidden",
 			)}
 		>
 			{/* Sidebar (hidden on small mobile unless toggled) */}
@@ -81,6 +84,7 @@ export const AppShell: React.FC<AppShellProps> = ({
 						darkMode={darkMode}
 						onDarkModeToggle={onDarkModeToggle}
 						onSettingsClick={onSettingsClick}
+						onPowerUserClick={onPowerUserClick}
 						onSelectLibrary={onSelectLibrary}
 						collections={collections}
 						onOpenCollection={onOpenCollection}
@@ -90,19 +94,27 @@ export const AppShell: React.FC<AppShellProps> = ({
 			) : null}
 
 			{/* Main column */}
-			<div className="flex-1 flex flex-col overflow-hidden bg-background min-h-screen">
-				<header className="bg-card border-b border-border shadow-sm px-2 py-2 sm:px-3 sm:py-3 md:px-6 lg:px-8 md:py-4 lg:py-5 flex flex-col gap-1 sm:gap-2 md:gap-3 flex-shrink-0">
+			<div className={clsx(
+				"flex-1 flex flex-col overflow-hidden bg-background min-h-screen",
+				getLayout('mainContent')
+			)}>
+				<header className={clsx(
+					"bg-card border-b border-border shadow-sm flex flex-col flex-shrink-0",
+					classes.header,
+					"gap-1 sm:gap-2 md:gap-3"
+				)}>
 					<TopBar {...topBarProps} />
 					{quickActions ? <HeaderQuickActions {...quickActions} /> : null}
 				</header>
 
 				<main
 					id="main-content"
-					className="flex-1 overflow-y-auto overflow-x-hidden"
+					className={clsx(
+						"flex-1 overflow-y-auto overflow-x-hidden",
+						classes.container
+					)}
 				>
-					<div className="w-full px-2 pb-4 pt-3 sm:px-3 sm:pb-6 sm:pt-4 md:px-6 lg:px-8 md:pb-8 md:pt-6">
-						{children}
-					</div>
+					{children}
 				</main>
 			</div>
 		</div>

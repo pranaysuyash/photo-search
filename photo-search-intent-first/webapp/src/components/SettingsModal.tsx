@@ -1,4 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/shadcn/Button";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/shadcn/Dialog";
+import { Input } from "@/components/ui/shadcn/Input";
 import {
 	apiDataNuke,
 	apiGetExcludes,
@@ -9,12 +20,6 @@ import {
 	apiWatchStatus,
 	apiWatchStop,
 } from "../api";
-import { Button } from "@/components/ui/shadcn/Button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/shadcn/Dialog";
-import { Input } from "@/components/ui/shadcn/Input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 
 interface SettingsModalProps {
 	isOpen: boolean;
@@ -136,10 +141,16 @@ export function SettingsModal({
 
 					{/* Excludes */}
 					<section>
-						<Label className="text-base font-medium mb-2">Excluded Folders / Patterns</Label>
+						<Label className="text-base font-medium mb-2">
+							Excluded Folders / Patterns
+						</Label>
 						<div className="bg-gray-50 dark:bg-gray-800 border rounded-lg p-4">
 							<div className="text-xs text-gray-600 mb-3">
-								Examples: <code className="bg-gray-100 px-1 rounded">**/Screenshots/**</code>, <code className="bg-gray-100 px-1 rounded">*.heic</code>,{" "}
+								Examples:{" "}
+								<code className="bg-gray-100 px-1 rounded">
+									**/Screenshots/**
+								</code>
+								, <code className="bg-gray-100 px-1 rounded">*.heic</code>,{" "}
 								<code className="bg-gray-100 px-1 rounded">**/.trash/**</code>
 							</div>
 							<div className="flex items-center gap-2 mb-3">
