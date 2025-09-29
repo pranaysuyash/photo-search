@@ -233,26 +233,6 @@
       "path": "/settings/excludes"
     },
     {
-      "method": "GET",
-      "path": "/share"
-    },
-    {
-      "method": "POST",
-      "path": "/share"
-    },
-    {
-      "method": "GET",
-      "path": "/share/detail"
-    },
-    {
-      "method": "POST",
-      "path": "/share/revoke"
-    },
-    {
-      "method": "GET",
-      "path": "/share/{token}/view"
-    },
-    {
       "method": "POST",
       "path": "/thumb/batch"
     },
@@ -267,9 +247,9 @@
   ],
   "summary": {
     "base_count": 124,
-    "candidate_count": 152,
+    "candidate_count": 157,
     "changed": 4,
     "extra": 35,
-    "missing": 22
+    "missing": 17
   }
 }
