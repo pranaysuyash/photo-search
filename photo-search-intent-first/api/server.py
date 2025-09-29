@@ -64,6 +64,9 @@ from api.routers.file_management import router as file_management_router
 from api.routers.indexing import router as indexing_router
 from api.routers.config import router as config_router
 from api.routers.library import router as library_router
+from api.routers.metadata import router as metadata_router
+from api.routers.models import router as models_router
+from api.routers.ocr import router as ocr_router
 from api.routers.presets import router as presets_router
 from api.routers.saved import router as saved_router
 from api.routers.tagging import router as tagging_router
@@ -161,6 +164,9 @@ app.include_router(fast_index_router)
 app.include_router(favorites_router)
 app.include_router(file_management_router)
 app.include_router(library_router)
+app.include_router(metadata_router)
+app.include_router(models_router)
+app.include_router(ocr_router)
 app.include_router(presets_router)
 app.include_router(saved_router)
 app.include_router(tagging_router)

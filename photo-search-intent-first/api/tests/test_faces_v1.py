@@ -27,7 +27,9 @@ def test_faces_build_endpoint(tmp_path: Path) -> None:
     # Should succeed with a valid response
     assert response.status_code == 200
     data = response.json()
-    assert "ok" in data
+    assert "clusters" in data
+    assert "faces" in data
+    assert "updated" in data
 
 
 def test_faces_clusters_endpoint_empty(tmp_path: Path) -> None:

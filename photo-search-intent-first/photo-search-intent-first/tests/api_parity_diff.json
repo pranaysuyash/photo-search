@@ -217,42 +217,6 @@
       "path": "/index/status"
     },
     {
-      "method": "GET",
-      "path": "/metadata"
-    },
-    {
-      "method": "GET",
-      "path": "/metadata/batch"
-    },
-    {
-      "method": "POST",
-      "path": "/metadata/build"
-    },
-    {
-      "method": "GET",
-      "path": "/models/capabilities"
-    },
-    {
-      "method": "POST",
-      "path": "/models/download"
-    },
-    {
-      "method": "POST",
-      "path": "/models/validate"
-    },
-    {
-      "method": "POST",
-      "path": "/ocr/build"
-    },
-    {
-      "method": "POST",
-      "path": "/ocr/snippets"
-    },
-    {
-      "method": "GET",
-      "path": "/ocr/status"
-    },
-    {
       "method": "POST",
       "path": "/open"
     },
@@ -359,9 +323,9 @@
   ],
   "summary": {
     "base_count": 124,
-    "candidate_count": 129,
+    "candidate_count": 138,
     "changed": 4,
     "extra": 35,
-    "missing": 45
+    "missing": 36
   }
 }
