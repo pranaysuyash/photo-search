@@ -24,14 +24,40 @@ def _load_excludes(root: Path) -> List[str]:
 
 
 def list_photos(root: Path) -> List[Photo]:
-    root = Path(root).expanduser().resolve()
+    # Block absolute-path traversal before touching the filesystem
+    try:
+        resolved_root = Path(root).expanduser().resolve()
+    except (OSError, RuntimeError) as e:
+        raise ValueError(f"Invalid path: {root}") from e
+
+    # Check for path traversal attempts - ensure the path is safe and doesn't escape
+    # This prevents directory traversal attacks like ../../../etc/passwd
+    try:
+        # Convert to absolute path and check if it's within expected bounds
+        abs_root = str(resolved_root.absolute())
+
+        # Additional safety check: reject obviously suspicious patterns
+        suspicious_patterns = ['..', '~', '/etc', '/usr', '/bin', '/sbin', '/var', '/sys', '/proc']
+        for pattern in suspicious_patterns:
+            if pattern in abs_root:
+                raise ValueError(f"Suspicious path pattern detected: {pattern}")
+
+        # Validate that this looks like a legitimate photo directory path
+        # Reject paths that are clearly system directories
+        if abs_root.startswith(('/etc/', '/usr/', '/bin/', '/sbin/', '/var/', '/sys/', '/proc/')):
+            raise ValueError(f"System directory access denied: {abs_root}")
+
+    except (OSError, RuntimeError) as e:
+        raise ValueError(f"Path validation failed: {root}") from e
 
     # Check if root directory exists and is accessible
-    if not root.exists():
-        raise FileNotFoundError(f"Directory not found: {root}")
+    if not resolved_root.exists():
+        raise FileNotFoundError(f"Directory not found: {resolved_root}")
 
-    if not root.is_dir():
-        raise NotADirectoryError(f"Path is not a directory: {root}")
+    if not resolved_root.is_dir():
+        raise NotADirectoryError(f"Path is not a directory: {resolved_root}")
+
+    root = resolved_root
 
     excludes = _load_excludes(root)
     items: list[Photo] = []

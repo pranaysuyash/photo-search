@@ -4,10 +4,9 @@ import json
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Iterable
 from collections import deque
 import time
-import os
 
 
 def _analytics_file(index_dir: Path) -> Path:
@@ -62,6 +61,54 @@ def log_open(index_dir: Path, path: str, search_id: Optional[str] = None) -> Non
     f.parent.mkdir(parents=True, exist_ok=True)
     with open(f, "a", encoding="utf-8") as fh:
         fh.write(json.dumps(rec) + "\n")
+
+# --- Interaction Events ----------------------------------------------------
+
+ALLOWED_INTERACTIONS = {"view", "favorite", "share", "edit"}
+
+
+def log_interaction(index_dir: Path, path: str, action: str, meta: Optional[dict] = None) -> None:
+    """Generic interaction logger.
+
+    action must be one of ALLOWED_INTERACTIONS. Meta (if provided) must be JSON serialisable.
+    A single line JSON record is appended for lightweight analytics.
+    """
+    act = (action or "").lower().strip()
+    if act not in ALLOWED_INTERACTIONS:
+        return  # silently ignore invalid actions to avoid crashing UI paths
+    rec = {
+        "type": "interaction",
+        "time": datetime.utcnow().isoformat() + "Z",
+        "action": act,
+        "path": path,
+    }
+    if meta and isinstance(meta, dict):
+        # shallow merge – avoid overwriting core keys
+        for k, v in meta.items():
+            if k in rec:
+                continue
+            try:
+                json.dumps(v)  # validate
+                rec[k] = v
+            except Exception:
+                continue
+    _write_event(index_dir, rec)
+
+
+def log_view(index_dir: Path, path: str):  # convenience wrappers
+    log_interaction(index_dir, path, "view")
+
+
+def log_favorite(index_dir: Path, path: str):
+    log_interaction(index_dir, path, "favorite")
+
+
+def log_share(index_dir: Path, path: str):
+    log_interaction(index_dir, path, "share")
+
+
+def log_edit(index_dir: Path, path: str):
+    log_interaction(index_dir, path, "edit")
 
 
 def load_feedback(index_dir: Path) -> Dict[str, Dict[str, int]]:
@@ -201,8 +248,24 @@ class AnalyticsStore:
         for line in tail:
             try:
                 event = json.loads(line.strip())
-                if dir_filter is None or str(event.get("dir")) == str(dir_filter):
-                    events.append(event)
             except Exception:
+                # malformed line; skip
                 continue
+            if dir_filter is None or str(event.get("dir")) == str(dir_filter):
+                events.append(event)
         return events
+
+    # New helper for streaming events (no limit) – used by attention aggregator.
+    def iter_events(self) -> Iterable[dict]:
+        if not self.analytics_file.exists():
+            return
+        if not self.analytics_file.exists():
+            return
+        with open(self.analytics_file, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                try:
+                    evt = json.loads(line.strip())
+                except Exception:
+                    continue
+                else:
+                    yield evt

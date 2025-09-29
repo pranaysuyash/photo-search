@@ -54,9 +54,17 @@ def _to_iso(dt: datetime) -> str:
 
 
 def _from_hours(hours: Optional[int]) -> Optional[str]:
-    if not hours or hours <= 0:
+    # Enforce positive expiry_hours - must be a positive integer
+    if hours is None:
         return None
-    return _to_iso(datetime.now(timezone.utc) + timedelta(hours=hours))
+    try:
+        hours_int = int(hours)
+        if hours_int <= 0:
+            return None
+        return _to_iso(datetime.now(timezone.utc) + timedelta(hours=hours_int))
+    except (ValueError, TypeError):
+        # Handle case where hours is not a valid integer
+        return None
 
 
 def init_store() -> None:

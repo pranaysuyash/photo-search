@@ -27,7 +27,31 @@ def _sanitize_key(key: str) -> str:
 
 class IndexStore:
     def __init__(self, root: Path, index_key: Optional[str] = None) -> None:
-        self.root = Path(root).expanduser().resolve()
+        # Restore directory validation before building the Path
+        if not root:
+            raise ValueError("Root path cannot be empty")
+
+        try:
+            # Validate the path before resolving it
+            root_str = str(root)
+
+            # Check for suspicious patterns
+            suspicious_patterns = ['..', '~', '/etc', '/usr', '/bin', '/sbin', '/var', '/sys', '/proc']
+            for pattern in suspicious_patterns:
+                if pattern in root_str:
+                    raise ValueError(f"Suspicious path pattern detected: {pattern}")
+
+            # Resolve the path safely
+            self.root = Path(root).expanduser().resolve()
+
+            # Additional validation: ensure the resolved path is safe
+            abs_root = str(self.root.absolute())
+            if abs_root.startswith(('/etc/', '/usr/', '/bin/', '/sbin/', '/var/', '/sys/', '/proc/')):
+                raise ValueError(f"System directory access denied: {abs_root}")
+
+        except (OSError, RuntimeError, ValueError) as e:
+            raise ValueError(f"Invalid root path: {root}") from e
+
         # Backwards compatibility: some callers/tests expect `root_dir`
         # referencing the canonical root path. Mirror the value so newer
         # helpers can migrate without breaking legacy access patterns.
@@ -166,6 +190,44 @@ class IndexStore:
 
         self.save()
         return new_count, updated_count
+
+    def should_rebuild_cache(self, current_paths: List[str]) -> bool:
+        """
+        Check if the cache should be rebuilt based on path changes.
+        Returns True if paths have significantly changed.
+        """
+        if not self.state.paths:
+            return True  # No existing cache, need to build
+
+        current_set = set(current_paths)
+        existing_set = set(self.state.paths)
+
+        # If the path sets differ significantly, rebuild cache
+        if len(current_set.symmetric_difference(existing_set)) > len(current_set) * 0.1:
+            return True
+
+        # Check if any existing paths no longer exist
+        for path_str in self.state.paths:
+            try:
+                path = Path(path_str)
+                if not path.exists():
+                    return True
+            except (OSError, RuntimeError):
+                return True
+
+        return False
+
+    def rebuild_cache_if_needed(self, embedder, current_paths: List[str], batch_size: int = 32) -> bool:
+        """
+        Rebuild the cache if the requested paths have changed significantly.
+        Returns True if cache was rebuilt.
+        """
+        if self.should_rebuild_cache(current_paths):
+            # Clear existing state to force full rebuild
+            self.state = IndexState(paths=[], mtimes=[], embeddings=None)
+            self.save()
+            return True
+        return False
 
     def upsert_paths(self, embedder, paths: List[Path], batch_size: int = 32) -> Tuple[int, int]:
         """Update or insert only the specified paths; does not prune deletions.

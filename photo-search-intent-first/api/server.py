@@ -9,7 +9,8 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, TypeVar
 
-from fastapi import Body, FastAPI, HTTPException, Query
+from fastapi import Body, FastAPI, HTTPException, Query, Header
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -24,7 +25,25 @@ from api.schemas.v1 import (
     SearchResultItem,
     TagsRequest,
     FavoritesRequest,
+    ShareRequest,
+    ShareRevokeRequest,
+    CachedSearchRequest,
+    WorkspaceSearchRequest,
+    BaseResponse,
+    SuccessResponse,
+    IndexResponse,
+    ShareResponse,
+    FavoriteResponse,
+    TagResponse,
+    CollectionResponse,
+    HealthResponse,
 )
+from api.exception_handlers import (
+    custom_http_exception_handler,
+    validation_exception_handler,
+    general_exception_handler,
+)
+from api.v1.router import api_v1
 from api.search_models import (
     SearchRequest as UnifiedSearchRequest,
     build_unified_request_from_flat,
@@ -34,6 +53,7 @@ from api.search_models import (
 from api.routers.analytics import router as analytics_router
 from api.routers.indexing import router as indexing_router
 from api.routers.config import router as config_router
+from api.attention import router as attention_router  # NEW: adaptive attention (scaffold)
 from infra.analytics import log_search, _analytics_file, _write_event as _write_event_infra
 from infra.collections import load_collections, save_collections, load_smart_collections, save_smart_collections
 from infra.config import config
@@ -89,6 +109,11 @@ from PIL import Image, ExifTags
 _APP_START = time.time()
 app = FastAPI(title="Photo Search API")
 
+# Register global exception handlers
+app.add_exception_handler(Exception, general_exception_handler)
+app.add_exception_handler(HTTPException, custom_http_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+
 @app.get("/tech.json")
 def tech_manifest():
     """
@@ -116,6 +141,10 @@ app.add_middleware(
 app.include_router(analytics_router)
 app.include_router(indexing_router)
 app.include_router(config_router)
+app.include_router(attention_router)
+
+# Mount versioned API router
+app.include_router(api_v1)
 
 # Mount static files for React app
 web_dir = Path(__file__).parent / "web"
@@ -141,31 +170,33 @@ def _zip_meta(
 
 # --- Health and diagnostics ---
 @app.get("/health")
-def api_health() -> Dict[str, Any]:
+def api_health() -> HealthResponse:
     now = time.time()
-    return {
-        "ok": True,
-        "uptime_seconds": max(0, int(now - _APP_START)),
-        "time": datetime.now(timezone.utc).isoformat(),
-    }
+    return HealthResponse(
+        ok=True,
+        uptime_seconds=max(0, int(now - _APP_START)),
+    )
 
 @app.get("/api/health")
-def api_health_api() -> Dict[str, Any]:
-    return {"ok": True}
+def api_health_api() -> HealthResponse:
+    return HealthResponse(ok=True)
 
 @app.get("/api/ping")
-def api_ping() -> Dict[str, Any]:
-    return {"ok": True, "pong": True}
+def api_ping() -> HealthResponse:
+    return HealthResponse(ok=True)
 
 # Demo directory helper
 @app.get("/demo/dir")
-def api_demo_dir() -> Dict[str, Any]:
+def api_demo_dir() -> BaseResponse:
     try:
         demo = Path(__file__).resolve().parent.parent / "demo_photos"
         exists = demo.exists() and demo.is_dir()
-        return {"ok": True, "path": str(demo), "exists": bool(exists)}
+        return SuccessResponse(
+            ok=True,
+            data={"path": str(demo), "exists": bool(exists)}
+        )
     except Exception:
-        return {"ok": False}
+        return BaseResponse(ok=False)
 
 # Monitoring endpoints (allow unauthenticated in middleware)
 @app.get("/monitoring")
@@ -905,12 +936,16 @@ def api_library_defaults(include_videos: bool = True) -> Dict[str, Any]:
 
 # Auth status (dev helper)
 @app.get("/auth/status")
-def api_auth_status() -> Dict[str, Any]:
-    """Return whether the API currently requires an auth token.
-
-    Note: Does not reveal the token. Useful for diagnosing 401s in dev.
-    """
-    return {"auth_required": (not config.dev_no_auth) and bool(config.api_token)}
+def api_auth_status(
+    token: Optional[str] = Header(None, alias="X-API-Token"),
+) -> BaseResponse:
+    if config.dev_no_auth:
+        return SuccessResponse(ok=True, data={"reason": "dev_no_auth"})
+    if not config.api_token:
+        return SuccessResponse(ok=True, data={"reason": "no_auth_required"})
+    if token and token == config.api_token:
+        return SuccessResponse(ok=True, data={"reason": "valid_token"})
+    return BaseResponse(ok=False, message="invalid_token")
 
 @app.post("/auth/check")
 def api_auth_check() -> Dict[str, Any]:
@@ -933,37 +968,27 @@ def api_watch_status() -> Dict[str, Any]:
 # Sharing APIs
 @app.post("/share")
 def api_share(
-    directory: Optional[str] = Query(None, alias="dir"),
-    provider: Optional[str] = None,
-    paths: Optional[List[str]] = None,
-    expiry_hours: Optional[int] = None,
-    password: Optional[str] = None,
-    view_only: Optional[bool] = None,
-    body: Optional[Dict[str, Any]] = Body(None),
-) -> Dict[str, Any]:
-    # Accept new 'directory' name or legacy 'dir' for backward compatibility
-    directory_value = _from_body(body, directory, "directory") or _from_body(body, directory, "dir")
-    directory_value = _require(directory_value, "directory")
-    provider_value = _from_body(body, provider, "provider", default="local") or "local"
-    paths_value = _from_body(body, paths, "paths", default=[], cast=_as_str_list) or []
-    expiry_value = _from_body(body, expiry_hours, "expiry_hours", default=24, cast=lambda v: int(v))
-    password_value = _from_body(body, password, "password")
-    view_only_value = _from_body(body, view_only, "view_only", default=True, cast=_as_bool)
-
-    folder = Path(directory_value)
+    req: ShareRequest = Body(...),
+) -> ShareResponse:
+    folder = Path(req.dir or req.directory)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
     try:
         rec = _share_create(
             str(folder),
-            provider_value or "local",
-            [str(p) for p in paths_value],
-            expiry_hours=expiry_value,
-            password=password_value,
-            view_only=bool(view_only_value),
+            req.provider or "local",
+            [str(p) for p in req.paths],
+            expiry_hours=req.expiry_hours,
+            password=req.password,
+            view_only=bool(req.view_only),
         )
-        url = f"/share/{rec.token}/view"
-        return {"ok": True, "token": rec.token, "url": url, "expires": rec.expires}
+        url = f"{config.root_url}/share/{rec.token}/view"
+        return ShareResponse(
+            ok=True,
+            token=rec.token,
+            url=url,
+            expires=rec.expires
+        )
     except Exception as e:
         raise HTTPException(500, f"Create share failed: {e}")
 
@@ -991,16 +1016,13 @@ def api_share_list(directory: Optional[str] = Query(None, alias="dir")) -> Dict[
 
 @app.post("/share/revoke")
 def api_share_revoke(
-    token: Optional[str] = None,
-    body: Optional[Dict[str, Any]] = Body(None),
-) -> Dict[str, Any]:
-    token_value = _require(_from_body(body, token, "token"), "token")
-    ok = False
+    req: ShareRevokeRequest = Body(...),
+) -> BaseResponse:
     try:
-        ok = _share_revoke(str(token_value))
+        success = _share_revoke(str(req.token))
+        return BaseResponse(ok=bool(success))
     except Exception:
-        ok = False
-    return {"ok": bool(ok)}
+        return BaseResponse(ok=False)
 
 
 @app.get("/share/detail")
@@ -1212,24 +1234,23 @@ class IndexRequest(BaseModel):
     openai_key: Optional[str] = None
 
 @app.post("/index")
-def api_index(req: IndexRequest) -> Dict[str, Any]:
-    folder = Path(req.dir)
-
-    # Validate folder path
-    if not folder:
-        raise HTTPException(400, "Folder path is required")
-
-    folder = folder.expanduser().resolve()
-
-    # Check if folder exists and is accessible
+def api_index(
+    req: IndexRequest = Body(...),
+) -> IndexResponse:
+    # Validate and expand directory path
+    dir_value = req.dir or req.directory
+    if not dir_value:
+        raise HTTPException(400, "Directory path is required")
+    
+    folder = Path(dir_value).expanduser().resolve()
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
-
+    
     if not folder.is_dir():
         raise HTTPException(400, "Path is not a directory")
 
     try:
-        # Test if we can read the directory
+        # Attempt to access the folder
         next(folder.iterdir(), None)
     except PermissionError:
         raise HTTPException(403, "Permission denied to access folder")
@@ -1237,25 +1258,26 @@ def api_index(req: IndexRequest) -> Dict[str, Any]:
         raise HTTPException(400, f"Cannot access folder: {str(e)}")
 
     emb = _emb(req.provider, req.hf_token, req.openai_key)
-
-    # Generate unique job ID for this indexing operation
-    import uuid
-    job_id = f"index-{uuid.uuid4().hex[:8]}"
-
-    new_c, upd_c, total = index_photos(
-        folder,
-        batch_size=req.batch_size,
-        embedder=emb,
-        job_id=job_id
+    store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
+    
+    # Generate a job ID
+    job_id = str(uuid.uuid4())
+    
+    # Start indexing in the background
+    def do_index():
+        try:
+            out = index_photos(store, emb, batch_size=req.batch_size)
+            return out
+        except Exception as e:
+            logging.error(f"Indexing job {job_id} failed: {str(e)}")
+            raise
+    
+    executor.submit(do_index)
+    
+    return IndexResponse(
+        ok=True,
+        job_id=job_id,
     )
-    try:
-        _write_event_infra(IndexStore(folder, index_key=getattr(emb,'index_id',None)).index_dir, {
-                'type': 'index',
-                'new': int(new_c), 'updated': int(upd_c), 'total': int(total)
-            })
-    except Exception:
-        pass
-    return {"new": new_c, "updated": upd_c, "total": total, "job_id": job_id}
 
 
 class WatchReq(BaseModel):
@@ -1629,114 +1651,196 @@ def api_index_resume(
 
 @app.post("/search/cached")
 def api_search_cached(
-    directory: Optional[str] = None,
-    query: Optional[str] = None,
-    top_k: Optional[int] = None,
-    provider: Optional[str] = None,
-    cache_key: Optional[str] = None,
-    hf_token: Optional[str] = None,
-    openai_key: Optional[str] = None,
-    use_fast: Optional[bool] = None,
-    fast_kind: Optional[str] = None,
-    use_captions: Optional[bool] = None,
-    use_ocr: Optional[bool] = None,
-    body: Optional[Dict[str, Any]] = Body(None),
+    req: CachedSearchRequest = Body(...),
 ) -> Dict[str, Any]:
-    """Cached search that reuses previous results when possible."""
-    dir_value = _require(_from_body(body, directory, "dir"), "dir")
-    query_value = _require(_from_body(body, query, "query"), "query")
-    top_k_value = _from_body(body, top_k, "top_k", default=12, cast=int) or 12
-    provider_value = _from_body(body, provider, "provider", default="local") or "local"
-    cache_key_value = _from_body(body, cache_key, "cache_key")
-    hf_token_value = _from_body(body, hf_token, "hf_token")
-    openai_key_value = _from_body(body, openai_key, "openai_key")
-    use_fast_value = _from_body(body, use_fast, "use_fast", default=False, cast=_as_bool) or False
-    fast_kind_value = _from_body(body, fast_kind, "fast_kind")
-    use_captions_value = _from_body(body, use_captions, "use_captions", default=False, cast=_as_bool) or False
-    use_ocr_value = _from_body(body, use_ocr, "use_ocr", default=False, cast=_as_bool) or False
+    """Perform a semantic search with lightweight result caching.
 
-    folder = Path(dir_value)
-    if not folder.exists():
+    The cache key is either supplied explicitly (req.cache_key) or derived from the
+    key search parameters. Cached entries are considered valid for up to 1 hour
+    OR until the index directory's mtime is newer than the cached timestamp.
+    """
+
+    folder = Path(req.dir).expanduser().resolve()
+    if not folder.exists() or not folder.is_dir():
         raise HTTPException(400, "Folder not found")
 
-    # Generate cache key if not provided
-    cache_key = cache_key_value
+    # Derive cache key if missing
+    cache_key = req.cache_key
     if not cache_key:
         import hashlib
-        cache_key = hashlib.sha256(
-            f"{query_value}:{top_k_value}:{provider_value}:{use_fast_value}:{fast_kind_value}:{use_captions_value}:{use_ocr_value}".encode()
-        ).hexdigest()
+        raw_key = (
+            f"{req.query}:{req.top_k}:{req.provider}:{req.use_fast}:{req.fast_kind}:"
+            f"{req.use_captions}:{req.use_ocr}:{req.favorites_only}:{','.join(req.tags or [])}:"
+            f"{req.date_from}:{req.date_to}:{req.place}:{req.person}:{','.join(req.persons or [])}"
+        )
+        cache_key = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
 
+    # Build store for path computations *before* deciding embedder index id
     store = IndexStore(folder, index_key=None)
     cache_file = store.index_dir / f"search_cache_{cache_key}.json"
 
-    # Try to load from cache first
-    if cache_file.exists():
+    # Invalidate cache if index changed after cached timestamp
+    def _cache_valid(ts: float) -> bool:
+        # 1. TTL based expiry (1 hour)
+        if time.time() - ts > 3600:  # TTL 1h
+            return False
+        # 2. Structural mutation detection: we only consider core index artifact files.
+        #    Previous implementation walked every file in the index directory which caused
+        #    a false invalidation on every request because the analytics log and the cache
+        #    file itself are updated for each search. This meant we never produced a warm hit.
+        core_suffixes = {
+            'index_state.json',          # primary state
+            'exif_index.json',           # EXIF metadata
+            'captions_index.json',       # captions
+            'ocr_texts.json',            # OCR texts
+            'faces_index.json',          # faces clustering
+            'dupes_index.json',          # perceptual duplicates
+            'paths.json',                # core path listing (mutation means index change)
+            'fast_faiss.index',          # optional ANN artifacts
+            'fast_hnsw.bin',
+            'fast_annoy.ann',
+        }
+        epsilon = 1e-6  # allow tiny clock skew / write ordering
         try:
-            cache_data = json.loads(cache_file.read_text())
-            cache_time = cache_data.get('timestamp', 0)
-            # Cache valid for 1 hour
-            if time.time() - cache_time < 3600:
-                cached_result = cache_data['results']
-                cached_result['cached'] = True
-                return cached_result
+            idx_dir = store.index_dir
+            if not idx_dir.exists():
+                return False
+            for p in idx_dir.glob('*'):
+                # Shallow scan: top-level only; nested dirs are rare for core artifacts.
+                try:
+                    if not p.is_file():
+                        continue
+                    name = p.name
+                    # Ignore cache shards & analytics logs/events
+                    if name.startswith('search_cache_') or 'analytics' in name:
+                        continue
+                    if name not in core_suffixes and not name.endswith('.npy'):
+                        # Skip unrelated auxiliary files
+                        continue
+                    if p.stat().st_mtime > ts + epsilon:
+                        return False
+                except Exception:
+                    continue
         except Exception:
-            pass  # Fall through to fresh search
+            return False
+        return True
 
-    # Perform fresh search using the main search logic
-    emb = _emb(provider_value, hf_token_value, openai_key_value)
-    store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
+    if cache_file.exists():  # Try cached hit
+        try:
+            cache_data = json.loads(cache_file.read_text(encoding="utf-8"))
+            ts = float(cache_data.get("timestamp", 0))
+            if _cache_valid(ts):
+                payload = cache_data.get("results", {})
+                if payload:
+                    payload["cached"] = True
+                    return payload
+        except Exception:
+            pass  # ignore and rebuild
+
+    # Fresh search -----------------------------------------------------------------
+    emb = _emb(req.provider or "local", req.hf_token, req.openai_key)
+    store = IndexStore(folder, index_key=getattr(emb, "index_id", None))
     store.load()
 
-    if use_fast_value:
-        try:
-            if fast_kind_value and fast_kind_value.lower() == 'faiss' and store.faiss_status().get('exists'):
-                results = store.search_faiss(emb, query_value, top_k=top_k_value)
-            elif fast_kind_value and fast_kind_value.lower() == 'hnsw' and store.hnsw_status().get('exists'):
-                results = store.search_hnsw(emb, query_value, top_k=top_k_value)
-            elif fast_kind_value and fast_kind_value.lower() == 'annoy' and store.ann_status().get('exists'):
-                results = store.search_annoy(emb, query_value, top_k=top_k_value)
-            else:
-                if store.faiss_status().get('exists'):
-                    results = store.search_faiss(emb, query_value, top_k=top_k_value)
-                elif store.hnsw_status().get('exists'):
-                    results = store.search_hnsw(emb, query_value, top_k=top_k_value)
-                elif store.ann_status().get('exists'):
-                    results = store.search_annoy(emb, query_value, top_k=top_k_value)
-                else:
-                    results = store.search(emb, query_value, top_k=top_k_value)
-        except Exception:
-            results = store.search(emb, query_value, top_k=top_k_value)
-    else:
-        if use_captions_value and store.captions_available():
-            results = store.search_with_captions(emb, query_value, top_k=top_k_value)
-        elif use_ocr_value and store.ocr_available():
-            results = store.search_with_ocr(emb, query_value, top_k=top_k_value)
+    top_k = max(1, int(req.top_k or 48))
+    query_text = req.query or ""
+
+    try:
+        if req.use_fast:
+            # Prefer whichever fast index exists matching hint, else fallback chain
+            fk = (req.fast_kind or "").lower()
+            try:
+                if fk == "faiss" and store.faiss_status().get("exists"):
+                    results = store.search_faiss(emb, query_text, top_k=top_k)
+                elif fk == "hnsw" and store.hnsw_status().get("exists"):
+                    results = store.search_hnsw(emb, query_text, top_k=top_k)
+                elif fk == "annoy" and store.ann_status().get("exists"):
+                    results = store.search_annoy(emb, query_text, top_k=top_k)
+                else:  # auto fallback order
+                    if store.faiss_status().get("exists"):
+                        results = store.search_faiss(emb, query_text, top_k=top_k)
+                    elif store.hnsw_status().get("exists"):
+                        results = store.search_hnsw(emb, query_text, top_k=top_k)
+                    elif store.ann_status().get("exists"):
+                        results = store.search_annoy(emb, query_text, top_k=top_k)
+                    else:
+                        results = store.search(emb, query_text, top_k)
+            except Exception:
+                results = store.search(emb, query_text, top_k)
         else:
-            results = store.search(emb, query_value, top_k=top_k_value)
+            if req.use_captions and store.captions_available():
+                results = store.search_with_captions(emb, query_text, top_k)
+            elif req.use_ocr and store.ocr_available():
+                results = store.search_with_ocr(emb, query_text, top_k)
+            else:
+                results = store.search(emb, query_text, top_k)
+    except Exception as e:
+        raise HTTPException(500, f"Search failed: {e}")
 
     out = results
-    sid = log_search(store.index_dir, getattr(emb, 'index_id', 'default'), query_value, [(str(r.path), float(r.score)) for r in out])
 
-    result_data = {
+    # Basic server-side filters (subset of /search for parity where low risk)
+    # Favorites filter with fallback: if semantic search misses all favorites, we still want
+    # to return the favorites themselves so that a favorites-only view is always populated.
+    if req.favorites_only:
+        try:
+            coll = load_collections(store.index_dir)
+            favs = set(coll.get("Favorites", []))
+            filtered = [r for r in out if str(r.path) in favs]
+            if not filtered:  # fallback populate from favorites list (maintain deterministic order by path)
+                from pathlib import Path as _P
+                from domain.models import SearchResult as _SR  # local import to avoid circular type issues
+                existing = set(store.state.paths or [])
+                wanted = [p for p in sorted(favs) if p in existing]
+                filtered = [_SR(path=_P(p), score=0.0) for p in wanted[:top_k]]
+            out = filtered
+        except Exception:
+            pass
+    # Tags filter with fallback similar logic: if no semantic hits carry the tags, enumerate tag set.
+    if req.tags:
+        try:
+            tmap = load_tags(store.index_dir)
+            tag_set = set(req.tags)
+            filtered = [r for r in out if tag_set.issubset(set(tmap.get(str(r.path), [])))]
+            if not filtered:
+                from pathlib import Path as _P
+                from domain.models import SearchResult as _SR
+                # Collect all images that satisfy tags directly from tag map
+                candidates = [p for p, tags in tmap.items() if tag_set.issubset(set(tags or []))]
+                existing = set(store.state.paths or [])
+                wanted = [p for p in sorted(candidates) if p in existing]
+                filtered = [_SR(path=_P(p), score=0.0) for p in wanted[:top_k]]
+            out = filtered
+        except Exception:
+            pass
+
+    sid = log_search(
+        store.index_dir,
+        getattr(emb, "index_id", "default"),
+        query_text,
+        [(str(r.path), float(r.score)) for r in out],
+    )
+
+    result_payload: Dict[str, Any] = {
         "search_id": sid,
         "results": [{"path": str(r.path), "score": float(r.score)} for r in out],
         "cached": False,
-        "cache_key": cache_key
+        "cache_key": cache_key,
     }
 
-    # Cache the results
+    # Persist cache (best-effort, atomic temp write)
     try:
-        cache_data = {
-            "timestamp": time.time(),
-            "query": query_value,
-            "results": result_data
-        }
-        cache_file.write_text(json.dumps(cache_data), encoding='utf-8')
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
+        tmp = cache_file.with_suffix(".tmp")
+        tmp.write_text(
+            json.dumps({"timestamp": time.time(), "results": result_payload}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        tmp.replace(cache_file)
     except Exception:
-        pass  # Don't fail if caching fails
+        pass
 
-    return result_data
+    return result_payload
 
 
 # Removed duplicate, malformed /search endpoint definition below. Using the validated one above.
@@ -1841,41 +1945,12 @@ def api_trips_list(directory: str = Query(..., alias="dir")) -> Dict[str, Any]:
 
 @app.post("/search_workspace")
 def api_search_workspace(
-    dir: Optional[str] = None,
-    query: Optional[str] = None,
-    top_k: Optional[int] = None,
-    provider: Optional[str] = None,
-    hf_token: Optional[str] = None,
-    openai_key: Optional[str] = None,
-    favorites_only: Optional[bool] = None,
-    tags: Optional[List[str]] = None,
-    date_from: Optional[float] = None,
-    date_to: Optional[float] = None,
-    place: Optional[str] = None,
-    has_text: Optional[bool] = None,
-    person: Optional[str] = None,
-    persons: Optional[List[str]] = None,
-    body: Optional[Dict[str, Any]] = Body(None),
+    req: WorkspaceSearchRequest = Body(...),
 ) -> Dict[str, Any]:
-    dir_value = _require(_from_body(body, dir, "dir"), "dir")
-    query_value = _require(_from_body(body, query, "query"), "query")
-    top_k_value = _from_body(body, top_k, "top_k", default=12, cast=int) or 12
-    provider_value = _from_body(body, provider, "provider", default="local") or "local"
-    hf_token_value = _from_body(body, hf_token, "hf_token")
-    openai_key_value = _from_body(body, openai_key, "openai_key")
-    favorites_value = _from_body(body, favorites_only, "favorites_only", default=False, cast=_as_bool) or False
-    tags_value = _from_body(body, tags, "tags", default=[], cast=_as_str_list) or []
-    date_from_value = _from_body(body, date_from, "date_from")
-    date_to_value = _from_body(body, date_to, "date_to")
-    place_value = _from_body(body, place, "place")
-    has_text_value = _from_body(body, has_text, "has_text", default=False, cast=_as_bool) or False
-    person_value = _from_body(body, person, "person")
-    persons_value = _from_body(body, persons, "persons", default=[], cast=_as_str_list) or []
-
-    folder = Path(dir_value)
+    folder = Path(req.dir)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
-    emb = _emb(provider_value, hf_token_value, openai_key_value)
+    emb = _emb(req.provider, req.hf_token, req.openai_key)
     primary = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
     primary.load()
     stores: List[IndexStore] = [primary]
@@ -1886,7 +1961,7 @@ def api_search_workspace(
             s.load()
             stores.append(s)
     try:
-        qv = emb.embed_text(query_value)
+        qv = emb.embed_text(req.query)
     except Exception:
         raise HTTPException(500, "Embedding failed")
     import numpy as np
@@ -1900,33 +1975,33 @@ def api_search_workspace(
         return {"search_id": None, "results": []}
     E = np.vstack(E_list).astype('float32')
     sims = (E @ qv).astype(float)
-    k = max(1, min(top_k_value, len(sims)))
+    k = max(1, min(req.top_k, len(sims)))
     idx = np.argpartition(-sims, k - 1)[:k]
     idx = idx[np.argsort(-sims[idx])]
     out = [SearchResult(path=Path(paths[i]), score=float(sims[i])) for i in idx]
 
-    if favorites_value:
+    if req.favorites_only:
         favset = set()
         for s in stores:
             coll = load_collections(s.index_dir)
             favset.update(coll.get('Favorites', []))
         out = [r for r in out if str(r.path) in favset]
-    if tags_value:
-        req = set(tags_value)
+    if req.tags:
+        req_set = set(req.tags)
         tmap: Dict[str, List[str]] = {}
         for s in stores:
             for k, v in load_tags(s.index_dir).items():
                 tmap[k] = v
-        out = [r for r in out if req.issubset(set(tmap.get(str(r.path), [])))]
-    if date_from_value is not None and date_to_value is not None:
+        out = [r for r in out if req_set.issubset(set(tmap.get(str(r.path), [])))]
+    if req.date_from is not None and req.date_to is not None:
         mmap: Dict[str, float] = {}
         for s in stores:
             mmap.update({sp: float(mt) for sp, mt in zip(s.state.paths or [], s.state.mtimes or [])})
-        out = [r for r in out if date_from_value <= mmap.get(str(r.path), 0.0) <= date_to_value]
+        out = [r for r in out if req.date_from <= mmap.get(str(r.path), 0.0) <= req.date_to]
     try:
-        if persons_value:
+        if req.persons:
             sets: List[set] = []
-            for nm in persons_value:
+            for nm in req.persons:
                 pp = set()
                 for s in stores:
                     try:
@@ -1937,17 +2012,17 @@ def api_search_workspace(
             if sets:
                 inter = set.intersection(*sets) if len(sets) > 1 else sets[0]
                 out = [r for r in out if str(r.path) in inter]
-        elif person_value:
+        elif req.person:
             ppl = set()
             for s in stores:
                 try:
-                    ppl.update(set(_face_photos(s.index_dir, str(person_value))))
+                    ppl.update(set(_face_photos(s.index_dir, str(req.person))))
                 except Exception:
                     continue
             out = [r for r in out if str(r.path) in ppl]
     except Exception:
         pass
-    if place_value and str(place_value).strip():
+    if req.place and str(req.place).strip():
         place_map: Dict[str, str] = {}
         for s in stores:
             try:
@@ -1957,9 +2032,9 @@ def api_search_workspace(
                     place_map.update({p: (str(v or '')) for p, v in zip(m.get('paths', []), m.get('place', []))})
             except Exception:
                 continue
-        pl = str(place_value).strip().lower()
+        pl = str(req.place).strip().lower()
         out = [r for r in out if pl in (place_map.get(str(r.path), '') or '').lower()]
-    if has_text_value:
+    if req.has_text:
         texts_map: Dict[str, str] = {}
         for s in stores:
             try:
@@ -1970,15 +2045,27 @@ def api_search_workspace(
                 continue
         out = [r for r in out if texts_map.get(str(r.path), '').strip()]
 
-    sid = log_search(primary.index_dir, getattr(emb, 'index_id', 'default'), query_value, [(str(r.path), float(r.score)) for r in out])
+    sid = log_search(primary.index_dir, getattr(emb, 'index_id', 'default'), req.query, [(str(r.path), float(r.score)) for r in out])
     return {"search_id": sid, "results": [{"path": p, "score": sc} for (p, sc) in [(str(r.path), float(r.score)) for r in out]]}
 
 
 @app.get("/favorites")
-def api_get_favorites(directory: str = Query(..., alias="dir")) -> Dict[str, Any]:
-    store = IndexStore(Path(directory))
-    coll = load_collections(store.index_dir)
-    return {"favorites": coll.get('Favorites', [])}
+def api_get_favorites(directory: str = Query(..., alias="dir")) -> SuccessResponse:
+    folder = Path(directory).expanduser().resolve()
+    if not folder.exists() or not folder.is_dir():
+        raise HTTPException(400, "Directory not found")
+    coll = load_collections(folder / ".photo_index")
+    favs = set(coll.get("Favorites", []))
+    meta = _zip_meta(load_meta(folder / ".photo_index"), "mtime", lambda v: v)
+    return SuccessResponse(
+        ok=True,
+        data={
+            "paths": [
+                {"path": str(p), "mtime": mt, "is_favorite": str(p) in favs}
+                for p, mt in meta.items()
+            ],
+        },
+    )
 
 
 @app.post("/favorites")

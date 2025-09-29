@@ -6,13 +6,76 @@ Endpoints can gradually adopt them via explicit parsing/validation.
 """
 from __future__ import annotations
 
-from typing import List, Optional, Annotated
+from typing import List, Optional, Annotated, Dict, Any
 
 from pydantic import BaseModel, Field
 try:  # Pydantic v2
     from pydantic import model_validator  # type: ignore
 except Exception:  # pragma: no cover
     model_validator = None  # type: ignore
+
+
+class BaseResponse(BaseModel):
+    """Base response model for all API responses."""
+    ok: bool
+    message: Optional[str] = None
+
+
+class ErrorResponse(BaseResponse):
+    """Error response model for API errors."""
+    ok: bool = False
+    error: Optional[Dict[str, Any]] = None
+
+
+class SuccessResponse(BaseResponse):
+    """Generic success response model."""
+    ok: bool = True
+    data: Optional[Dict[str, Any]] = None
+
+
+class IndexResponse(BaseResponse):
+    """Response model for index operations."""
+    ok: bool = True
+    new: int = 0
+    updated: int = 0
+    total: int = 0
+    job_id: Optional[str] = None
+
+
+class ShareResponse(BaseResponse):
+    """Response model for share operations."""
+    ok: bool = True
+    token: Optional[str] = None
+    url: Optional[str] = None
+    expires: Optional[str] = None
+
+
+class FavoriteResponse(BaseResponse):
+    """Response model for favorite operations."""
+    ok: bool = True
+    path: Optional[str] = None
+    favorite: bool = False
+
+
+class TagResponse(BaseResponse):
+    """Response model for tag operations."""
+    ok: bool = True
+    path: Optional[str] = None
+    tags: List[str] = Field(default_factory=list)
+
+
+class CollectionResponse(BaseResponse):
+    """Response model for collection operations."""
+    ok: bool = True
+    name: Optional[str] = None
+    paths: List[str] = Field(default_factory=list)
+
+
+class HealthResponse(BaseResponse):
+    """Response model for health check operations."""
+    ok: bool = True
+    uptime_seconds: Optional[int] = None
+    version: Optional[str] = None
 
 
 class SearchRequest(BaseModel):
@@ -139,7 +202,7 @@ class FavoritesRequest(BaseModel):
     path: str
     favorite: bool = True
 
-    if model_validator:  # Pydantic v2
+    if model_validator:  # Pydantic v2 path
         @model_validator(mode="after")  # type: ignore
         def _unify_directory(self):  # type: ignore
             if not self.dir and self.directory:
@@ -149,15 +212,93 @@ class FavoritesRequest(BaseModel):
             return self
 
     class Config:
-        allow_population_by_field_name = True
-        populate_by_name = True
+        allow_population_by_field_name = True  # pydantic v1
+        populate_by_name = True  # pydantic v2
+
+
+class ShareRequest(BaseModel):
+    """Share request with directory alias migration."""
+
+    dir: Optional[str] = Field(default=None, description="Deprecated; use 'directory'")
+    directory: Optional[str] = Field(default=None, alias="directory", description="Absolute path to the photo directory")
+    # Accept new 'directory' name or legacy 'dir' for backward compatibility
+    provider: str = "local"
+    paths: List[str] = Field(default_factory=list)
+    expiry_hours: int = 24
+    password: Optional[str] = None
+    view_only: bool = True
+
+    if model_validator:  # Pydantic v2 path
+        @model_validator(mode="after")  # type: ignore
+        def _unify_directory(self):  # type: ignore
+            if not self.dir and self.directory:
+                self.dir = self.directory
+            if not self.dir:
+                raise ValueError("directory required")
+            return self
+
+    class Config:
+        allow_population_by_field_name = True  # pydantic v1
+        populate_by_name = True  # pydantic v2
+
+
+class ShareRevokeRequest(BaseModel):
+    """Request to revoke a share token."""
+    token: str
+
+    class Config:
+        allow_population_by_field_name = True  # pydantic v1
+        populate_by_name = True  # pydantic v2
+
+
+class CachedSearchRequest(SearchRequest):
+    """Search request with additional cache parameters."""
+    cache_key: Optional[str] = None
+    use_captions: bool = False
+    use_ocr: bool = False
+    use_fast: bool = False
+    fast_kind: Optional[str] = None
+
+    class Config:
+        allow_population_by_field_name = True  # pydantic v1
+        populate_by_name = True  # pydantic v2
+
+
+class WorkspaceSearchRequest(SearchRequest):
+    """Search request for workspace functionality."""
+    # Additional parameters specific to workspace search
+    favorites_only: bool = False
+    tags: List[str] = Field(default_factory=list)
+    date_from: Optional[float] = None
+    date_to: Optional[float] = None
+    place: Optional[str] = None
+    has_text: bool = False
+    person: Optional[str] = None
+    persons: List[str] = Field(default_factory=list)
+
+    class Config:
+        allow_population_by_field_name = True  # pydantic v1
+        populate_by_name = True  # pydantic v2
 
 
 __all__ = [
+    "BaseResponse",
+    "ErrorResponse",
+    "SuccessResponse",
+    "IndexResponse",
+    "ShareResponse",
+    "FavoriteResponse",
+    "TagResponse",
+    "CollectionResponse",
+    "HealthResponse",
     "SearchRequest",
     "SearchResponse",
     "SearchResultItem",
     "IndexRequest",
     "TagsRequest",
     "FavoritesRequest",
+    "ShareRequest",
+    "ShareRevokeRequest",
+    "CachedSearchRequest",
+    "WorkspaceSearchRequest",
 ]
