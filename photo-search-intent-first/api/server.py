@@ -51,6 +51,7 @@ from api.search_models import (
     PaginatedSearchResponse,
 )
 from api.routers.analytics import router as analytics_router, legacy_router as analytics_legacy_router
+from api.routers.auth import router as auth_router
 from api.routers.indexing import router as indexing_router
 from api.routers.config import router as config_router
 from api.attention import router as attention_router  # NEW: adaptive attention (scaffold)
@@ -133,6 +134,7 @@ app.include_router(health_router)
 
 # Mount legacy routers for parity with original_server.py
 app.include_router(analytics_legacy_router)
+app.include_router(auth_router)
 
 # Mount versioned API router
 app.include_router(api_v1)
