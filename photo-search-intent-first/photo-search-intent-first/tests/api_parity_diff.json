@@ -190,10 +190,6 @@
     },
     {
       "method": "POST",
-      "path": "/search/paginated"
-    },
-    {
-      "method": "POST",
       "path": "/search_like"
     },
     {
@@ -209,10 +205,6 @@
       "path": "/settings/excludes"
     },
     {
-      "method": "POST",
-      "path": "/thumb/batch"
-    },
-    {
       "method": "GET",
       "path": "/thumb_face"
     },
@@ -223,9 +215,9 @@
   ],
   "summary": {
     "base_count": 124,
-    "candidate_count": 163,
+    "candidate_count": 168,
     "changed": 4,
     "extra": 35,
-    "missing": 11
+    "missing": 9
   }
 }

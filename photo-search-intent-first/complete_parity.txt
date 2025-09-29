@@ -1,0 +1,49 @@
+/Users/pranay/Projects/adhoc_projects/photo-search/photo-search-intent-first/.venv/lib/python3.12/site-packages/pydantic/_internal/_config.py:373: UserWarning: Valid config keys have changed in V2:
+* 'allow_population_by_field_name' has been renamed to 'validate_by_name'
+  warnings.warn(message, UserWarning)
+/Users/pranay/Projects/adhoc_projects/photo-search/photo-search-intent-first/.venv/lib/python3.12/site-packages/pydantic/_internal/_config.py:373: UserWarning: Valid config keys have changed in V2:
+* 'allow_population_by_field_name' has been renamed to 'validate_by_name'
+* 'anystr_strip_whitespace' has been renamed to 'str_strip_whitespace'
+  warnings.warn(message, UserWarning)
+API PARITY CHECK
+Baseline routes:  124
+Candidate routes: 168
+Missing: 9  Extra: 35  Changed: 4
+Status: FAIL (differences detected)
+
+ADDITIONAL ROUTES in server.py (not in baseline): 35
+  + POST /api/v1/auth/check
+  + GET /api/v1/auth/status
+  + POST /api/v1/batch/collections
+  + POST /api/v1/batch/delete
+  + POST /api/v1/batch/tag
+  + GET /api/v1/collections/
+  + POST /api/v1/collections/
+  + POST /api/v1/collections/delete
+  + GET /api/v1/collections/smart
+  + POST /api/v1/collections/smart
+  + POST /api/v1/collections/smart/delete
+  + POST /api/v1/collections/smart/resolve
+  + POST /api/v1/faces/build
+  + GET /api/v1/faces/clusters
+  + POST /api/v1/faces/merge
+  + POST /api/v1/faces/name
+  + GET /api/v1/faces/photos
+  + POST /api/v1/faces/split
+  + GET /api/v1/favorites/
+  + POST /api/v1/favorites/
+  + GET /api/v1/metadata/
+  + GET /api/v1/metadata/batch
+  + POST /api/v1/metadata/build
+  + POST /api/v1/ocr/build
+  + POST /api/v1/ocr/snippets
+  + GET /api/v1/ocr/status
+  + GET /api/v1/presets/
+  + POST /api/v1/presets/
+  + POST /api/v1/presets/delete
+  + GET /api/v1/saved/
+  + POST /api/v1/saved/
+  + POST /api/v1/saved/delete
+  + GET /api/v1/tags/
+  + POST /api/v1/tags/
+  + POST /api/v1/tags/autotag

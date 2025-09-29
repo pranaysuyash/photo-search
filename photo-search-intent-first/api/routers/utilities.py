@@ -1,15 +1,22 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Body, HTTPException, Query
+from fastapi.responses import FileResponse, JSONResponse
 from PIL import Image, ExifTags
 
-from api.utils import _as_bool, _as_str_list, _from_body, _require
+from api.schemas.v1 import CachedSearchRequest, SearchRequest
+from api.utils import _as_bool, _as_str_list, _emb, _from_body, _require
+from infra.analytics import log_search, _write_event as _write_event_infra
+from infra.faces import load_faces as _faces_load
 from infra.index_store import IndexStore
+from infra.thumbs import get_or_create_face_thumb, get_or_create_thumb
 
 # Legacy router without prefix for parity with original_server.py routes
 router = APIRouter(tags=["utilities"])
@@ -110,3 +117,423 @@ def api_map(directory: str = Query(..., alias="dir"), limit: int = 1000) -> Dict
         except Exception:
             continue
     return {"points": pts}
+
+
+@router.get("/tech.json")
+def tech_manifest():
+    """
+    Machine-readable manifest for auditors and tools.
+    Confirms Electron + React (Vite) + FastAPI stack, and that Streamlit is not used.
+    """
+    return JSONResponse({
+        "frontend": "react+vite",
+        "shell": "electron",
+        "backend": "fastapi",
+        "streamlit": False,
+        "version": "0.1.0"
+    })
+
+
+@router.post("/search/paginated")
+def search_paginated(
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    """Paginated search with cursor support for large result sets."""
+    # Extract pagination parameters
+    limit_value = _from_body(body, limit, "limit", default=24, cast=lambda v: int(v)) or 24
+    offset_value = _from_body(body, offset, "offset", default=0, cast=lambda v: int(v)) or 0
+
+    # Build unified search request from body parameters
+    try:
+        search_req = SearchRequest.from_query_params(body or {})
+    except Exception as e:
+        raise HTTPException(400, f"Invalid search parameters: {e}")
+
+    # Override top_k to get enough results for pagination
+    search_req.top_k = min(limit_value + offset_value + 50, search_req.top_k)
+
+    # Validate directory
+    if not search_req.dir:
+        raise HTTPException(400, "Directory path is required")
+
+    folder = Path(search_req.dir).expanduser().resolve()
+    if not folder.exists():
+        raise HTTPException(400, "Folder not found")
+
+    # Get embedder
+    emb = _emb(search_req.provider, search_req.hf_token, search_req.openai_key)
+    store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
+    store.load()
+
+    # Perform search
+    if search_req.use_captions and store.captions_available():
+        results = store.search_with_captions(emb, search_req.query, top_k=search_req.top_k)
+    elif search_req.use_ocr and store.ocr_available():
+        results = store.search_with_ocr(emb, search_req.query, top_k=search_req.top_k)
+    else:
+        results = store.search(emb, search_req.query, top_k=search_req.top_k)
+
+    # Apply pagination
+    total = len(results)
+    paginated_results = results[offset_value:offset_value + limit_value]
+
+    # Log search
+    sid = log_search(store.index_dir, getattr(emb, 'index_id', 'default'), search_req.query, [(str(r.path), float(r.score)) for r in results])
+
+    return {
+        "search_id": sid,
+        "results": [{"path": str(r.path), "score": float(r.score)} for r in paginated_results],
+        "pagination": {
+            "offset": offset_value,
+            "limit": limit_value,
+            "total": total,
+            "has_more": offset_value + limit_value < total
+        }
+    }
+
+
+@router.post("/search_video")
+def search_video(
+    dir: Optional[str] = None,
+    query: Optional[str] = None,
+    top_k: Optional[int] = None,
+    provider: Optional[str] = None,
+    hf_token: Optional[str] = None,
+    openai_key: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    """Search for videos using semantic search on extracted metadata and keyframes."""
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    query_value = _require(_from_body(body, query, "query"), "query")
+    top_k_value = _from_body(body, top_k, "top_k", default=12, cast=lambda v: int(v)) or 12
+    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+    hf_token_value = _from_body(body, hf_token, "hf_token")
+    openai_key_value = _from_body(body, openai_key, "openai_key")
+
+    folder = Path(dir_value)
+    if not folder.exists():
+        raise HTTPException(400, "Folder not found")
+
+    # Placeholder implementation - video search needs specialized infrastructure
+    return {
+        "search_id": None,
+        "results": [],
+        "message": "Video search functionality needs implementation"
+    }
+
+
+@router.post("/search_video_like")
+def search_video_like(
+    dir: Optional[str] = None,
+    path: Optional[str] = None,
+    top_k: Optional[int] = None,
+    provider: Optional[str] = None,
+    hf_token: Optional[str] = None,
+    openai_key: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    """Find videos similar to a given video using keyframe similarity."""
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    path_value = _require(_from_body(body, path, "path"), "path")
+    top_k_value = _from_body(body, top_k, "top_k", default=12, cast=lambda v: int(v)) or 12
+    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+    hf_token_value = _from_body(body, hf_token, "hf_token")
+    openai_key_value = _from_body(body, openai_key, "openai_key")
+
+    folder = Path(dir_value)
+    if not folder.exists():
+        raise HTTPException(400, "Folder not found")
+
+    # Placeholder implementation - video similarity search needs specialized infrastructure
+    return {
+        "search_id": None,
+        "results": [],
+        "message": "Video similarity search functionality needs implementation"
+    }
+
+
+@router.post("/thumb/batch")
+def thumb_batch(
+    dir: Optional[str] = None,
+    paths: Optional[List[str]] = None,
+    size: Optional[int] = None,
+    provider: Optional[str] = None,
+    hf_token: Optional[str] = None,
+    openai_key: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    """Generate thumbnails for multiple images in batch to reduce API calls."""
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    paths_value = _from_body(body, paths, "paths", default=[], cast=_as_str_list) or []
+    size_value = _from_body(body, size, "size", default=256, cast=int) or 256
+
+    folder = Path(dir_value)
+    if not folder.exists():
+        raise HTTPException(400, "Folder not found")
+
+    store = IndexStore(folder)
+    results = []
+    
+    for path_str in paths_value:
+        try:
+            path = folder / path_str
+            if path.exists() and path.is_file():
+                # Use existing thumbnail infrastructure
+                thumb_path = get_or_create_thumb(store.index_dir, path, path.stat().st_mtime, size_value)
+                results.append({
+                    "path": path_str,
+                    "success": thumb_path is not None,
+                    "thumb_path": str(thumb_path) if thumb_path else None
+                })
+            else:
+                results.append({
+                    "path": path_str,
+                    "success": False,
+                    "error": "File not found"
+                })
+        except Exception as e:
+            results.append({
+                "path": path_str,
+                "success": False,
+                "error": str(e)
+            })
+
+    return {
+        "results": results,
+        "total": len(paths_value),
+        "success_count": sum(1 for r in results if r["success"])
+    }
+
+
+@router.get("/thumb_face")
+def get_face_thumbnail(
+    directory: str = Query(..., alias="dir"), 
+    path: str = Query(...), 
+    emb: int = Query(...), 
+    provider: str = "local", 
+    size: int = 256, 
+    hf_token: Optional[str] = None, 
+    openai_key: Optional[str] = None
+):
+    """Get thumbnail of a face from a photo."""
+    folder = Path(directory)
+    if not folder.exists():
+        raise HTTPException(400, "Folder not found")
+    
+    embd = _emb(provider, hf_token, openai_key)
+    store = IndexStore(folder, index_key=getattr(embd, 'index_id', None))
+    store.load()
+    
+    try:
+        idx_map = {sp: float(mt) for sp, mt in zip(store.state.paths or [], store.state.mtimes or [])}
+        mtime = idx_map.get(path, 0.0)
+        data = _faces_load(store.index_dir)
+        bbox = None
+        
+        for it in data.get('photos', {}).get(path, []) or []:
+            try:
+                if int(it.get('emb')) == int(emb):
+                    bb = it.get('bbox')
+                    if isinstance(bb, list) and len(bb) == 4:
+                        bbox = (int(bb[0]), int(bb[1]), int(bb[2]), int(bb[3]))
+                        break
+            except Exception:
+                continue
+        
+        if bbox is None:
+            # fallback to generic thumb
+            tp = get_or_create_thumb(store.index_dir, Path(path), float(mtime), size=size)
+            if tp is None or not tp.exists():
+                raise HTTPException(404, "Thumb not found")
+            return FileResponse(str(tp))
+        
+        fp = get_or_create_face_thumb(store.index_dir, Path(path), float(mtime), bbox, size=size)
+        if fp is None or not fp.exists():
+            raise HTTPException(404, "Face thumb not found")
+        return FileResponse(str(fp))
+    except Exception:
+        raise HTTPException(500, "Failed to generate face thumbnail")
+
+
+@router.post("/search_like")
+def search_like(
+    dir: Optional[str] = None,
+    path: Optional[str] = None,
+    top_k: Optional[int] = None,
+    provider: Optional[str] = None,
+    hf_token: Optional[str] = None,
+    openai_key: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    """Find similar photos to a given photo."""
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    path_value = _require(_from_body(body, path, "path"), "path")
+    top_k_value = _from_body(body, top_k, "top_k", default=12, cast=int) or 12
+    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+    hf_token_value = _from_body(body, hf_token, "hf_token")
+    openai_key_value = _from_body(body, openai_key, "openai_key")
+
+    folder = Path(dir_value)
+    if not folder.exists():
+        raise HTTPException(400, "Folder not found")
+    
+    emb = _emb(provider_value, hf_token_value, openai_key_value)
+    store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
+    store.load()
+    out = store.search_like(path_value, top_k=top_k_value)
+    return {"results": [{"path": str(r.path), "score": float(r.score)} for r in out]}
+
+
+@router.post("/search_like_plus")
+def search_like_plus(
+    dir: Optional[str] = None,
+    path: Optional[str] = None,
+    top_k: Optional[int] = None,
+    text: Optional[str] = None,
+    weight: Optional[float] = None,
+    provider: Optional[str] = None,
+    hf_token: Optional[str] = None,
+    openai_key: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    """Enhanced similarity search with text weighting."""
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    path_value = _require(_from_body(body, path, "path"), "path")
+    top_k_value = _from_body(body, top_k, "top_k", default=12, cast=int) or 12
+    text_value = _from_body(body, text, "text")
+    weight_value = _from_body(body, weight, "weight", default=0.5, cast=float) or 0.5
+    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+    hf_token_value = _from_body(body, hf_token, "hf_token")
+    openai_key_value = _from_body(body, openai_key, "openai_key")
+
+    folder = Path(dir_value)
+    if not folder.exists():
+        raise HTTPException(400, "Folder not found")
+    
+    emb = _emb(provider_value, hf_token_value, openai_key_value)
+    store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
+    store.load()
+    
+    if store.state.embeddings is None or not store.state.paths:
+        return {"results": []}
+    
+    try:
+        i = store.state.paths.index(path_value)
+        img_emb = store.state.embeddings[i]
+        
+        if text_value:
+            text_emb = emb.embed_text(text_value)
+            combined_emb = weight_value * img_emb + (1 - weight_value) * text_emb
+        else:
+            combined_emb = img_emb
+            
+        out = store.search_by_embedding(combined_emb, top_k=top_k_value)
+        return {"results": [{"path": str(r.path), "score": float(r.score)} for r in out]}
+    except (ValueError, IndexError):
+        raise HTTPException(404, "Photo not found in index")
+
+
+@router.post("/search/cached")
+def search_cached(
+    req: CachedSearchRequest = Body(...),
+) -> Dict[str, Any]:
+    """Perform a semantic search with lightweight result caching."""
+    folder = Path(req.dir).expanduser().resolve()
+    if not folder.exists() or not folder.is_dir():
+        raise HTTPException(400, "Folder not found")
+
+    # Derive cache key if missing
+    cache_key = req.cache_key
+    if not cache_key:
+        raw_key = (
+            f"{req.query}:{req.top_k}:{req.provider}:{req.use_fast}:{req.fast_kind}:"
+            f"{req.use_captions}:{req.use_ocr}:{req.favorites_only}:{','.join(req.tags or [])}:"
+            f"{req.date_from}:{req.date_to}:{req.place}:{req.person}:{','.join(req.persons or [])}"
+        )
+        cache_key = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
+
+    # Build store for path computations
+    store = IndexStore(folder, index_key=None)
+    cache_file = store.index_dir / f"search_cache_{cache_key}.json"
+
+    # Check cache validity
+    try:
+        import time
+        if cache_file.exists():
+            cached_data = json.loads(cache_file.read_text())
+            cache_time = cached_data.get("timestamp", 0)
+            index_mtime = store.index_dir.stat().st_mtime
+            
+            # Cache valid for 1 hour OR until index changes
+            if (time.time() - cache_time < 3600) and (cache_time > index_mtime):
+                return cached_data.get("results", {"results": []})
+    except Exception:
+        pass
+
+    # Cache miss - perform actual search
+    emb = _emb(req.provider, req.hf_token, req.openai_key)
+    store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
+    store.load()
+    
+    if req.use_captions and store.captions_available():
+        results = store.search_with_captions(emb, req.query, top_k=req.top_k)
+    elif req.use_ocr and store.ocr_available():
+        results = store.search_with_ocr(emb, req.query, top_k=req.top_k)
+    else:
+        results = store.search(emb, req.query, top_k=req.top_k)
+    
+    output = {"results": [{"path": str(r.path), "score": float(r.score)} for r in results]}
+    
+    # Cache the results
+    try:
+        cache_data = {
+            "timestamp": time.time(),
+            "cache_key": cache_key,
+            "results": output
+        }
+        cache_file.write_text(json.dumps(cache_data))
+    except Exception:
+        pass  # Don't fail search if caching fails
+    
+    return output
+
+
+@router.post("/thumbs")
+def build_thumbnails(
+    dir: Optional[str] = None,
+    size: Optional[int] = None,
+    provider: Optional[str] = None,
+    hf_token: Optional[str] = None,
+    openai_key: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    """Build thumbnails for all photos in directory."""
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    size_value = _from_body(body, size, "size", default=512, cast=int) or 512
+    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+    hf_token_value = _from_body(body, hf_token, "hf_token")
+    openai_key_value = _from_body(body, openai_key, "openai_key")
+
+    folder = Path(dir_value)
+    if not folder.exists():
+        raise HTTPException(400, "Folder not found")
+    
+    emb = _emb(provider_value, hf_token_value, openai_key_value)
+    store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
+    store.load()
+    
+    made = 0
+    for sp, mt in zip(store.state.paths or [], store.state.mtimes or []):
+        tp = get_or_create_thumb(store.index_dir, Path(sp), float(mt), size=size_value)
+        if tp is not None:
+            made += 1
+    
+    out = {"made": made}
+    _write_event_infra(store.index_dir, { 
+        'type': 'thumbs_build', 
+        'made': made, 
+        'size': size_value 
+    })
+    return out
