@@ -4,7 +4,7 @@ import {
 	Cpu,
 	HardDrive,
 	Loader2,
-	WifiOff,
+	Cloud,
 	XCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -99,12 +99,12 @@ export function ModelStatusIndicator() {
 
 	const getStatusText = () => {
 		if (!status.ok) {
-			return "Model Error";
+			return "System Error";
 		}
 		if (status.capabilities.clip_available) {
-			return "Models Ready";
+			return "Ready";
 		}
-		return "Models Loading";
+		return "Loading Models";
 	};
 
 	const totalModelSize = Object.values(status.models).reduce(
@@ -118,10 +118,10 @@ export function ModelStatusIndicator() {
 				<CardTitle className="flex items-center gap-2 text-sm">
 					{getStatusIcon()}
 					{getStatusText()}
-					{status.offline_mode && (
-						<Badge variant="secondary" className="ml-auto">
-							<WifiOff className="w-3 h-3 mr-1" />
-							Offline
+					{!status.offline_mode && (
+						<Badge variant="outline" className="ml-auto border-blue-200 text-blue-700">
+							<Cloud className="w-3 h-3 mr-1" />
+							Online Features
 						</Badge>
 					)}
 				</CardTitle>

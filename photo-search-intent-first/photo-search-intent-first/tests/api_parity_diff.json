@@ -33,7 +33,16 @@
       }
     }
   ],
-  "extra": [],
+  "extra": [
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/check"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/status"
+    }
+  ],
   "missing": [
     {
       "method": "POST",
@@ -66,10 +75,6 @@
     {
       "method": "POST",
       "path": "/data/nuke"
-    },
-    {
-      "method": "GET",
-      "path": "/diagnostics"
     },
     {
       "method": "POST",
@@ -281,10 +286,6 @@
     },
     {
       "method": "GET",
-      "path": "/status/{operation}"
-    },
-    {
-      "method": "GET",
       "path": "/tags"
     },
     {
@@ -354,9 +355,9 @@
   ],
   "summary": {
     "base_count": 124,
-    "candidate_count": 60,
+    "candidate_count": 64,
     "changed": 4,
-    "extra": 0,
-    "missing": 79
+    "extra": 2,
+    "missing": 77
   }
 }

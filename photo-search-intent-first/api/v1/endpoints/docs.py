@@ -74,6 +74,25 @@ async def get_api_docs():
             response_schema="SearchResponse",
             example='{"dir": "/path/to/photos", "query": "red flowers", "top_k": 10}'
         ),
+        # Auth endpoints (fully implemented)
+        EndpointDocumentation(
+            method="GET",
+            path="/api/v1/auth/status",
+            summary="Authentication status",
+            description="Get authentication status for debugging",
+            request_schema="",
+            response_schema="Dict",
+            example='{"X-API-Token": "your_token"}'
+        ),
+        EndpointDocumentation(
+            method="POST",
+            path="/api/v1/auth/check",
+            summary="Authentication check",
+            description="Verify if Authorization header is accepted",
+            request_schema="",
+            response_schema="Dict",
+            example='{"Authorization": "Bearer your_token"}'
+        ),
         # Indexing endpoints (stubs - no actual endpoints yet)
         EndpointDocumentation(
             method="N/A",
