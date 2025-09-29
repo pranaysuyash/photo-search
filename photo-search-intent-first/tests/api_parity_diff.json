@@ -1,0 +1,358 @@
+{
+  "changed": [
+    {
+      "method": "POST",
+      "path": "/api/v1/search/cached",
+      "response_model": {
+        "base": "typing.Dict",
+        "candidate": "api.schemas.v1.SearchResponse"
+      }
+    }
+  ],
+  "extra": [],
+  "missing": [
+    {
+      "method": "POST",
+      "path": "/auth/check"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/status"
+    },
+    {
+      "method": "POST",
+      "path": "/autotag"
+    },
+    {
+      "method": "POST",
+      "path": "/batch/collections"
+    },
+    {
+      "method": "POST",
+      "path": "/batch/delete"
+    },
+    {
+      "method": "POST",
+      "path": "/batch/tag"
+    },
+    {
+      "method": "POST",
+      "path": "/captions/build"
+    },
+    {
+      "method": "GET",
+      "path": "/collections"
+    },
+    {
+      "method": "POST",
+      "path": "/collections"
+    },
+    {
+      "method": "POST",
+      "path": "/collections/delete"
+    },
+    {
+      "method": "POST",
+      "path": "/data/nuke"
+    },
+    {
+      "method": "POST",
+      "path": "/delete"
+    },
+    {
+      "method": "GET",
+      "path": "/diagnostics"
+    },
+    {
+      "method": "POST",
+      "path": "/edit/ops"
+    },
+    {
+      "method": "POST",
+      "path": "/edit/upscale"
+    },
+    {
+      "method": "POST",
+      "path": "/export"
+    },
+    {
+      "method": "POST",
+      "path": "/faces/build"
+    },
+    {
+      "method": "GET",
+      "path": "/faces/clusters"
+    },
+    {
+      "method": "POST",
+      "path": "/faces/merge"
+    },
+    {
+      "method": "POST",
+      "path": "/faces/name"
+    },
+    {
+      "method": "GET",
+      "path": "/faces/photos"
+    },
+    {
+      "method": "POST",
+      "path": "/faces/split"
+    },
+    {
+      "method": "POST",
+      "path": "/fast/build"
+    },
+    {
+      "method": "GET",
+      "path": "/fast/status"
+    },
+    {
+      "method": "GET",
+      "path": "/favorites"
+    },
+    {
+      "method": "POST",
+      "path": "/favorites"
+    },
+    {
+      "method": "POST",
+      "path": "/index"
+    },
+    {
+      "method": "POST",
+      "path": "/index/pause"
+    },
+    {
+      "method": "POST",
+      "path": "/index/resume"
+    },
+    {
+      "method": "GET",
+      "path": "/index/status"
+    },
+    {
+      "method": "GET",
+      "path": "/library"
+    },
+    {
+      "method": "GET",
+      "path": "/library/defaults"
+    },
+    {
+      "method": "GET",
+      "path": "/map"
+    },
+    {
+      "method": "GET",
+      "path": "/metadata"
+    },
+    {
+      "method": "GET",
+      "path": "/metadata/batch"
+    },
+    {
+      "method": "POST",
+      "path": "/metadata/build"
+    },
+    {
+      "method": "GET",
+      "path": "/models/capabilities"
+    },
+    {
+      "method": "POST",
+      "path": "/models/download"
+    },
+    {
+      "method": "POST",
+      "path": "/models/validate"
+    },
+    {
+      "method": "POST",
+      "path": "/ocr/build"
+    },
+    {
+      "method": "POST",
+      "path": "/ocr/snippets"
+    },
+    {
+      "method": "GET",
+      "path": "/ocr/status"
+    },
+    {
+      "method": "POST",
+      "path": "/open"
+    },
+    {
+      "method": "GET",
+      "path": "/presets"
+    },
+    {
+      "method": "POST",
+      "path": "/presets"
+    },
+    {
+      "method": "POST",
+      "path": "/presets/delete"
+    },
+    {
+      "method": "GET",
+      "path": "/saved"
+    },
+    {
+      "method": "POST",
+      "path": "/saved"
+    },
+    {
+      "method": "POST",
+      "path": "/saved/delete"
+    },
+    {
+      "method": "POST",
+      "path": "/scan_count"
+    },
+    {
+      "method": "POST",
+      "path": "/search/cached"
+    },
+    {
+      "method": "POST",
+      "path": "/search/paginated"
+    },
+    {
+      "method": "POST",
+      "path": "/search_like"
+    },
+    {
+      "method": "POST",
+      "path": "/search_like_plus"
+    },
+    {
+      "method": "POST",
+      "path": "/search_workspace"
+    },
+    {
+      "method": "GET",
+      "path": "/settings/excludes"
+    },
+    {
+      "method": "GET",
+      "path": "/share"
+    },
+    {
+      "method": "POST",
+      "path": "/share"
+    },
+    {
+      "method": "GET",
+      "path": "/share/detail"
+    },
+    {
+      "method": "POST",
+      "path": "/share/revoke"
+    },
+    {
+      "method": "GET",
+      "path": "/share/{token}/view"
+    },
+    {
+      "method": "GET",
+      "path": "/smart_collections"
+    },
+    {
+      "method": "POST",
+      "path": "/smart_collections"
+    },
+    {
+      "method": "POST",
+      "path": "/smart_collections/delete"
+    },
+    {
+      "method": "POST",
+      "path": "/smart_collections/resolve"
+    },
+    {
+      "method": "GET",
+      "path": "/status/{operation}"
+    },
+    {
+      "method": "GET",
+      "path": "/tags"
+    },
+    {
+      "method": "POST",
+      "path": "/tags"
+    },
+    {
+      "method": "POST",
+      "path": "/thumb/batch"
+    },
+    {
+      "method": "GET",
+      "path": "/thumb_face"
+    },
+    {
+      "method": "POST",
+      "path": "/thumbs"
+    },
+    {
+      "method": "GET",
+      "path": "/trips"
+    },
+    {
+      "method": "POST",
+      "path": "/trips/build"
+    },
+    {
+      "method": "POST",
+      "path": "/undo_delete"
+    },
+    {
+      "method": "GET",
+      "path": "/video/metadata"
+    },
+    {
+      "method": "GET",
+      "path": "/video/thumbnail"
+    },
+    {
+      "method": "GET",
+      "path": "/videos"
+    },
+    {
+      "method": "POST",
+      "path": "/videos/index"
+    },
+    {
+      "method": "POST",
+      "path": "/watch/start"
+    },
+    {
+      "method": "GET",
+      "path": "/watch/status"
+    },
+    {
+      "method": "POST",
+      "path": "/watch/stop"
+    },
+    {
+      "method": "GET",
+      "path": "/workspace"
+    },
+    {
+      "method": "POST",
+      "path": "/workspace/add"
+    },
+    {
+      "method": "POST",
+      "path": "/workspace/remove"
+    }
+  ],
+  "summary": {
+    "base_count": 124,
+    "candidate_count": 55,
+    "changed": 1,
+    "extra": 0,
+    "missing": 84
+  }
+}
