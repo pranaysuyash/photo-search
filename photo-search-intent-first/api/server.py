@@ -61,6 +61,7 @@ from api.routers.editing import router as editing_router
 from api.routers.fast_index import router as fast_index_router
 from api.routers.favorites import router as favorites_router
 from api.routers.file_management import router as file_management_router
+from api.routers.index import router as index_router
 from api.routers.indexing import router as indexing_router
 from api.routers.config import router as config_router
 from api.routers.library import router as library_router
@@ -165,6 +166,7 @@ app.include_router(editing_router)
 app.include_router(fast_index_router)
 app.include_router(favorites_router)
 app.include_router(file_management_router)
+app.include_router(index_router)
 app.include_router(library_router)
 app.include_router(metadata_router)
 app.include_router(models_router)

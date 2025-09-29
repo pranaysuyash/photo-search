@@ -1,5 +1,5 @@
 """
-Debug script to see what the faces split endpoint is returning.
+Debug script to see what the OCR build endpoint is returning.
 """
 from __future__ import annotations
 
@@ -14,23 +14,22 @@ from fastapi.testclient import TestClient
 
 from api.server import app  # type: ignore
 
-def debug_faces_split():
-    """Debug the faces split endpoint."""
+def debug_ocr_build():
+    """Debug the OCR build endpoint."""
     client = TestClient(app)
     
     # Create a test directory
     photos_dir = Path("/tmp/debug_photos")
     photos_dir.mkdir(exist_ok=True)
     
-    # Test the faces split endpoint
-    response = client.post("/api/v1/faces/split", json={
+    # Test the OCR build endpoint
+    response = client.post("/api/v1/ocr/build", json={
         "dir": str(photos_dir),
-        "cluster_id": "1",
-        "photo_paths": ["/path/to/photo1.jpg", "/path/to/photo2.jpg"]
+        "provider": "local"
     })
     
     print(f"Status code: {response.status_code}")
     print(f"Response: {response.json()}")
 
 if __name__ == "__main__":
-    debug_faces_split()
+    debug_ocr_build()

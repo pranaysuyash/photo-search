@@ -202,22 +202,6 @@
     },
     {
       "method": "POST",
-      "path": "/index"
-    },
-    {
-      "method": "POST",
-      "path": "/index/pause"
-    },
-    {
-      "method": "POST",
-      "path": "/index/resume"
-    },
-    {
-      "method": "GET",
-      "path": "/index/status"
-    },
-    {
-      "method": "POST",
       "path": "/open"
     },
     {
@@ -299,9 +283,9 @@
   ],
   "summary": {
     "base_count": 124,
-    "candidate_count": 144,
+    "candidate_count": 148,
     "changed": 4,
     "extra": 35,
-    "missing": 30
+    "missing": 26
   }
 }
