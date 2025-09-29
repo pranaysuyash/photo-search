@@ -15,6 +15,22 @@
         "base": "api.schemas.v1.BaseResponse",
         "candidate": "typing.Dict"
       }
+    },
+    {
+      "method": "POST",
+      "path": "/delete",
+      "response_model": {
+        "base": "builtins.dict",
+        "candidate": "typing.Dict"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/undo_delete",
+      "response_model": {
+        "base": "builtins.dict",
+        "candidate": "typing.Dict"
+      }
     }
   ],
   "extra": [],
@@ -50,10 +66,6 @@
     {
       "method": "POST",
       "path": "/data/nuke"
-    },
-    {
-      "method": "POST",
-      "path": "/delete"
     },
     {
       "method": "GET",
@@ -300,10 +312,6 @@
       "path": "/trips/build"
     },
     {
-      "method": "POST",
-      "path": "/undo_delete"
-    },
-    {
       "method": "GET",
       "path": "/video/metadata"
     },
@@ -346,9 +354,9 @@
   ],
   "summary": {
     "base_count": 124,
-    "candidate_count": 58,
-    "changed": 2,
+    "candidate_count": 60,
+    "changed": 4,
     "extra": 0,
-    "missing": 81
+    "missing": 79
   }
 }
