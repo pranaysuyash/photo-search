@@ -73,6 +73,8 @@ from api.routers.tagging import router as tagging_router
 from api.routers.trips import router as trips_router
 from api.routers.utilities import router as utilities_router
 from api.routers.videos import router as videos_router
+from api.routers.watch import router as watch_router
+from api.routers.workspace import router as workspace_router
 from api.attention import router as attention_router  # NEW: adaptive attention (scaffold)
 from api.routes.health import router as health_router  # Extracted health & root endpoints
 from infra.analytics import log_search, _analytics_file, _write_event as _write_event_infra
@@ -173,6 +175,8 @@ app.include_router(tagging_router)
 app.include_router(trips_router)
 app.include_router(utilities_router)
 app.include_router(videos_router)
+app.include_router(watch_router)
+app.include_router(workspace_router)
 
 # Mount versioned API router
 app.include_router(api_v1)

@@ -295,37 +295,13 @@
     {
       "method": "POST",
       "path": "/thumbs"
-    },
-    {
-      "method": "POST",
-      "path": "/watch/start"
-    },
-    {
-      "method": "GET",
-      "path": "/watch/status"
-    },
-    {
-      "method": "POST",
-      "path": "/watch/stop"
-    },
-    {
-      "method": "GET",
-      "path": "/workspace"
-    },
-    {
-      "method": "POST",
-      "path": "/workspace/add"
-    },
-    {
-      "method": "POST",
-      "path": "/workspace/remove"
     }
   ],
   "summary": {
     "base_count": 124,
-    "candidate_count": 138,
+    "candidate_count": 144,
     "changed": 4,
     "extra": 35,
-    "missing": 36
+    "missing": 30
   }
 }
