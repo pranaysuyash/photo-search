@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Body, Query
 
-from api.schemas.v1 import TagsRequest
+from api.schemas.v1 import TagsRequest, TagResponse, TagsListResponse, AutoTagResponse
 from api.utils import _from_body, _require, _emb
 from infra.index_store import IndexStore
 from infra.tags import load_tags, save_tags, all_tags
@@ -16,14 +16,14 @@ from infra.tags import load_tags, save_tags, all_tags
 router = APIRouter(tags=["tagging"])
 
 
-@router.post("/autotag")
+@router.post("/autotag", response_model=AutoTagResponse)
 def api_autotag(
     directory: Optional[str] = None,
     provider: Optional[str] = None,
     min_len: Optional[int] = None,
     max_tags_per_image: Optional[int] = None,
     body: Optional[Dict[str, Any]] = Body(None),
-) -> Dict[str, Any]:
+) -> AutoTagResponse:
     """Derive simple tags from captions (if available) and add them to tags.json.
     Heuristic: split on non-letters, lowercase, drop stopwords/short tokens, keep unique tokens.
     """
@@ -38,7 +38,7 @@ def api_autotag(
     store.load()
     cap_p = store.cap_texts_file
     if not cap_p.exists():
-        return {"updated": 0}
+        return AutoTagResponse(ok=True, updated=0)
     try:
         data = json.loads(cap_p.read_text())
         texts = {p: t for p, t in zip(data.get('paths', []), data.get('texts', []))}
@@ -65,21 +65,21 @@ def api_autotag(
             tmap[p] = sorted(cur)
             updated += 1
     save_tags(store.index_dir, tmap)
-    return {"updated": updated}
+    return AutoTagResponse(ok=True, updated=updated)
 
 
-@router.get("/tags")
-def api_get_tags(directory: str = Query(..., alias="dir")) -> Dict[str, Any]:
+@router.get("/tags", response_model=TagsListResponse)
+def api_get_tags(directory: str = Query(..., alias="dir")) -> TagsListResponse:
     """Get all tags for a directory."""
     store = IndexStore(Path(directory))
-    return {"tags": load_tags(store.index_dir), "all": all_tags(store.index_dir)}
+    return TagsListResponse(ok=True, tags=load_tags(store.index_dir), all=all_tags(store.index_dir))
 
 
-@router.post("/tags")
-def api_set_tags(req: TagsRequest) -> Dict[str, Any]:
+@router.post("/tags", response_model=TagResponse)
+def api_set_tags(req: TagsRequest) -> TagResponse:
     """Set tags for a specific photo."""
     store = IndexStore(Path(req.dir))
     t = load_tags(store.index_dir)
     t[req.path] = sorted({s.strip() for s in req.tags if s.strip()})
     save_tags(store.index_dir, t)
-    return {"ok": True, "tags": t[req.path]}
+    return TagResponse(ok=True, path=req.path, tags=t[req.path])

@@ -7,10 +7,13 @@ from fastapi import APIRouter, Body, HTTPException, Query
 from fastapi.responses import HTMLResponse
 
 from api.schemas.v1 import (
-    BaseResponse,
-    ShareRequest,
-    ShareResponse,
-    ShareRevokeRequest,
+  BaseResponse,
+  ShareRequest,
+  ShareResponse,
+  ShareRevokeRequest,
+  ShareListResponse,
+  ShareListItem,
+  ShareDetailResponse,
 )
 from infra.config import config
 from infra.shares import (
@@ -25,9 +28,9 @@ from infra.shares import (
 router = APIRouter()
 
 
-@router.post("/share")
+@router.post("/share", response_model=ShareResponse)
 def create_share(
-    req: ShareRequest = Body(...),
+  req: ShareRequest = Body(...),
 ) -> ShareResponse:
     """Create a new share with optional password protection and expiry."""
     folder = Path(req.dir or req.directory)
@@ -53,8 +56,8 @@ def create_share(
         raise HTTPException(500, f"Create share failed: {e}")
 
 
-@router.get("/share")
-def list_shares(directory: Optional[str] = Query(None, alias="dir")) -> Dict[str, Any]:
+@router.get("/share", response_model=ShareListResponse)
+def list_shares(directory: Optional[str] = Query(None, alias="dir")) -> ShareListResponse:
     """List all shares, optionally filtered by directory."""
     try:
         items = _share_list(dir_filter=directory)
@@ -70,14 +73,29 @@ def list_shares(directory: Optional[str] = Query(None, alias="dir")) -> Dict[str
                 "view_only": bool(it.view_only),
                 "expired": _share_expired(it),
             })
-        return {"shares": out}
+        return ShareListResponse(
+            ok=True,
+            shares=[
+                ShareListItem(
+                    token=it["token"],
+                    created=it["created"],
+                    expires=it["expires"],
+                    dir=it["dir"],
+                    provider=it["provider"],
+                    count=it["count"],
+                    view_only=it["view_only"],
+                    expired=it["expired"],
+                )
+                for it in out
+            ],
+        )
     except Exception:
-        return {"shares": []}
+        # Preserve legacy silent-fail behavior on error (empty list rather than 500)
+        return ShareListResponse(ok=True, shares=[])
 
-
-@router.post("/share/revoke")
+@router.post("/share/revoke", response_model=BaseResponse)
 def revoke_share(
-    req: ShareRevokeRequest = Body(...),
+  req: ShareRevokeRequest = Body(...),
 ) -> BaseResponse:
     """Revoke an existing share by token."""
     try:
@@ -87,31 +105,33 @@ def revoke_share(
         return BaseResponse(ok=False)
 
 
-@router.get("/share/detail")
-def get_share_detail(token: str, password: Optional[str] = None) -> Dict[str, Any]:
+@router.get("/share/detail", response_model=ShareDetailResponse)
+def get_share_detail(token: str, password: Optional[str] = None) -> ShareDetailResponse:
     """Return share record details; if password protected, require matching password."""
     try:
         rec = _share_load(str(token))
         if rec is None:
             raise HTTPException(404, "Share not found")
+
+        # Expiry check
         if _share_expired(rec):
-            return {"ok": False, "error": "expired"}
-        
-        # Password validation
+            return ShareDetailResponse(ok=False, error="expired")
+
+        # Password validation (if set and invalid)
         if not _share_validate(rec, password):
-            return {"ok": False, "error": "password_required"}
-        
-        return {
-            "ok": True,
-            "token": rec.token,
-            "created": rec.created,
-            "expires": rec.expires,
-            "dir": rec.dir,
-            "provider": rec.provider,
-            "paths": rec.paths,
-            "view_only": bool(rec.view_only),
-            "has_password": bool(rec.pass_hash),
-        }
+            return ShareDetailResponse(ok=False, error="password_required")
+
+        return ShareDetailResponse(
+            ok=True,
+            token=rec.token,
+            created=rec.created,
+            expires=rec.expires,
+            dir=rec.dir,
+            provider=rec.provider,
+            paths=rec.paths or [],
+            view_only=bool(rec.view_only),
+            has_password=bool(rec.pass_hash),
+        )
     except HTTPException:
         raise
     except Exception as e:

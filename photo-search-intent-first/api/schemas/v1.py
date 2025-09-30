@@ -42,12 +42,58 @@ class IndexResponse(BaseResponse):
     job_id: Optional[str] = None
 
 
+class IndexStatusResponse(BaseResponse):
+    """Response model for /index/status endpoint.
+
+    This normalizes the previously ad-hoc dict so clients get a stable
+    contract. All numeric fields are optional because legacy indexes may
+    omit them. Additional fields can be appended non-breaking later.
+    """
+    ok: bool = True
+    state: Optional[str] = None
+    total: Optional[int] = None
+    indexed: Optional[int] = None
+    coverage: Optional[float] = None
+    drift: Optional[int] = None
+    paused: Optional[bool] = None
+    last_index_time: Optional[float] = None
+
+
 class ShareResponse(BaseResponse):
     """Response model for share operations."""
     ok: bool = True
     token: Optional[str] = None
     url: Optional[str] = None
     expires: Optional[str] = None
+
+
+class ShareListItem(BaseModel):
+    token: str
+    created: Optional[str] = None
+    expires: Optional[str] = None
+    dir: Optional[str] = None
+    provider: Optional[str] = None
+    count: int = 0
+    view_only: bool = True
+    expired: bool = False
+
+
+class ShareListResponse(BaseResponse):
+    ok: bool = True
+    shares: List[ShareListItem] = Field(default_factory=list)
+
+
+class ShareDetailResponse(BaseResponse):
+    ok: bool = True
+    token: Optional[str] = None
+    created: Optional[str] = None
+    expires: Optional[str] = None
+    dir: Optional[str] = None
+    provider: Optional[str] = None
+    paths: List[str] = Field(default_factory=list)
+    view_only: bool = True
+    has_password: bool = False
+    error: Optional[str] = None
 
 
 class FavoriteResponse(BaseResponse):
@@ -64,11 +110,36 @@ class TagResponse(BaseResponse):
     tags: List[str] = Field(default_factory=list)
 
 
+class TagsListResponse(BaseResponse):
+    """Response model for listing all tags and per-path mapping."""
+    ok: bool = True
+    tags: Dict[str, List[str]] = Field(default_factory=dict, description="Mapping path -> tags")
+    all: List[str] = Field(default_factory=list, description="Flattened unique tag list")
+
+
+class AutoTagResponse(BaseResponse):
+    """Response model for autotag operation results."""
+    ok: bool = True
+    updated: int = 0
+
+
 class CollectionResponse(BaseResponse):
     """Response model for collection operations."""
     ok: bool = True
     name: Optional[str] = None
     paths: List[str] = Field(default_factory=list)
+
+
+class CollectionsResponse(BaseResponse):
+    """Response model for listing all collections."""
+    ok: bool = True
+    collections: Dict[str, List[str]] = Field(default_factory=dict, description="Mapping collection name -> list of paths")
+
+
+class CollectionDeleteResponse(BaseResponse):
+    """Response model for collection deletion."""
+    ok: bool = True
+    deleted: Optional[str] = None
 
 
 class HealthResponse(BaseResponse):
@@ -291,10 +362,18 @@ __all__ = [
     "ErrorResponse",
     "SuccessResponse",
     "IndexResponse",
+    "IndexStatusResponse",
     "ShareResponse",
+    "ShareListItem",
+    "ShareListResponse",
+    "ShareDetailResponse",
     "FavoriteResponse",
     "TagResponse",
+    "TagsListResponse",
+    "AutoTagResponse",
     "CollectionResponse",
+    "CollectionsResponse",
+    "CollectionDeleteResponse",
     "HealthResponse",
     "SearchRequest",
     "SearchResponse",

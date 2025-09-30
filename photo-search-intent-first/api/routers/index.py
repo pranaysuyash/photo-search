@@ -16,7 +16,7 @@ from api.utils import _require, _from_body, _emb
 from infra.index_store import IndexStore
 from infra.analytics import _analytics_file, _write_event
 from usecases.index_photos import index_photos
-from api.schemas.v1 import IndexResponse
+from api.schemas.v1 import IndexResponse, IndexStatusResponse, SuccessResponse
 
 router = APIRouter()
 
@@ -89,13 +89,13 @@ def api_index(
         raise HTTPException(500, f"Indexing failed: {str(e)}")
 
 
-@router.get("/index/status")
+@router.get("/index/status", response_model=IndexStatusResponse)
 def api_index_status(
-    directory: str = Query(..., alias="dir"), 
-    provider: str = "local", 
-    hf_token: Optional[str] = None, 
-    openai_key: Optional[str] = None
-) -> Dict[str, Any]:
+    directory: str = Query(..., alias="dir"),
+    provider: str = "local",
+    hf_token: Optional[str] = None,
+    openai_key: Optional[str] = None,
+) -> IndexStatusResponse:
     """Get the current status of indexing for a directory."""
     folder = Path(directory)
     if not folder.exists():
@@ -139,12 +139,13 @@ def api_index_status(
         # Provide a minimal snapshot from diagnostics as fallback
         try:
             store.load()
-            return {
-                'state': 'idle',
-                'total': len(store.state.paths or []),
-            }
+            return IndexStatusResponse(
+                ok=True,
+                state='idle',
+                total=len(store.state.paths or []),
+            )
         except Exception:
-            return { 'state': 'idle' }
+            return IndexStatusResponse(ok=True, state='idle')
     
     try:
         data = json.loads(status_file.read_text(encoding='utf-8'))
@@ -191,41 +192,42 @@ def api_index_status(
             except Exception:
                 pass
         
-        return data
+        return IndexStatusResponse(ok=True, **data)
     except Exception:
-        return { 'state': 'unknown' }
+        return IndexStatusResponse(ok=False, state='unknown')
 
 
-@router.post("/index/pause")
+@router.post("/index/pause", response_model=SuccessResponse)
 def api_index_pause(
-    dir: Optional[str] = None,
+    directory_param: Optional[str] = None,
     body: Optional[Dict[str, Any]] = Body(None),
-) -> Dict[str, Any]:
+) -> SuccessResponse:
     """Pause indexing operations for a directory."""
-    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    # Support both direct param and legacy body key 'dir'
+    dir_value = _require(_from_body(body, directory_param, "dir"), "dir")
     store = IndexStore(Path(dir_value))
     p = store.index_dir / 'index_control.json'
     try:
         p.parent.mkdir(parents=True, exist_ok=True)
         with open(p, 'w', encoding='utf-8') as fh:
-            fh.write(json.dumps({ 'pause': True }))
-        return { 'ok': True }
+            fh.write(json.dumps({'pause': True}))
+        return SuccessResponse(ok=True, data={'paused': True})
     except Exception as e:
         raise HTTPException(500, f"Pause failed: {e}")
 
 
-@router.post("/index/resume")
+@router.post("/index/resume", response_model=SuccessResponse)
 def api_index_resume(
-    dir: Optional[str] = None,
+    directory_param: Optional[str] = None,
     body: Optional[Dict[str, Any]] = Body(None),
-) -> Dict[str, Any]:
+) -> SuccessResponse:
     """Resume indexing operations for a directory."""
-    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    dir_value = _require(_from_body(body, directory_param, "dir"), "dir")
     store = IndexStore(Path(dir_value))
     p = store.index_dir / 'index_control.json'
     try:
         if p.exists():
             p.unlink()
-        return { 'ok': True }
+        return SuccessResponse(ok=True, data={'paused': False})
     except Exception as e:
         raise HTTPException(500, f"Resume failed: {e}")

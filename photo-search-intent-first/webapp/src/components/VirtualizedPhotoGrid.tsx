@@ -1,451 +1,306 @@
-// Virtualized Photo Grid Component
-// User Intent: "I want the app to stay fast even with thousands of photos"
-// High-performance grid that only renders visible photos
-
-import { Check, Download, Heart, Info, Play, Share2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ProgressiveImage } from "./ProgressiveImage";
-import { matchAnalyzer, SearchExplainability } from "./SearchExplainability";
-
-interface Photo {
-	id: string;
-	path: string;
-	thumbnail?: string;
-	width?: number;
-	height?: number;
-	caption?: string;
-	tags?: string[];
-	date?: Date | string;
-	favorite?: boolean;
-	selected?: boolean;
-	type?: "image" | "video";
-	duration?: number;
-	matchReasons?: unknown[];
-}
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Grid } from 'react-window';
+import AutoSizer from 'react-virtualized-auto-sizer';
+import { useInfiniteLibraryScroll, usePredictivePreloading } from '../hooks/useInfiniteLibraryScroll';
+import { LazyImage } from './LazyImage';
+import { Card } from './ui/card';
+import { Button } from './ui/shadcn/Button';
+import { Badge } from './ui/badge';
+import { usePerformanceMonitor } from '../services/PerformanceMonitor';
 
 interface VirtualizedPhotoGridProps {
-	photos: Photo[];
-	gridColumns?: number;
-	itemHeight?: number;
-	overscan?: number;
-	onPhotoClick?: (photo: Photo, index: number) => void;
-	onPhotoSelect?: (photo: Photo, selected: boolean) => void;
-	onPhotoFavorite?: (photo: Photo) => void;
-	selectedPhotos?: Set<string>;
-	searchQuery?: string;
-	showExplainability?: boolean;
-	className?: string;
+  dir: string;
+  engine: string;
+  onItemClick?: (path: string) => void;
+  className?: string;
+  imageQuality?: 'low' | 'medium' | 'high';
+  showMetrics?: boolean;
 }
+
+interface GridItemData {
+  items: string[];
+  onItemClick?: (path: string) => void;
+  imageQuality: string;
+  isPreloaded: (item: string) => boolean;
+}
+
+const GridItem: React.FC<{
+  columnIndex: number;
+  rowIndex: number;
+  style: React.CSSProperties;
+  data: GridItemData;
+}> = ({ columnIndex, rowIndex, style, data }) => {
+  const { items, onItemClick, imageQuality, isPreloaded } = data;
+  const index = rowIndex * Math.floor(window.innerWidth / 200) + columnIndex; // Approximate columns
+  const item = items[index];
+
+  if (!item) {
+    return (
+      <div style={style} className="flex items-center justify-center bg-gray-100 rounded">
+        <div className="text-gray-400 text-sm">Empty</div>
+      </div>
+    );
+  }
+
+  const fileName = item.split('/').pop() || 'Unknown';
+  const preloaded = isPreloaded(item);
+
+  return (
+    <div style={style} className="p-1">
+      <Card
+        className={`relative group cursor-pointer overflow-hidden transition-all duration-200 hover:shadow-lg ${
+          preloaded ? 'ring-2 ring-blue-200' : ''
+        }`}
+        onClick={() => onItemClick?.(item)}
+      >
+        <div className="aspect-square relative">
+          <LazyImage
+            src={item}
+            alt={fileName}
+            className="w-full h-full object-cover"
+            placeholder={
+              <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse flex items-center justify-center">
+                <div className="text-gray-400 text-xs text-center px-2">
+                  {fileName.length > 20 ? fileName.substring(0, 20) + '...' : fileName}
+                </div>
+              </div>
+            }
+            quality={imageQuality}
+            loading="lazy"
+          />
+
+          {/* Overlay with file info */}
+          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 flex items-end">
+            <div className="p-2 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              <div className="text-xs truncate">{fileName}</div>
+              {preloaded && (
+                <Badge variant="secondary" className="text-xs mt-1">
+                  Preloaded
+                </Badge>
+              )}
+            </div>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+};
 
 export function VirtualizedPhotoGrid({
-	photos,
-	gridColumns = 4,
-	itemHeight = 250,
-	overscan = 3,
-	onPhotoClick,
-	onPhotoSelect,
-	onPhotoFavorite,
-	selectedPhotos = new Set(),
-	searchQuery,
-	showExplainability = false,
-	className = "",
+  dir,
+  engine,
+  onItemClick,
+  className = '',
+  imageQuality = 'medium',
+  showMetrics = false
 }: VirtualizedPhotoGridProps) {
-	const containerRef = useRef<HTMLDivElement>(null);
-	const [scrollTop, setScrollTop] = useState(0);
-	const [containerHeight, setContainerHeight] = useState(0);
-	const [hoveredPhoto, setHoveredPhoto] = useState<string | null>(null);
-	const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
-	const [columns, setColumns] = useState(gridColumns);
+  const [currentScrollIndex, setCurrentScrollIndex] = useState(0);
+  const gridRef = useRef<any>(null);
+  const performanceMonitor = usePerformanceMonitor();
 
-	// Calculate responsive columns based on container width
-	useEffect(() => {
-		const updateColumns = () => {
-			if (containerRef.current) {
-				const width = containerRef.current.clientWidth;
-				if (width < 640) setColumns(2);
-				else if (width < 768) setColumns(3);
-				else if (width < 1024) setColumns(4);
-				else if (width < 1280) setColumns(5);
-				else setColumns(6);
-			}
-		};
+  // Use infinite scroll hook
+  const {
+    items,
+    loading,
+    hasMore,
+    error,
+    loadMore,
+    reset,
+    totalItems,
+    loadedItems,
+    memoryUsage
+  } = useInfiniteLibraryScroll(dir, engine, {
+    initialBatchSize: 500,
+    batchSize: 1000,
+    threshold: 500,
+    maxMemoryMB: 300,
+    enablePreload: true
+  });
 
-		updateColumns();
-		window.addEventListener("resize", updateColumns);
-		return () => window.removeEventListener("resize", updateColumns);
-	}, []);
+  // Use predictive preloading
+  const { isPreloaded } = usePredictivePreloading(items, currentScrollIndex, 10);
 
-	// Calculate grid dimensions
-	const rowCount = Math.ceil(photos.length / columns);
-	const totalHeight = rowCount * itemHeight;
+  // Calculate grid dimensions
+  const getGridDimensions = useCallback((width: number) => {
+    const minItemWidth = 180;
+    const gap = 8;
+    const columns = Math.max(1, Math.floor((width - gap) / (minItemWidth + gap)));
+    const itemWidth = (width - gap * (columns + 1)) / columns;
+    const itemHeight = itemWidth; // Square items
 
-	// Calculate visible range
-	const startRow = Math.max(0, Math.floor(scrollTop / itemHeight) - overscan);
-	const endRow = Math.min(
-		rowCount,
-		Math.ceil((scrollTop + containerHeight) / itemHeight) + overscan,
-	);
+    return {
+      columns,
+      itemWidth: itemWidth + gap,
+      itemHeight: itemHeight + gap,
+      rowHeight: itemHeight + gap
+    };
+  }, []);
 
-	const startIndex = startRow * columns;
-	const endIndex = Math.min(photos.length, endRow * columns);
+  // Handle scroll events for predictive preloading
+  const handleScroll = useCallback(({ scrollTop }: { scrollTop: number }) => {
+    if (gridRef.current) {
+      const { itemHeight } = getGridDimensions(window.innerWidth);
+      const newIndex = Math.floor(scrollTop / itemHeight);
+      setCurrentScrollIndex(newIndex);
+    }
+  }, [getGridDimensions]);
 
-	// Handle scroll
-	const handleScroll = useCallback(() => {
-		if (containerRef.current) {
-			setScrollTop(containerRef.current.scrollTop);
-		}
-	}, []);
+  // Track performance metrics
+  useEffect(() => {
+    const renderStart = performance.now();
 
-	// Update container height on resize
-	useEffect(() => {
-		const updateHeight = () => {
-			if (containerRef.current) {
-				setContainerHeight(containerRef.current.clientHeight);
-			}
-		};
+    // Update performance metrics
+    performanceMonitor.updateLibraryMetrics({
+      totalItems,
+      loadedItems,
+      virtualizationEnabled: true,
+      visibleItems: Math.min(items.length, 100), // Approximate visible items
+      totalRenderedItems: items.length
+    });
 
-		updateHeight();
-		window.addEventListener("resize", updateHeight);
-		return () => window.removeEventListener("resize", updateHeight);
-	}, []);
+    // Record grid render time
+    const renderEnd = performance.now();
+    performanceMonitor.recordGridRenderTime(renderEnd - renderStart);
+  }, [items.length, totalItems, loadedItems, performanceMonitor]);
 
-	// Preload images for smooth scrolling
-	const preloadImage = useCallback(
-		(src: string) => {
-			if (!loadedImages.has(src)) {
-				const img = new Image();
-				img.src = src;
-				img.onload = () => {
-					setLoadedImages((prev) => new Set(prev).add(src));
-				};
-			}
-		},
-		[loadedImages],
-	);
+  // Memoize grid item data
+  const gridItemData = useMemo<GridItemData>(() => ({
+    items,
+    onItemClick,
+    imageQuality,
+    isPreloaded
+  }), [items, onItemClick, imageQuality, isPreloaded]);
 
-	// Preload nearby images
-	useEffect(() => {
-		const preloadStart = Math.max(0, startIndex - columns * 2);
-		const preloadEnd = Math.min(photos.length, endIndex + columns * 2);
+  // Calculate total rows needed
+  const getTotalRows = useCallback((width: number) => {
+    const { columns } = getGridDimensions(width);
+    return Math.ceil(items.length / columns);
+  }, [items.length, getGridDimensions]);
 
-		for (let i = preloadStart; i < preloadEnd; i++) {
-			const photo = photos[i];
-			if (photo.thumbnail || photo.path) {
-				preloadImage(photo.thumbnail || photo.path);
-			}
-		}
-	}, [startIndex, endIndex, photos, columns, preloadImage]);
+  // Performance metrics
+  const performanceMetrics = useMemo(() => {
+    if (!showMetrics) return null;
 
-	// Keyboard navigation
-	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
-			if (
-				e.target instanceof HTMLInputElement ||
-				e.target instanceof HTMLTextAreaElement
-			) {
-				return;
-			}
+    return (
+      <div className="fixed bottom-4 right-4 bg-white rounded-lg shadow-lg p-4 border z-50">
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span>Total Items:</span>
+            <span className="font-mono">{totalItems.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Loaded:</span>
+            <span className="font-mono">{loadedItems.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Memory:</span>
+            <span className={`font-mono ${memoryUsage > 250 ? 'text-red-600' : 'text-green-600'}`}>
+              {memoryUsage}MB
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span>Loading:</span>
+            <span className="font-mono">{loading ? 'Yes' : 'No'}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }, [showMetrics, totalItems, loadedItems, memoryUsage, loading]);
 
-			switch (e.key) {
-				case "ArrowLeft":
-					e.preventDefault();
-					// Navigate left
-					break;
-				case "ArrowRight":
-					e.preventDefault();
-					// Navigate right
-					break;
-				case "ArrowUp":
-					e.preventDefault();
-					// Navigate up
-					break;
-				case "ArrowDown":
-					e.preventDefault();
-					// Navigate down
-					break;
-			}
-		};
+  // Sentinel element for infinite scroll
+  const Sentinel = () => (
+    <div
+      ref={(el) => {
+        if (el && hasMore && !loading) {
+          // This element will be observed by the intersection observer
+          el.setAttribute('data-sentinel', 'true');
+        }
+      }}
+      className="flex justify-center items-center py-8"
+    >
+      {loading && (
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-sm text-gray-600">Loading more photos...</p>
+        </div>
+      )}
+      {error && (
+        <div className="text-center">
+          <p className="text-red-600 mb-2">Error loading photos</p>
+          <Button onClick={loadMore} variant="outline" size="sm">
+            Retry
+          </Button>
+        </div>
+      )}
+      {!hasMore && items.length > 0 && (
+        <div className="text-center text-gray-500">
+          <p>All photos loaded</p>
+          <p className="text-sm">Showing {items.length} of {totalItems} photos</p>
+        </div>
+      )}
+    </div>
+  );
 
-		window.addEventListener("keydown", handleKeyDown);
-		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, []);
+  if (error && items.length === 0) {
+    return (
+      <div className={`flex flex-col items-center justify-center p-8 ${className}`}>
+        <div className="text-center">
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Library</h3>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <Button onClick={reset} variant="outline">
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
-	// Render photo item
-	const renderPhotoItem = (photo: Photo, index: number) => {
-		const isSelected = selectedPhotos.has(photo.id);
-		const isHovered = hoveredPhoto === photo.id;
-		const _isLoaded = loadedImages.has(photo.thumbnail || photo.path);
+  return (
+    <div className={`relative ${className}`}>
+      {showMetrics && performanceMetrics}
 
-		// Calculate match reasons if searching
-		const matchReasons =
-			searchQuery && showExplainability
-				? matchAnalyzer.analyzeMatch(photo, searchQuery)
-				: [];
+      {items.length === 0 && !loading ? (
+        <div className="flex flex-col items-center justify-center p-8">
+          <div className="text-center">
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No Photos Found</h3>
+            <p className="text-gray-600">Check your directory and try again.</p>
+          </div>
+        </div>
+      ) : (
+        <div className="h-full">
+          <AutoSizer>
+            {({ width, height }) => {
+              const { columns, itemWidth, rowHeight } = getGridDimensions(width);
+              const totalRows = getTotalRows(width);
 
-		return (
-			<button
-				key={photo.id}
-				type="button"
-				className="photo-item relative group cursor-pointer"
-				style={{
-					position: "absolute",
-					left: `${(index % columns) * (100 / columns)}%`,
-					top: `${Math.floor(index / columns) * itemHeight}px`,
-					width: `${100 / columns}%`,
-					height: `${itemHeight}px`,
-					padding: "4px",
-				}}
-				onMouseEnter={() => setHoveredPhoto(photo.id)}
-				onMouseLeave={() => setHoveredPhoto(null)}
-				onClick={() => onPhotoClick?.(photo, index)}
-				onKeyDown={(e) => {
-					if (e.key === "Enter" || e.key === " ") {
-						e.preventDefault();
-						onPhotoClick?.(photo, index);
-					}
-				}}
-				aria-label={`View ${photo.caption || "photo"}`}
-			>
-				<div
-					className={`
-          relative w-full h-full rounded-lg overflow-hidden
-          ${isSelected ? "ring-2 ring-blue-500" : ""}
-          ${isHovered ? "transform scale-[1.02] shadow-lg" : ""}
-          transition-all duration-200
-        `}
-				>
-					{/* Progressive image loading */}
-					<ProgressiveImage
-						src={photo.thumbnail || photo.path}
-						alt={photo.caption || "Photo"}
-						className="w-full h-full"
-						thumbSize={96}
-						mediumSize={256}
-						fullSize={512}
-						enableLazyLoading={true}
-						onLoad={() =>
-							setLoadedImages((prev) =>
-								new Set(prev).add(photo.thumbnail || photo.path),
-							)
-						}
-						loadingComponent={
-							<div className="absolute inset-0 bg-gray-200 dark:bg-gray-700 animate-pulse" />
-						}
-					/>
+              return (
+                <div className="relative" style={{ height }}>
+                  <Grid
+                    ref={gridRef}
+                    columnCount={columns}
+                    columnWidth={itemWidth}
+                    height={height - 100} // Leave space for sentinel
+                    rowCount={totalRows}
+                    rowHeight={rowHeight}
+                    itemData={gridItemData}
+                    onScroll={handleScroll}
+                  >
+                    {GridItem}
+                  </Grid>
 
-					{/* Video indicator */}
-					{photo.type === "video" && (
-						<div className="absolute top-2 right-2 bg-black/60 rounded-full p-1.5">
-							<Play className="w-4 h-4 text-white fill-white" />
-							{photo.duration && (
-								<span className="absolute -bottom-5 right-0 text-xs text-white bg-black/60 px-1 rounded">
-									{formatDuration(photo.duration)}
-								</span>
-							)}
-						</div>
-					)}
-
-					{/* Selection checkbox */}
-					<button
-						type="button"
-						className={`
-              absolute top-2 left-2 
-              ${isHovered || isSelected ? "opacity-100" : "opacity-0"}
-              transition-opacity duration-200
-            `}
-						onClick={(e) => {
-							e.stopPropagation();
-							onPhotoSelect?.(photo, !isSelected);
-						}}
-						onKeyDown={(e) => {
-							if (e.key === "Enter" || e.key === " ") {
-								e.preventDefault();
-								e.stopPropagation();
-								onPhotoSelect?.(photo, !isSelected);
-							}
-						}}
-						aria-label={isSelected ? "Deselect photo" : "Select photo"}
-					>
-						<div
-							className={`
-              w-6 h-6 rounded border-2 flex items-center justify-center
-              ${
-								isSelected
-									? "bg-blue-500 border-blue-500"
-									: "bg-white/80 border-white hover:bg-white"
-							}
-            `}
-						>
-							{isSelected && <Check className="w-4 h-4 text-white" />}
-						</div>
-					</button>
-
-					{/* Favorite button */}
-					<button
-						type="button"
-						className={`
-              absolute top-2 right-2
-              ${
-								photo.favorite
-									? "opacity-100"
-									: "opacity-0 group-hover:opacity-100"
-							}
-              transition-opacity duration-200
-            `}
-						onClick={(e) => {
-							e.stopPropagation();
-							onPhotoFavorite?.(photo);
-						}}
-					>
-						<Heart
-							className={`
-              w-5 h-5 
-              ${photo.favorite ? "fill-red-500 text-red-500" : "text-white"}
-              drop-shadow-lg hover:scale-110 transition-transform
-            `}
-						/>
-					</button>
-
-					{/* Quick actions bar */}
-					{isHovered && (
-						<div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
-							<div className="flex items-center justify-between">
-								<div className="text-white text-xs truncate">
-									{photo.caption || "Untitled"}
-								</div>
-								<div className="flex items-center gap-1">
-									<button
-										type="button"
-										className="p-1 hover:bg-white/20 rounded transition-colors"
-										aria-label="Download photo"
-									>
-										<Download className="w-3 h-3 text-white" />
-									</button>
-									<button
-										type="button"
-										className="p-1 hover:bg-white/20 rounded transition-colors"
-										aria-label="Share photo"
-									>
-										<Share2 className="w-3 h-3 text-white" />
-									</button>
-									<button
-										type="button"
-										className="p-1 hover:bg-white/20 rounded transition-colors"
-										aria-label="View photo details"
-									>
-										<Info className="w-3 h-3 text-white" />
-									</button>
-								</div>
-							</div>
-						</div>
-					)}
-
-					{/* Search match explanation */}
-					{showExplainability && matchReasons.length > 0 && (
-						<div className="absolute bottom-0 left-0 right-0 p-2">
-							<SearchExplainability
-								reasons={matchReasons}
-								query={searchQuery || ""}
-								compact
-							/>
-						</div>
-					)}
-				</div>
-			</button>
-		);
-	};
-
-	// Performance metrics
-	const renderMetrics = useMemo(
-		() => ({
-			totalPhotos: photos.length,
-			visiblePhotos: endIndex - startIndex,
-			renderedRows: endRow - startRow,
-			memoryUsage: `${Math.round((endIndex - startIndex) * 0.5)}MB`, // Rough estimate
-		}),
-		[photos.length, startIndex, endIndex, startRow, endRow],
-	);
-
-	return (
-		<div className={`virtualized-photo-grid ${className}`}>
-			{/* Performance indicator (only in dev) */}
-			{process.env.NODE_ENV === "development" && (
-				<div className="absolute top-2 right-2 z-10 bg-black/60 text-white text-xs p-2 rounded">
-					<div>Total: {renderMetrics.totalPhotos}</div>
-					<div>Visible: {renderMetrics.visiblePhotos}</div>
-					<div>Memory: ~{renderMetrics.memoryUsage}</div>
-				</div>
-			)}
-
-			{/* Scrollable container */}
-			<div
-				ref={containerRef}
-				className="w-full h-full overflow-auto"
-				onScroll={handleScroll}
-				style={{ position: "relative" }}
-			>
-				{/* Virtual spacer to maintain scroll height */}
-				<div style={{ height: totalHeight, position: "relative" }}>
-					{/* Render only visible photos */}
-					{photos
-						.slice(startIndex, endIndex)
-						.map((photo, idx) => renderPhotoItem(photo, startIndex + idx))}
-				</div>
-			</div>
-
-			{/* Empty state */}
-			{photos.length === 0 && (
-				<div className="flex items-center justify-center h-full">
-					<div className="text-center text-gray-500">
-						<p className="text-lg">No photos to display</p>
-						<p className="text-sm mt-1">Try adjusting your search or filters</p>
-					</div>
-				</div>
-			)}
-		</div>
-	);
-}
-
-// Helper function to format video duration
-function formatDuration(seconds: number): string {
-	const mins = Math.floor(seconds / 60);
-	const secs = Math.floor(seconds % 60);
-	return `${mins}:${secs.toString().padStart(2, "0")}`;
-}
-
-// Hook for infinite scrolling
-export function useInfiniteScroll(
-	callback: () => void,
-	options: { threshold?: number; enabled?: boolean } = {},
-) {
-	const { threshold = 0.9, enabled = true } = options;
-	const observerRef = useRef<IntersectionObserver | null>(null);
-	const sentinelRef = useRef<HTMLDivElement>(null);
-
-	useEffect(() => {
-		if (!enabled) return;
-
-		const handleIntersect = (entries: IntersectionObserverEntry[]) => {
-			const [entry] = entries;
-			if (entry.isIntersecting) {
-				callback();
-			}
-		};
-
-		observerRef.current = new IntersectionObserver(handleIntersect, {
-			threshold,
-		});
-
-		if (sentinelRef.current) {
-			observerRef.current.observe(sentinelRef.current);
-		}
-
-		return () => {
-			if (observerRef.current) {
-				observerRef.current.disconnect();
-			}
-		};
-	}, [callback, threshold, enabled]);
-
-	return sentinelRef;
+                  {/* Sentinel for infinite scroll */}
+                  <div
+                    className="absolute bottom-0 left-0 right-0"
+                    style={{ height: 100 }}
+                  >
+                    <Sentinel />
+                  </div>
+                </div>
+              );
+            }}
+          </AutoSizer>
+        </div>
+      )}
+    </div>
+  );
 }

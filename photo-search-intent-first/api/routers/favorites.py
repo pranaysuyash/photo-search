@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Dict
 from fastapi import APIRouter, HTTPException, Query
 
-from api.schemas.v1 import FavoritesRequest, SuccessResponse
+from api.schemas.v1 import FavoritesRequest, SuccessResponse, FavoriteResponse
 from api.utils import _zip_meta
 from infra.collections import load_collections, save_collections
 from infra.index_store import IndexStore
@@ -22,9 +22,13 @@ def load_meta(index_dir: Path) -> Dict[str, Any]:
         return json.loads(meta_p.read_text())
     return {"paths": [], "mtime": []}
 
-@router.get("/favorites")
+@router.get("/favorites", response_model=SuccessResponse)
 def api_get_favorites(directory: str = Query(..., alias="dir")) -> SuccessResponse:
-    """Get all favorites for a directory with metadata."""
+    """Get all favorites for a directory with metadata.
+
+    Returns SuccessResponse with data.paths = list of {path, mtime, is_favorite}.
+    A dedicated response model can be introduced later if stricter typing is needed.
+    """
     folder = Path(directory).expanduser().resolve()
     if not folder.exists() or not folder.is_dir():
         raise HTTPException(400, "Directory not found")
@@ -41,9 +45,12 @@ def api_get_favorites(directory: str = Query(..., alias="dir")) -> SuccessRespon
         },
     )
 
-@router.post("/favorites")
-def api_set_favorite(req: FavoritesRequest) -> Dict[str, Any]:
-    """Add or remove a photo from favorites."""
+@router.post("/favorites", response_model=FavoriteResponse)
+def api_set_favorite(req: FavoritesRequest) -> FavoriteResponse:
+    """Add or remove a photo from favorites.
+
+    Returns FavoriteResponse with the toggled path and resulting favorite state.
+    """
     store = IndexStore(Path(req.dir))
     coll = load_collections(store.index_dir)
     fav = coll.get('Favorites', [])
@@ -54,4 +61,4 @@ def api_set_favorite(req: FavoritesRequest) -> Dict[str, Any]:
         fav = [p for p in fav if p != req.path]
     coll['Favorites'] = fav
     save_collections(store.index_dir, coll)
-    return {"ok": True, "favorites": fav}
+    return FavoriteResponse(ok=True, path=req.path, favorite=req.favorite)

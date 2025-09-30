@@ -737,7 +737,10 @@ function AppWithModalControls() {
 					console.warn("Directory path should be absolute:", dir);
 				}
 
-				const r = await apiLibrary(dir, engine, limit, offset, {
+				// Use larger batch sizes for better performance with large collections
+				const optimizedLimit = library && library.length > 2000 ? Math.max(limit, 500) : limit;
+
+				const r = await apiLibrary(dir, engine, optimizedLimit, offset, {
 					openaiKey: needsOAI ? openaiKey : undefined,
 					hfToken: needsHf ? hfToken : undefined,
 				});
@@ -746,12 +749,16 @@ function AppWithModalControls() {
 				const total = typeof r.total === "number" ? r.total : Infinity;
 				const hasMore =
 					r.paths &&
-					r.paths.length === limit &&
+					r.paths.length === optimizedLimit &&
 					offset + r.paths.length < total;
 
 				if (append) {
 					if (r.paths && r.paths.length > 0) {
 						photoActions.appendLibrary(r.paths);
+						// Log performance metrics for large collections
+						if (library && library.length > 1000) {
+							console.log(`Loaded ${r.paths.length} items, total: ${library.length + r.paths.length}, memory: ${Math.round(performance.memory ? performance.memory.usedJSHeapSize / 1024 / 1024 : 0)}MB`);
+						}
 					}
 				} else {
 					photoActions.setLibrary(r.paths || []);
@@ -771,6 +778,7 @@ function AppWithModalControls() {
 		[
 			dir,
 			engine,
+			library,
 			needsOAI,
 			openaiKey,
 			needsHf,

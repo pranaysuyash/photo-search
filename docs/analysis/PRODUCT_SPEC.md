@@ -1,7 +1,6 @@
 # Photo Search – Product Spec and Plan
 
-This document captures the product vision, current capabilities, APIs, frontends, and roadmap for the two apps in this repository. It is a living source of truth for what we’ve built, what we should build next, and how we keep the “Classic” and “Intent‑First” approaches feature‑aligned while differing in architecture and development style.
-
+This document captures the product vision, current capabilities, APIs, frontends, and roadmap for the two apps in this repository. It is a living source of truth for what we've built, what we should build next, and how we keep the "Classic" and "Intent‑First" approaches feature‑aligned while differing in architecture and development style.
 
 ## Vision & Principles
 - Help people find any photo fast with friendly, private‑by‑default tools.
@@ -10,7 +9,7 @@ This document captures the product vision, current capabilities, APIs, frontends
 - Maintain two implementations:
   - Classic: minimal, pragmatic structure for speed and simplicity.
   - Intent‑First: layered architecture (domain/adapters/infra/usecases/ui) guided by the intent handbook.
-
+- API Standardization: Consistent, versioned APIs with standardized response models for better maintainability and client compatibility.
 
 ## Codebase Split
 - Classic app
@@ -32,7 +31,7 @@ This document captures the product vision, current capabilities, APIs, frontends
   - Providers: `adapters/provider_factory.py`
   - Index store & fast search: `infra/index_store.py` (Annoy/FAISS/HNSW, OCR, thumbnails)
   - Extras: look‑alikes (`infra/dupes.py`), workspace (`infra/workspace*.py`), analytics (`infra/analytics.py`)
-
+  - API Versioning: `api/v1/router.py` with standardized response models in `api/schemas/v1.py`
 
 ## Engines & Indexing
 - Engines (both apps)
@@ -49,7 +48,6 @@ This document captures the product vision, current capabilities, APIs, frontends
   - Analytics/Feedback: `analytics.jsonl`, `feedback.json`
   - Collections/Favorites/Tags/Saved: `collections.json`, `tags.json`, `saved_searches.json` (intent) or legacy layout in classic
   - Dupes: `hashes.json`, resolved groups: `dupes_resolved.json`
-
 
 ## Current Feature Matrix
 
@@ -85,11 +83,14 @@ This document captures the product vision, current capabilities, APIs, frontends
 - Map & Diagnostics
   - Map points from EXIF GPS
   - Diagnostics: per‑engine index stats, fast‑index availability, OS, free disk
+- API Standardization
+  - Versioned API endpoints with `/api/v1/` prefix
+  - Consistent response models (BaseResponse, SuccessResponse, etc.)
+  - Proper error handling and standardized error responses
 - Electron app
   - Starts uvicorn and opens the app (127.0.0.1:8000)
 
-
-## Public APIs (summary)
+## Public APIs (Updated Summary)
 
 ### Classic – `archive/photo-search-classic/api/server.py`
 - POST `/index` {dir, provider, batch_size}
@@ -107,27 +108,46 @@ This document captures the product vision, current capabilities, APIs, frontends
 - GET `/map` ?dir=…&limit=…
 - GET `/diagnostics` ?dir=…
 
-### Intent‑First – `photo-search-intent-first/api/server.py`
-- POST `/index` {dir, provider, batch_size}
-- POST `/search` {dir, provider, query, top_k, favorites_only?, tags?, date_from?, date_to?}
-- GET `/favorites` ?dir=…
-- POST `/favorites` {dir, path, favorite}
-- GET `/tags` ?dir=…
-- POST `/tags` {dir, path, tags}
-- GET `/saved` ?dir=…
-- POST `/saved` {dir, name, query, top_k}
-- POST `/saved/delete` {dir, name}
-- POST `/feedback` {dir, search_id, query, positives, note}
-- GET `/thumb` ?dir=…&provider=…&path=…&size=…
-- POST `/open` {dir, path}
-- GET `/map` ?dir=…&limit=…
-- POST `/ocr/build` {dir, provider, languages?, …}
-- POST `/fast/build` {dir, kind: annoy|faiss|hnsw, provider, …}
-- GET `/lookalikes` ?dir=…&max_distance=…
-- POST `/lookalikes/resolve` {dir, group_paths}
-- GET `/workspace` (list); POST `/workspace/add`; POST `/workspace/remove`
-- GET `/diagnostics` ?dir=… [&provider=…]
+### Intent-First – `photo-search-intent-first/api/server.py`
+- **Legacy Endpoints** (for backward compatibility)
+  - Same as Classic API above
+- **Versioned API** (v1) at `/api/v1/*`
+  - `/api/v1/search`: Standardized search endpoint with SearchRequest/SearchResponse models
+  - `/api/v1/index`: Standardized indexing with IndexRequest/IndexResponse models
+  - `/api/v1/favorites`: Standardized favorites with FavoritesRequest/FavoriteResponse models
+  - `/api/v1/tags`: Standardized tagging with TagsRequest/TagResponse models
+  - `/api/v1/shares`: Standardized sharing with ShareRequest/ShareResponse models
+  - `/api/v1/collections`: Standardized collections with CollectionResponse models
+  - `/api/v1/analytics`: Standardized analytics endpoints
+  - `/api/v1/metadata`: Standardized metadata endpoints
+  - `/api/v1/ocr`: Standardized OCR endpoints
+  - `/api/v1/faces`: Standardized face recognition endpoints
+  - `/api/v1/batch`: Standardized batch operations
+  - `/api/v1/saved`: Standardized saved searches
+  - `/api/v1/presets`: Standardized presets
+  - `/api/v1/docs`: API documentation endpoints
+  - `/api/v1/auth`: Authentication endpoints
+  - `/api/v1/video`: Video handling endpoints
+  - `/api/v1/workspace`: Workspace management endpoints
 
+## API Standardization (New Section)
+The Intent-First implementation includes comprehensive API standardization with:
+
+- Versioned endpoints using `/api/v1/` prefix for consistent client integration
+- Standardized response models in `api/schemas/v1.py`:
+  - `BaseResponse`: Generic base response with ok/message
+  - `ErrorResponse`: Structured errors with optional error details
+  - `SuccessResponse`: Success responses with optional data payload
+  - `IndexResponse`: Index operation results
+  - `ShareResponse`: Share operation results
+  - `FavoriteResponse`: Favorite toggle results
+  - `TagResponse`: Tagging operation results
+  - `CollectionResponse`: Collection operation results
+  - Specialized models for each domain with proper typing
+
+- Request validation using Pydantic models with field constraints
+- Consistent error handling across all endpoints
+- Backward compatibility maintained through legacy endpoints
 
 ## Frontends
 
@@ -142,20 +162,17 @@ This document captures the product vision, current capabilities, APIs, frontends
 ### Legacy Streamlit UIs
 - Kept for reference and fallback: Classic `app.py`, Intent‑First `ui/app.py`.
 
-
 ## Analytics & Feedback
 - `analytics.jsonl` appends an entry for each search (engine, query, results) and each file open.
 - `feedback.json` holds per‑query, per‑path positive counts used to add small boosts during ranking.
 - Both apps apply boost and log feedback/search consistently.
 
-
-## UX Guidelines (to keep it “wow” without clutter)
+## UX Guidelines (to keep it "wow" without clutter)
 - Essentials always visible; advanced tools in tabs/expanders.
-- Clear copy (“Build Index”, “Reveal”, “Favorites only”), helpful empty states.
+- Clear copy ("Build Index", "Reveal", "Favorites only"), helpful empty states.
 - Keyboard affordances (next/prev, favorite, reveal) and soft toasts.
 - Thumbnails + details drawer for quick inspection.
 - Non‑blocking background tasks with visible progress (see Roadmap SSE).
-
 
 ## Setup – Quick Start
 - Intent‑First
@@ -168,14 +185,13 @@ This document captures the product vision, current capabilities, APIs, frontends
   - Electron: `cd ../electron && npm i && npm run dev`
 - Optional keys: `OPENAI_API_KEY`, `HF_API_TOKEN`
 
-
 ## Roadmap
 
 ### Short‑term (Finish Polishing)
 - Classic UI polish
   - Tabs + details drawer, tag chips, bulk selection/export, keyboard shortcuts, toasts.
 - Intent‑First UI
-  - Saved searches polish; Speed & OCR toggles; Look‑alikes “Keep/Discard” flow; Workspace UI; Map and Diagnostics panels.
+  - Saved searches polish; Speed & OCR toggles; Look‑alikes "Keep/Discard" flow; Workspace UI; Map and Diagnostics panels.
 - HF reliability (+ telemetry)
   - Retries with backoff; fallback caption models (BLIP base, ViT‑GPT2); clear UI messaging.
 - Job progress
@@ -185,7 +201,7 @@ This document captures the product vision, current capabilities, APIs, frontends
 
 ### Mid‑term (Wow‑factor Features)
 - People & faces (opt‑in): local face detection/embeddings and clustering; naming; face filters.
-- Auto‑albums & smart collections: on‑device captioning/classifiers + rules (e.g., “Beach in 2021”).
+- Auto‑albums & smart collections: on‑device captioning/classifiers + rules (e.g., "Beach in 2021").
 - Timeline & map upgrades: timeline heatmap; real map tiles; cluster markers; hover thumbs.
 - Similar‑by‑example: click a photo to find visually similar neighbors (local CLIP/SigLIP neighbors).
 - Local LLM helpers (opt‑in): on‑device Q&A over personal photos; natural language filters.
@@ -195,7 +211,6 @@ This document captures the product vision, current capabilities, APIs, frontends
 - Vector DB integration (optional): FAISS/SQLite hybrid or external vector stores for huge libraries.
 - Sync/export options: export collections or analytics snapshots; optional cloud sync with strict privacy.
 - Extensions: plugin points for custom taggers/captioners or external tools.
-
 
 ## Open Tasks (Working Plan)
 - Classic (near‑term polish)
@@ -212,9 +227,23 @@ This document captures the product vision, current capabilities, APIs, frontends
   - SSE progress + job status
   - Electron packaging + scripts
   - Docs (developer runbooks; privacy & engine guidance)
-
+- API Standardization (COMPLETED)
+  - Versioned API endpoints with consistent response models
+  - Standardized error handling
+  - Backward compatibility maintained
 
 ## Notes on Privacy & Data
 - On‑device engines keep all photos and embeddings local.
 - Cloud engines (HF/OpenAI) are explicit opt‑in; API keys are entered by the user; results/keys are not persisted beyond the session unless the user chooses to save them.
-- Index folders (.photo_index) remain within the user’s photo folders, portable and private.
+- Index folders (.photo_index) remain within the user's photo folders, portable and private.
+
+## Historical Context (Preserved for Reference)
+
+The original product specification did not include the comprehensive API standardization that has since been implemented in the Intent-First approach. This was a major architectural improvement that:
+
+- Addresses inconsistency in API response formats
+- Provides clear contracts for API consumers
+- Improves maintainability through standardized models
+- Ensures backward compatibility while enabling future enhancements
+
+The API versioning strategy (v1) was developed to provide a stable, standardized interface while maintaining all existing functionality for legacy clients. This reflects the project's mature approach to API design and evolution.

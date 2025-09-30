@@ -1,41 +1,26 @@
 from __future__ import annotations
 
 import json
-import logging
 import os
-import shutil
-import platform
+import time
 import time
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, TypeVar
 
-from fastapi import Body, FastAPI, HTTPException, Query, Header
+from fastapi import Body, FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
-from datetime import datetime, timezone
+from datetime import datetime
 
-from adapters.provider_factory import get_provider
-from api.utils import _from_body, _require, _as_bool, _as_str_list, _emb, _zip_meta
+from api.utils import _from_body, _require, _emb
 from api.schemas.v1 import (
     SearchRequest,
     SearchResponse,
     SearchResultItem,
-    TagsRequest,
-    FavoritesRequest,
-    ShareRequest,
-    ShareRevokeRequest,
-    CachedSearchRequest,
-    WorkspaceSearchRequest,
     BaseResponse,
     SuccessResponse,
-    IndexResponse,
-    ShareResponse,
-    FavoriteResponse,
-    TagResponse,
-    CollectionResponse,
     HealthResponse,
 )
 from api.exception_handlers import (
@@ -46,9 +31,6 @@ from api.exception_handlers import (
 from api.v1.router import api_v1
 from api.search_models import (
     SearchRequest as UnifiedSearchRequest,
-    build_unified_request_from_flat,
-    PaginatedSearchRequest,
-    PaginatedSearchResponse,
 )
 from api.routers.analytics import router as analytics_router, legacy_router as analytics_legacy_router
 from api.routers.auth import router as auth_router
@@ -81,12 +63,12 @@ from api.routers.watch import router as watch_router
 from api.routers.workspace import router as workspace_router
 from api.attention import router as attention_router  # NEW: adaptive attention (scaffold)
 from api.routes.health import router as health_router  # Extracted health & root endpoints
-from infra.analytics import log_search, _analytics_file, _write_event as _write_event_infra
-from infra.collections import load_collections, save_collections, load_smart_collections, save_smart_collections
+from infra.analytics import log_search
+from infra.collections import load_collections
 from infra.config import config
 from infra.index_store import IndexStore
 from infra.fast_index import FastIndexManager
-from infra.tags import load_tags, save_tags, all_tags
+from infra.tags import load_tags
 from infra.trips import build_trips as _build_trips, load_trips as _load_trips
 from infra.faces import (
     build_faces as _build_faces,
@@ -104,11 +86,10 @@ from infra.shares import (
 from infra.edits import EditOps as _EditOps, apply_ops as _edit_apply_ops, upscale as _edit_upscale
 from usecases.manage_saved import load_saved, save_saved
 from usecases.manage_presets import load_presets, save_presets
-from usecases.index_photos import index_photos
-from adapters.vlm_caption_hf import VlmCaptionHF
+from usecases.index_photos import index_photos  # noqa: F401 (potential future use)
 from infra.video_index_store import VideoIndexStore
-from infra.thumbs import get_or_create_thumb, get_or_create_face_thumb
-from infra.faces import load_faces as _faces_load
+from infra.thumbs import get_or_create_thumb, get_or_create_face_thumb  # noqa: F401
+from infra.faces import load_faces as _faces_load  # noqa: F401
 try:
     from adapters.video_processor import list_videos, get_video_metadata, extract_video_thumbnail
 except Exception:
@@ -130,7 +111,14 @@ except Exception:
     def extract_video_thumbnail(video_path: str, out_path: Path, when_sec: float = 0.0) -> bool:
         # No-op fallback: return False to indicate no thumbnail extracted
         return False
-from PIL import Image, ExifTags
+from PIL import Image, ExifTags  # noqa: F401
+
+# Supported extension constants (import with safe fallback)
+try:
+    from infra.constants import SUPPORTED_EXTS, SUPPORTED_VIDEO_EXTS  # type: ignore
+except Exception:  # pragma: no cover - fallback values
+    SUPPORTED_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".tif", ".tiff", ".bmp"}
+    SUPPORTED_VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".avi", ".webm"}
 
 # Initialize app early (was missing due to prior broken edits)
 _APP_START = time.time()
@@ -197,36 +185,7 @@ if web_dir.exists():
 T = TypeVar("T")
 
 
-def _zip_meta(
-    meta: Dict[str, Iterable[Any]],
-    key: str,
-    transform: Callable[[Any], T],
-) -> Dict[str, T]:
-    """Map values from the EXIF metadata index onto their paths with a transform."""
-
-    paths = meta.get("paths") or []
-    values = meta.get(key) or []
-    result: Dict[str, T] = {}
-    for path, raw in zip(paths, values):
-        result[str(path)] = transform(raw)
-    return result
-
-# --- Health and diagnostics ---
-@app.get("/health")
-def api_health() -> HealthResponse:
-    now = time.time()
-    return HealthResponse(
-        ok=True,
-        uptime_seconds=max(0, int(now - _APP_START)),
-    )
-
-@app.get("/api/health")
-def api_health_api() -> HealthResponse:
-    return HealthResponse(ok=True)
-
-@app.get("/api/ping")
-def api_ping() -> HealthResponse:
-    return HealthResponse(ok=True)
+# Removed local _zip_meta (use imported) and duplicate health/ping endpoints (handled by health_router)
 
 # Demo directory helper
 @app.get("/demo/dir")
@@ -413,7 +372,7 @@ def api_search(req: SearchRequest) -> SearchResponse:
     legacy_params = unified_req.to_legacy_param_dict()
 
     dir_value = legacy_params.get("dir")
-    query_value = legacy_params.get("query")
+    query_value = (legacy_params.get("query") or "").strip()
     top_k_value = legacy_params.get("top_k", 48)
     provider_value = legacy_params.get("provider") or "local"
     hf_token_value = legacy_params.get("hf_token")
@@ -708,8 +667,9 @@ def api_search(req: SearchRequest) -> SearchResponse:
         if has_text_value:
             out = [r for r in out if (texts_map.get(str(r.path), '').strip() != '')]
         import re as _re
-        d_parts = _re.findall(r'"([^"]+)"', query_value)
-        s_parts = _re.findall(r"'([^']+)'", query_value)
+        qtext = query_value or ""
+        d_parts = _re.findall(r'"([^"]+)"', qtext)
+        s_parts = _re.findall(r"'([^']+)'", qtext)
         req = (d_parts or []) + (s_parts or [])
         if req:
             low = {p: texts_map.get(p, '').lower() for p in texts_map.keys()}
@@ -728,7 +688,7 @@ def api_search(req: SearchRequest) -> SearchResponse:
             cap_map = {p: (t or '') for p, t in zip(cd.get('paths', []), cd.get('texts', []))}
         if cap_map:
             import shlex
-            tokens = shlex.split(query_value)
+            tokens = shlex.split(query_value) if query_value else []
             if tokens:
                 out_q: List[str] = []
                 op_set = {'AND','OR','NOT'}
@@ -930,12 +890,21 @@ def api_search(req: SearchRequest) -> SearchResponse:
     except Exception:
         pass
 
-    # Apply simple pagination using top_k (no offset/limit in SearchRequest model)
-    total = len(out)
-    top_k_value = req.top_k or 12
-    paginated_results = out[:top_k_value]  # Simple top-k approach
+    # Apply simple top-k truncation (SearchRequest currently has no offset/limit)
+    total = len(out)  # retained for future pagination / telemetry
+    try:
+        tk = int(top_k_value) if top_k_value is not None else 12
+    except Exception:
+        tk = 12
+    paginated_results = out[:tk]
 
-    sid = log_search(store.index_dir, getattr(emb, 'index_id', 'default'), req.query, [(str(r.path), float(r.score)) for r in paginated_results])
+    # Use the normalized query_value (legacy bridge may have mutated original req)
+    sid = log_search(
+        store.index_dir,
+        getattr(emb, 'index_id', 'default'),
+        query_value or "",
+        [(str(r.path), float(r.score)) for r in paginated_results]
+    )
 
     return SearchResponse(
         search_id=sid,
@@ -944,7 +913,7 @@ def api_search(req: SearchRequest) -> SearchResponse:
 
 
 # Video Search API
-@app.post("/search_video")
+@app.post("/search_video", response_model=SearchResponse)
 def api_search_video(
     dir: Optional[str] = None,
     query: Optional[str] = None,
@@ -953,8 +922,12 @@ def api_search_video(
     hf_token: Optional[str] = None,
     openai_key: Optional[str] = None,
     body: Optional[Dict[str, Any]] = Body(None),
-) -> Dict[str, Any]:
-    """Search for videos using semantic search on extracted metadata and keyframes."""
+) -> SearchResponse:
+    """Search for videos using semantic search on extracted metadata and keyframes.
+
+    Standardized to return SearchResponse (same schema as photo search) for
+    consistency across clients.
+    """
     dir_value = _require(_from_body(body, dir, "dir"), "dir")
     query_value = _require(_from_body(body, query, "query"), "query")
     top_k_value = _from_body(body, top_k, "top_k", default=12, cast=lambda v: int(v)) or 12
@@ -966,35 +939,36 @@ def api_search_video(
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
 
-    # Get video index store
     video_store = VideoIndexStore(folder)
     if not video_store.load():
-        return {"results": []}
+        return SearchResponse(search_id="video-empty", results=[])
 
-    # Embed query
-    emb = _emb(provider_value, hf_token_value, openai_key_value)
+    emb_inst = _emb(provider_value, hf_token_value, openai_key_value)
     try:
-        qv = emb.embed_text(query_value)
-    except Exception:
-        raise HTTPException(500, "Embedding failed")
+        qv = emb_inst.embed_text(query_value)
+    except Exception as e:
+        raise HTTPException(500, f"Embedding failed: {e}")
 
-    # Search in video store
     results = video_store.search(qv, top_k=top_k_value)
+    # Fabricate a search id (video index currently separate from photo log system)
+    search_id = f"video-{int(time.time()*1000)}"
+    return SearchResponse(
+        search_id=search_id,
+        results=[SearchResultItem(path=str(r.path), score=float(r.score)) for r in results]
+    )
 
-    return {"results": [{"path": r.path, "score": float(r.score)} for r in results]}
 
-
-@app.post("/search_video_like")
+@app.post("/search_video_like", response_model=SearchResponse)
 def api_search_video_like(
     dir: Optional[str] = None,
     path: Optional[str] = None,
     top_k: Optional[int] = None,
     body: Optional[Dict[str, Any]] = Body(None),
-) -> Dict[str, Any]:
+) -> SearchResponse:
     """Find visually similar videos based on a reference video.
 
-    Provider / token parameters were unused; removed to reduce noise. If future
-    embedding-based re-ranking is added we can reintroduce via unified schema.
+    Standardized to return SearchResponse for client uniformity. The
+    search_id encodes the reference path for traceability.
     """
     dir_value = _require(_from_body(body, dir, "dir"), "dir")
     path_value = _require(_from_body(body, path, "path"), "path")
@@ -1006,115 +980,14 @@ def api_search_video_like(
 
     video_store = VideoIndexStore(folder)
     if not video_store.load():
-        return {"results": []}
+        return SearchResponse(search_id="video-like-empty", results=[])
 
     results = video_store.search_like(path_value, top_k=top_k_value)
-    return {"results": [{"path": r.path, "score": float(r.score)} for r in results]}
+    search_id = f"video-like-{int(time.time()*1000)}"
+    return SearchResponse(
+        search_id=search_id,
+        results=[SearchResultItem(path=str(r.path), score=float(r.score)) for r in results]
+    )
 
 
-# Removed duplicated health/root/monitoring/tech endpoints now handled by api.routes.health router
-
-# Demo directory helper
-@app.get("/demo/dir")
-def api_demo_dir() -> BaseResponse:
-    try:
-        demo = Path(__file__).resolve().parent.parent / "demo_photos"
-        exists = demo.exists() and demo.is_dir()
-        return SuccessResponse(
-            ok=True,
-            data={"path": str(demo), "exists": bool(exists)}
-        )
-    except Exception:
-        return BaseResponse(ok=False)
-
-# Small helpers used by several legacy endpoints
-def _normcase_path(p: str) -> str:
-    try:
-        return str(Path(p).expanduser().resolve()).lower()
-    except Exception:
-        return str(p).lower()
-
-
-def _default_photo_dir_candidates() -> List[Dict[str, str]]:
-    """Best-effort local photo folder suggestions across OSes."""
-    out: List[Dict[str, str]] = []
-    home = Path.home()
-    sysname = (os.uname().sysname if hasattr(os, 'uname') else os.name).lower()
-    def _add(p: Path, label: str, source: str):
-        try:
-            if p.exists() and p.is_dir():
-                out.append({"path": str(p), "label": label, "source": source})
-        except Exception:
-            pass
-    # Common directories
-    _add(home / "Pictures", "Pictures", "home")
-    _add(home / "Downloads", "Downloads", "home")
-    # Windows-like envs
-    one_drive_env = os.environ.get("OneDrive")
-    if one_drive_env:
-        _add(Path(one_drive_env) / "Pictures", "OneDrive Pictures", "onedrive")
-    public_dir = os.environ.get("PUBLIC")
-    if public_dir:
-        _add(Path(public_dir) / "Pictures", "Public Pictures", "windows")
-    # macOS iCloud hints
-    if "darwin" in sysname:
-        icloud_docs = home / "Library" / "Mobile Documents" / "com~apple~CloudDocs"
-        _add(icloud_docs / "Photos", "iCloud Drive Photos", "icloud")
-        _add(icloud_docs / "Pictures", "iCloud Drive Pictures", "icloud")
-        _add(home / "Library" / "CloudStorage" / "iCloud Drive" / "Photos", "iCloud Photos", "icloud")
-    # Linux XDG
-    if "linux" in sysname:
-        try:
-            user_dirs = home / ".config" / "user-dirs.dirs"
-            if user_dirs.exists():
-                text = user_dirs.read_text(encoding="utf-8")
-                for line in text.splitlines():
-                    if line.startswith("XDG_PICTURES_DIR") or line.startswith("XDG_DOWNLOAD_DIR"):
-                        parts = line.split("=")
-                        if len(parts) == 2:
-                            raw = parts[1].strip().strip('"')
-                            resolved = raw.replace("$HOME", str(home))
-                            label = "Pictures" if "PICTURES" in parts[0] else "Downloads"
-                            _add(Path(resolved), label, "xdg")
-        except Exception:
-            pass
-    # Deduplicate by normalized path
-    seen: set[str] = set()
-    uniq: List[Dict[str, str]] = []
-    for it in out:
-        key = _normcase_path(it["path"])
-        if key in seen:
-            continue
-        seen.add(key)
-        uniq.append(it)
-    return uniq
-
-
-def _scan_media_counts(paths: List[str], include_videos: bool = True) -> Dict[str, Any]:
-    """Count image/video files and bytes for quick previews; privacy-friendly."""
-    total_files = 0
-    total_bytes = 0
-    items: List[Dict[str, Any]] = []
-    img_exts = SUPPORTED_EXTS
-    vid_exts = SUPPORTED_VIDEO_EXTS if include_videos else set()
-    for p in paths:
-        pth = Path(p).expanduser()
-        count = 0
-        size = 0
-        try:
-            if pth.exists() and pth.is_dir():
-                for root, _, files in os.walk(pth):
-                    for name in files:
-                        ext = Path(name).suffix.lower()
-                        if ext in img_exts or ext in vid_exts:
-                            count += 1
-                            try:
-                                size += (Path(root) / name).stat().st_size
-                            except Exception:
-                                continue
-        except Exception:
-            count = 0; size = 0
-        total_files += count
-        total_bytes += size
-        items.append({"path": str(pth), "count": count, "bytes": size})
-    return {"items": items, "total_files": total_files, "total_bytes": total_bytes}
+"""(End of file)"""

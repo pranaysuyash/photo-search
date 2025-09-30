@@ -1,10 +1,12 @@
 import { motion } from "framer-motion";
-import { ArrowUpDown, BarChart3, Check, Play } from "lucide-react";
+import { ArrowUpDown, BarChart3, Check, Play, Settings } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { apiThumbBatch, thumbUrl } from "../api";
 import { VideoService } from "../services/VideoService";
 import { ScrollLoader } from "../utils/loading";
+import { VirtualizedPhotoGrid } from "./VirtualizedPhotoGrid";
+import { useMemoryManager } from "../hooks/useMemoryManager";
 
 type SortOption = "name" | "date" | "size" | "rating" | "camera";
 type SortDirection = "asc" | "desc";
@@ -37,10 +39,29 @@ const LibraryBrowser = memo(function LibraryBrowser({
 	const [sortBy, setSortBy] = useState<SortOption>("name");
 	const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 	const [showStats, setShowStats] = useState(false);
+	const [useVirtualizedGrid, setUseVirtualizedGrid] = useState(false);
 	const [preloadedThumbs, setPreloadedThumbs] = useState<Set<string>>(
 		new Set(),
 	);
 	const preloadInProgress = useRef(false);
+
+	// Initialize memory manager for performance optimization
+	const memoryManager = useMemoryManager({
+		maxMemoryMB: 300,
+		cleanupThreshold: 0.8,
+		monitoringInterval: 10000,
+		onMemoryWarning: (usageMB) => {
+			console.warn(`Memory warning: ${usageMB}MB used`);
+			// Auto-enable virtualized grid for large collections when memory is high
+			if (library.length > 5000 && !useVirtualizedGrid) {
+				setUseVirtualizedGrid(true);
+			}
+		},
+		onMemoryCritical: (usageMB) => {
+			console.error(`Memory critical: ${usageMB}MB used - enabling virtualized grid`);
+			setUseVirtualizedGrid(true);
+		}
+	});
 
 	// Animation variants for micro-interactions
 	const photoVariants = {
@@ -88,6 +109,18 @@ const LibraryBrowser = memo(function LibraryBrowser({
 		},
 		[dir, preloadedThumbs],
 	);
+
+	// Auto-enable virtualized grid for large collections
+	useEffect(() => {
+		// Enable virtualized grid for large collections to improve performance
+		if (library.length > 2000 && !useVirtualizedGrid) {
+			console.log(`Large collection detected (${library.length} items), enabling virtualized grid`);
+			setUseVirtualizedGrid(true);
+		} else if (library.length <= 1000 && useVirtualizedGrid) {
+			// Disable for small collections to maintain smooth animations
+			setUseVirtualizedGrid(false);
+		}
+	}, [library.length, useVirtualizedGrid]);
 
 	// Preload thumbnails when library changes
 	useEffect(() => {
@@ -221,8 +254,8 @@ const LibraryBrowser = memo(function LibraryBrowser({
 	}, [onToggleSelect, selected]);
 
 	const handleLoadLibrary = useCallback(() => {
-		onLoadLibrary(120, 0);
-	}, [onLoadLibrary]);
+		onLoadLibrary(useVirtualizedGrid ? 500 : 120, 0);
+	}, [onLoadLibrary, useVirtualizedGrid]);
 
 	const _selectRange = (startIndex: number, endIndex: number) => {
 		if (onToggleSelect) {
@@ -255,6 +288,20 @@ const LibraryBrowser = memo(function LibraryBrowser({
 					>
 						<BarChart3 className="w-4 h-4" />
 					</button>
+					{library.length > 1000 && (
+						<button
+							type="button"
+							onClick={() => setUseVirtualizedGrid(!useVirtualizedGrid)}
+							className={`p-1 rounded ${
+								useVirtualizedGrid
+									? "bg-green-100 text-green-600"
+									: "text-gray-500 hover:bg-gray-100"
+							}`}
+							title={`${useVirtualizedGrid ? "Disable" : "Enable"} virtualized grid for better performance`}
+						>
+							<Settings className="w-4 h-4" />
+						</button>
+					)}
 				</div>
 
 				<div className="flex items-center gap-2">
@@ -367,7 +414,18 @@ const LibraryBrowser = memo(function LibraryBrowser({
 				<div className="text-sm text-gray-600 mt-2">
 					No items yet. Build the index, then click Reload.
 				</div>
+			) : useVirtualizedGrid ? (
+				/* Virtualized grid for large collections */
+				<VirtualizedPhotoGrid
+					dir={dir}
+					engine={engine}
+					onItemClick={onOpen}
+					className="mt-2"
+					imageQuality="medium"
+					showMetrics={showStats}
+				/>
 			) : (
+				/* Traditional grid for small collections with animations */
 				<>
 					<div className="mt-2 grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-2">
 						{sortedLibrary.slice(0, 120).map((p, i) => {
