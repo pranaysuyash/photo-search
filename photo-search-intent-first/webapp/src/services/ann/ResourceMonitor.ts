@@ -297,21 +297,34 @@ export class ResourceMonitor {
 
       // WebGL context as fallback
       try {
-        const canvas = document.createElement('canvas');
-        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-        if (gl) {
-          // Check for debug renderer info safely
-          try {
-            const debugInfo = (gl as any).getExtension('WEBGL_debug_renderer_info');
-            if (debugInfo) {
-              // This doesn't give us exact memory, but we can estimate
-              return {
-                total: 2048, // 2GB default estimate
-                available: 1536 // 75% available
-              };
+        if (typeof document !== 'undefined' && document.createElement) {
+          const canvas = document.createElement('canvas');
+          if (canvas && typeof canvas.getContext === 'function') {
+            let gl = null;
+            try {
+              gl = canvas.getContext('webgl');
+            } catch (e) {
+              try {
+                gl = canvas.getContext('experimental-webgl');
+              } catch (e2) {
+                // Neither WebGL context is available
+              }
             }
-          } catch (error) {
-            // Extension not available
+            if (gl) {
+              // Check for debug renderer info safely
+              try {
+                const debugInfo = (gl as any).getExtension('WEBGL_debug_renderer_info');
+                if (debugInfo) {
+                  // This doesn't give us exact memory, but we can estimate
+                  return {
+                    total: 2048, // 2GB default estimate
+                    available: 1536 // 75% available
+                  };
+                }
+              } catch (error) {
+                // Extension not available
+              }
+            }
           }
         }
       } catch (canvasError) {
@@ -551,10 +564,25 @@ export class ResourceMonitor {
       let webgl2 = false;
 
       try {
-        webgl = !!document.createElement('canvas').getContext('webgl');
-        webgl2 = !!document.createElement('canvas').getContext('webgl2');
+        // Check if we're in a test environment or if document/canvas is available
+        if (typeof document !== 'undefined' && document.createElement) {
+          const canvas = document.createElement('canvas');
+          if (canvas && typeof canvas.getContext === 'function') {
+            // Try-catch each getContext call individually
+            try {
+              webgl = !!canvas.getContext('webgl');
+            } catch (e) {
+              // WebGL not available
+            }
+            try {
+              webgl2 = !!canvas.getContext('webgl2');
+            } catch (e) {
+              // WebGL2 not available
+            }
+          }
+        }
       } catch (error) {
-        console.warn('[ResourceMonitor] Canvas not available for WebGL detection');
+        console.warn('[ResourceMonitor] Canvas not available for WebGL detection:', error);
       }
 
       const capabilities = {

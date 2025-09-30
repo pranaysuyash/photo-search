@@ -30,6 +30,8 @@ export interface PerformanceMetrics {
   gpuUsage?: number; // percentage
   accuracy?: number; // 0-1
   throughput?: number; // samples per second
+  reliability?: number; // 0-1
+  timestamp?: number;
 }
 
 export interface ResourceRange {
@@ -100,6 +102,7 @@ export interface BackendHealth {
   responseTime: number;
   activeConnections: number;
   resourceUsage: ResourceUsage;
+  error?: string;
 }
 
 export interface ResourceUsage {
@@ -144,7 +147,7 @@ export type TaskType =
   | 'feature_extraction'
   | 'semantic_search';
 
-export type BackendType = 'tensorflowjs' | 'pytorch' | 'onnx' | 'custom';
+export type BackendType = 'tensorflowjs' | 'pytorch' | 'onnx' | 'custom' | 'unknown';
 
 export interface BackendConfig {
   id: string;
@@ -207,6 +210,12 @@ export interface BackendSelection {
   confidence: number;
   fallbacks: string[];
   reasoning: SelectionReason[];
+  timestamp?: number;
+  estimatedPerformance?: {
+    inferenceTime: number;
+    memoryUsage: number;
+    accuracy?: number;
+  };
 }
 
 export interface SelectionReason {
@@ -315,29 +324,6 @@ export interface PerformanceHistory {
   successRates: number[];
 }
 
-export interface AlertRule {
-  id: string;
-  name: string;
-  description: string;
-  condition: AlertCondition;
-  severity: 'info' | 'warning' | 'error' | 'critical';
-  actions: AlertAction[];
-  enabled: boolean;
-}
-
-export interface AlertCondition {
-  metric: string;
-  operator: 'gt' | 'lt' | 'eq' | 'ne' | 'gte' | 'lte';
-  threshold: number;
-  duration?: number; // ms
-}
-
-export interface AlertAction {
-  type: 'log' | 'email' | 'webhook' | 'notification';
-  target: string;
-  message: string;
-  parameters?: Record<string, any>;
-}
 
 export interface PerformanceAlert {
   id: string;
@@ -438,4 +424,172 @@ export interface ModelDiscovery {
   lastSync: number;
   status: 'active' | 'inactive' | 'error';
   models: string[];
+}
+
+export interface BackendInfo {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  capabilities: BackendCapability[];
+  resourceRequirements: ResourceRequirements;
+  performanceProfile: PerformanceMetrics;
+  health: BackendHealth;
+  models: string[];
+  lastActivity: number;
+  status: 'active' | 'inactive' | 'error';
+  metadata: Record<string, any>;
+  isAvailable?: boolean;
+  executeTask?: (task: AITask) => Promise<TaskResult>;
+}
+
+export interface BackendProfile {
+  backendId: string;
+  profileData: {
+    averageInferenceTime: number;
+    averageMemoryUsage: number;
+    accuracy: number;
+    throughput: number;
+    reliability: number;
+    lastUpdated: number;
+    sampleCount: number;
+  };
+}
+
+export interface MonitoringEvent {
+  id: string;
+  type: string;
+  level: 'debug' | 'info' | 'warning' | 'error' | 'critical';
+  source: string;
+  message: string;
+  data: Record<string, any>;
+  tags: string[];
+  timestamp: number;
+}
+
+export interface AlertRule {
+  id: string;
+  name: string;
+  description: string;
+  severity: 'info' | 'warning' | 'error' | 'critical';
+  category: string;
+  condition: (context: any) => boolean;
+  message: string;
+  enabled?: boolean;
+}
+
+export interface TimeSeriesData {
+  timestamp: number;
+  value: number;
+  tags?: Record<string, string>;
+}
+
+export interface TaskMetrics {
+  taskId: string;
+  processingTime: number;
+  memoryUsage: number;
+  cpuUsage: number;
+  success: boolean;
+  error?: string;
+}
+
+export interface ModelMetrics {
+  modelId: string;
+  inferenceTime: number;
+  memoryUsage: number;
+  accuracy: number;
+  throughput: number;
+  lastUsed: number;
+}
+
+export interface BackendMetrics {
+  backendId: string;
+  uptime: number;
+  errorRate: number;
+  averageResponseTime: number;
+  activeConnections: number;
+  resourceUsage: ResourceUsage;
+}
+
+export interface SystemMetrics {
+  totalMemory: number;
+  availableMemory: number;
+  totalCPU: number;
+  availableCPU: number;
+  activeBackends: number;
+  totalTasks: number;
+  systemLoad: number;
+}
+
+export interface Alert {
+  id: string;
+  ruleId: string;
+  message: string;
+  severity: 'info' | 'warning' | 'error' | 'critical';
+  timestamp: number;
+  source: string;
+  data: Record<string, any>;
+  acknowledged: boolean;
+  resolved: boolean;
+}
+
+export interface AnalyticsData {
+  period: { start: number; end: number };
+  tasks: {
+    total: number;
+    successful: number;
+    failed: number;
+    averageProcessingTime: number;
+  };
+  backends: {
+    total: number;
+    active: number;
+    healthy: number;
+  };
+  performance: {
+    averageInferenceTime: number;
+    averageMemoryUsage: number;
+    systemThroughput: number;
+  };
+  errors: {
+    total: number;
+    errorRate: number;
+    topErrors: Array<{ error: string; count: number }>;
+  };
+}
+
+export interface MonitoringConfig {
+  collectionInterval: number;
+  retentionPeriod: number;
+  maxEvents: number;
+  maxAlerts: number;
+  enableRealTimeMonitoring: boolean;
+  enableAnalytics: boolean;
+  enableReporting: boolean;
+  alertRules: AlertRule[];
+}
+
+export interface HistogramData {
+  min: number;
+  max: number;
+  bins: number;
+  data: Array<{ value: number; count: number }>;
+}
+
+export interface DashboardData {
+  summary: {
+    totalBackends: number;
+    activeBackends: number;
+    totalTasks: number;
+    systemHealth: 'healthy' | 'degraded' | 'unhealthy';
+  };
+  metrics: {
+    cpu: number;
+    memory: number;
+    throughput: number;
+    errorRate: number;
+  };
+  alerts: Alert[];
+  health: Record<string, BackendHealth>;
+  trends: Array<{ timestamp: number; metric: string; value: number }>;
 }

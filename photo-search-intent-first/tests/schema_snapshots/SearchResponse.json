@@ -1,0 +1,87 @@
+{
+  "$defs": {
+    "SearchResultItem": {
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "score": {
+          "title": "Score",
+          "type": "number"
+        }
+      },
+      "required": [
+        "path",
+        "score"
+      ],
+      "title": "SearchResultItem",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "cache_key": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cache Key"
+    },
+    "cached": {
+      "default": false,
+      "title": "Cached",
+      "type": "boolean"
+    },
+    "fast_backend": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Fast Backend"
+    },
+    "fast_fallback": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Fast Fallback"
+    },
+    "results": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/SearchResultItem"
+      },
+      "title": "Results",
+      "type": "array"
+    },
+    "search_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Search Id"
+    }
+  },
+  "title": "SearchResponse",
+  "type": "object"
+}

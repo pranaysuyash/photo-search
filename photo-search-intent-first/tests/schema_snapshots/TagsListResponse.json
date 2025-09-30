@@ -1,0 +1,43 @@
+{
+  "description": "Response model for listing all tags and per-path mapping.",
+  "properties": {
+    "all": {
+      "description": "Flattened unique tag list",
+      "items": {
+        "type": "string"
+      },
+      "title": "All",
+      "type": "array"
+    },
+    "message": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Message"
+    },
+    "ok": {
+      "default": true,
+      "title": "Ok",
+      "type": "boolean"
+    },
+    "tags": {
+      "additionalProperties": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "description": "Mapping path -> tags",
+      "title": "Tags",
+      "type": "object"
+    }
+  },
+  "title": "TagsListResponse",
+  "type": "object"
+}

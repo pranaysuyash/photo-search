@@ -1,0 +1,29 @@
+{
+  "description": "Response model for autotag operation results.",
+  "properties": {
+    "message": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Message"
+    },
+    "ok": {
+      "default": true,
+      "title": "Ok",
+      "type": "boolean"
+    },
+    "updated": {
+      "default": 0,
+      "title": "Updated",
+      "type": "integer"
+    }
+  },
+  "title": "AutoTagResponse",
+  "type": "object"
+}

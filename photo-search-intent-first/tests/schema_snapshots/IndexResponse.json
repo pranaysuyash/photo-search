@@ -1,0 +1,51 @@
+{
+  "description": "Response model for index operations.",
+  "properties": {
+    "job_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Job Id"
+    },
+    "message": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Message"
+    },
+    "new": {
+      "default": 0,
+      "title": "New",
+      "type": "integer"
+    },
+    "ok": {
+      "default": true,
+      "title": "Ok",
+      "type": "boolean"
+    },
+    "total": {
+      "default": 0,
+      "title": "Total",
+      "type": "integer"
+    },
+    "updated": {
+      "default": 0,
+      "title": "Updated",
+      "type": "integer"
+    }
+  },
+  "title": "IndexResponse",
+  "type": "object"
+}

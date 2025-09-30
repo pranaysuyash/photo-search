@@ -1,0 +1,37 @@
+{
+  "description": "Error response model for API errors.",
+  "properties": {
+    "error": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Error"
+    },
+    "message": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Message"
+    },
+    "ok": {
+      "default": false,
+      "title": "Ok",
+      "type": "boolean"
+    }
+  },
+  "title": "ErrorResponse",
+  "type": "object"
+}

@@ -13,7 +13,38 @@ class MockBackend extends BaseBackend {
   readonly id = 'mock-backend';
   readonly name = 'Mock Backend';
   readonly version = '1.0.0';
-  readonly capabilities = [];
+  readonly capabilities = [
+    {
+      type: 'inference' as const,
+      modelTypes: [
+        {
+          id: 'model1',
+          name: 'Test Model',
+          description: 'Test model for face detection',
+          framework: 'mock',
+          version: '1.0.0',
+          size: 1000000,
+          format: 'tensorflow' as const,
+          capabilities: [
+            { type: 'classification' as const, confidence: 0.85 },
+            { type: 'detection' as const, confidence: 0.90 }
+          ]
+        }
+      ],
+      inputFormats: [
+        { type: 'tensor' as const, dtype: 'float32' as const }
+      ],
+      outputFormats: [
+        { type: 'classification' as const, dtype: 'float32' as const }
+      ],
+      features: [],
+      performance: {
+        inferenceTime: 100,
+        memoryUsage: 50,
+        accuracy: 0.85
+      }
+    }
+  ];
   readonly resourceRequirements = {
     memory: { min: 100, max: 200, optimal: 150 },
     cpu: { min: 10, max: 30, optimal: 20 }
@@ -97,12 +128,12 @@ describe('BackendSelector', () => {
     backendSelector = new BackendSelector();
 
     // Register mock backend
-    backendRegistry.registerBackend('mock', mockBackend);
+    backendRegistry.registerBackend('mock-backend', mockBackend);
   });
 
   afterEach(() => {
     // Clean up registry
-    backendRegistry.unregisterBackend('mock');
+    backendRegistry.unregisterBackend('mock-backend');
   });
 
   describe('Backend Selection', () => {
@@ -122,7 +153,7 @@ describe('BackendSelector', () => {
 
       const selection = await backendSelector.selectBackend(task);
 
-      expect(selection.backend).toBe('mock');
+      expect(selection.backend).toBe('mock-backend');
       expect(selection.confidence).toBeGreaterThan(0);
       expect(selection.reasoning).toBeDefined();
       expect(selection.estimatedPerformance).toBeDefined();
@@ -156,7 +187,7 @@ describe('BackendSelector', () => {
 
       const selection = await backendSelector.selectBackend(task, criteria);
 
-      expect(selection.backend).toBe('mock');
+      expect(selection.backend).toBe('mock-backend');
       expect(selection.confidence).toBeGreaterThan(0);
     });
 
@@ -178,12 +209,12 @@ describe('BackendSelector', () => {
 
       expect(selections.length).toBeGreaterThan(0);
       expect(selections.length).toBeLessThanOrEqual(3);
-      expect(selections[0].backend).toBe('mock');
+      expect(selections[0].backend).toBe('mock-backend');
     });
 
     it('should throw error when no backends available', async () => {
       // Unregister the mock backend
-      backendRegistry.unregisterBackend('mock');
+      backendRegistry.unregisterBackend('mock-backend');
 
       const task = {
         id: 'test-task',
@@ -295,7 +326,7 @@ describe('BackendSelector', () => {
         }
       };
 
-      const backendInfo = backendRegistry.getBackend('mock');
+      const backendInfo = backendRegistry.getBackend('mock-backend');
       if (!backendInfo) {
         throw new Error('Backend not found');
       }
@@ -307,7 +338,7 @@ describe('BackendSelector', () => {
         systemResources
       );
 
-      expect(score.backendId).toBe('mock');
+      expect(score.backendId).toBe('mock-backend');
       expect(score.score).toBeGreaterThan(0);
       expect(score.confidence).toBeGreaterThan(0);
       expect(score.reasoning).toBeDefined();
@@ -376,6 +407,12 @@ describe('BackendSelector Integration', () => {
     };
 
     const backendRegistry = BackendRegistry.getInstance();
+
+    // Register mock backend
+    const mockBackend = new MockBackend();
+    backendRegistry.registerBackend('mock-backend', mockBackend);
+
+    // Register high-resource backend
     backendRegistry.registerBackend('high-resource', highResourceBackend);
 
     const task = {
@@ -402,7 +439,7 @@ describe('BackendSelector Integration', () => {
     const selection = await backendSelector.selectBackend(task, criteria);
 
     // Should select the mock backend, not the high-resource one
-    expect(selection.backend).toBe('mock');
+    expect(selection.backend).toBe('mock-backend');
 
     // Clean up
     backendRegistry.unregisterBackend('high-resource');

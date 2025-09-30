@@ -240,7 +240,7 @@ export class BackendSelector {
       // Check if backend supports the required capability
       const hasCapability = backend.capabilities.some(cap =>
         cap.type === 'inference' && cap.modelTypes?.some(model =>
-          model.toLowerCase().includes(criteria.modelId.toLowerCase().split('_')[0])
+          model.id.toLowerCase().includes(criteria.modelId.toLowerCase().split('_')[0])
         )
       );
 
@@ -393,7 +393,7 @@ export class BackendSelector {
   private calculateCapabilityScore(backend: BackendInfo, criteria: SelectionCriteria): number {
     const requiredCapability = backend.capabilities.find(cap =>
       cap.type === 'inference' && cap.modelTypes?.some(model =>
-        model.toLowerCase().includes(criteria.modelId.toLowerCase().split('_')[0])
+        model.id.toLowerCase().includes(criteria.modelId.toLowerCase().split('_')[0])
       )
     );
 

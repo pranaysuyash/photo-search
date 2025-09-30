@@ -1,0 +1,108 @@
+{
+  "$defs": {
+    "ShareListItem": {
+      "properties": {
+        "count": {
+          "default": 0,
+          "title": "Count",
+          "type": "integer"
+        },
+        "created": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Created"
+        },
+        "dir": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dir"
+        },
+        "expired": {
+          "default": false,
+          "title": "Expired",
+          "type": "boolean"
+        },
+        "expires": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expires"
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider"
+        },
+        "token": {
+          "title": "Token",
+          "type": "string"
+        },
+        "view_only": {
+          "default": true,
+          "title": "View Only",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "token"
+      ],
+      "title": "ShareListItem",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "message": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Message"
+    },
+    "ok": {
+      "default": true,
+      "title": "Ok",
+      "type": "boolean"
+    },
+    "shares": {
+      "items": {
+        "$ref": "#/$defs/ShareListItem"
+      },
+      "title": "Shares",
+      "type": "array"
+    }
+  },
+  "title": "ShareListResponse",
+  "type": "object"
+}

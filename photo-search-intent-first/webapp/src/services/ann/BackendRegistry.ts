@@ -97,6 +97,13 @@ export class BackendRegistry {
     return this.backends.get(backendId);
   }
 
+  getAvailableBackends(): BackendInfo[] {
+    return Array.from(this.backends.values()).filter(backend =>
+      backend.status === 'active' &&
+      (backend.health.status === 'healthy' || backend.health.status === 'degraded')
+    );
+  }
+
   getAllBackends(): BackendInfo[] {
     return Array.from(this.backends.values());
   }

@@ -1,0 +1,41 @@
+{
+  "description": "Response model for favorite operations.",
+  "properties": {
+    "favorite": {
+      "default": false,
+      "title": "Favorite",
+      "type": "boolean"
+    },
+    "message": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Message"
+    },
+    "ok": {
+      "default": true,
+      "title": "Ok",
+      "type": "boolean"
+    },
+    "path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Path"
+    }
+  },
+  "title": "FavoriteResponse",
+  "type": "object"
+}
