@@ -425,7 +425,7 @@ export function AppChrome({
 		// 1. User hasn't completed onboarding
 		// 2. No directory is selected (first time setup)
 		// 3. Enhanced onboarding should be shown based on progress tracking
-		if (!hasCompletedOnboarding && !dir && shouldShowEnhancedOnboarding()) {
+		if (!hasCompletedOnboarding && !dir && shouldShowEnhancedOnboarding) {
 			setShowEnhancedOnboarding(true);
 		}
 	}, [hasCompletedOnboarding, dir, shouldShowEnhancedOnboarding]);

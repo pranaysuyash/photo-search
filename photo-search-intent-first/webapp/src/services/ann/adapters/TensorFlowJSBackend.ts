@@ -16,9 +16,14 @@ import type {
 } from './types';
 
 export class TensorFlowJSBackend extends BaseBackend {
-  readonly id = 'tensorflowjs';
+  readonly id: string;
   readonly name = 'TensorFlow.js Backend';
   readonly version = '1.0.0';
+
+  constructor(id?: string) {
+    super();
+    this.id = id || 'tensorflowjs';
+  }
   readonly capabilities: BackendCapability[] = [
     {
       type: 'inference',

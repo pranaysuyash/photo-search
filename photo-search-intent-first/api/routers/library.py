@@ -12,8 +12,12 @@ from fastapi import APIRouter, HTTPException, Query, Header
 from api.utils import _emb
 from domain.models import SUPPORTED_EXTS, SUPPORTED_VIDEO_EXTS
 from infra.index_store import IndexStore
+from services.directory_scanner import DirectoryScanner
 
 router = APIRouter()
+
+# Global service instance
+directory_scanner = DirectoryScanner()
 
 def _normcase_path(p: str) -> str:
     """Normalize path case for cross-platform compatibility."""
@@ -24,63 +28,7 @@ def _normcase_path(p: str) -> str:
 
 def _default_photo_dir_candidates() -> List[Dict[str, str]]:
     """Best-effort local photo folder suggestions across OSes."""
-    out: List[Dict[str, str]] = []
-    home = Path.home()
-    sysname = (os.uname().sysname if hasattr(os, 'uname') else os.name).lower()
-    
-    def _add(p: Path, label: str, source: str):
-        try:
-            if p.exists() and p.is_dir():
-                out.append({"path": str(p), "label": label, "source": source})
-        except Exception:
-            pass
-    
-    # Common directories
-    _add(home / "Pictures", "Pictures", "home")
-    _add(home / "Downloads", "Downloads", "home")
-    
-    # Windows-like envs
-    one_drive_env = os.environ.get("OneDrive")
-    if one_drive_env:
-        _add(Path(one_drive_env) / "Pictures", "OneDrive Pictures", "onedrive")
-    public_dir = os.environ.get("PUBLIC")
-    if public_dir:
-        _add(Path(public_dir) / "Pictures", "Public Pictures", "windows")
-    
-    # macOS iCloud hints
-    if "darwin" in sysname:
-        icloud_docs = home / "Library" / "Mobile Documents" / "com~apple~CloudDocs"
-        _add(icloud_docs / "Photos", "iCloud Drive Photos", "icloud")
-        _add(icloud_docs / "Pictures", "iCloud Drive Pictures", "icloud")
-        _add(home / "Library" / "CloudStorage" / "iCloud Drive" / "Photos", "iCloud Photos", "icloud")
-    
-    # Linux XDG
-    if "linux" in sysname:
-        try:
-            user_dirs = home / ".config" / "user-dirs.dirs"
-            if user_dirs.exists():
-                text = user_dirs.read_text(encoding="utf-8")
-                for line in text.splitlines():
-                    if line.startswith("XDG_PICTURES_DIR") or line.startswith("XDG_DOWNLOAD_DIR"):
-                        parts = line.split("=")
-                        if len(parts) == 2:
-                            raw = parts[1].strip().strip('"')
-                            resolved = raw.replace("$HOME", str(home))
-                            label = "Pictures" if "PICTURES" in parts[0] else "Downloads"
-                            _add(Path(resolved), label, "xdg")
-        except Exception:
-            pass
-    
-    # Deduplicate by normalized path
-    seen: set[str] = set()
-    uniq: List[Dict[str, str]] = []
-    for it in out:
-        key = _normcase_path(it["path"])
-        if key in seen:
-            continue
-        seen.add(key)
-        uniq.append(it)
-    return uniq
+    return directory_scanner.get_default_photo_directories()
 
 def _scan_media_counts(paths: List[str], include_videos: bool = True) -> Dict[str, Any]:
     """Count image/video files and bytes for quick previews; privacy-friendly."""

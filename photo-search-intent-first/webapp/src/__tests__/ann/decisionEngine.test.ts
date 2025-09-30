@@ -5,22 +5,59 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { DecisionEngine } from '../../services/ann/DecisionEngine';
 import { BaseBackend } from '../../services/ann/BackendInterface';
+import { BackendRegistry } from '../../services/ann/BackendRegistry';
 
 // Mock backend for testing
 class MockBackend extends BaseBackend {
   readonly id = 'mock-backend';
   readonly name = 'Mock Backend';
   readonly version = '1.0.0';
-  readonly capabilities = [];
+  readonly capabilities = [
+    {
+      type: 'inference' as const,
+      modelTypes: [
+        {
+          id: 'model1-tensorflow',
+          name: 'TensorFlow Model',
+          description: 'Mock TensorFlow model',
+          framework: 'tensorflow' as const,
+          version: '1.0.0',
+          size: 1000000,
+          format: 'tensorflow' as const,
+          capabilities: [
+            { type: 'classification' as const, confidence: 0.85 },
+            { type: 'detection' as const, confidence: 0.90 }
+          ]
+        }
+      ],
+      inputFormats: [
+        { type: 'tensor' as const, dtype: 'float32' as const }
+      ],
+      outputFormats: [
+        { type: 'classification' as const, dtype: 'float32' as const }
+      ],
+      features: [],
+      performance: {
+        inferenceTime: 100,
+        memoryUsage: 50,
+        accuracy: 0.85
+      }
+    }
+  ];
   readonly resourceRequirements = {
     memory: { min: 100, max: 200, optimal: 150 },
-    cpu: { min: 10, max: 30, optimal: 20 }
+    cpu: { min: 10, max: 30, optimal: 20 },
+    storage: { min: 10, max: 50, optimal: 25 }
   };
   readonly performanceProfile = {
     inferenceTime: 100,
     memoryUsage: 50,
+    cpuUsage: 20,
+    gpuUsage: 0,
+    accuracy: 0.85,
     throughput: 10,
-    accuracy: 0.85
+    reliability: 0.9,
+    timestamp: Date.now()
   };
 
   private initialized = false;
@@ -85,8 +122,23 @@ class MockBackend extends BaseBackend {
 
 describe('DecisionEngine', () => {
   let decisionEngine: DecisionEngine;
+  let mockBackend: MockBackend;
+  let backendRegistry: BackendRegistry;
 
   beforeEach(async () => {
+    // Get registry instance and clear it for clean testing
+    backendRegistry = BackendRegistry.getInstance();
+    backendRegistry.clearAllBackends();
+
+    // Create and register mock backend
+    mockBackend = new MockBackend();
+    await mockBackend.initialize();
+    backendRegistry.registerBackend('mock-backend', mockBackend);
+
+    // Update the backend's models in the registry
+    const models = await mockBackend.listModels();
+    backendRegistry.updateBackendModels('mock-backend', models);
+
     decisionEngine = new DecisionEngine();
     await decisionEngine.initialize();
   });

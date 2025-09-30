@@ -12,6 +12,7 @@ import {
 } from './types';
 import { BaseBackend } from './BackendInterface';
 import { ResourceMonitor } from './ResourceMonitor';
+import { BackendRegistry } from './BackendRegistry';
 
 export interface PerformanceProfile {
   backendId: string;
@@ -90,16 +91,24 @@ export interface OptimizationRecommendation {
   risks: string[];
 }
 
+export interface ExecutionRecordOptions {
+  resourceUsage?: Partial<ResourceUsage>;
+  metadata?: Partial<PerformanceProfile['metadata']>;
+}
+
 export class PerformanceProfiler {
   private profiles: Map<string, PerformanceProfile[]> = new Map();
   private benchmarks: Map<string, PerformanceBenchmark> = new Map();
   private resourceProfiles: Map<string, ResourceProfile> = new Map();
   private resourceMonitor: ResourceMonitor;
+  private backendRegistry: BackendRegistry;
   private isProfiling = false;
+  private profilingIntervalId: ReturnType<typeof setInterval> | null = null;
   private profileInterval: number = 60000; // 1 minute
 
   constructor(config: { profileInterval?: number } = {}) {
-    this.resourceMonitor = new ResourceMonitor();
+    this.resourceMonitor = ResourceMonitor.getInstance();
+    this.backendRegistry = BackendRegistry.getInstance();
     this.profileInterval = config.profileInterval || 60000;
   }
 
@@ -119,6 +128,47 @@ export class PerformanceProfiler {
       console.error('[PerformanceProfiler] Failed to initialize:', error);
       return false;
     }
+  }
+
+  async stop(): Promise<void> {
+    this.isProfiling = false;
+
+    if (this.profilingIntervalId) {
+      clearInterval(this.profilingIntervalId);
+      this.profilingIntervalId = null;
+    }
+  }
+
+  async recordExecution(
+    backendId: string,
+    taskType: TaskType,
+    modelId: string,
+    metrics: PerformanceMetrics,
+    options: ExecutionRecordOptions = {}
+  ): Promise<void> {
+    const normalizedMetrics = this.normalizeMetrics(metrics);
+    const profileKey = `${backendId}_${taskType}_${modelId}`;
+    const profiles = this.profiles.get(profileKey) || [];
+
+    const resourceUsage = this.deriveResourceUsage(normalizedMetrics, options.resourceUsage);
+    const metadata = this.buildProfileMetadata(taskType, options.metadata);
+    const timestamp = normalizedMetrics.timestamp ?? Date.now();
+
+    const profile: PerformanceProfile = {
+      backendId,
+      taskType,
+      modelId,
+      metrics: normalizedMetrics,
+      resourceUsage,
+      sampleSize: 1,
+      timestamp,
+      metadata
+    };
+
+    profiles.push(profile);
+    this.profiles.set(profileKey, profiles);
+
+    await this.updateBenchmark(backendId, taskType, modelId);
   }
 
   async profileBackend(
@@ -184,6 +234,51 @@ export class PerformanceProfiler {
     return profile;
   }
 
+  getProfile(backendId: string, taskType: TaskType, modelId: string): PerformanceProfile {
+    const profileKey = `${backendId}_${taskType}_${modelId}`;
+    const profiles = this.profiles.get(profileKey) || [];
+
+    if (profiles.length === 0) {
+      return {
+        backendId,
+        taskType,
+        modelId,
+        metrics: {
+          inferenceTime: 0,
+          memoryUsage: 0,
+          throughput: 0,
+          accuracy: 0,
+          reliability: 0
+        },
+        resourceUsage: {
+          memory: 0,
+          cpu: 0,
+          storage: 0,
+          timestamp: Date.now()
+        },
+        sampleSize: 0,
+        timestamp: Date.now(),
+        metadata: this.buildProfileMetadata(taskType)
+      };
+    }
+
+    const aggregatedMetrics = this.calculateAverageMetrics(profiles.map(p => p.metrics));
+    const aggregatedResourceUsage = this.calculateAverageResourceUsage(profiles.map(p => p.resourceUsage));
+    const sampleSize = profiles.reduce((sum, profile) => sum + profile.sampleSize, 0);
+    const latestProfile = profiles[profiles.length - 1];
+
+    return {
+      backendId,
+      taskType,
+      modelId,
+      metrics: aggregatedMetrics,
+      resourceUsage: aggregatedResourceUsage,
+      sampleSize,
+      timestamp: latestProfile.timestamp,
+      metadata: latestProfile.metadata
+    };
+  }
+
   async createResourceProfile(backend: BaseBackend): Promise<ResourceProfile> {
     console.log(`[PerformanceProfiler] Creating resource profile for ${backend.id}...`);
 
@@ -221,8 +316,12 @@ export class PerformanceProfiler {
     return this.resourceProfiles.get(backendId) || null;
   }
 
+  getAvailableBackends() {
+    return this.backendRegistry.getAvailableBackends();
+  }
+
   compareBackends(
-    backendIds: string[],
+    backendIds: string[] | null,
     taskType: TaskType,
     modelId: string
   ): {
@@ -239,7 +338,10 @@ export class PerformanceProfiler {
     }>;
     winner: string | null;
   } {
-    const comparison = backendIds.map(backendId => {
+    // If no backend IDs provided, get all available backends
+    const idsToCompare = backendIds || this.getAvailableBackends().map(b => b.id);
+
+    const comparison = idsToCompare.map(backendId => {
       const profile = this.getPerformanceProfile(backendId, taskType, modelId);
       const scores = profile ? this.calculatePerformanceScores(profile) : {
         speed: 0,
@@ -649,6 +751,63 @@ export class PerformanceProfiler {
     };
   }
 
+  private normalizeMetrics(metrics: PerformanceMetrics): PerformanceMetrics {
+    const timestamp = metrics.timestamp ?? Date.now();
+    const accuracy = typeof metrics.accuracy === 'number' ? Math.max(0, Math.min(1, metrics.accuracy)) : undefined;
+    const reliability = typeof metrics.reliability === 'number'
+      ? Math.max(0, Math.min(1, metrics.reliability))
+      : accuracy;
+
+    return {
+      inferenceTime: metrics.inferenceTime,
+      memoryUsage: metrics.memoryUsage,
+      cpuUsage: metrics.cpuUsage,
+      gpuUsage: metrics.gpuUsage,
+      accuracy,
+      throughput: metrics.throughput,
+      reliability,
+      timestamp
+    };
+  }
+
+  private deriveResourceUsage(metrics: PerformanceMetrics, overrides: Partial<ResourceUsage> = {}): ResourceUsage {
+    const currentResources = this.resourceMonitor.getCurrentResources();
+
+    const totalCPU = currentResources.totalCPU ?? 0;
+    const availableCPU = currentResources.availableCPU ?? totalCPU;
+    const totalStorage = currentResources.totalStorage ?? 0;
+    const availableStorage = currentResources.availableStorage ?? totalStorage;
+
+    const usage: ResourceUsage = {
+      memory: overrides.memory ?? metrics.memoryUsage,
+      cpu: overrides.cpu ?? metrics.cpuUsage ?? Math.max(0, totalCPU - availableCPU),
+      storage: overrides.storage ?? Math.max(0, totalStorage - availableStorage),
+      timestamp: Date.now()
+    };
+
+    if (overrides.gpu !== undefined) {
+      usage.gpu = overrides.gpu;
+    } else if (metrics.gpuUsage !== undefined) {
+      usage.gpu = metrics.gpuUsage;
+    }
+
+    if (overrides.network) {
+      usage.network = overrides.network;
+    }
+
+    return usage;
+  }
+
+  private buildProfileMetadata(taskType: TaskType, overrides: Partial<PerformanceProfile['metadata']> = {}): PerformanceProfile['metadata'] {
+    return {
+      inputSize: overrides.inputSize ?? this.estimateInputSize(taskType),
+      inputShape: overrides.inputShape,
+      preprocessingTime: overrides.preprocessingTime ?? 0,
+      postprocessingTime: overrides.postprocessingTime ?? 0,
+      queueTime: overrides.queueTime ?? 0
+    };
+  }
+
   private calculateAverageMetrics(metrics: PerformanceMetrics[]): PerformanceMetrics {
     if (metrics.length === 0) {
       return {
@@ -663,7 +822,24 @@ export class PerformanceProfiler {
       inferenceTime: metrics.reduce((sum, m) => sum + m.inferenceTime, 0) / metrics.length,
       memoryUsage: metrics.reduce((sum, m) => sum + m.memoryUsage, 0) / metrics.length,
       throughput: metrics.reduce((sum, m) => sum + (m.throughput || 0), 0) / metrics.length,
-      accuracy: metrics.reduce((sum, m) => sum + (m.accuracy || 0), 0) / metrics.filter(m => m.accuracy).length
+      accuracy: (() => {
+        const accuracyValues = metrics
+          .map(m => m.accuracy)
+          .filter((value): value is number => typeof value === 'number');
+        if (accuracyValues.length === 0) {
+          return 0;
+        }
+        return accuracyValues.reduce((sum, value) => sum + value, 0) / accuracyValues.length;
+      })(),
+      reliability: (() => {
+        const reliabilityValues = metrics
+          .map(m => m.reliability)
+          .filter((value): value is number => typeof value === 'number');
+        if (reliabilityValues.length === 0) {
+          return undefined;
+        }
+        return reliabilityValues.reduce((sum, value) => sum + value, 0) / reliabilityValues.length;
+      })()
     };
   }
 
@@ -896,8 +1072,12 @@ export class PerformanceProfiler {
   private startProfiling(): void {
     this.isProfiling = true;
 
+    if (this.profilingIntervalId) {
+      clearInterval(this.profilingIntervalId);
+    }
+
     // Set up periodic profiling
-    setInterval(async () => {
+    this.profilingIntervalId = setInterval(async () => {
       if (this.isProfiling) {
         await this.runPeriodicProfiling();
       }

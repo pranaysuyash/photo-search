@@ -30,6 +30,7 @@ export interface BackendInfo {
 export class BackendRegistry {
   private static instance: BackendRegistry;
   private backends: Map<string, BackendInfo> = new Map();
+  private backendInstances: Map<string, BaseBackend> = new Map(); // backendId -> actual backend instance
   private capabilities: Map<string, string[]> = new Map(); // capability -> backendIds
   private models: Map<string, string[]> = new Map(); // modelId -> backendIds
   private eventListeners: Map<string, Function[]> = new Map();
@@ -62,6 +63,7 @@ export class BackendRegistry {
     };
 
     this.backends.set(backendId, backendInfo);
+    this.backendInstances.set(backendId, backend);
 
     // Update capability index
     this.updateCapabilityIndex(backendId, backend.capabilities);
@@ -86,6 +88,7 @@ export class BackendRegistry {
 
     // Remove from registry
     this.backends.delete(backendId);
+    this.backendInstances.delete(backendId);
 
     // Emit event
     this.emitEvent('backendUnregistered', { backendId, backendInfo });
@@ -93,8 +96,23 @@ export class BackendRegistry {
     console.log(`[BackendRegistry] Backend ${backendId} unregistered successfully`);
   }
 
+  /**
+   * Clear all registered backends (useful for testing)
+   */
+  clearAllBackends(): void {
+    this.backends.clear();
+    this.backendInstances.clear();
+    this.capabilities.clear();
+    this.models.clear();
+    console.log('[BackendRegistry] All backends cleared');
+  }
+
   getBackend(backendId: string): BackendInfo | undefined {
     return this.backends.get(backendId);
+  }
+
+  getBackendInstance(backendId: string): BaseBackend | undefined {
+    return this.backendInstances.get(backendId);
   }
 
   getAvailableBackends(): BackendInfo[] {

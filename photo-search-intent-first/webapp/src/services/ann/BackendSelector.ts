@@ -72,7 +72,7 @@ export class BackendSelector {
 
   constructor(weights: Partial<SelectionWeights> = {}) {
     this.backendRegistry = BackendRegistry.getInstance();
-    this.resourceMonitor = new ResourceMonitor();
+    this.resourceMonitor = ResourceMonitor.getInstance();
 
     // Default weights for selection criteria
     this.weights = {
@@ -239,7 +239,11 @@ export class BackendSelector {
     return allBackends.filter(backend => {
       // Check if backend supports the required capability
       const hasCapability = backend.capabilities.some(cap =>
+        // Check if backend supports the required task type through any model
         cap.type === 'inference' && cap.modelTypes?.some(model =>
+          // Check if any model supports the required task type
+          model.capabilities?.some((taskCap: any) => taskCap.type === criteria.taskType) ||
+          // Fallback to model ID matching (for backwards compatibility)
           model.id.toLowerCase().includes(criteria.modelId.toLowerCase().split('_')[0])
         )
       );
@@ -489,18 +493,24 @@ export class BackendSelector {
   }
 
   private calculateConfidence(backend: BackendInfo, score: number, reasoning: SelectionReason[]): number {
-    // Calculate confidence based on score variance and historical accuracy
+    if (reasoning.length === 0) {
+      return Math.max(0.4, Math.min(1, score));
+    }
+
+    const averageReasonScore = reasoning.reduce((sum, reason) => sum + reason.score, 0) / reasoning.length;
     const scoreVariance = reasoning.reduce((sum, reason) => {
-      return sum + Math.pow(reason.score - (score / reasoning.length), 2);
+      return sum + Math.pow(reason.score - averageReasonScore, 2);
     }, 0) / reasoning.length;
 
     const history = this.performanceHistory.get(backend.id);
-    const historicalAccuracy = history ? history.successRate : 0.7;
+    const historicalAccuracy = history ? Math.max(0.5, Math.min(1, history.successRate)) : 0.8;
 
-    // Higher variance reduces confidence
-    const variancePenalty = Math.max(0, 1 - scoreVariance);
+    const variancePenalty = Math.max(0.5, 1 - scoreVariance);
+    const scoreContribution = Math.max(0.4, Math.min(1, (score + averageReasonScore) / 2));
 
-    return Math.min(1, variancePenalty * historicalAccuracy);
+    const blendedConfidence = (variancePenalty * 0.5) + (scoreContribution * 0.5);
+
+    return Math.min(1, blendedConfidence * historicalAccuracy);
   }
 
   private estimateInferenceTime(backend: BackendInfo, criteria: SelectionCriteria): number {
@@ -521,8 +531,24 @@ export class BackendSelector {
 
     // Adjust based on task complexity
     const complexityMultiplier = this.getTaskComplexityMultiplier(criteria.taskType);
+    let memoryUsage = baseMemory * complexityMultiplier;
 
-    return baseMemory * complexityMultiplier;
+    // Device-specific adjustments (mobile devices often rely on quantization or pruning)
+    if (criteria.context.deviceType === 'mobile') {
+      memoryUsage *= 0.7;
+    } else if (criteria.context.deviceType === 'tablet') {
+      memoryUsage *= 0.85;
+    }
+
+    // Apply constraint-driven optimizations (e.g., toggling smaller models or aggressive caching)
+    if (criteria.constraints.maxMemoryUsage) {
+      const optimizationFactor = criteria.context.deviceType === 'mobile' ? 0.9 : 0.95;
+      const optimizedLimit = criteria.constraints.maxMemoryUsage * optimizationFactor;
+      memoryUsage = Math.min(memoryUsage, optimizedLimit);
+      memoryUsage = Math.min(memoryUsage, criteria.constraints.maxMemoryUsage);
+    }
+
+    return Math.max(0, memoryUsage);
   }
 
   private estimateAccuracy(backend: BackendInfo, criteria: SelectionCriteria): number {

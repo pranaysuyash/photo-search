@@ -87,7 +87,17 @@ from infra.edits import EditOps as _EditOps, apply_ops as _edit_apply_ops, upsca
 from usecases.manage_saved import load_saved, save_saved
 from usecases.manage_presets import load_presets, save_presets
 from usecases.index_photos import index_photos  # noqa: F401 (potential future use)
+from services.directory_scanner import DirectoryScanner
+from services.search_executor import SearchExecutor
+from services.media_scanner import MediaScanner
+from services.rpn_expression_evaluator import RPNExpressionEvaluator
 from infra.video_index_store import VideoIndexStore
+
+# Global service instances
+directory_scanner = DirectoryScanner()
+search_executor = SearchExecutor()
+media_scanner = MediaScanner()
+rpn_evaluator = RPNExpressionEvaluator()
 from infra.thumbs import get_or_create_thumb, get_or_create_face_thumb  # noqa: F401
 from infra.faces import load_faces as _faces_load  # noqa: F401
 try:
@@ -232,87 +242,12 @@ def _normcase_path(p: str) -> str:
 
 def _default_photo_dir_candidates() -> List[Dict[str, str]]:
     """Best-effort local photo folder suggestions across OSes."""
-    out: List[Dict[str, str]] = []
-    home = Path.home()
-    sysname = (os.uname().sysname if hasattr(os, 'uname') else os.name).lower()
-    def _add(p: Path, label: str, source: str):
-        try:
-            if p.exists() and p.is_dir():
-                out.append({"path": str(p), "label": label, "source": source})
-        except Exception:
-            pass
-    # Common directories
-    _add(home / "Pictures", "Pictures", "home")
-    _add(home / "Downloads", "Downloads", "home")
-    # Windows-like envs
-    one_drive_env = os.environ.get("OneDrive")
-    if one_drive_env:
-        _add(Path(one_drive_env) / "Pictures", "OneDrive Pictures", "onedrive")
-    public_dir = os.environ.get("PUBLIC")
-    if public_dir:
-        _add(Path(public_dir) / "Pictures", "Public Pictures", "windows")
-    # macOS iCloud hints
-    if "darwin" in sysname:
-        icloud_docs = home / "Library" / "Mobile Documents" / "com~apple~CloudDocs"
-        _add(icloud_docs / "Photos", "iCloud Drive Photos", "icloud")
-        _add(icloud_docs / "Pictures", "iCloud Drive Pictures", "icloud")
-        _add(home / "Library" / "CloudStorage" / "iCloud Drive" / "Photos", "iCloud Photos", "icloud")
-    # Linux XDG
-    if "linux" in sysname:
-        try:
-            user_dirs = home / ".config" / "user-dirs.dirs"
-            if user_dirs.exists():
-                text = user_dirs.read_text(encoding="utf-8")
-                for line in text.splitlines():
-                    if line.startswith("XDG_PICTURES_DIR") or line.startswith("XDG_DOWNLOAD_DIR"):
-                        parts = line.split("=")
-                        if len(parts) == 2:
-                            raw = parts[1].strip().strip('"')
-                            resolved = raw.replace("$HOME", str(home))
-                            label = "Pictures" if "PICTURES" in parts[0] else "Downloads"
-                            _add(Path(resolved), label, "xdg")
-        except Exception:
-            pass
-    # Deduplicate by normalized path
-    seen: set[str] = set()
-    uniq: List[Dict[str, str]] = []
-    for it in out:
-        key = _normcase_path(it["path"])
-        if key in seen:
-            continue
-        seen.add(key)
-        uniq.append(it)
-    return uniq
+    return directory_scanner.get_default_photo_directories()
 
 
 def _scan_media_counts(paths: List[str], include_videos: bool = True) -> Dict[str, Any]:
     """Count image/video files and bytes for quick previews; privacy-friendly."""
-    total_files = 0
-    total_bytes = 0
-    items: List[Dict[str, Any]] = []
-    img_exts = SUPPORTED_EXTS
-    vid_exts = SUPPORTED_VIDEO_EXTS if include_videos else set()
-    for p in paths:
-        pth = Path(p).expanduser()
-        count = 0
-        size = 0
-        try:
-            if pth.exists() and pth.is_dir():
-                for root, _, files in os.walk(pth):
-                    for name in files:
-                        ext = Path(name).suffix.lower()
-                        if ext in img_exts or ext in vid_exts:
-                            count += 1
-                            try:
-                                size += (Path(root) / name).stat().st_size
-                            except Exception:
-                                continue
-        except Exception:
-            count = 0; size = 0
-        total_files += count
-        total_bytes += size
-        items.append({"path": str(pth), "count": count, "bytes": size})
-    return {"items": items, "total_files": total_files, "total_bytes": total_bytes}
+    return media_scanner.scan_directories(paths, include_videos)
 
 
 # Search endpoint helper functions (extracted from 143 CCN main function)
@@ -350,257 +285,256 @@ def _initialize_search_provider(unified_req: UnifiedSearchRequest):
 
 def _perform_semantic_search(store, embedder, unified_req: UnifiedSearchRequest) -> List:
     """Perform the core semantic search operation with all search modes."""
-    try:
-        # Extract legacy parameters for compatibility
-        legacy_params = unified_req.to_legacy_param_dict()
-        query_value = (legacy_params.get("query") or "").strip()
-        top_k_value = legacy_params.get("top_k", 48)
-        use_fast_value = bool(legacy_params.get("use_fast"))
-        fast_kind_value = legacy_params.get("fast_kind")
-        use_captions_value = bool(legacy_params.get("use_captions"))
-        use_ocr_value = bool(legacy_params.get("use_ocr"))
-        
-        # Handle fast indexing if enabled
-        if use_fast_value:
-            from infra.fast_index_manager import FastIndexManager
-            fim = FastIndexManager(store)
-            try:
-                results, fast_meta = fim.search(
-                    embedder, query_value, 
-                    top_k=top_k_value, 
-                    use_fast=True, 
-                    fast_kind_hint=fast_kind_value
-                )
-                return results
-            except Exception:
-                # Fallback to regular search
-                pass
-        
-        # Regular search with different modes
-        if query_value and query_value.strip():
-            if use_captions_value and store.captions_available():
-                return store.search_with_captions(embedder, query_value, top_k_value)
-            elif use_ocr_value and store.ocr_available():
-                return store.search_with_ocr(embedder, query_value, top_k_value)
-            else:
-                return store.search(
-                    embedder,
-                    query_value,
-                    top_k=top_k_value,
-                    similarity_threshold=unified_req.similarity_threshold,
-                    use_captions=use_captions_value,
-                    use_fast=use_fast_value,
-                    fast_kind=fast_kind_value,
-                    use_ocr=use_ocr_value,
-                )
-        else:
-            # No query: return all indexed photos (with score 1.0)
-            from domain.models import SearchResult
-            paths = store.state.paths or []
-            return [SearchResult(path=Path(p), score=1.0) for p in paths]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Search failed: {e}")
+    return search_executor.execute_search(store, embedder, unified_req)
 
 
 def _apply_metadata_filters(store, results: List, unified_req: UnifiedSearchRequest) -> List:
     """Apply EXIF and metadata-based filters to search results."""
     try:
-        # Build metadata maps if needed for filtering
+        # Early return if no metadata file exists
         meta_p = store.index_dir / 'exif_index.json'
         if not meta_p.exists():
             return results
             
-        needs_meta = any([
-            unified_req.camera,
-            unified_req.iso_min is not None, unified_req.iso_max is not None,
-            unified_req.f_min is not None, unified_req.f_max is not None,
-            unified_req.place,
-            unified_req.flash, unified_req.wb, unified_req.metering,
-            unified_req.alt_min is not None, unified_req.alt_max is not None,
-            unified_req.heading_min is not None, unified_req.heading_max is not None,
-            unified_req.sharp_only, unified_req.exclude_under, unified_req.exclude_over,
-        ])
-        
-        if not needs_meta:
+        # Check if any metadata filtering is needed
+        if not _needs_metadata_filtering(unified_req):
             return results
             
-        import json
-        m = json.loads(meta_p.read_text())
+        # Load metadata maps
+        metadata_maps = _load_metadata_maps(meta_p)
         
-        # Create metadata lookup maps
-        cam_map = {p: (c or '') for p, c in zip(m.get('paths', []), m.get('camera', []))}
-        iso_map = {p: (i if isinstance(i, int) else None) for p, i in zip(m.get('paths', []), m.get('iso', []))}
-        f_map = {p: (float(x) if isinstance(x, (int, float)) else None) for p, x in zip(m.get('paths', []), m.get('fnumber', []))}
-        place_map = {p: (s or '') for p, s in zip(m.get('paths', []), m.get('place', []))}
-        flash_map = {p: (int(x) if isinstance(x, (int, float)) else None) for p, x in zip(m.get('paths', []), m.get('flash', []))}
-        wb_map = {p: (int(x) if isinstance(x, (int, float)) else None) for p, x in zip(m.get('paths', []), m.get('white_balance', []))}
-        met_map = {p: (int(x) if isinstance(x, (int, float)) else None) for p, x in zip(m.get('paths', []), m.get('metering', []))}
-        alt_map = {p: (float(x) if isinstance(x, (int, float)) else None) for p, x in zip(m.get('paths', []), m.get('gps_altitude', []))}
-        head_map = {p: (float(x) if isinstance(x, (int, float)) else None) for p, x in zip(m.get('paths', []), m.get('gps_heading', []))}
-        sharp_map = {p: (float(x) if isinstance(x, (int, float)) else None) for p, x in zip(m.get('paths', []), m.get('sharpness', []))}
-        bright_map = {p: (float(x) if isinstance(x, (int, float)) else None) for p, x in zip(m.get('paths', []), m.get('brightness', []))}
-
-        # Create specialized metadata filter functions
-        def _check_iso_range(p: str) -> bool:
-            """Check if photo's ISO falls within specified range."""
-            if unified_req.iso_min is not None:
-                v = iso_map.get(p)
-                if v is None or v < int(unified_req.iso_min):
-                    return False
-            if unified_req.iso_max is not None:
-                v = iso_map.get(p)
-                if v is None or v > int(unified_req.iso_max):
-                    return False
-            return True
-
-        def _check_f_range(p: str) -> bool:
-            """Check if photo's f-number falls within specified range."""
-            if unified_req.f_min is not None:
-                v = f_map.get(p)
-                if v is None or v < float(unified_req.f_min):
-                    return False
-            if unified_req.f_max is not None:
-                v = f_map.get(p)
-                if v is None or v > float(unified_req.f_max):
-                    return False
-            return True
-
-        def _check_camera_match(p: str) -> bool:
-            """Check if photo's camera matches specified filter."""
-            if unified_req.camera and unified_req.camera.strip():
-                if unified_req.camera.strip().lower() not in (cam_map.get(p,'') or '').lower():
-                    return False
-            return True
-
-        def _matches_camera_settings(p: str) -> bool:
-            """Check camera-related filters: camera, ISO, f-number."""
-            return (_check_camera_match(p) and 
-                    _check_iso_range(p) and 
-                    _check_f_range(p))
-
-        def _check_place_match(p: str) -> bool:
-            """Check if photo's place matches specified filter."""
-            if unified_req.place and unified_req.place.strip():
-                if unified_req.place.strip().lower() not in (place_map.get(p,'') or '').lower():
-                    return False
-            return True
-
-        def _check_altitude_range(p: str) -> bool:
-            """Check if photo's altitude falls within specified range."""
-            if unified_req.alt_min is not None or unified_req.alt_max is not None:
-                av = alt_map.get(p)
-                if av is None:
-                    return False
-                if unified_req.alt_min is not None and av < float(unified_req.alt_min):
-                    return False
-                if unified_req.alt_max is not None and av > float(unified_req.alt_max):
-                    return False
-            return True
-
-        def _check_heading_range(p: str) -> bool:
-            """Check if photo's heading falls within specified range."""
-            if unified_req.heading_min is not None or unified_req.heading_max is not None:
-                hv = head_map.get(p)
-                if hv is None:
-                    return False
-                try:
-                    hh = float(hv) % 360.0
-                except Exception:
-                    hh = hv
-                if unified_req.heading_min is not None and hh < float(unified_req.heading_min):
-                    return False
-                if unified_req.heading_max is not None and hh > float(unified_req.heading_max):
-                    return False
-            return True
-
-        def _matches_location_filters(p: str) -> bool:
-            """Check location-related filters: place, altitude, heading."""
-            return (_check_place_match(p) and 
-                    _check_altitude_range(p) and 
-                    _check_heading_range(p))
-
-        def _check_flash_setting(p: str) -> bool:
-            """Check if photo's flash setting matches filter."""
-            if unified_req.flash:
-                fv = flash_map.get(p)
-                if fv is None:
-                    return False
-                fired = 1 if fv & 1 else 0
-                if unified_req.flash == 'fired' and fired != 1:
-                    return False
-                if unified_req.flash in ('no','noflash') and fired != 0:
-                    return False
-            return True
-
-        def _check_white_balance(p: str) -> bool:
-            """Check if photo's white balance matches filter."""
-            if unified_req.wb:
-                wv = wb_map.get(p)
-                if wv is None:
-                    return False
-                if unified_req.wb == 'auto' and wv != 0:
-                    return False
-                if unified_req.wb == 'manual' and wv != 1:
-                    return False
-            return True
-
-        def _check_metering_mode(p: str) -> bool:
-            """Check if photo's metering mode matches filter."""
-            if unified_req.metering:
-                mv = met_map.get(p)
-                if mv is None:
-                    return False
-                name = str(unified_req.metering).lower()
-                mm = {0: 'unknown', 1: 'average', 2: 'center', 3: 'spot', 4: 'multispot', 5: 'pattern', 6: 'partial', 255: 'other'}
-                label = mm.get(int(mv), 'other')
-                if name not in (label, 'any'):
-                    if not (name == 'matrix' and label == 'pattern'):
-                        return False
-            return True
-
-        def _matches_technical_settings(p: str) -> bool:
-            """Check technical camera settings: flash, white balance, metering."""
-            return (_check_flash_setting(p) and 
-                    _check_white_balance(p) and 
-                    _check_metering_mode(p))
-
-        def _check_sharpness_filter(p: str) -> bool:
-            """Check if photo meets sharpness requirement."""
-            if unified_req.sharp_only:
-                sv = sharp_map.get(p)
-                if sv is None or sv < 60.0:
-                    return False
-            return True
-
-        def _check_exposure_filters(p: str) -> bool:
-            """Check if photo meets exposure requirements."""
-            if unified_req.exclude_under:
-                bv = bright_map.get(p)
-                if bv is not None and bv < 50.0:
-                    return False
-            if unified_req.exclude_over:
-                bv = bright_map.get(p)
-                if bv is not None and bv > 205.0:
-                    return False
-            return True
-
-        def _matches_quality_filters(p: str) -> bool:
-            """Check image quality filters: sharpness, exposure."""
-            return (_check_sharpness_filter(p) and 
-                    _check_exposure_filters(p))
-
-        def _matches_all_metadata(p: str) -> bool:
-            """Combined metadata filter checking all categories."""
-            return (_matches_camera_settings(p) and
-                    _matches_location_filters(p) and
-                    _matches_technical_settings(p) and
-                    _matches_quality_filters(p))
-
-        return [r for r in results if _matches_all_metadata(str(r.path))]
+        # Create and apply filters
+        filter_func = _create_metadata_filter(unified_req, metadata_maps)
+        return [r for r in results if filter_func(str(r.path))]
         
     except Exception:
         # If metadata filtering fails, return original results
         return results
+
+
+def _needs_metadata_filtering(unified_req: UnifiedSearchRequest) -> bool:
+    """Check if any metadata-based filtering is requested."""
+    return any([
+        unified_req.camera,
+        unified_req.iso_min is not None, unified_req.iso_max is not None,
+        unified_req.f_min is not None, unified_req.f_max is not None,
+        unified_req.place,
+        unified_req.flash, unified_req.wb, unified_req.metering,
+        unified_req.alt_min is not None, unified_req.alt_max is not None,
+        unified_req.heading_min is not None, unified_req.heading_max is not None,
+        unified_req.sharp_only, unified_req.exclude_under, unified_req.exclude_over,
+    ])
+
+
+def _load_metadata_maps(meta_path) -> dict:
+    """Load and create metadata lookup maps from EXIF index."""
+    import json
+    m = json.loads(meta_path.read_text())
+    paths = m.get('paths', [])
+    
+    return {
+        'cam_map': _create_string_map(paths, m.get('camera', [])),
+        'iso_map': _create_int_map(paths, m.get('iso', [])),
+        'f_map': _create_float_map(paths, m.get('fnumber', [])),
+        'place_map': _create_string_map(paths, m.get('place', [])),
+        'flash_map': _create_int_map(paths, m.get('flash', [])),
+        'wb_map': _create_int_map(paths, m.get('white_balance', [])),
+        'met_map': _create_int_map(paths, m.get('metering', [])),
+        'alt_map': _create_float_map(paths, m.get('gps_altitude', [])),
+        'head_map': _create_float_map(paths, m.get('gps_heading', [])),
+        'sharp_map': _create_float_map(paths, m.get('sharpness', [])),
+        'bright_map': _create_float_map(paths, m.get('brightness', [])),
+    }
+
+
+def _create_string_map(paths: list, values: list) -> dict:
+    """Create a path-to-string mapping with empty string fallback."""
+    return {p: (c or '') for p, c in zip(paths, values)}
+
+
+def _create_int_map(paths: list, values: list) -> dict:
+    """Create a path-to-int mapping with None for invalid values."""
+    return {p: (int(x) if isinstance(x, (int, float)) else None) for p, x in zip(paths, values)}
+
+
+def _create_float_map(paths: list, values: list) -> dict:
+    """Create a path-to-float mapping with None for invalid values."""
+    return {p: (float(x) if isinstance(x, (int, float)) else None) for p, x in zip(paths, values)}
+
+
+def _create_metadata_filter(unified_req: UnifiedSearchRequest, metadata_maps: dict):
+    """Create a combined metadata filter function."""
+    def _matches_all_metadata(p: str) -> bool:
+        """Combined metadata filter checking all categories."""
+        return (_matches_camera_settings(p, unified_req, metadata_maps) and
+                _matches_location_filters(p, unified_req, metadata_maps) and
+                _matches_technical_settings(p, unified_req, metadata_maps) and
+                _matches_quality_filters(p, unified_req, metadata_maps))
+    
+    return _matches_all_metadata
+
+
+def _matches_camera_settings(p: str, unified_req: UnifiedSearchRequest, metadata_maps: dict) -> bool:
+    """Check camera-related filters: camera, ISO, f-number."""
+    return (_check_camera_match(p, unified_req, metadata_maps['cam_map']) and 
+            _check_iso_range(p, unified_req, metadata_maps['iso_map']) and 
+            _check_f_range(p, unified_req, metadata_maps['f_map']))
+
+
+def _matches_location_filters(p: str, unified_req: UnifiedSearchRequest, metadata_maps: dict) -> bool:
+    """Check location-related filters: place, altitude, heading."""
+    return (_check_place_match(p, unified_req, metadata_maps['place_map']) and 
+            _check_altitude_range(p, unified_req, metadata_maps['alt_map']) and 
+            _check_heading_range(p, unified_req, metadata_maps['head_map']))
+
+
+def _matches_technical_settings(p: str, unified_req: UnifiedSearchRequest, metadata_maps: dict) -> bool:
+    """Check technical camera settings: flash, white balance, metering."""
+    return (_check_flash_setting(p, unified_req, metadata_maps['flash_map']) and 
+            _check_white_balance(p, unified_req, metadata_maps['wb_map']) and 
+            _check_metering_mode(p, unified_req, metadata_maps['met_map']))
+
+
+def _matches_quality_filters(p: str, unified_req: UnifiedSearchRequest, metadata_maps: dict) -> bool:
+    """Check image quality filters: sharpness, exposure."""
+    return (_check_sharpness_filter(p, unified_req, metadata_maps['sharp_map']) and 
+            _check_exposure_filters(p, unified_req, metadata_maps['bright_map']))
+
+
+def _check_camera_match(p: str, unified_req: UnifiedSearchRequest, cam_map: dict) -> bool:
+    """Check if photo's camera matches specified filter."""
+    if unified_req.camera and unified_req.camera.strip():
+        if unified_req.camera.strip().lower() not in (cam_map.get(p,'') or '').lower():
+            return False
+    return True
+
+
+def _check_iso_range(p: str, unified_req: UnifiedSearchRequest, iso_map: dict) -> bool:
+    """Check if photo's ISO falls within specified range."""
+    if unified_req.iso_min is not None:
+        v = iso_map.get(p)
+        if v is None or v < int(unified_req.iso_min):
+            return False
+    if unified_req.iso_max is not None:
+        v = iso_map.get(p)
+        if v is None or v > int(unified_req.iso_max):
+            return False
+    return True
+
+
+def _check_f_range(p: str, unified_req: UnifiedSearchRequest, f_map: dict) -> bool:
+    """Check if photo's f-number falls within specified range."""
+    if unified_req.f_min is not None:
+        v = f_map.get(p)
+        if v is None or v < float(unified_req.f_min):
+            return False
+    if unified_req.f_max is not None:
+        v = f_map.get(p)
+        if v is None or v > float(unified_req.f_max):
+            return False
+    return True
+
+
+def _check_place_match(p: str, unified_req: UnifiedSearchRequest, place_map: dict) -> bool:
+    """Check if photo's place matches specified filter."""
+    if unified_req.place and unified_req.place.strip():
+        if unified_req.place.strip().lower() not in (place_map.get(p,'') or '').lower():
+            return False
+    return True
+
+
+def _check_altitude_range(p: str, unified_req: UnifiedSearchRequest, alt_map: dict) -> bool:
+    """Check if photo's altitude falls within specified range."""
+    if unified_req.alt_min is not None or unified_req.alt_max is not None:
+        av = alt_map.get(p)
+        if av is None:
+            return False
+        if unified_req.alt_min is not None and av < float(unified_req.alt_min):
+            return False
+        if unified_req.alt_max is not None and av > float(unified_req.alt_max):
+            return False
+    return True
+
+
+def _check_heading_range(p: str, unified_req: UnifiedSearchRequest, head_map: dict) -> bool:
+    """Check if photo's heading falls within specified range."""
+    if unified_req.heading_min is not None or unified_req.heading_max is not None:
+        hv = head_map.get(p)
+        if hv is None:
+            return False
+        try:
+            hh = float(hv) % 360.0
+        except Exception:
+            hh = hv
+        if unified_req.heading_min is not None and hh < float(unified_req.heading_min):
+            return False
+        if unified_req.heading_max is not None and hh > float(unified_req.heading_max):
+            return False
+    return True
+
+
+def _check_flash_setting(p: str, unified_req: UnifiedSearchRequest, flash_map: dict) -> bool:
+    """Check if photo's flash setting matches filter."""
+    if unified_req.flash:
+        fv = flash_map.get(p)
+        if fv is None:
+            return False
+        fired = 1 if fv & 1 else 0
+        if unified_req.flash == 'fired' and fired != 1:
+            return False
+        if unified_req.flash in ('no','noflash') and fired != 0:
+            return False
+    return True
+
+
+def _check_white_balance(p: str, unified_req: UnifiedSearchRequest, wb_map: dict) -> bool:
+    """Check if photo's white balance matches filter."""
+    if unified_req.wb:
+        wv = wb_map.get(p)
+        if wv is None:
+            return False
+        if unified_req.wb == 'auto' and wv != 0:
+            return False
+        if unified_req.wb == 'manual' and wv != 1:
+            return False
+    return True
+
+
+def _check_metering_mode(p: str, unified_req: UnifiedSearchRequest, met_map: dict) -> bool:
+    """Check if photo's metering mode matches filter."""
+    if unified_req.metering:
+        mv = met_map.get(p)
+        if mv is None:
+            return False
+        name = str(unified_req.metering).lower()
+        mm = {0: 'unknown', 1: 'average', 2: 'center', 3: 'spot', 4: 'multispot', 5: 'pattern', 6: 'partial', 255: 'other'}
+        label = mm.get(int(mv), 'other')
+        if name not in (label, 'any'):
+            if not (name == 'matrix' and label == 'pattern'):
+                return False
+    return True
+
+
+def _check_sharpness_filter(p: str, unified_req: UnifiedSearchRequest, sharp_map: dict) -> bool:
+    """Check if photo meets sharpness requirement."""
+    if unified_req.sharp_only:
+        sv = sharp_map.get(p)
+        if sv is None or sv < 60.0:
+            return False
+    return True
+
+
+def _check_exposure_filters(p: str, unified_req: UnifiedSearchRequest, bright_map: dict) -> bool:
+    """Check if photo meets exposure requirements."""
+    if unified_req.exclude_under:
+        bv = bright_map.get(p)
+        if bv is not None and bv < 50.0:
+            return False
+    if unified_req.exclude_over:
+        bv = bright_map.get(p)
+        if bv is not None and bv > 205.0:
+            return False
+    return True
 
 
 def _apply_collection_filters(store, results: List, unified_req: UnifiedSearchRequest) -> List:
@@ -815,11 +749,15 @@ def _parse_caption_expressions(store, results: List, cap_map: dict, query_value:
 
 def _convert_to_rpn(tokens: List[str]) -> List[str]:
     """Convert infix tokens to Reverse Polish Notation using shunting yard algorithm."""
+    normalized_tokens = _normalize_rpn_tokens(tokens)
+    return _apply_shunting_yard_algorithm(normalized_tokens)
+
+
+def _normalize_rpn_tokens(tokens: List[str]) -> List[str]:
+    """Normalize tokens for RPN conversion."""
     op_set = {'AND', 'OR', 'NOT'}
-    precedence = {'NOT': 3, 'AND': 2, 'OR': 1}
-    
-    # Normalize tokens
     normalized_tokens = []
+    
     for tok in tokens:
         tu = tok.upper()
         if tu in op_set:
@@ -829,29 +767,51 @@ def _convert_to_rpn(tokens: List[str]) -> List[str]:
         else:
             normalized_tokens.append(tok)
     
-    # Apply shunting yard algorithm
+    return normalized_tokens
+
+
+def _apply_shunting_yard_algorithm(tokens: List[str]) -> List[str]:
+    """Apply shunting yard algorithm to convert to RPN."""
+    precedence = {'NOT': 3, 'AND': 2, 'OR': 1}
+    op_set = {'AND', 'OR', 'NOT'}
+    
     output = []
     stack = []
-    for tok in normalized_tokens:
+    
+    for tok in tokens:
         tu = tok.upper()
+        
         if tu in op_set:
-            while stack and stack[-1] != '(' and precedence.get(stack[-1], 0) >= precedence[tu]:
-                output.append(stack.pop())
-            stack.append(tu)
+            _process_operator_token(stack, output, tu, precedence)
         elif tok == '(':
             stack.append(tok)
         elif tok == ')':
-            while stack and stack[-1] != '(':
-                output.append(stack.pop())
-            if stack and stack[-1] == '(':
-                stack.pop()
+            _process_closing_parenthesis(stack, output)
         else:
             output.append(tok)
     
+    # Pop remaining operators
     while stack:
         output.append(stack.pop())
     
     return output
+
+
+def _process_operator_token(stack: List[str], output: List[str], operator: str, precedence: dict) -> None:
+    """Process an operator token in shunting yard algorithm."""
+    while (stack and 
+           stack[-1] != '(' and 
+           precedence.get(stack[-1], 0) >= precedence[operator]):
+        output.append(stack.pop())
+    stack.append(operator)
+
+
+def _process_closing_parenthesis(stack: List[str], output: List[str]) -> None:
+    """Process a closing parenthesis in shunting yard algorithm."""
+    while stack and stack[-1] != '(':
+        output.append(stack.pop())
+    if stack and stack[-1] == '(':
+        stack.pop()
 
 
 def _build_evaluation_context(store, cap_map: dict) -> dict:
@@ -887,60 +847,90 @@ def _build_evaluation_context(store, cap_map: dict) -> dict:
 def _load_exif_metadata(store, metadata_maps: dict) -> None:
     """Load EXIF metadata into evaluation context."""
     try:
-        meta_p = store.index_dir / 'exif_index.json'
-        if not meta_p.exists():
+        exif_data = _load_exif_file_data(store)
+        if not exif_data:
             return
-            
-        m = json.loads(meta_p.read_text())
-        paths = m.get('paths', [])
         
-        # Load numeric metadata with type safety
-        metadata_maps['iso'] = {p: (i if isinstance(i, int) else None) for p, i in zip(paths, m.get('iso', []))}
-        metadata_maps['fnumber'] = {p: (float(x) if isinstance(x, (int, float)) else None) for p, x in zip(paths, m.get('fnumber', []))}
-        metadata_maps['width'] = {p: (int(x) if isinstance(x, (int, float)) else None) for p, x in zip(paths, m.get('width', []))}
-        metadata_maps['height'] = {p: (int(x) if isinstance(x, (int, float)) else None) for p, x in zip(paths, m.get('height', []))}
-        metadata_maps['brightness'] = {p: (float(x) if isinstance(x, (int, float)) else None) for p, x in zip(paths, m.get('brightness', []))}
-        metadata_maps['sharpness'] = {p: (float(x) if isinstance(x, (int, float)) else None) for p, x in zip(paths, m.get('sharpness', []))}
+        paths = exif_data.get('paths', [])
         
-        # Load string metadata
-        metadata_maps['camera'] = {p: (c or '') for p, c in zip(paths, m.get('camera', []))}
-        metadata_maps['place'] = {p: (s or '') for p, s in zip(paths, m.get('place', []))}
-        
-        # Load complex value metadata with conversion
-        def _convert_fraction(v):
-            try:
-                if isinstance(v, (list, tuple)) and len(v) == 2:
-                    a, b = v
-                    return float(a) / float(b) if b else None
-                if isinstance(v, str) and '/' in v:
-                    a, b = v.split('/', 1)
-                    return float(a) / float(b)
-                return float(v) if isinstance(v, (int, float)) else None
-            except Exception:
-                return None
-        
-        metadata_maps['exposure'] = {p: _convert_fraction(x) for p, x in zip(paths, m.get('exposure', []))}
-        metadata_maps['focal'] = {p: _convert_fraction(x) for p, x in zip(paths, m.get('focal', []))}
+        # Load different types of metadata
+        _load_numeric_metadata(metadata_maps, paths, exif_data)
+        _load_string_metadata(metadata_maps, paths, exif_data)
+        _load_fractional_metadata(metadata_maps, paths, exif_data)
     except Exception:
         pass
 
 
+def _load_exif_file_data(store) -> dict:
+    """Load and parse EXIF index file."""
+    try:
+        exif_file_path = store.index_dir / 'exif_index.json'
+        if not exif_file_path.exists():
+            return {}
+        return json.loads(exif_file_path.read_text())
+    except Exception:
+        return {}
+
+
+def _load_numeric_metadata(metadata_maps: dict, paths: list, exif_data: dict) -> None:
+    """Load numeric EXIF metadata with type safety."""
+    numeric_fields = [
+        ('iso', int, 'iso'),
+        ('fnumber', float, 'fnumber'),
+        ('width', int, 'width'),
+        ('height', int, 'height'),
+        ('brightness', float, 'brightness'),
+        ('sharpness', float, 'sharpness')
+    ]
+    
+    for field_name, field_type, data_key in numeric_fields:
+        metadata_maps[field_name] = {
+            p: (field_type(x) if isinstance(x, (int, float)) else None)
+            for p, x in zip(paths, exif_data.get(data_key, []))
+        }
+
+
+def _load_string_metadata(metadata_maps: dict, paths: list, exif_data: dict) -> None:
+    """Load string EXIF metadata."""
+    string_fields = [
+        ('camera', 'camera'),
+        ('place', 'place')
+    ]
+    
+    for field_name, data_key in string_fields:
+        metadata_maps[field_name] = {
+            p: (value or '') for p, value in zip(paths, exif_data.get(data_key, []))
+        }
+
+
+def _load_fractional_metadata(metadata_maps: dict, paths: list, exif_data: dict) -> None:
+    """Load fractional EXIF metadata with conversion."""
+    def _convert_fraction_value(v):
+        try:
+            if isinstance(v, (list, tuple)) and len(v) == 2:
+                a, b = v
+                return float(a) / float(b) if b else None
+            if isinstance(v, str) and '/' in v:
+                a, b = v.split('/', 1)
+                return float(a) / float(b)
+            return float(v) if isinstance(v, (int, float)) else None
+        except Exception:
+            return None
+    
+    fractional_fields = [
+        ('exposure', 'exposure'),
+        ('focal', 'focal')
+    ]
+    
+    for field_name, data_key in fractional_fields:
+        metadata_maps[field_name] = {
+            p: _convert_fraction_value(x) for p, x in zip(paths, exif_data.get(data_key, []))
+        }
+
+
 def _evaluate_rpn_expression(rpn_output: List[str], path: str, context: dict) -> bool:
     """Evaluate RPN expression for a single photo path."""
-    stack = []
-    for token in rpn_output:
-        tu = token.upper()
-        if tu == 'NOT':
-            v = stack.pop() if stack else False
-            stack.append(not v)
-        elif tu in ('AND', 'OR'):
-            b = stack.pop() if stack else False
-            a = stack.pop() if stack else False
-            stack.append((a and b) if tu == 'AND' else (a or b))
-        else:
-            stack.append(_evaluate_field_expression(token, path, context))
-    
-    return bool(stack[-1]) if stack else True
+    return rpn_evaluator.evaluate_expression(rpn_output, path, context)
 
 
 def _evaluate_field_expression(token: str, path: str, context: dict) -> bool:

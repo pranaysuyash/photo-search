@@ -11,10 +11,41 @@ import { BaseBackend } from '../../services/ann/BackendInterface';
 
 // Mock backend for testing
 class MockBackend extends BaseBackend {
-  readonly id = 'mock-backend';
+  readonly id = 'mock';
   readonly name = 'Mock Backend';
   readonly version = '1.0.0';
-  readonly capabilities = [];
+  readonly capabilities = [
+    {
+      type: 'inference' as const,
+      modelTypes: [
+        {
+          id: 'tensorflow-model',
+          name: 'TensorFlow Model',
+          description: 'Mock TensorFlow model',
+          framework: 'tensorflow' as const,
+          version: '1.0.0',
+          size: 1000000,
+          format: 'tensorflow' as const,
+          capabilities: [
+            { type: 'classification' as const, confidence: 0.85 },
+            { type: 'detection' as const, confidence: 0.90 }
+          ]
+        }
+      ],
+      inputFormats: [
+        { type: 'tensor' as const, dtype: 'float32' as const }
+      ],
+      outputFormats: [
+        { type: 'classification' as const, dtype: 'float32' as const }
+      ],
+      features: [],
+      performance: {
+        inferenceTime: 100,
+        memoryUsage: 50,
+        accuracy: 0.85
+      }
+    }
+  ];
   readonly resourceRequirements = {
     memory: { min: 100, max: 200, optimal: 150 },
     cpu: { min: 10, max: 30, optimal: 20 }
@@ -340,8 +371,6 @@ describe('HealthMonitor', () => {
   let mockBackend: MockBackend;
 
   beforeEach(() => {
-    // Import dynamically to avoid issues
-    const { HealthMonitor } = require('../../services/ann/HealthMonitor');
     healthMonitor = new HealthMonitor({
       interval: 100, // Faster for testing
       failureThreshold: 2,
@@ -352,7 +381,9 @@ describe('HealthMonitor', () => {
   });
 
   afterEach(async () => {
-    await healthMonitor.stop();
+    if (healthMonitor && typeof healthMonitor.stop === 'function') {
+      await healthMonitor.stop();
+    }
   });
 
   it('should initialize successfully', async () => {
@@ -372,6 +403,7 @@ describe('HealthMonitor', () => {
 
   it('should perform health checks', async () => {
     await healthMonitor.initialize();
+    await mockBackend.initialize(); // Initialize the mock backend
     healthMonitor.monitorBackend('mock', mockBackend);
 
     const check = await healthMonitor.performHealthCheck('mock');
@@ -388,6 +420,8 @@ describe('BackendRegistry', () => {
 
   beforeEach(() => {
     registry = BackendRegistry.getInstance();
+    // Clear all existing backends to ensure clean test state
+    registry.clearAllBackends();
     mockBackend = new MockBackend();
   });
 

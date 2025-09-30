@@ -16,9 +16,14 @@ import type {
 } from './types';
 
 export class ONNXBackend extends BaseBackend {
-  readonly id = 'onnx';
+  readonly id: string;
   readonly name = 'ONNX Runtime Backend';
   readonly version = '1.0.0';
+
+  constructor(id?: string) {
+    super();
+    this.id = id || 'onnx';
+  }
   readonly capabilities: BackendCapability[] = [
     {
       type: 'inference',

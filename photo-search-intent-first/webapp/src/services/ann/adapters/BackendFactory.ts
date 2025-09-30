@@ -15,6 +15,7 @@ import type {
 export class BackendFactory {
   private static instance: BackendFactory;
   private backends: Map<string, BaseBackend> = new Map();
+  private backendTypes: Map<string, BackendType> = new Map();
   private backendConfigs: Map<string, BackendConfig> = new Map();
 
   private constructor() {
@@ -53,20 +54,21 @@ export class BackendFactory {
 
     switch (type) {
       case 'tensorflowjs':
-        backend = new TensorFlowJSBackend();
+        backend = new TensorFlowJSBackend(fullConfig.id);
         break;
       case 'pytorch':
-        backend = new PyTorchBackend();
+        backend = new PyTorchBackend(fullConfig.id);
         break;
       case 'onnx':
-        backend = new ONNXBackend();
+        backend = new ONNXBackend(fullConfig.id);
         break;
       default:
         throw new Error(`Unsupported backend type: ${type}`);
     }
 
-    // Store backend reference
+    // Store backend reference and type
     this.backends.set(fullConfig.id || type, backend);
+    this.backendTypes.set(fullConfig.id || type, type);
 
     // Initialize the backend
     const initialized = await backend.initialize();
@@ -155,6 +157,7 @@ export class BackendFactory {
     if (backend) {
       await backend.shutdown();
       this.backends.delete(id);
+      this.backendTypes.delete(id);
       console.log(`[BackendFactory] Shutdown backend: ${id}`);
     }
   }
@@ -176,6 +179,7 @@ export class BackendFactory {
 
     await Promise.all(shutdownPromises);
     this.backends.clear();
+    this.backendTypes.clear();
     console.log('[BackendFactory] All backends shutdown');
   }
 
@@ -200,8 +204,13 @@ export class BackendFactory {
    * Get backend type by ID
    */
   private getBackendTypeById(id: string): BackendType | null {
-    // This is a simplified lookup - in a real implementation,
-    // we'd store the type alongside the backend
+    // First check the stored type mapping
+    const storedType = this.backendTypes.get(id);
+    if (storedType) {
+      return storedType;
+    }
+
+    // Fallback to config lookup for backwards compatibility
     for (const [type, config] of this.backendConfigs.entries()) {
       if (config.id === id) {
         return type as BackendType;

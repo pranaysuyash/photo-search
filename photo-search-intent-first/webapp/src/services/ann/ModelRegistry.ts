@@ -290,7 +290,7 @@ export class ModelRegistry {
     try {
       const model = this.models.get(modelId)!;
       const backendRegistry = BackendRegistry.getInstance();
-      const backend = backendRegistry.getBackend(backendId);
+      const backend = backendRegistry.getBackendInstance(backendId);
 
       if (!backend) {
         throw new Error(`Backend ${backendId} not found`);
@@ -379,7 +379,7 @@ export class ModelRegistry {
 
     try {
       const backendRegistry = BackendRegistry.getInstance();
-      const backend = backendRegistry.getBackend(instance.backendId);
+      const backend = backendRegistry.getBackendInstance(instance.backendId);
 
       if (backend) {
         await backend.unloadModel(instance.modelId);
@@ -736,7 +736,7 @@ export class ModelRegistry {
     // If preferred backend is specified and compatible, use it
     if (preferredBackend) {
       const backend = backendRegistry.getBackend(preferredBackend);
-      if (backend && backend.isAvailable()) {
+      if (backend && backend.status === 'active' && backend.health.status !== 'unhealthy') {
         return preferredBackend;
       }
     }
@@ -749,19 +749,30 @@ export class ModelRegistry {
     // Score backends based on compatibility and performance
     const scoredBackends = availableBackends
       .filter(backend => {
-        const backendType = backend.id.split('-')[0]; // Simple backend type detection
-        return model.backendRequirements[backendType as keyof typeof model.backendRequirements];
+        const requirementKey = this.getRequirementKeyForBackend(backend.id);
+        if (!requirementKey) {
+          return true;
+        }
+        return model.backendRequirements[requirementKey] ?? false;
       })
       .map(backend => {
-        const health = backend.getHealth();
+        const health = backend.health;
         let score = 0;
 
         // Health score
-        score += health.status === 'healthy' ? 100 : 50;
-        score += (100 - health.errorRate * 10);
+        if (health.status === 'healthy') {
+          score += 100;
+        } else if (health.status === 'degraded') {
+          score += 70;
+        } else {
+          score += 30;
+        }
+
+        score += Math.max(0, 100 - health.errorRate * 10);
 
         // Resource availability
-        const resourceScore = Math.min(100, (currentResources.availableMemory / model.systemRequirements.minMemoryMB) * 50);
+        const memoryBaseline = model.systemRequirements.minMemoryMB || 1;
+        const resourceScore = Math.min(100, (currentResources.availableMemory / memoryBaseline) * 50);
         score += resourceScore;
 
         return { backend, score };
@@ -774,6 +785,28 @@ export class ModelRegistry {
   private getModelPath(modelId: string, version: string): string {
     // In a real implementation, this would return the actual model file path
     return `/models/${modelId}/${version}/model`;
+  }
+
+  private getRequirementKeyForBackend(backendId: string): keyof ModelMetadata['backendRequirements'] | null {
+    const normalizedId = backendId.toLowerCase();
+
+    if (normalizedId.includes('tensorflow')) {
+      return 'tensorflowjs';
+    }
+    if (normalizedId.includes('pytorch')) {
+      return 'pytorch';
+    }
+    if (normalizedId.includes('onnx')) {
+      return 'onnx';
+    }
+    if (normalizedId.includes('webgpu')) {
+      return 'webgpu';
+    }
+    if (normalizedId.includes('webnn')) {
+      return 'webnn';
+    }
+
+    return null;
   }
 
   private findLoadedInstance(modelId: string, version: string, backendId: string): string | null {

@@ -17,6 +17,7 @@ import { BaseBackend } from './BackendInterface';
 import { BackendSelector } from './BackendSelector';
 import { PerformanceProfiler } from './PerformanceProfiler';
 import { ResourceMonitor } from './ResourceMonitor';
+import { BackendRegistry } from './BackendRegistry';
 
 export interface DecisionContext {
   task: AITask;
@@ -80,7 +81,7 @@ export class DecisionEngine {
   } = {}) {
     this.backendSelector = new BackendSelector();
     this.performanceProfiler = new PerformanceProfiler();
-    this.resourceMonitor = new ResourceMonitor();
+    this.resourceMonitor = ResourceMonitor.getInstance();
 
     this.weights = {
       performance: 0.25,
@@ -546,9 +547,16 @@ export class DecisionEngine {
   }
 
   private async getBackendHealthStatus(): Promise<Record<string, BackendHealth>> {
-    // This would typically query the actual backend health
-    // For now, return placeholder data
-    return {};
+    // Get health status from all available backends
+    const backendRegistry = BackendRegistry.getInstance();
+    const availableBackends = backendRegistry.getAvailableBackends();
+    const healthStatus: Record<string, BackendHealth> = {};
+
+    for (const backend of availableBackends) {
+      healthStatus[backend.id] = backend.health;
+    }
+
+    return healthStatus;
   }
 
   private getHistoricalPerformance(): Map<string, PerformanceHistory> {
@@ -612,15 +620,15 @@ export class DecisionEngine {
       },
       {
         criterion: 'performance_score',
-        score: best.details.performance,
+        score: best.details.performance || 0,
         weight: this.weights.performance,
-        explanation: `Performance score: ${best.details.performance.toFixed(3)}`
+        explanation: `Performance score: ${(best.details.performance || 0).toFixed(3)}`
       },
       {
         criterion: 'reliability_score',
-        score: best.details.reliability,
+        score: best.details.reliability || 0,
         weight: this.weights.reliability,
-        explanation: `Reliability score: ${best.details.reliability.toFixed(3)}`
+        explanation: `Reliability score: ${(best.details.reliability || 0).toFixed(3)}`
       }
     ];
   }
@@ -784,6 +792,8 @@ export class DecisionEngine {
 
   private calculateConvergenceRate(data: LearningData[]): number {
     // Simple convergence measure
+    if (data.length === 0) return 0;
+
     const accuracies = data.map(d => d.actualPerformance.accuracy);
     const variance = accuracies.reduce((sum, acc) => sum + Math.pow(acc - 0.85, 2), 0) / accuracies.length;
 
@@ -793,6 +803,8 @@ export class DecisionEngine {
   private calculateModelStability(): number {
     // Measure how stable the model weights are
     const weightValues = Object.values(this.weights);
+    if (weightValues.length === 0) return 1.0;
+
     const mean = weightValues.reduce((sum, val) => sum + val, 0) / weightValues.length;
     const variance = weightValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / weightValues.length;
 

@@ -40,7 +40,7 @@ export class BackendManager {
       ...config
     };
 
-    this.resourceMonitor = new ResourceMonitor({ interval: this.config.resourceMonitorInterval });
+    this.resourceMonitor = ResourceMonitor.getInstance({ interval: this.config.resourceMonitorInterval });
     this.healthMonitor = new HealthMonitor({ interval: this.config.healthMonitorInterval });
     this.backendRegistry = BackendRegistry.getInstance();
   }

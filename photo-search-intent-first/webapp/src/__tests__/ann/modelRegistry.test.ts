@@ -14,53 +14,66 @@ import type {
   ModelUsageStats
 } from '../../services/ann/ModelRegistry';
 
+// Persistent mocks so ModelRegistry sees the same instances even after vi.clearAllMocks()
+const mockBackendRegistry = {
+  getBackend: vi.fn(),
+  getBackendInstance: vi.fn(),
+  getAvailableBackends: vi.fn(() => [])
+};
+
+const defaultResources = {
+  totalMemory: 8192,
+  availableMemory: 4096,
+  totalCPU: 400,
+  availableCPU: 200,
+  totalStorage: 10000,
+  availableStorage: 7000,
+  network: {
+    online: true,
+    bandwidth: 100,
+    latency: 50,
+    reliability: 0.95
+  }
+};
+
+const mockResourceMonitor = {
+  getCurrentResources: vi.fn(() => defaultResources)
+};
+
 // Mock backend registry
 vi.mock('../../services/ann/BackendRegistry', () => ({
   BackendRegistry: {
-    getInstance: vi.fn(() => ({
-      getBackend: vi.fn(),
-      getAvailableBackends: vi.fn()
-    }))
+    getInstance: vi.fn(() => mockBackendRegistry)
   }
 }));
 
 // Mock resource monitor
 vi.mock('../../services/ann/ResourceMonitor', () => ({
   ResourceMonitor: {
-    getInstance: vi.fn(() => ({
-      getCurrentResources: vi.fn(() => ({
-        totalMemory: 8192,
-        availableMemory: 4096,
-        totalCPU: 400,
-        availableCPU: 200,
-        totalStorage: 10000,
-        availableStorage: 7000,
-        network: {
-          online: true,
-          bandwidth: 100,
-          latency: 50,
-          reliability: 0.95
-        }
-      }))
-    }))
+    getInstance: vi.fn(() => mockResourceMonitor)
   }
 }));
 
 describe('ModelRegistry', () => {
   let modelRegistry: ModelRegistry;
-  let mockBackendRegistry: any;
-  let mockResourceMonitor: any;
+  let mockBackend: any;
 
   beforeEach(() => {
-    modelRegistry = ModelRegistry.getInstance();
-    mockBackendRegistry = BackendRegistry.getInstance();
-    mockResourceMonitor = ResourceMonitor.getInstance();
-
-    // Reset mocks
     vi.clearAllMocks();
+
+    modelRegistry = ModelRegistry.getInstance();
+    BackendRegistry.getInstance();
+    ResourceMonitor.getInstance();
+
+    mockBackendRegistry.getBackend.mockReset();
+    mockBackendRegistry.getBackendInstance.mockReset();
+    mockBackendRegistry.getAvailableBackends.mockReset();
+    mockResourceMonitor.getCurrentResources.mockReset();
 
     // Setup default mock responses
     mockBackendRegistry.getAvailableBackends.mockReturnValue([]);
+    mockBackendRegistry.getBackendInstance.mockReturnValue(null);
+    mockResourceMonitor.getCurrentResources.mockReturnValue(defaultResources);
   });
 
   afterEach(async () => {
@@ -280,10 +293,10 @@ describe('ModelRegistry', () => {
       await modelRegistry.registerModel(modelMetadata);
 
       // Setup mock backend
-      const mockBackend = {
-        id: 'mock-backend',
+      mockBackend = {
+        id: 'tensorflow-js-mock',
         isAvailable: vi.fn(() => true),
-        getHealth: vi.fn(() => ({
+        health: {
           status: 'healthy',
           lastCheck: Date.now(),
           uptime: 1000,
@@ -291,7 +304,13 @@ describe('ModelRegistry', () => {
           responseTime: 50,
           activeConnections: 0,
           resourceUsage: { memory: 100, cpu: 20, storage: 0 }
-        })),
+        },
+        performanceProfile: {
+          inferenceTime: 50,
+          memoryUsage: 128,
+          throughput: 20,
+          accuracy: 0.9
+        },
         loadModel: vi.fn().mockResolvedValue({
           id: 'loadable-model',
           loaded: true,
@@ -302,10 +321,19 @@ describe('ModelRegistry', () => {
       };
 
       mockBackendRegistry.getBackend.mockReturnValue(mockBackend);
+      mockBackendRegistry.getBackendInstance.mockReturnValue(mockBackend);
       mockBackendRegistry.getAvailableBackends.mockReturnValue([mockBackend]);
+      // Mock selectBackend to return our mock backend ID
+      modelRegistry.selectBackend = vi.fn().mockResolvedValue('tensorflow-js-mock');
     });
 
     it('should load a model successfully', async () => {
+      // Ensure mocks are set up correctly (after global vi.clearAllMocks())
+      mockBackendRegistry.getBackend.mockReturnValue(mockBackend);
+      mockBackendRegistry.getBackendInstance.mockReturnValue(mockBackend);
+      mockBackendRegistry.getAvailableBackends.mockReturnValue([mockBackend]);
+      modelRegistry.selectBackend = vi.fn().mockResolvedValue('tensorflow-js-mock');
+
       const instanceId = await modelRegistry.loadModel('loadable-model');
 
       expect(instanceId).toBeDefined();
@@ -536,10 +564,10 @@ describe('ModelRegistry', () => {
       await modelRegistry.registerModel(modelMetadata);
 
       // Setup mock backend
-      const mockBackend = {
-        id: 'mock-backend',
+      mockBackend = {
+        id: 'tensorflow-js-mock',
         isAvailable: vi.fn(() => true),
-        getHealth: vi.fn(() => ({
+        health: {
           status: 'healthy',
           lastCheck: Date.now(),
           uptime: 1000,
@@ -547,7 +575,13 @@ describe('ModelRegistry', () => {
           responseTime: 50,
           activeConnections: 0,
           resourceUsage: { memory: 100, cpu: 20, storage: 0 }
-        })),
+        },
+        performanceProfile: {
+          inferenceTime: 50,
+          memoryUsage: 128,
+          throughput: 20,
+          accuracy: 0.9
+        },
         loadModel: vi.fn().mockResolvedValue({
           id: 'stats-model',
           loaded: true,
@@ -557,7 +591,10 @@ describe('ModelRegistry', () => {
       };
 
       mockBackendRegistry.getBackend.mockReturnValue(mockBackend);
+      mockBackendRegistry.getBackendInstance.mockReturnValue(mockBackend);
       mockBackendRegistry.getAvailableBackends.mockReturnValue([mockBackend]);
+      // Mock selectBackend to return our mock backend ID
+      modelRegistry.selectBackend = vi.fn().mockResolvedValue('tensorflow-js-mock');
     });
 
     it('should record inference statistics', async () => {
@@ -591,7 +628,7 @@ describe('ModelRegistry', () => {
 
       expect(usage.totalMemoryMB).toBeGreaterThan(0);
       expect(usage.totalInstances).toBe(1);
-      expect(usage.backendDistribution).toEqual({ 'mock-backend': 1 });
+      expect(usage.backendDistribution).toEqual({ [mockBackend.id]: 1 });
       expect(usage.modelDistribution).toEqual({ 'stats-model': 1 });
     });
   });

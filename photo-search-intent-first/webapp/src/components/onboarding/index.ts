@@ -24,7 +24,9 @@ export interface OnboardingStep {
 }
 
 // Context integration
-export { OnboardingContext, useOnboardingContext } from '../../contexts/OnboardingContext';
+import OnboardingContextDefault, { useOnboardingContext } from '../../contexts/OnboardingContext';
+export { useOnboardingContext };
+export { OnboardingContextDefault as OnboardingContext };
 
 // Legacy components (for backward compatibility)
 export { default as FirstRunSetup } from '../modals/FirstRunSetup';

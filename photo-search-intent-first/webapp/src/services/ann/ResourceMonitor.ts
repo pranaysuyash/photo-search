@@ -29,6 +29,7 @@ export interface ResourceAlert {
 }
 
 export class ResourceMonitor {
+  private static instance: ResourceMonitor | null = null;
   private config: ResourceMonitorConfig;
   private currentResources: SystemResources;
   private history: ResourceUsage[] = [];
@@ -50,11 +51,29 @@ export class ResourceMonitor {
         cpu: 80, // 80%
         gpu: 90, // 90%
         storage: 90 // 90%
-      },
-      ...config
+      }
     };
 
+    this.applyConfigOverrides(config);
+
     this.currentResources = this.getInitialResources();
+  }
+
+  static getInstance(config: Partial<ResourceMonitorConfig> = {}): ResourceMonitor {
+    if (!ResourceMonitor.instance) {
+      ResourceMonitor.instance = new ResourceMonitor(config);
+    } else if (Object.keys(config).length > 0) {
+      ResourceMonitor.instance.applyConfigOverrides(config);
+    }
+
+    return ResourceMonitor.instance;
+  }
+
+  static resetInstanceForTests(): void {
+    if (ResourceMonitor.instance) {
+      ResourceMonitor.instance.stop();
+    }
+    ResourceMonitor.instance = null;
   }
 
   async initialize(): Promise<boolean> {
@@ -613,7 +632,7 @@ export class ResourceMonitor {
       totalStorage: 10000, // 10GB default
       availableStorage: 7000, // 70% available
       network: {
-        online: navigator.onLine,
+        online: typeof navigator !== 'undefined' ? navigator.onLine : true,
         bandwidth: 10, // 10 Mbps
         latency: 50, // 50ms
         reliability: 0.95
@@ -650,5 +669,20 @@ export class ResourceMonitor {
         }
       });
     }
+  }
+
+  private applyConfigOverrides(config: Partial<ResourceMonitorConfig>): void {
+    if (!config || Object.keys(config).length === 0) {
+      return;
+    }
+
+    this.config = {
+      ...this.config,
+      ...config,
+      alertThresholds: {
+        ...this.config.alertThresholds,
+        ...(config.alertThresholds || {})
+      }
+    };
   }
 }

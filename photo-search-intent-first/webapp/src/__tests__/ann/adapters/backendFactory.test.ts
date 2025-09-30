@@ -213,6 +213,7 @@ describe('BackendFactory', () => {
         activeConnections: 1,
         resourceUsage: { memory: 100, cpu: 20, storage: 0 }
       });
+      const availableMock = vi.spyOn(TensorFlowJSBackend.prototype, 'isAvailable').mockReturnValue(true);
 
       await factory.createBackend('tensorflowjs', { id: 'test-tf' });
 
@@ -226,6 +227,7 @@ describe('BackendFactory', () => {
 
       tfMock.mockRestore();
       healthMock.mockRestore();
+      availableMock.mockRestore();
     });
   });
 

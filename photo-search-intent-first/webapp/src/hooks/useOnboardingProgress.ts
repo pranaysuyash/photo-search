@@ -18,6 +18,21 @@ interface OnboardingProgress {
 const ONBOARDING_VERSION = '1.0.0';
 const STORAGE_KEY = 'photosearch-onboarding-progress';
 
+// Helper function to get default progress - moved before hook to avoid TDZ
+const getDefaultProgress = (): OnboardingProgress => ({
+	completedSteps: [],
+	currentStep: 0,
+	skipCount: 0,
+	lastInteraction: Date.now(),
+	flowType: 'none',
+	preferences: {
+		includeVideos: false,
+		enableFaceRecognition: true,
+		enableAutoIndex: true,
+	},
+	version: ONBOARDING_VERSION,
+});
+
 interface UseOnboardingProgressReturn {
 	progress: OnboardingProgress;
 	markStepComplete: (stepId: string) => void;
@@ -56,21 +71,7 @@ export const useOnboardingProgress = (): UseOnboardingProgressReturn => {
 	useEffect(() => {
 		const completed = localStorage.getItem('onboarding-completed') === 'true';
 		setHasCompletedOnboarding(completed);
-	}, [progress.completedAt]);
-
-	const getDefaultProgress = (): OnboardingProgress => ({
-		completedSteps: [],
-		currentStep: 0,
-		skipCount: 0,
-		lastInteraction: Date.now(),
-		flowType: 'none',
-		preferences: {
-			includeVideos: false,
-			enableFaceRecognition: true,
-			enableAutoIndex: true,
-		},
-		version: ONBOARDING_VERSION,
-	});
+	}, []);
 
 	const saveProgress = (newProgress: OnboardingProgress) => {
 		try {
@@ -167,8 +168,8 @@ export const useOnboardingProgress = (): UseOnboardingProgressReturn => {
 		isStepCompleted,
 		getCompletionPercentage,
 		hasCompletedOnboarding,
-		canShowWelcome,
-		shouldShowOnboarding,
+		canShowWelcome: canShowWelcome(),
+		shouldShowOnboarding: shouldShowOnboarding(),
 	};
 };
 

@@ -16,9 +16,14 @@ import type {
 } from './types';
 
 export class PyTorchBackend extends BaseBackend {
-  readonly id = 'pytorch';
+  readonly id: string;
   readonly name = 'PyTorch Backend';
   readonly version = '1.0.0';
+
+  constructor(id?: string) {
+    super();
+    this.id = id || 'pytorch';
+  }
   readonly capabilities: BackendCapability[] = [
     {
       type: 'inference',
