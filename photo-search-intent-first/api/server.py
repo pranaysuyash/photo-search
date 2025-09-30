@@ -605,108 +605,191 @@ def _apply_metadata_filters(store, results: List, unified_req: UnifiedSearchRequ
 
 def _apply_collection_filters(store, results: List, unified_req: UnifiedSearchRequest) -> List:
     """Apply collection-based filters (favorites, tags, people, dates)."""
-    out = results
+    output = results
     
-    # Favorites filter
-    if unified_req.favorites_only:
-        try:
-            from infra.collections import load_collections
-            coll = load_collections(store.index_dir)
-            favs = set(coll.get('Favorites', []))
-            out = [r for r in out if str(r.path) in favs]
-        except Exception:
-            pass
+    # Apply each filter type sequentially
+    output = _apply_favorites_filter(store, output, unified_req)
+    output = _apply_tags_filter(store, output, unified_req)
+    output = _apply_people_filter(store, output, unified_req)
+    output = _apply_date_range_filter(store, output, unified_req)
+    
+    return output
 
-    # Tags filter
-    if unified_req.tags:
-        try:
-            from infra.tags import load_tags
-            tmap = load_tags(store.index_dir)
-            req_tags = set(unified_req.tags) if isinstance(unified_req.tags, list) else {unified_req.tags}
-            out = [r for r in out if req_tags.issubset(set(tmap.get(str(r.path), [])))]
-        except Exception:
-            pass
 
-    # People filter
+def _apply_favorites_filter(store, results: List, unified_req: UnifiedSearchRequest) -> List:
+    """Apply favorites collection filter."""
+    if not unified_req.favorites_only:
+        return results
+    
     try:
-        if unified_req.persons and isinstance(unified_req.persons, list) and len(unified_req.persons) > 0:
-            sets = []
-            for nm in unified_req.persons:
-                try:
-                    sets.append(set(_face_photos(store.index_dir, str(nm))))
-                except Exception:
-                    sets.append(set())
-            if sets:
-                inter = set.intersection(*sets) if len(sets) > 1 else sets[0]
-                out = [r for r in out if str(r.path) in inter]
-        elif unified_req.person:
-            ppl = set(_face_photos(store.index_dir, str(unified_req.person)))
-            out = [r for r in out if str(r.path) in ppl]
+        from infra.collections import load_collections
+        collections = load_collections(store.index_dir)
+        favorites_set = set(collections.get('Favorites', []))
+        return [r for r in results if str(r.path) in favorites_set]
     except Exception:
-        pass
+        return results
 
-    # Date range filter
-    if unified_req.date_from is not None and unified_req.date_to is not None:
-        try:
-            mmap = {
-                sp: float(mt)
-                for sp, mt in zip(store.state.paths or [], store.state.mtimes or [])
-            }
-            out = [
-                r
-                for r in out
-                if unified_req.date_from <= mmap.get(str(r.path), 0.0) <= unified_req.date_to
-            ]
-        except Exception:
-            pass
+
+def _apply_tags_filter(store, results: List, unified_req: UnifiedSearchRequest) -> List:
+    """Apply tags filter."""
+    if not unified_req.tags:
+        return results
     
-    return out
+    try:
+        from infra.tags import load_tags
+        tags_map = load_tags(store.index_dir)
+        required_tags = set(unified_req.tags) if isinstance(unified_req.tags, list) else {unified_req.tags}
+        return [r for r in results if required_tags.issubset(set(tags_map.get(str(r.path), [])))]
+    except Exception:
+        return results
+
+
+def _apply_people_filter(store, results: List, unified_req: UnifiedSearchRequest) -> List:
+    """Apply people/person filter."""
+    # Handle multiple persons (intersection)
+    if unified_req.persons and isinstance(unified_req.persons, list) and len(unified_req.persons) > 0:
+        return _apply_multiple_persons_filter(store, results, unified_req.persons)
+    
+    # Handle single person
+    if unified_req.person:
+        return _apply_single_person_filter(store, results, unified_req.person)
+    
+    return results
+
+
+def _apply_multiple_persons_filter(store, results: List, person_names: List[str]) -> List:
+    """Apply filter for multiple persons (intersection logic)."""
+    try:
+        person_photo_sets = []
+        for person_name in person_names:
+            try:
+                photo_set = set(_face_photos(store.index_dir, str(person_name)))
+                person_photo_sets.append(photo_set)
+            except Exception:
+                person_photo_sets.append(set())
+        
+        if person_photo_sets:
+            # Find intersection of all person photo sets
+            intersection = set.intersection(*person_photo_sets) if len(person_photo_sets) > 1 else person_photo_sets[0]
+            return [r for r in results if str(r.path) in intersection]
+        
+        return results
+    except Exception:
+        return results
+
+
+def _apply_single_person_filter(store, results: List, person_name: str) -> List:
+    """Apply filter for single person."""
+    try:
+        person_photos = set(_face_photos(store.index_dir, str(person_name)))
+        return [r for r in results if str(r.path) in person_photos]
+    except Exception:
+        return results
+
+
+def _apply_date_range_filter(store, results: List, unified_req: UnifiedSearchRequest) -> List:
+    """Apply date range filter."""
+    if unified_req.date_from is None or unified_req.date_to is None:
+        return results
+    
+    try:
+        # Build mtime map
+        mtime_map = {
+            path: float(mtime)
+            for path, mtime in zip(store.state.paths or [], store.state.mtimes or [])
+        }
+        
+        # Filter by date range
+        return [
+            r for r in results
+            if unified_req.date_from <= mtime_map.get(str(r.path), 0.0) <= unified_req.date_to
+        ]
+    except Exception:
+        return results
 
 
 def _apply_text_and_caption_filters(store, results: List, unified_req: UnifiedSearchRequest, query_value: str) -> List:
     """Apply OCR text and caption-based filters including advanced expression parsing."""
-    out = results
+    output = results
     
-    # OCR and quoted text filters
-    try:
-        import json
-        texts_map = {}
-        if hasattr(store, 'ocr_texts_file') and store.ocr_texts_file.exists():
-            d = json.loads(store.ocr_texts_file.read_text())
-            texts_map = {p: (t or '') for p, t in zip(d.get('paths', []), d.get('texts', []))}
-        
-        if unified_req.has_text:
-            out = [r for r in out if (texts_map.get(str(r.path), '').strip() != '')]
-        
-        # Handle quoted text requirements
-        import re as _re
-        qtext = query_value or ""
-        d_parts = _re.findall(r'"([^"]+)"', qtext)
-        s_parts = _re.findall(r"'([^']+)'", qtext)
-        req = (d_parts or []) + (s_parts or [])
-        if req:
-            low = {p: texts_map.get(p, '').lower() for p in texts_map.keys()}
-            def _has_all(pth: str) -> bool:
-                s = low.get(pth, '')
-                return all(x.lower() in s for x in req)
-            out = [r for r in out if _has_all(str(r.path))]
-    except Exception:
-        pass
+    # Apply each filter type sequentially
+    output = _apply_ocr_text_filters(store, output, unified_req, query_value)
+    output = _apply_caption_expression_filters(store, output, query_value)
+    
+    return output
 
-    # Advanced caption expression parsing with boolean logic
+
+def _apply_ocr_text_filters(store, results: List, unified_req: UnifiedSearchRequest, query_value: str) -> List:
+    """Apply OCR text-based filters including has_text and quoted text requirements."""
     try:
-        cap_map = {}
-        if store.captions_available() and store.captions_file.exists():
-            cd = json.loads(store.captions_file.read_text())
-            cap_map = {p: (t or '') for p, t in zip(cd.get('paths', []), cd.get('texts', []))}
+        texts_map = _load_ocr_texts_map(store)
         
-        if cap_map and query_value:
-            # Parse boolean expressions in captions
-            out = _parse_caption_expressions(store, out, cap_map, query_value)
+        # Apply has_text filter
+        if unified_req.has_text:
+            results = [r for r in results if (texts_map.get(str(r.path), '').strip() != '')]
+        
+        # Apply quoted text requirements filter
+        results = _apply_quoted_text_filter(results, texts_map, query_value)
+        
+        return results
     except Exception:
-        pass
+        return results
+
+
+def _load_ocr_texts_map(store) -> dict:
+    """Load OCR texts mapping from store."""
+    import json
+    texts_map = {}
+    if hasattr(store, 'ocr_texts_file') and store.ocr_texts_file.exists():
+        data = json.loads(store.ocr_texts_file.read_text())
+        texts_map = {p: (t or '') for p, t in zip(data.get('paths', []), data.get('texts', []))}
+    return texts_map
+
+
+def _apply_quoted_text_filter(results: List, texts_map: dict, query_value: str) -> List:
+    """Apply quoted text requirements filter."""
+    import re as _re
     
-    return out
+    # Extract quoted text requirements
+    query_text = query_value or ""
+    double_quoted = _re.findall(r'"([^"]+)"', query_text)
+    single_quoted = _re.findall(r"'([^']+)'", query_text)
+    required_phrases = (double_quoted or []) + (single_quoted or [])
+    
+    if not required_phrases:
+        return results
+    
+    # Build lowercase text map for case-insensitive matching
+    lowercase_texts = {path: texts_map.get(path, '').lower() for path in texts_map.keys()}
+    
+    def _has_all_phrases(path: str) -> bool:
+        text_content = lowercase_texts.get(path, '')
+        return all(phrase.lower() in text_content for phrase in required_phrases)
+    
+    return [r for r in results if _has_all_phrases(str(r.path))]
+
+
+def _apply_caption_expression_filters(store, results: List, query_value: str) -> List:
+    """Apply advanced caption expression parsing with boolean logic."""
+    try:
+        caption_map = _load_caption_map(store)
+        
+        if caption_map and query_value:
+            return _parse_caption_expressions(store, results, caption_map, query_value)
+        
+        return results
+    except Exception:
+        return results
+
+
+def _load_caption_map(store) -> dict:
+    """Load caption mapping from store."""
+    import json
+    caption_map = {}
+    if store.captions_available() and store.captions_file.exists():
+        caption_data = json.loads(store.captions_file.read_text())
+        caption_map = {p: (t or '') for p, t in zip(caption_data.get('paths', []), caption_data.get('texts', []))}
+    return caption_map
 
 
 def _parse_caption_expressions(store, results: List, cap_map: dict, query_value: str) -> List:
