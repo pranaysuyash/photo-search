@@ -72,6 +72,8 @@ from api.routers.smart_collections import router as smart_collections_router
 from api.routers.tagging import router as tagging_router
 from api.routers.trips import router as trips_router
 from api.routers.utilities import router as utilities_router
+from api.routers.discovery import router as discovery_router
+from api.routers.auto_curation import router as auto_curation_router
 from api.routers.videos import router as videos_router
 from api.routers.watch import router as watch_router
 from api.routers.workspace import router as workspace_router
@@ -196,6 +198,8 @@ app.include_router(smart_collections_router)
 app.include_router(tagging_router)
 app.include_router(trips_router)
 app.include_router(utilities_router)
+app.include_router(discovery_router)
+app.include_router(auto_curation_router)
 app.include_router(videos_router)
 app.include_router(watch_router)
 app.include_router(workspace_router)

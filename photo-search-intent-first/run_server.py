@@ -35,7 +35,7 @@ if __name__ == "__main__":
         "api.server:app",
         host=host,
         port=port,
-        reload=True,
+        reload=False,
         log_level="info",
         workers=1,  # Single worker to avoid multi-process mutex issues
         loop="asyncio",

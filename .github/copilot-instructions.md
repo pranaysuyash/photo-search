@@ -69,8 +69,7 @@ electron/   # Desktop shell packaging
 
 ```bash
 # Setup Python environment (uses existing .venv)
-cd photo-search-intent-first
-source .venv/bin/activate  # Virtual environment already exists with all dependencies
+cd photo-search-intent-first && source .venv/bin/activate  # Virtual environment already exists with all dependencies
 
 # Run API server (FastAPI with auto-reload)
 python api/server.py

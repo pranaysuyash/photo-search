@@ -6,9 +6,9 @@ from typing import Dict, Any, Optional
 
 from api.schemas.v1 import SearchRequest, SearchResponse, SearchResultItem, CachedSearchRequest
 from adapters.provider_factory import get_provider
-from infra.index_store import IndexStore
 from usecases.index_photos import index_photos
 from api.utils import _emb
+from api.runtime_flags import is_offline
 from pathlib import Path
 import json
 
@@ -45,6 +45,13 @@ async def search_v1(
         raise HTTPException(400, f"Cannot access folder: {str(e)}")
 
     emb = _emb(request.provider, request.hf_token, request.openai_key)
+    
+    # Enforce local provider in offline mode
+    if is_offline():
+        request.provider = "local"
+        emb = _emb(request.provider, request.hf_token, request.openai_key)
+    
+    from infra.index_store import IndexStore  # Lazy import to prevent mutex issues
     store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
     store.load()
 
@@ -289,7 +296,9 @@ async def search_v1(
     return SearchResponse(
         search_id=search_id,
         results=result_items,
-        cached=False  # In a real implementation, this would track if results came from cache
+        cached=False,  # In a real implementation, this would track if results came from cache
+        provider=request.provider,
+        offline_mode=is_offline()
     )
 
 
@@ -322,6 +331,13 @@ async def search_cached_v1(
         raise HTTPException(400, f"Cannot access folder: {str(e)}")
 
     emb = _emb(request.provider, request.hf_token, request.openai_key)
+    
+    # Enforce local provider in offline mode
+    if is_offline():
+        request.provider = "local"
+        emb = _emb(request.provider, request.hf_token, request.openai_key)
+    
+    from infra.index_store import IndexStore  # Lazy import to prevent mutex issues
     store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
     store.load()
 
@@ -338,5 +354,7 @@ async def search_cached_v1(
     return SearchResponse(
         search_id=search_id,
         results=result_items,
-        cached=True  # Mark as cached since this is the cached endpoint
+        cached=True,  # Mark as cached since this is the cached endpoint
+        provider=request.provider,
+        offline_mode=is_offline()
     )

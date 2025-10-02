@@ -4,16 +4,16 @@
  * and screen reader support.
  */
 import React, { createContext, useContext, useMemo } from "react";
-import { 
+import {
   useAccessibilityContext,
   useAnnouncer,
-  useAriaAttributes, 
+  useAriaAttributes,
   useFocusManager,
   useHighContrast,
   useKeyboardNavigation,
   useLandmarkNavigation,
   useReducedMotion,
-  useSkipLinks
+  useSkipLinks,
 } from "../framework/AccessibilityFramework";
 
 // Accessibility-first design system interface
@@ -57,7 +57,7 @@ export interface AccessibilityFirstDesignContextType {
   Complementary: React.FC<ComplementaryProps>;
   Region: React.FC<RegionProps>;
   Article: React.FC<ArticleProps>;
-  
+
   // Accessibility hooks
   useAccessibility: () => ReturnType<typeof useAccessibilityContext>;
   useAnnouncer: () => ReturnType<typeof useAnnouncer>;
@@ -68,44 +68,51 @@ export interface AccessibilityFirstDesignContextType {
   useSkipLinks: () => ReturnType<typeof useSkipLinks>;
   useLandmarkNavigation: () => ReturnType<typeof useLandmarkNavigation>;
   useAriaAttributes: () => ReturnType<typeof useAriaAttributes>;
-  
+
   // Utility functions
-  announce: (message: string, priority?: "polite" | "assertive" | "off", options?: AnnouncementOptions) => void;
-  announceAction: (action: string, status?: "started" | "completed" | "failed") => void;
+  announce: (
+    message: string,
+    priority?: "polite" | "assertive" | "off",
+    options?: AnnouncementOptions
+  ) => void;
+  announceAction: (
+    action: string,
+    status?: "started" | "completed" | "failed"
+  ) => void;
   announceProgress: (progress: number, total: number, message?: string) => void;
   announceError: (error: string, context?: string) => void;
   announceSuccess: (message: string) => void;
   announceWarning: (message: string) => void;
   announceInfo: (message: string) => void;
-  
+
   // Focus management
   focusNext: () => void;
   focusPrevious: () => void;
   focusFirst: () => void;
   focusLast: () => void;
   trapFocus: (container: HTMLElement) => (() => void) | undefined;
-  
+
   // Keyboard navigation
   enableKeyboardNavigation: () => void;
   disableKeyboardNavigation: () => void;
   isKeyboardNavigationEnabled: boolean;
-  
+
   // High contrast mode
   isHighContrast: boolean;
   toggleHighContrast: () => void;
-  
+
   // Reduced motion
   isReducedMotion: boolean;
   toggleReducedMotion: () => void;
-  
+
   // Skip links
   skipToMainContent: () => void;
   skipToSearch: () => void;
   skipToNavigation: () => void;
-  
+
   // Landmark navigation
   goToLandmark: (landmark: LandmarkType) => void;
-  
+
   // ARIA attributes
   getAriaAttributes: (element: ElementType) => React.AriaAttributes;
 }
@@ -144,7 +151,14 @@ interface LinkProps extends React.AnchorHTMLAttributes<HTMLAnchorElement> {
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode;
-  variant?: "primary" | "secondary" | "danger" | "success" | "warning" | "info" | "ghost";
+  variant?:
+    | "primary"
+    | "secondary"
+    | "danger"
+    | "success"
+    | "warning"
+    | "info"
+    | "ghost";
   size?: "small" | "medium" | "large";
   icon?: React.ReactNode;
   iconPosition?: "left" | "right";
@@ -191,7 +205,8 @@ interface RadioProps extends React.InputHTMLAttributes<HTMLInputElement> {
   announceLabel?: boolean;
 }
 
-interface TextAreaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+interface TextAreaProps
+  extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   label?: string;
   helperText?: string;
   error?: string;
@@ -271,7 +286,8 @@ interface FormProps extends React.FormHTMLAttributes<HTMLFormElement> {
   announceSubmit?: boolean;
 }
 
-interface FieldsetProps extends React.FieldsetHTMLAttributes<HTMLFieldSetElement> {
+interface FieldsetProps
+  extends React.FieldsetHTMLAttributes<HTMLFieldSetElement> {
   children: React.ReactNode;
   legend?: string;
   announce?: boolean;
@@ -525,7 +541,9 @@ interface ArticleProps {
 }
 
 // Create the context with a default value
-const AccessibilityFirstDesignContext = createContext<AccessibilityFirstDesignContextType | undefined>(undefined);
+const AccessibilityFirstDesignContext = createContext<
+  AccessibilityFirstDesignContextType | undefined
+>(undefined);
 
 // Provider component props
 interface AccessibilityFirstDesignProviderProps {
@@ -533,9 +551,9 @@ interface AccessibilityFirstDesignProviderProps {
 }
 
 // Provider component
-export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesignProviderProps> = ({
-  children,
-}) => {
+export const AccessibilityFirstDesignProvider: React.FC<
+  AccessibilityFirstDesignProviderProps
+> = ({ children }) => {
   // Get all accessibility contexts
   const _accessibilityContext = useAccessibilityContext();
   const announcer = useAnnouncer();
@@ -546,7 +564,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
   const skipLinks = useSkipLinks();
   const landmarkNavigation = useLandmarkNavigation();
   const ariaAttributes = useAriaAttributes();
-  
+
   // Create semantic components with accessibility
   const Heading: React.FC<HeadingProps> = ({
     level,
@@ -560,7 +578,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
     announce = false,
   }) => {
     const Tag = `h${level}` as keyof JSX.IntrinsicElements;
-    
+
     // Announce heading if requested
     React.useEffect(() => {
       if (announce && children) {
@@ -570,7 +588,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         );
       }
     }, [announce, children]);
-    
+
     return React.createElement(Tag, {
       id,
       className: `heading-${level} ${className}`,
@@ -581,7 +599,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       children,
     });
   };
-  
+
   const Paragraph: React.FC<ParagraphProps> = ({
     children,
     id,
@@ -601,7 +619,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         );
       }
     }, [announce, children]);
-    
+
     return (
       <p
         id={id}
@@ -615,7 +633,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </p>
     );
   };
-  
+
   const Link: React.FC<LinkProps> = ({
     href,
     children,
@@ -633,7 +651,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         );
       }
     }, [announce, announceText, children]);
-    
+
     return (
       <a
         href={href}
@@ -646,7 +664,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </a>
     );
   };
-  
+
   const Button: React.FC<ButtonProps> = ({
     children,
     variant = "primary",
@@ -668,7 +686,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         );
       }
     }, [announce, announceText, children]);
-    
+
     // Announce action if requested
     const handleClick = React.useCallback(
       (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -684,32 +702,37 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       },
       [announceAction, children, props.onClick]
     );
-    
+
     // Determine button classes based on variant and size
     const buttonClasses = useMemo(() => {
-      const baseClasses = "inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background";
-      
+      const baseClasses =
+        "inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background";
+
       const variantClasses = {
         primary: "bg-primary text-primary-foreground hover:bg-primary/90",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        danger: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        secondary:
+          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        danger:
+          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         success: "bg-green-600 text-white hover:bg-green-700",
         warning: "bg-yellow-500 text-white hover:bg-yellow-600",
         info: "bg-blue-500 text-white hover:bg-blue-600",
         ghost: "hover:bg-accent hover:text-accent-foreground",
       }[variant];
-      
+
       const sizeClasses = {
         small: "h-8 px-3 text-xs",
         medium: "h-10 py-2 px-4 text-sm",
         large: "h-12 px-8 text-base",
       }[size];
-      
+
       return `${baseClasses} ${variantClasses} ${sizeClasses}`;
     }, [variant, size]);
-    
+
     return (
-      <button type="button" {...props}
+      <button
+        type="button"
+        {...props}
         {...ariaAttributes.getAriaAttributes("button")}
         className={`${buttonClasses} ${props.className || ""}`}
         onClick={handleClick}
@@ -753,7 +776,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </button>
     );
   };
-  
+
   const Input: React.FC<InputProps> = ({
     label,
     helperText,
@@ -764,14 +787,14 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
     ...props
   }) => {
     const id = props.id || `input-${Math.random().toString(36).substr(2, 9)}`;
-    
+
     // Announce label if requested
     React.useEffect(() => {
       if (announceLabel && label) {
         announcer.announce(label, "polite");
       }
     }, [announceLabel, label]);
-    
+
     return (
       <div className="space-y-1">
         {label && (
@@ -789,10 +812,14 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
           {...ariaAttributes.getAriaAttributes("input")}
           id={id}
           className={`block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${
-            error ? "border-red-300 focus:border-red-500 focus:ring-red-500" : ""
+            error
+              ? "border-red-300 focus:border-red-500 focus:ring-red-500"
+              : ""
           } ${props.className || ""}`}
           aria-invalid={!!error}
-          aria-describedby={error ? `${id}-error` : helperText ? `${id}-description` : undefined}
+          aria-describedby={
+            error ? `${id}-error` : helperText ? `${id}-description` : undefined
+          }
           aria-required={required}
         />
         {helperText && !error && (
@@ -808,7 +835,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </div>
     );
   };
-  
+
   const Select: React.FC<SelectProps> = ({
     label,
     helperText,
@@ -820,14 +847,14 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
     ...props
   }) => {
     const id = props.id || `select-${Math.random().toString(36).substr(2, 9)}`;
-    
+
     // Announce label if requested
     React.useEffect(() => {
       if (announceLabel && label) {
         announcer.announce(label, "polite");
       }
     }, [announceLabel, label]);
-    
+
     return (
       <div className="space-y-1">
         {label && (
@@ -845,10 +872,14 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
           {...ariaAttributes.getAriaAttributes("select")}
           id={id}
           className={`block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${
-            error ? "border-red-300 focus:border-red-500 focus:ring-red-500" : ""
+            error
+              ? "border-red-300 focus:border-red-500 focus:ring-red-500"
+              : ""
           } ${props.className || ""}`}
           aria-invalid={!!error}
-          aria-describedby={error ? `${id}-error` : helperText ? `${id}-description` : undefined}
+          aria-describedby={
+            error ? `${id}-error` : helperText ? `${id}-description` : undefined
+          }
           aria-required={required}
         >
           {options.map((option) => (
@@ -870,7 +901,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </div>
     );
   };
-  
+
   const Checkbox: React.FC<CheckboxProps> = ({
     label,
     helperText,
@@ -880,15 +911,16 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
     announceLabel = false,
     ...props
   }) => {
-    const id = props.id || `checkbox-${Math.random().toString(36).substr(2, 9)}`;
-    
+    const id =
+      props.id || `checkbox-${Math.random().toString(36).substr(2, 9)}`;
+
     // Announce label if requested
     React.useEffect(() => {
       if (announceLabel && label) {
         announcer.announce(label, "polite");
       }
     }, [announceLabel, label]);
-    
+
     return (
       <div className="space-y-1">
         <div className="flex items-center">
@@ -898,10 +930,18 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
             id={id}
             type="checkbox"
             className={`h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded ${
-              error ? "border-red-300 focus:border-red-500 focus:ring-red-500" : ""
+              error
+                ? "border-red-300 focus:border-red-500 focus:ring-red-500"
+                : ""
             } ${props.className || ""}`}
             aria-invalid={!!error}
-            aria-describedby={error ? `${id}-error` : helperText ? `${id}-description` : undefined}
+            aria-describedby={
+              error
+                ? `${id}-error`
+                : helperText
+                ? `${id}-description`
+                : undefined
+            }
             aria-required={required}
           />
           {label && (
@@ -928,7 +968,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </div>
     );
   };
-  
+
   const Radio: React.FC<RadioProps> = ({
     label,
     helperText,
@@ -939,14 +979,14 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
     ...props
   }) => {
     const id = props.id || `radio-${Math.random().toString(36).substr(2, 9)}`;
-    
+
     // Announce label if requested
     React.useEffect(() => {
       if (announceLabel && label) {
         announcer.announce(label, "polite");
       }
     }, [announceLabel, label]);
-    
+
     return (
       <div className="space-y-1">
         <div className="flex items-center">
@@ -956,10 +996,18 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
             id={id}
             type="radio"
             className={`h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 ${
-              error ? "border-red-300 focus:border-red-500 focus:ring-red-500" : ""
+              error
+                ? "border-red-300 focus:border-red-500 focus:ring-red-500"
+                : ""
             } ${props.className || ""}`}
             aria-invalid={!!error}
-            aria-describedby={error ? `${id}-error` : helperText ? `${id}-description` : undefined}
+            aria-describedby={
+              error
+                ? `${id}-error`
+                : helperText
+                ? `${id}-description`
+                : undefined
+            }
             aria-required={required}
           />
           {label && (
@@ -986,7 +1034,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </div>
     );
   };
-  
+
   const TextArea: React.FC<TextAreaProps> = ({
     label,
     helperText,
@@ -996,15 +1044,16 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
     announceLabel = false,
     ...props
   }) => {
-    const id = props.id || `textarea-${Math.random().toString(36).substr(2, 9)}`;
-    
+    const id =
+      props.id || `textarea-${Math.random().toString(36).substr(2, 9)}`;
+
     // Announce label if requested
     React.useEffect(() => {
       if (announceLabel && label) {
         announcer.announce(label, "polite");
       }
     }, [announceLabel, label]);
-    
+
     return (
       <div className="space-y-1">
         {label && (
@@ -1022,10 +1071,14 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
           {...ariaAttributes.getAriaAttributes("textarea")}
           id={id}
           className={`block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${
-            error ? "border-red-300 focus:border-red-500 focus:ring-red-500" : ""
+            error
+              ? "border-red-300 focus:border-red-500 focus:ring-red-500"
+              : ""
           } ${props.className || ""}`}
           aria-invalid={!!error}
-          aria-describedby={error ? `${id}-error` : helperText ? `${id}-description` : undefined}
+          aria-describedby={
+            error ? `${id}-error` : helperText ? `${id}-description` : undefined
+          }
           aria-required={required}
         />
         {helperText && !error && (
@@ -1041,7 +1094,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </div>
     );
   };
-  
+
   const Label: React.FC<LabelProps> = ({
     children,
     htmlFor,
@@ -1058,20 +1111,22 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         );
       }
     }, [announce, children]);
-    
+
     return (
       <label
         {...props}
         {...ariaAttributes.getAriaAttributes("label")}
         htmlFor={htmlFor}
-        className={`block text-sm font-medium text-gray-700 ${props.className || ""}`}
+        className={`block text-sm font-medium text-gray-700 ${
+          props.className || ""
+        }`}
       >
         {children}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
     );
   };
-  
+
   const List: React.FC<ListProps> = ({
     children,
     ordered = false,
@@ -1089,9 +1144,9 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         announcer.announce("List", "polite");
       }
     }, [announce]);
-    
+
     const Tag = ordered ? "ol" : "ul";
-    
+
     return React.createElement(Tag, {
       id,
       className: `list-disc pl-5 space-y-1 ${className}`,
@@ -1102,7 +1157,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       children,
     });
   };
-  
+
   const ListItem: React.FC<ListItemProps> = ({
     children,
     className = "",
@@ -1122,7 +1177,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         );
       }
     }, [announce, children]);
-    
+
     return (
       <li
         id={id}
@@ -1136,7 +1191,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </li>
     );
   };
-  
+
   const Table: React.FC<TableProps> = ({
     children,
     className = "",
@@ -1154,7 +1209,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         announcer.announce(caption || "Table", "polite");
       }
     }, [announce, caption]);
-    
+
     return (
       <table
         id={id}
@@ -1164,14 +1219,12 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         aria-details={ariaDetails}
         aria-owns={ariaOwns}
       >
-        {caption && (
-          <caption className="sr-only">{caption}</caption>
-        )}
+        {caption && <caption className="sr-only">{caption}</caption>}
         {children}
       </table>
     );
   };
-  
+
   const TableRow: React.FC<TableRowProps> = ({
     children,
     className = "",
@@ -1188,7 +1241,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         announcer.announce("Table row", "polite");
       }
     }, [announce]);
-    
+
     return (
       <tr
         id={id}
@@ -1202,7 +1255,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </tr>
     );
   };
-  
+
   const TableCell: React.FC<TableCellProps> = ({
     children,
     header = false,
@@ -1215,7 +1268,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
     announce = false,
   }) => {
     const Tag = header ? "th" : "td";
-    
+
     // Announce table cell if requested
     React.useEffect(() => {
       if (announce && children) {
@@ -1225,7 +1278,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         );
       }
     }, [announce, children]);
-    
+
     return React.createElement(Tag, {
       id,
       className: `px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${className}`,
@@ -1236,7 +1289,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       children,
     });
   };
-  
+
   const Form: React.FC<FormProps> = ({
     children,
     announce = false,
@@ -1249,7 +1302,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         announcer.announce("Form", "polite");
       }
     }, [announce]);
-    
+
     const handleSubmit = React.useCallback(
       (e: React.FormEvent<HTMLFormElement>) => {
         if (announceSubmit) {
@@ -1261,7 +1314,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       },
       [announceSubmit, props.onSubmit]
     );
-    
+
     return (
       <form
         {...props}
@@ -1272,7 +1325,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </form>
     );
   };
-  
+
   const Fieldset: React.FC<FieldsetProps> = ({
     children,
     legend,
@@ -1285,19 +1338,23 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         announcer.announce(legend || "Fieldset", "polite");
       }
     }, [announce, legend]);
-    
+
     return (
       <fieldset
         {...props}
         {...ariaAttributes.getAriaAttributes("fieldset")}
         className={`space-y-4 ${props.className || ""}`}
       >
-        {legend && <legend className="text-lg font-medium text-gray-900">{legend}</legend>}
+        {legend && (
+          <legend className="text-lg font-medium text-gray-900">
+            {legend}
+          </legend>
+        )}
         {children}
       </fieldset>
     );
   };
-  
+
   const Legend: React.FC<LegendProps> = ({
     children,
     announce = false,
@@ -1312,7 +1369,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         );
       }
     }, [announce, children]);
-    
+
     return (
       <legend
         {...props}
@@ -1323,7 +1380,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </legend>
     );
   };
-  
+
   const Dialog: React.FC<DialogProps> = ({
     children,
     open,
@@ -1346,7 +1403,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         announcer.announce(title, "assertive");
       }
     }, [open, announceOpen, title]);
-    
+
     // Announce dialog close if requested
     const handleClose = React.useCallback(() => {
       if (announceClose) {
@@ -1354,9 +1411,9 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       }
       onClose();
     }, [announceClose, onClose]);
-    
+
     if (!open) return null;
-    
+
     return (
       <div
         id={id}
@@ -1375,8 +1432,10 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
             className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
             aria-hidden="true"
             onClick={handleClose}
-          / role="button" tabIndex={0}>
-          
+            role="button"
+            tabIndex={0}
+          />
+
           {/* Dialog panel */}
           <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
             <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
@@ -1411,7 +1470,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </div>
     );
   };
-  
+
   const Alert: React.FC<AlertProps> = ({
     children,
     type,
@@ -1427,20 +1486,19 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
     // Announce alert if requested
     React.useEffect(() => {
       if (announce && (announceText || children)) {
-        const message = announceText || (
-          typeof children === "string" ? children : "Alert"
-        );
+        const message =
+          announceText || (typeof children === "string" ? children : "Alert");
         announcer.announce(message, type === "error" ? "assertive" : "polite");
       }
     }, [announce, announceText, children, type]);
-    
+
     const typeClasses = {
       info: "bg-blue-50 border-blue-200 text-blue-800",
       success: "bg-green-50 border-green-200 text-green-800",
       warning: "bg-yellow-50 border-yellow-200 text-yellow-800",
       error: "bg-red-50 border-red-200 text-red-800",
     }[type];
-    
+
     const icon = {
       info: (
         <svg
@@ -1503,7 +1561,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         </svg>
       ),
     }[type];
-    
+
     return (
       <div
         id={id}
@@ -1523,7 +1581,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </div>
     );
   };
-  
+
   const ProgressBar: React.FC<ProgressBarProps> = ({
     value,
     max = 100,
@@ -1538,24 +1596,34 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
     announceFrequency = "changes",
   }) => {
     const [lastAnnouncedValue, setLastAnnouncedValue] = useState<number>(0);
-    
+
     // Announce progress if requested
     React.useEffect(() => {
       if (announceProgress) {
-        const shouldAnnounce = 
+        const shouldAnnounce =
           announceFrequency === "always" ||
           (announceFrequency === "changes" && value !== lastAnnouncedValue) ||
-          (announceFrequency === "milestones" && value % 10 === 0 && value !== lastAnnouncedValue);
-        
+          (announceFrequency === "milestones" &&
+            value % 10 === 0 &&
+            value !== lastAnnouncedValue);
+
         if (shouldAnnounce) {
           announcer.announceProgress(value, max, ariaLabel);
           setLastAnnouncedValue(value);
         }
       }
-    }, [value, max, announceProgress, announceFrequency, lastAnnouncedValue, ariaLabel, setLastAnnouncedValue]);
-    
+    }, [
+      value,
+      max,
+      announceProgress,
+      announceFrequency,
+      lastAnnouncedValue,
+      ariaLabel,
+      setLastAnnouncedValue,
+    ]);
+
     const percentage = Math.round((value / max) * 100);
-    
+
     return (
       <div
         id={id}
@@ -1582,7 +1650,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </div>
     );
   };
-  
+
   const Slider: React.FC<SliderProps> = ({
     label,
     helperText,
@@ -1598,28 +1666,28 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
     ...props
   }) => {
     const id = props.id || `slider-${Math.random().toString(36).substr(2, 9)}`;
-    
+
     // Announce label if requested
     React.useEffect(() => {
       if (announceLabel && label) {
         announcer.announce(label, "polite");
       }
     }, [announceLabel, label]);
-    
+
     // Announce value if requested
     React.useEffect(() => {
       if (announceValue) {
         announcer.announce(`${label || "Slider"}: ${value}`, "polite");
       }
     }, [value, announceValue, label]);
-    
+
     const handleChange = React.useCallback(
       (e: React.ChangeEvent<HTMLInputElement>) => {
         onChange(Number(e.target.value));
       },
       [onChange]
     );
-    
+
     return (
       <div className="space-y-1">
         {label && (
@@ -1643,10 +1711,14 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
           value={value}
           onChange={handleChange}
           className={`w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer ${
-            error ? "border-red-300 focus:border-red-500 focus:ring-red-500" : ""
+            error
+              ? "border-red-300 focus:border-red-500 focus:ring-red-500"
+              : ""
           } ${props.className || ""}`}
           aria-invalid={!!error}
-          aria-describedby={error ? `${id}-error` : helperText ? `${id}-description` : undefined}
+          aria-describedby={
+            error ? `${id}-error` : helperText ? `${id}-description` : undefined
+          }
           aria-required={props.required}
           aria-valuenow={value}
           aria-valuemin={min}
@@ -1670,7 +1742,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </div>
     );
   };
-  
+
   const Tabs: React.FC<TabsProps> = ({
     children,
     className = "",
@@ -1687,7 +1759,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         announcer.announce(ariaLabel || "Tabs", "polite");
       }
     }, [announce, ariaLabel]);
-    
+
     return (
       <div
         id={id}
@@ -1703,7 +1775,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </div>
     );
   };
-  
+
   const Tab: React.FC<TabProps> = ({
     children,
     selected,
@@ -1726,9 +1798,11 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         );
       }
     }, [announceSelect, selected, children]);
-    
+
     return (
-      <button type="button" id={id}
+      <button
+        type="button"
+        id={id}
         className={`px-4 py-2 text-sm font-medium rounded-md ${
           selected
             ? "bg-indigo-100 text-indigo-700"
@@ -1748,7 +1822,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </button>
     );
   };
-  
+
   const TabPanel: React.FC<TabPanelProps> = ({
     children,
     selected,
@@ -1766,7 +1840,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         announcer.announce(ariaLabel || "Tab panel", "polite");
       }
     }, [announce, selected, ariaLabel]);
-    
+
     return (
       <div
         id={id}
@@ -1783,7 +1857,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </div>
     );
   };
-  
+
   const Tree: React.FC<TreeProps> = ({
     children,
     className = "",
@@ -1800,7 +1874,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         announcer.announce(ariaLabel || "Tree", "polite");
       }
     }, [announce, ariaLabel]);
-    
+
     return (
       <div
         id={id}
@@ -1816,7 +1890,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </div>
     );
   };
-  
+
   const TreeItem: React.FC<TreeItemProps> = ({
     children,
     expanded = false,
@@ -1842,7 +1916,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         );
       }
     }, [announceExpand, expanded, children]);
-    
+
     // Announce selection if requested
     React.useEffect(() => {
       if (announceSelect && selected && children) {
@@ -1852,7 +1926,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         );
       }
     }, [announceSelect, selected, children]);
-    
+
     return (
       <div
         id={id}
@@ -1870,7 +1944,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </div>
     );
   };
-  
+
   const Grid: React.FC<GridProps> = ({
     children,
     className = "",
@@ -1887,7 +1961,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         announcer.announce(ariaLabel || "Grid", "polite");
       }
     }, [announce, ariaLabel]);
-    
+
     return (
       <div
         id={id}
@@ -1903,7 +1977,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </div>
     );
   };
-  
+
   const Row: React.FC<RowProps> = ({
     children,
     className = "",
@@ -1920,7 +1994,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         announcer.announce(ariaLabel || "Row", "polite");
       }
     }, [announce, ariaLabel]);
-    
+
     return (
       <div
         id={id}
@@ -1936,7 +2010,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </div>
     );
   };
-  
+
   const Cell: React.FC<CellProps> = ({
     children,
     className = "",
@@ -1956,7 +2030,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         );
       }
     }, [announce, children]);
-    
+
     return (
       <div
         id={id}
@@ -1972,7 +2046,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </div>
     );
   };
-  
+
   const Navigation: React.FC<NavigationProps> = ({
     children,
     className = "",
@@ -1989,7 +2063,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         announcer.announce(ariaLabel || "Navigation", "polite");
       }
     }, [announce, ariaLabel]);
-    
+
     return (
       <nav
         id={id}
@@ -2004,7 +2078,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </nav>
     );
   };
-  
+
   const Main: React.FC<MainProps> = ({
     children,
     className = "",
@@ -2021,7 +2095,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         announcer.announce(ariaLabel || "Main content", "polite");
       }
     }, [announce, ariaLabel]);
-    
+
     return (
       <main
         id={id}
@@ -2036,7 +2110,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </main>
     );
   };
-  
+
   const Banner: React.FC<BannerProps> = ({
     children,
     className = "",
@@ -2053,7 +2127,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         announcer.announce(ariaLabel || "Banner", "polite");
       }
     }, [announce, ariaLabel]);
-    
+
     return (
       <header
         id={id}
@@ -2068,7 +2142,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </header>
     );
   };
-  
+
   const ContentInfo: React.FC<ContentInfoProps> = ({
     children,
     className = "",
@@ -2085,7 +2159,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         announcer.announce(ariaLabel || "Content information", "polite");
       }
     }, [announce, ariaLabel]);
-    
+
     return (
       <footer
         id={id}
@@ -2101,7 +2175,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </footer>
     );
   };
-  
+
   const Search: React.FC<SearchProps> = ({
     children,
     className = "",
@@ -2118,7 +2192,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         announcer.announce(ariaLabel || "Search", "polite");
       }
     }, [announce, ariaLabel]);
-    
+
     return (
       <div
         id={id}
@@ -2134,7 +2208,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </div>
     );
   };
-  
+
   const Complementary: React.FC<ComplementaryProps> = ({
     children,
     className = "",
@@ -2151,7 +2225,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         announcer.announce(ariaLabel || "Complementary content", "polite");
       }
     }, [announce, ariaLabel]);
-    
+
     return (
       <aside
         id={id}
@@ -2166,7 +2240,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </aside>
     );
   };
-  
+
   const Region: React.FC<RegionProps> = ({
     children,
     className = "",
@@ -2183,7 +2257,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         announcer.announce(ariaLabel || "Region", "polite");
       }
     }, [announce, ariaLabel]);
-    
+
     return (
       <section
         id={id}
@@ -2198,7 +2272,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </section>
     );
   };
-  
+
   const Article: React.FC<ArticleProps> = ({
     children,
     className = "",
@@ -2215,7 +2289,7 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
         announcer.announce(ariaLabel || "Article", "polite");
       }
     }, [announce, ariaLabel]);
-    
+
     return (
       <article
         id={id}
@@ -2230,148 +2304,152 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
       </article>
     );
   };
-  
+
   // Create context value with all components and hooks
-  const value = useMemo<AccessibilityFirstDesignContextType>(() => ({
-    // Semantic components
-    Heading,
-    Paragraph,
-    Link,
-    Button,
-    Input,
-    Select,
-    Checkbox,
-    Radio,
-    TextArea,
-    Label,
-    List,
-    ListItem,
-    Table,
-    TableRow,
-    TableCell,
-    Form,
-    Fieldset,
-    Legend,
-    Dialog,
-    Alert,
-    ProgressBar,
-    Slider,
-    Tabs,
-    Tab,
-    TabPanel,
-    Tree,
-    TreeItem,
-    Grid,
-    Row,
-    Cell,
-    Navigation,
-    Main,
-    Banner,
-    ContentInfo,
-    Search,
-    Complementary,
-    Region,
-    Article,
-    
-    // Accessibility hooks
-    useAccessibility: useAccessibilityContext,
-    useAnnouncer,
-    useFocusManager,
-    useKeyboardNavigation,
-    useHighContrast,
-    useReducedMotion,
-    useSkipLinks,
-    useLandmarkNavigation,
-    useAriaAttributes,
-    
-    // Utility functions
-    announce: announcer.announce,
-    announceAction: announcer.announceAction,
-    announceProgress: announcer.announceProgress,
-    announceError: announcer.announceError,
-    announceSuccess: announcer.announceSuccess,
-    announceWarning: announcer.announceWarning,
-    announceInfo: announcer.announceInfo,
-    
-    // Focus management
-    focusNext: focusManager.focusNext,
-    focusPrevious: focusManager.focusPrevious,
-    focusFirst: focusManager.focusFirst,
-    focusLast: focusManager.focusLast,
-    trapFocus: focusManager.trapFocus,
-    
-    // Keyboard navigation
-    enableKeyboardNavigation: keyboardNavigation.enableKeyboardNavigation,
-    disableKeyboardNavigation: keyboardNavigation.disableKeyboardNavigation,
-    isKeyboardNavigationEnabled: keyboardNavigation.isKeyboardNavigationEnabled,
-    
-    // High contrast mode
-    isHighContrast: highContrast.isHighContrast,
-    toggleHighContrast: highContrast.toggleHighContrast,
-    
-    // Reduced motion
-    isReducedMotion: reducedMotion.isReducedMotion,
-    toggleReducedMotion: reducedMotion.toggleReducedMotion,
-    
-    // Skip links
-    skipToMainContent: skipLinks.skipToMainContent,
-    skipToSearch: skipLinks.skipToSearch,
-    skipToNavigation: skipLinks.skipToNavigation,
-    
-    // Landmark navigation
-    goToLandmark: landmarkNavigation.goToLandmark,
-    
-    // ARIA attributes
-    getAriaAttributes: ariaAttributes.getAriaAttributes,
-  }), [
-    Heading, 
-    Paragraph, 
-    Link, 
-    Button, 
-    Input, 
-    Select, 
-    Checkbox, 
-    Radio, 
-    TextArea, 
-    Label, 
-    List, 
-    ListItem, 
-    Table, 
-    TableRow, 
-    TableCell, 
-    Form, 
-    Fieldset, 
-    Legend, 
-    Dialog, 
-    Alert, 
-    ProgressBar, 
-    Slider, 
-    Tabs, 
-    Tab, 
-    TabPanel, 
-    Tree, 
-    TreeItem, 
-    Grid, 
-    Row, 
-    Cell, 
-    Navigation, 
-    Main, 
-    Banner, 
-    ContentInfo, 
-    Search, 
-    Complementary, 
-    Region, 
-    Article, 
-    announcer, 
-    focusManager, 
-    keyboardNavigation, 
-    highContrast, 
-    reducedMotion, 
-    skipLinks, 
-    landmarkNavigation, 
-    ariaAttributes
-  ]);
-  
+  const value = useMemo<AccessibilityFirstDesignContextType>(
+    () => ({
+      // Semantic components
+      Heading,
+      Paragraph,
+      Link,
+      Button,
+      Input,
+      Select,
+      Checkbox,
+      Radio,
+      TextArea,
+      Label,
+      List,
+      ListItem,
+      Table,
+      TableRow,
+      TableCell,
+      Form,
+      Fieldset,
+      Legend,
+      Dialog,
+      Alert,
+      ProgressBar,
+      Slider,
+      Tabs,
+      Tab,
+      TabPanel,
+      Tree,
+      TreeItem,
+      Grid,
+      Row,
+      Cell,
+      Navigation,
+      Main,
+      Banner,
+      ContentInfo,
+      Search,
+      Complementary,
+      Region,
+      Article,
+
+      // Accessibility hooks
+      useAccessibility: useAccessibilityContext,
+      useAnnouncer,
+      useFocusManager,
+      useKeyboardNavigation,
+      useHighContrast,
+      useReducedMotion,
+      useSkipLinks,
+      useLandmarkNavigation,
+      useAriaAttributes,
+
+      // Utility functions
+      announce: announcer.announce,
+      announceAction: announcer.announceAction,
+      announceProgress: announcer.announceProgress,
+      announceError: announcer.announceError,
+      announceSuccess: announcer.announceSuccess,
+      announceWarning: announcer.announceWarning,
+      announceInfo: announcer.announceInfo,
+
+      // Focus management
+      focusNext: focusManager.focusNext,
+      focusPrevious: focusManager.focusPrevious,
+      focusFirst: focusManager.focusFirst,
+      focusLast: focusManager.focusLast,
+      trapFocus: focusManager.trapFocus,
+
+      // Keyboard navigation
+      enableKeyboardNavigation: keyboardNavigation.enableKeyboardNavigation,
+      disableKeyboardNavigation: keyboardNavigation.disableKeyboardNavigation,
+      isKeyboardNavigationEnabled:
+        keyboardNavigation.isKeyboardNavigationEnabled,
+
+      // High contrast mode
+      isHighContrast: highContrast.isHighContrast,
+      toggleHighContrast: highContrast.toggleHighContrast,
+
+      // Reduced motion
+      isReducedMotion: reducedMotion.isReducedMotion,
+      toggleReducedMotion: reducedMotion.toggleReducedMotion,
+
+      // Skip links
+      skipToMainContent: skipLinks.skipToMainContent,
+      skipToSearch: skipLinks.skipToSearch,
+      skipToNavigation: skipLinks.skipToNavigation,
+
+      // Landmark navigation
+      goToLandmark: landmarkNavigation.goToLandmark,
+
+      // ARIA attributes
+      getAriaAttributes: ariaAttributes.getAriaAttributes,
+    }),
+    [
+      Heading,
+      Paragraph,
+      Link,
+      Button,
+      Input,
+      Select,
+      Checkbox,
+      Radio,
+      TextArea,
+      Label,
+      List,
+      ListItem,
+      Table,
+      TableRow,
+      TableCell,
+      Form,
+      Fieldset,
+      Legend,
+      Dialog,
+      Alert,
+      ProgressBar,
+      Slider,
+      Tabs,
+      Tab,
+      TabPanel,
+      Tree,
+      TreeItem,
+      Grid,
+      Row,
+      Cell,
+      Navigation,
+      Main,
+      Banner,
+      ContentInfo,
+      Search,
+      Complementary,
+      Region,
+      Article,
+      announcer,
+      focusManager,
+      keyboardNavigation,
+      highContrast,
+      reducedMotion,
+      skipLinks,
+      landmarkNavigation,
+      ariaAttributes,
+    ]
+  );
+
   return (
     <AccessibilityFirstDesignContext.Provider value={value}>
       {children}
@@ -2380,13 +2458,16 @@ export const AccessibilityFirstDesignProvider: React.FC<AccessibilityFirstDesign
 };
 
 // Hook to consume the context
-export const useAccessibilityFirstDesign = (): AccessibilityFirstDesignContextType => {
-  const context = useContext(AccessibilityFirstDesignContext);
-  if (context === undefined) {
-    throw new Error("useAccessibilityFirstDesign must be used within an AccessibilityFirstDesignProvider");
-  }
-  return context;
-};
+export const useAccessibilityFirstDesign =
+  (): AccessibilityFirstDesignContextType => {
+    const context = useContext(AccessibilityFirstDesignContext);
+    if (context === undefined) {
+      throw new Error(
+        "useAccessibilityFirstDesign must be used within an AccessibilityFirstDesignProvider"
+      );
+    }
+    return context;
+  };
 
 // Selector hooks for specific accessibility features
 export const useSemanticComponents = (): Pick<

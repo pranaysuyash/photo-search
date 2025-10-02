@@ -208,6 +208,9 @@ class SearchResponse(BaseModel):
     cache_key: Optional[str] = None
     fast_backend: Optional[str] = None
     fast_fallback: Optional[bool] = None
+    # Observability fields (non-breaking additions)
+    provider: Optional[str] = None
+    offline_mode: Optional[bool] = None
 
 
 class IndexRequest(BaseModel):

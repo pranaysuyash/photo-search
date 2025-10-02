@@ -9,6 +9,8 @@ import {
 	Sparkles as IconSparkles,
 	Tag as IconTag,
 	Users as IconUsers,
+	Wand2 as IconWand2,
+	Palette as IconPalette,
 	X,
 } from "lucide-react";
 
@@ -100,9 +102,19 @@ export function Sidebar({
 	const smartItems: NavItem[] = [
 		{
 			id: "smart",
-			label: "Smart Collections",
+			label: "Smart Discovery",
 			icon: IconSparkles,
 			count: smart?.length || 0,
+		},
+		{
+			id: "curation",
+			label: "Auto-Curation",
+			icon: IconWand2,
+		},
+		{
+			id: "visual-tools",
+			label: "Visual Tools",
+			icon: IconPalette,
 		},
 		{
 			id: "saved",

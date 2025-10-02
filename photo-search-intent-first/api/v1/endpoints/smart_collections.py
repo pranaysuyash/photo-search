@@ -1,38 +1,47 @@
-"""Smart Collections router - manage and resolve smart collections with search integration."""
+"""
+Smart Collections-related endpoints for API v1.
+"""
+from fastapi import APIRouter, Body, HTTPException, Query, Depends
+from typing import Dict, Any, List, Optional
 
-import json
-from pathlib import Path
-from typing import Any, Dict, List, Optional
-
-from fastapi import APIRouter, Body, HTTPException, Query
-
+from api.schemas.v1 import SuccessResponse
 from api.utils import _emb, _from_body, _require, _zip_meta
+from api.auth import require_auth
 from infra.analytics import log_search
 from infra.collections import load_collections, load_smart_collections, save_smart_collections
 from infra.faces import photos_for_person as _face_photos
 from infra.index_store import IndexStore
 from infra.tags import load_tags
-from services.enhanced_smart_collections import EnhancedSmartCollectionsService
-from domain.smart_collection_rules import SmartCollectionConfig
+from pathlib import Path
+import json
 
-router = APIRouter()
+# Create router for smart collections endpoints
+smart_collections_router = APIRouter(prefix="/smart_collections", tags=["smart_collections"])
 
 
-@router.get("/smart_collections")
-def get_smart_collections(directory: str = Query(..., alias="dir")) -> Dict[str, Any]:
-    """Get all smart collections for a directory."""
+@smart_collections_router.get("/", response_model=SuccessResponse)
+def get_smart_collections_v1(
+    directory: str = Query(..., alias="dir"),
+    _auth = Depends(require_auth)
+) -> SuccessResponse:
+    """
+    Get all smart collections for a directory.
+    """
     store = IndexStore(Path(directory))
-    return {"smart": load_smart_collections(store.index_dir)}
+    return SuccessResponse(ok=True, data={"smart": load_smart_collections(store.index_dir)})
 
 
-@router.post("/smart_collections")
-def set_smart_collection(
+@smart_collections_router.post("/", response_model=SuccessResponse)
+def set_smart_collection_v1(
     dir: Optional[str] = None,
     name: Optional[str] = None,
     rules: Optional[Dict[str, Any]] = None,
     body: Optional[Dict[str, Any]] = Body(None),
-) -> Dict[str, Any]:
-    """Create or update a smart collection with rules."""
+    _auth = Depends(require_auth)
+) -> SuccessResponse:
+    """
+    Create or update a smart collection with rules.
+    """
     dir_value = _require(_from_body(body, dir, "dir"), "dir")
     name_value = _require(_from_body(body, name, "name"), "name")
     rules_value = _from_body(body, rules, "rules", default={}) or {}
@@ -41,16 +50,19 @@ def set_smart_collection(
     data = load_smart_collections(store.index_dir)
     data[name_value] = rules_value
     save_smart_collections(store.index_dir, data)
-    return {"ok": True, "smart": data}
+    return SuccessResponse(ok=True, data={"smart": data})
 
 
-@router.post("/smart_collections/delete")
-def delete_smart_collection(
+@smart_collections_router.post("/delete", response_model=SuccessResponse)
+def delete_smart_collection_v1(
     dir: Optional[str] = None,
     name: Optional[str] = None,
     body: Optional[Dict[str, Any]] = Body(None),
-) -> Dict[str, Any]:
-    """Delete a smart collection."""
+    _auth = Depends(require_auth)
+) -> SuccessResponse:
+    """
+    Delete a smart collection.
+    """
     dir_value = _require(_from_body(body, dir, "dir"), "dir")
     name_value = _require(_from_body(body, name, "name"), "name")
 
@@ -59,12 +71,12 @@ def delete_smart_collection(
     if name_value in data:
         del data[name_value]
         save_smart_collections(store.index_dir, data)
-        return {"ok": True, "deleted": name_value}
-    return {"ok": False, "deleted": None}
+        return SuccessResponse(ok=True, data={"deleted": name_value})
+    return SuccessResponse(ok=False, data={"deleted": None})
 
 
-@router.post("/smart_collections/resolve")
-def resolve_smart_collection(
+@smart_collections_router.post("/resolve", response_model=SuccessResponse)
+def resolve_smart_collection_v1(
     dir: Optional[str] = None,
     name: Optional[str] = None,
     provider: Optional[str] = None,
@@ -72,8 +84,11 @@ def resolve_smart_collection(
     hf_token: Optional[str] = None,
     openai_key: Optional[str] = None,
     body: Optional[Dict[str, Any]] = Body(None),
-) -> Dict[str, Any]:
-    """Resolve smart collection rules into actual search results."""
+    _auth = Depends(require_auth)
+) -> SuccessResponse:
+    """
+    Resolve smart collection rules into actual search results.
+    """
     dir_value = _require(_from_body(body, dir, "dir"), "dir")
     name_value = _require(_from_body(body, name, "name"), "name")
     provider_value = _from_body(body, provider, "provider", default="local") or "local"
@@ -91,7 +106,7 @@ def resolve_smart_collection(
     data = load_smart_collections(store.index_dir)
     rules = data.get(name_value)
     if not isinstance(rules, dict):
-        return {"search_id": None, "results": []}
+        return SuccessResponse(ok=True, data={"search_id": None, "results": []})
     
     # Extract rules with safe defaults
     query = str(rules.get('query') or '').strip()
@@ -297,4 +312,10 @@ def resolve_smart_collection(
         out = out
     
     sid = log_search(store.index_dir, getattr(emb, 'index_id', 'default'), query, [(str(r.path), float(r.score)) for r in out])
-    return {"search_id": sid, "results": [{"path": str(r.path), "score": float(r.score)} for r in out]}
+    return SuccessResponse(
+        ok=True,
+        data={
+            "search_id": sid,
+            "results": [{"path": str(r.path), "score": float(r.score)} for r in out]
+        }
+    )

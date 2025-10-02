@@ -8,7 +8,9 @@ import { SavedViewContainer } from "../../views/SavedViewContainer";
 import { SuspenseFallback } from "../SuspenseFallback";
 
 const MapView = lazy(() => import("../MapView"));
-const SmartCollections = lazy(() => import("../SmartCollections"));
+const SmartDiscovery = lazy(() => import("../SmartDiscovery"));
+const AutoCurationPanel = lazy(() => import("../AutoCurationPanel"));
+const VisualTools = lazy(() => import("../VisualTools"));
 const TripsView = lazy(() => import("../TripsView"));
 const VideoManager = lazy(() =>
 	import("../VideoManager").then((m) => ({
@@ -203,28 +205,42 @@ export function RoutesHost({
 					path="/smart"
 					element={
 						<div className="p-4">
-							<SmartCollections
-								dir={dir ?? ""}
-								engine={engine ?? "local"}
-								topK={topK}
-								smart={smart}
-								setSmart={setSmart}
-								setResults={setResults}
-								setSearchId={setSearchId}
-								setNote={setNote}
-								query={query}
-								favOnly={favOnly}
-								tagFilter={tagFilter}
-								useCaps={useCaps}
-								useOcr={useOcr}
-								hasText={hasText}
-								camera={camera}
-								isoMin={isoMin}
-								isoMax={isoMax}
-								fMin={fMin}
-								fMax={fMax}
-								place={place}
-								persons={persons}
+							<SmartDiscovery
+								onPhotoSelect={(photo) => openDetailByPath(photo.path)}
+								onPhotoView={(photo) => {
+									// Optional: Handle photo view actions
+									console.log('Viewing photo:', photo.path);
+								}}
+							/>
+						</div>
+					}
+				/>
+				<Route
+					path="/curation"
+					element={
+						<div className="p-4">
+							<AutoCurationPanel
+								onPhotoSelect={(photo) => openDetailByPath(photo)}
+								onPhotoView={(photo) => {
+									// Optional: Handle photo view actions
+									console.log('Viewing photo:', photo.path);
+								}}
+							/>
+						</div>
+					}
+				/>
+				<Route
+					path="/visual-tools"
+					element={
+						<div className="p-4">
+							<VisualTools
+								selectedImages={Array.from(selected)}
+								onImageSelect={(path) => openDetailByPath(path)}
+								onPhotoView={(photo) => {
+									// Optional: Handle photo view actions
+									console.log('Viewing photo:', photo.path);
+								}}
+								availableImages={library || []}
 							/>
 						</div>
 					}

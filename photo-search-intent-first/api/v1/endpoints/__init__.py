@@ -17,6 +17,21 @@ from .favorites import favorites_router
 from .batch import batch_router
 from .saved import saved_router
 from .presets import presets_router
+from .config import config_router
+from .library import library_router
+from .editing import editing_router
+from .models import models_router
+from .data_management import data_management_router
+from .utilities import utilities_router
+from .file_management import file_management_router
+from .fast_index import fast_index_router
+from .captions import captions_router
+from .admin import admin_router
+from .watch import watch_router
+from .workspace import workspace_router
+from .smart_collections import smart_collections_router
+from .trips import trips_router
+from .enhanced_smart_collections import enhanced_smart_collections_router
 
 __all__ = [
     "search_router",
@@ -35,4 +50,19 @@ __all__ = [
     "batch_router",
     "saved_router",
     "presets_router",
+    "config_router",
+    "library_router",
+    "editing_router",
+    "models_router",
+    "data_management_router",
+    "utilities_router",
+    "file_management_router",
+    "fast_index_router",
+    "captions_router",
+    "admin_router",
+    "watch_router",
+    "workspace_router",
+    "smart_collections_router",
+    "trips_router",
+    "enhanced_smart_collections_router",
 ]

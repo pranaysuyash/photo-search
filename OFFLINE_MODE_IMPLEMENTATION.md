@@ -8,20 +8,17 @@ This document describes the implementation and verification of true offline mode
 
 ## Features & Workflow
 
-
 ### 1. Offline Mode Startup Flag
 
 - **Environment Variable:** Set `OFFLINE_MODE=1` before starting the server or CLI.
 - **Effect:** The application disables all network/model downloads and uses only local resources.
 - **Location:** Startup check in `api/server.py` sets the runtime offline flag if the env var is present.
 
-
 ### 2. Bundled Model Usage
 
 - **Bundled Models:** CLIP models (`clip-vit-base-patch32`, `clip-vit-b-32`) are pre-packaged in `electron/models/`.
 - **Provider Factory:** `adapters/provider_factory.py` detects offline mode and maps model names to bundled directories.
 - **No Downloads:** When offline, the provider never attempts to fetch from HuggingFace or other remote sources.
-
 
 ### 3. CLI & API Support
 
@@ -31,7 +28,6 @@ This document describes the implementation and verification of true offline mode
 ---
 
 ## Usage Examples
-
 
 **Indexing Photos Offline:**
 
@@ -59,7 +55,6 @@ curl -X POST 'http://127.0.0.1:8000/admin/flags/offline' -H 'Content-Type: appli
 
 ---
 
-
 ## Implementation Details
 
 - **api/server.py:**
@@ -74,7 +69,6 @@ curl -X POST 'http://127.0.0.1:8000/admin/flags/offline' -H 'Content-Type: appli
 
 ---
 
-
 ## Verification
 
 - **Indexing:**
@@ -88,7 +82,6 @@ curl -X POST 'http://127.0.0.1:8000/admin/flags/offline' -H 'Content-Type: appli
 
 ---
 
-
 ## Security & Best Practices
 
 - **No model downloads** in offline mode; all assets must be pre-bundled.
@@ -96,7 +89,6 @@ curl -X POST 'http://127.0.0.1:8000/admin/flags/offline' -H 'Content-Type: appli
 - **Admin endpoint** allows runtime toggling for flexibility in dev/test.
 
 ---
-
 
 ## Summary
 
