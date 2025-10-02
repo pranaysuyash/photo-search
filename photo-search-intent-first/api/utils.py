@@ -1,5 +1,4 @@
 from typing import Any, Callable, Dict, Iterable, List, Optional, TypeVar
-from adapters.provider_factory import get_provider
 
 
 def _from_body(
@@ -49,8 +48,12 @@ def _as_str_list(v: Any) -> List[str]:
     return [str(v)]
 
 
+
+
 def _emb(provider: str, hf_token: Optional[str], openai_key: Optional[str], st_model: Optional[str] = None,
          tf_model: Optional[str] = None, hf_model: Optional[str] = None):
+    # Lazy import to avoid loading heavy ML libraries at module import time
+    from adapters.provider_factory import get_provider
     return get_provider(provider, hf_token=hf_token, openai_api_key=openai_key, st_model=st_model, tf_model=tf_model, hf_model=hf_model)
 
 

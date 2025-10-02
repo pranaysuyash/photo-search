@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from "react";
+import type React from "react";
+import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "../../lib/utils";
 import { FocusTrap } from "../../utils/accessibility";
@@ -47,7 +48,8 @@ export function ModalContainer({
 			const originalPaddingRight = originalStyle.paddingRight;
 
 			// Calculate scrollbar width
-			const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+			const scrollbarWidth =
+				window.innerWidth - document.documentElement.clientWidth;
 
 			// Apply scroll lock
 			document.body.style.overflow = "hidden";
@@ -74,7 +76,9 @@ export function ModalContainer({
 
 		document.addEventListener("keydown", handleEscapeKey, { capture: true });
 		return () => {
-			document.removeEventListener("keydown", handleEscapeKey, { capture: true });
+			document.removeEventListener("keydown", handleEscapeKey, {
+				capture: true,
+			});
 		};
 	}, [isOpen, enableEscapeKey, onClose]);
 
@@ -83,7 +87,10 @@ export function ModalContainer({
 		if (!isOpen) {
 			// Small delay to allow for transitions
 			const timer = setTimeout(() => {
-				if (previousActiveElement.current && document.contains(previousActiveElement.current)) {
+				if (
+					previousActiveElement.current &&
+					document.contains(previousActiveElement.current)
+				) {
 					try {
 						previousActiveElement.current.focus();
 					} catch (error) {
@@ -111,7 +118,7 @@ export function ModalContainer({
 			<div
 				className={cn(
 					"fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity",
-					backdropClassName
+					backdropClassName,
 				)}
 				onClick={handleBackdropClick}
 				aria-hidden="true"
@@ -126,7 +133,7 @@ export function ModalContainer({
 					"fixed inset-0 flex items-center justify-center p-4",
 					"transform transition-all duration-200 ease-out",
 					"scale-95 opacity-0 data-[state=open]:scale-100 data-[state=open]:opacity-100",
-					className
+					className,
 				)}
 				data-state={isOpen ? "open" : "closed"}
 				role="dialog"
@@ -135,9 +142,7 @@ export function ModalContainer({
 				aria-describedby={ariaDescribedBy}
 			>
 				{enableFocusTrap ? (
-					<FocusTrap onEscape={onClose}>
-						{children}
-					</FocusTrap>
+					<FocusTrap onEscape={onClose}>{children}</FocusTrap>
 				) : (
 					children
 				)}

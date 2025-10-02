@@ -7,7 +7,7 @@ import {
 	useState,
 } from "react";
 import type { SearchResult } from "../api";
-import { searchWorkspace, search } from "../api";
+import { search, searchWorkspace } from "../api";
 import {
 	useDir,
 	useEngine,
@@ -21,9 +21,9 @@ import { useWorkspaceStore } from "../stores/workspaceStore";
 import { expandSynonyms } from "../utils/searchSynonyms";
 
 export interface MultiFolderSearchScope {
-	type: 'all' | 'selected' | 'custom';
+	type: "all" | "selected" | "custom";
 	selectedFolders: string[];
-	searchScope: 'all' | 'recent' | 'favorites';
+	searchScope: "all" | "recent" | "favorites";
 }
 
 export type EnhancedSearchFilters = {
@@ -55,7 +55,10 @@ export type EnhancedSearchActions = {
 	addToken: (expr: string) => void;
 	clearTokens: (pattern: RegExp) => void;
 	performSearch: (q?: string) => Promise<void>;
-	performMultiFolderSearch: (query: string, scope: MultiFolderSearchScope) => Promise<void>;
+	performMultiFolderSearch: (
+		query: string,
+		scope: MultiFolderSearchScope,
+	) => Promise<void>;
 };
 
 const Ctx = createContext<{
@@ -63,7 +66,11 @@ const Ctx = createContext<{
 	actions: EnhancedSearchActions;
 } | null>(null);
 
-export function EnhancedSearchProvider({ children }: { children: React.ReactNode }) {
+export function EnhancedSearchProvider({
+	children,
+}: {
+	children: React.ReactNode;
+}) {
 	const photo = usePhotoActions();
 	const dir = useDir();
 	const engine = useEngine();
@@ -80,9 +87,9 @@ export function EnhancedSearchProvider({ children }: { children: React.ReactNode
 		favOnly: false,
 	});
 	const [searchScope, setSearchScopeState] = useState<MultiFolderSearchScope>({
-		type: 'all',
+		type: "all",
 		selectedFolders: [],
-		searchScope: 'all'
+		searchScope: "all",
 	});
 	const [isSearching, setIsSearching] = useState(false);
 	const [searchProgress, setSearchProgress] = useState(0);
@@ -199,12 +206,23 @@ export function EnhancedSearchProvider({ children }: { children: React.ReactNode
 				setResultsSafe([]);
 				return [];
 			} catch (error) {
-				console.error('Single folder search error:', error);
+				console.error("Single folder search error:", error);
 				setResultsSafe([]);
 				return [];
 			}
 		},
-		[query, dir, engine, needsHf, hfToken, needsOAI, openaiKey, filters, setResultsSafe, photo],
+		[
+			query,
+			dir,
+			engine,
+			needsHf,
+			hfToken,
+			needsOAI,
+			openaiKey,
+			filters,
+			setResultsSafe,
+			photo,
+		],
 	);
 
 	const performMultiFolderSearch = useCallback(
@@ -228,14 +246,16 @@ export function EnhancedSearchProvider({ children }: { children: React.ReactNode
 
 				// Determine which directories to search based on scope
 				switch (scope.type) {
-					case 'all':
+					case "all":
 						searchDirs = [dir, ...workspace];
 						break;
-					case 'selected':
-						searchDirs = scope.selectedFolders.length > 0 ? scope.selectedFolders : [dir];
+					case "selected":
+						searchDirs =
+							scope.selectedFolders.length > 0 ? scope.selectedFolders : [dir];
 						break;
-					case 'custom':
-						searchDirs = scope.selectedFolders.length > 0 ? scope.selectedFolders : [dir];
+					case "custom":
+						searchDirs =
+							scope.selectedFolders.length > 0 ? scope.selectedFolders : [dir];
 						break;
 					default:
 						searchDirs = [dir];
@@ -270,14 +290,16 @@ export function EnhancedSearchProvider({ children }: { children: React.ReactNode
 								dateTo: filters.dateTo ?? undefined,
 								place: filters.place ?? undefined,
 								useOcr: filters.hasText,
-							}
+							},
 						});
 
 						// Add folder information to results
-						const resultsWithFolder = (searchResults.results || []).map(result => ({
-							...result,
-							folder: currentDir
-						}));
+						const resultsWithFolder = (searchResults.results || []).map(
+							(result) => ({
+								...result,
+								folder: currentDir,
+							}),
+						);
 
 						allResults.push(...resultsWithFolder);
 					} catch (error) {
@@ -286,9 +308,12 @@ export function EnhancedSearchProvider({ children }: { children: React.ReactNode
 				}
 
 				// Sort all results by score (descending) and remove duplicates
-				const uniqueResults = allResults.filter((result, index, self) =>
-					index === self.findIndex(r => r.path === result.path)
-				).sort((a, b) => b.score - a.score);
+				const uniqueResults = allResults
+					.filter(
+						(result, index, self) =>
+							index === self.findIndex((r) => r.path === result.path),
+					)
+					.sort((a, b) => b.score - a.score);
 
 				// Take top K results overall
 				const finalResults = uniqueResults.slice(0, topK);
@@ -315,7 +340,7 @@ export function EnhancedSearchProvider({ children }: { children: React.ReactNode
 
 				return finalResults;
 			} catch (error) {
-				console.error('Multi-folder search error:', error);
+				console.error("Multi-folder search error:", error);
 				setResultsSafe([]);
 				return [];
 			} finally {
@@ -323,7 +348,19 @@ export function EnhancedSearchProvider({ children }: { children: React.ReactNode
 				setSearchProgress(0);
 			}
 		},
-		[dir, engine, workspace, needsHf, hfToken, needsOAI, openaiKey, filters, topK, setResultsSafe, photo],
+		[
+			dir,
+			engine,
+			workspace,
+			needsHf,
+			hfToken,
+			needsOAI,
+			openaiKey,
+			filters,
+			topK,
+			setResultsSafe,
+			photo,
+		],
 	);
 
 	const performSearch = useCallback(
@@ -331,7 +368,7 @@ export function EnhancedSearchProvider({ children }: { children: React.ReactNode
 			const searchQuery = typeof q === "string" ? q : query;
 			if (!searchQuery) return;
 
-			const isMultiFolder = searchScope.type !== 'all' || workspace.length > 0;
+			const isMultiFolder = searchScope.type !== "all" || workspace.length > 0;
 
 			if (isMultiFolder) {
 				await performMultiFolderSearch(searchQuery, searchScope);
@@ -343,11 +380,18 @@ export function EnhancedSearchProvider({ children }: { children: React.ReactNode
 				setQuerySafe(q);
 			}
 		},
-		[query, searchScope, workspace, performMultiFolderSearch, performSingleFolderSearch, setQuerySafe],
+		[
+			query,
+			searchScope,
+			workspace,
+			performMultiFolderSearch,
+			performSingleFolderSearch,
+			setQuerySafe,
+		],
 	);
 
 	const isMultiFolderSearch = useMemo(() => {
-		return searchScope.type !== 'all' || workspace.length > 0;
+		return searchScope.type !== "all" || workspace.length > 0;
 	}, [searchScope, workspace]);
 
 	const value = useMemo(
@@ -359,7 +403,7 @@ export function EnhancedSearchProvider({ children }: { children: React.ReactNode
 				searchScope,
 				isMultiFolderSearch,
 				isSearching,
-				searchProgress
+				searchProgress,
 			},
 			actions: {
 				setQuery: setQuerySafe,
@@ -397,6 +441,8 @@ export function EnhancedSearchProvider({ children }: { children: React.ReactNode
 export function useEnhancedSearchContext() {
 	const v = useContext(Ctx);
 	if (!v)
-		throw new Error("useEnhancedSearchContext must be used within EnhancedSearchProvider");
+		throw new Error(
+			"useEnhancedSearchContext must be used within EnhancedSearchProvider",
+		);
 	return v;
 }

@@ -1,11 +1,25 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
 import time
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, TypeVar
+
+logger = logging.getLogger(__name__)
+
+# Set environment variables to prevent threading/mutex issues with ML libraries
+# IMPORTANT: These must be set BEFORE any ML library imports
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("VECLIB_MAXIMUM_THREADS", "1")
+os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+os.environ.setdefault("TORCH_NUM_THREADS", "1")
+os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
 
 from fastapi import Body, FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
@@ -63,43 +77,41 @@ from api.routers.watch import router as watch_router
 from api.routers.workspace import router as workspace_router
 from api.attention import router as attention_router  # NEW: adaptive attention (scaffold)
 from api.routes.health import router as health_router  # Extracted health & root endpoints
+from api.routers.admin import router as admin_router
 from infra.analytics import log_search
 from infra.collections import load_collections
 from infra.config import config
-from infra.index_store import IndexStore
+# Lazy import: from infra.index_store import IndexStore  # imports numpy
 from infra.fast_index import FastIndexManager
 from infra.tags import load_tags
 from infra.trips import build_trips as _build_trips, load_trips as _load_trips
-from infra.faces import (
-    build_faces as _build_faces,
-    list_clusters as _face_list,
-    photos_for_person as _face_photos,
-    set_cluster_name as _face_name,
-)
-from infra.shares import (
-    create_share as _share_create,
-    is_expired as _share_expired,
-    list_shares as _share_list,
-    load_share as _share_load,
-    revoke_share as _share_revoke,
-)
-from infra.edits import EditOps as _EditOps, apply_ops as _edit_apply_ops, upscale as _edit_upscale
+# Lazy import: from infra.faces import (...  # imports numpy and PIL
+# Lazy import: from infra.shares import (...
+# Lazy import: from infra.edits import EditOps  # imports PIL
 from usecases.manage_saved import load_saved, save_saved
+
+# Import refactored services
+from api.dependencies import (
+    get_directory_scanner,
+    get_search_executor,
+    get_media_scanner,
+    get_expression_evaluator,
+)
 from usecases.manage_presets import load_presets, save_presets
 from usecases.index_photos import index_photos  # noqa: F401 (potential future use)
 from services.directory_scanner import DirectoryScanner
 from services.search_executor import SearchExecutor
 from services.media_scanner import MediaScanner
 from services.rpn_expression_evaluator import RPNExpressionEvaluator
-from infra.video_index_store import VideoIndexStore
+# Lazy import: from infra.video_index_store import VideoIndexStore  # imports numpy
 
 # Global service instances
 directory_scanner = DirectoryScanner()
 search_executor = SearchExecutor()
 media_scanner = MediaScanner()
 rpn_evaluator = RPNExpressionEvaluator()
-from infra.thumbs import get_or_create_thumb, get_or_create_face_thumb  # noqa: F401
-from infra.faces import load_faces as _faces_load  # noqa: F401
+# Lazy import: from infra.thumbs import get_or_create_thumb, get_or_create_face_thumb
+# Lazy import: from infra.faces import load_faces as _faces_load
 try:
     from adapters.video_processor import list_videos, get_video_metadata, extract_video_thumbnail
 except Exception:
@@ -121,7 +133,7 @@ except Exception:
     def extract_video_thumbnail(video_path: str, out_path: Path, when_sec: float = 0.0) -> bool:
         # No-op fallback: return False to indicate no thumbnail extracted
         return False
-from PIL import Image, ExifTags  # noqa: F401
+# Lazy import: from PIL import Image, ExifTags  # Can cause threading issues if imported at top level
 
 # Supported extension constants (import with safe fallback)
 try:
@@ -133,6 +145,10 @@ except Exception:  # pragma: no cover - fallback values
 # Initialize app early (was missing due to prior broken edits)
 _APP_START = time.time()
 app = FastAPI(title="Photo Search API")
+
+from api.runtime_flags import set_offline, is_offline
+set_offline(True)
+
 
 # Register global exception handlers
 app.add_exception_handler(Exception, general_exception_handler)
@@ -183,6 +199,7 @@ app.include_router(utilities_router)
 app.include_router(videos_router)
 app.include_router(watch_router)
 app.include_router(workspace_router)
+app.include_router(admin_router)
 
 # Mount versioned API router
 app.include_router(api_v1)
@@ -198,17 +215,18 @@ T = TypeVar("T")
 # Removed local _zip_meta (use imported) and duplicate health/ping endpoints (handled by health_router)
 
 # Demo directory helper
-@app.get("/demo/dir")
-def api_demo_dir() -> BaseResponse:
+@app.get("/demo/dir", response_model=SuccessResponse)
+def api_demo_dir() -> SuccessResponse:
     try:
         demo = Path(__file__).resolve().parent.parent / "demo_photos"
         exists = demo.exists() and demo.is_dir()
         return SuccessResponse(
             ok=True,
-            data={"path": str(demo), "exists": bool(exists)}
+            data={"path": str(demo), "exists": bool(exists), "ready": bool(exists)}
         )
-    except Exception:
-        return BaseResponse(ok=False)
+    except Exception as e:
+        logger.error(f"Error getting demo directory: {e}")
+        return SuccessResponse(ok=False, message=str(e))
 
 # Monitoring endpoints (allow unauthenticated in middleware)
 @app.get("/monitoring")
@@ -242,12 +260,14 @@ def _normcase_path(p: str) -> str:
 
 def _default_photo_dir_candidates() -> List[Dict[str, str]]:
     """Best-effort local photo folder suggestions across OSes."""
-    return directory_scanner.get_default_photo_directories()
+    scanner = get_directory_scanner()
+    return scanner.get_default_photo_directories()
 
 
 def _scan_media_counts(paths: List[str], include_videos: bool = True) -> Dict[str, Any]:
     """Count image/video files and bytes for quick previews; privacy-friendly."""
-    return media_scanner.scan_directories(paths, include_videos)
+    scanner = get_media_scanner()
+    return scanner.scan_media_counts(paths, include_videos)
 
 
 # Search endpoint helper functions (extracted from 143 CCN main function)
@@ -272,7 +292,12 @@ def _initialize_search_provider(unified_req: UnifiedSearchRequest):
         if unified_req.openai_key:
             kwargs['openai_api_key'] = unified_req.openai_key
         
-        embedder = get_provider(unified_req.provider, **kwargs)
+        # Enforce local provider in offline mode
+        provider = unified_req.provider
+        if is_offline():
+            provider = "local"
+        
+        embedder = get_provider(provider, **kwargs)
         dir_p = _validate_search_directory(unified_req.directory)
         
         from infra.index_store import IndexStore
@@ -285,7 +310,8 @@ def _initialize_search_provider(unified_req: UnifiedSearchRequest):
 
 def _perform_semantic_search(store, embedder, unified_req: UnifiedSearchRequest) -> List:
     """Perform the core semantic search operation with all search modes."""
-    return search_executor.execute_search(store, embedder, unified_req)
+    executor = get_search_executor()
+    return executor.execute(store, embedder, unified_req)
 
 
 def _apply_metadata_filters(store, results: List, unified_req: UnifiedSearchRequest) -> List:
@@ -594,6 +620,7 @@ def _apply_people_filter(store, results: List, unified_req: UnifiedSearchRequest
 def _apply_multiple_persons_filter(store, results: List, person_names: List[str]) -> List:
     """Apply filter for multiple persons (intersection logic)."""
     try:
+        from infra.faces import photos_for_person as _face_photos
         person_photo_sets = []
         for person_name in person_names:
             try:
@@ -615,6 +642,7 @@ def _apply_multiple_persons_filter(store, results: List, person_names: List[str]
 def _apply_single_person_filter(store, results: List, person_name: str) -> List:
     """Apply filter for single person."""
     try:
+        from infra.faces import photos_for_person as _face_photos
         person_photos = set(_face_photos(store.index_dir, str(person_name)))
         return [r for r in results if str(r.path) in person_photos]
     except Exception:
@@ -930,7 +958,8 @@ def _load_fractional_metadata(metadata_maps: dict, paths: list, exif_data: dict)
 
 def _evaluate_rpn_expression(rpn_output: List[str], path: str, context: dict) -> bool:
     """Evaluate RPN expression for a single photo path."""
-    return rpn_evaluator.evaluate_expression(rpn_output, path, context)
+    evaluator = get_expression_evaluator()
+    return evaluator.evaluate(rpn_output, path, context)
 
 
 def _evaluate_field_expression(token: str, path: str, context: dict) -> bool:
@@ -989,6 +1018,7 @@ def _evaluate_person_field(person_name: str, path: str, context: dict) -> bool:
     """Evaluate person field with caching."""
     if person_name not in context['person_cache']:
         try:
+            from infra.faces import photos_for_person as _face_photos
             # Get store from context or pass None for backward compatibility
             store_index_dir = context.get('store_index_dir')
             context['person_cache'][person_name] = set(_face_photos(store_index_dir, person_name))
@@ -1194,11 +1224,16 @@ def api_search_video(
     provider_value = _from_body(body, provider, "provider", default="local") or "local"
     hf_token_value = _from_body(body, hf_token, "hf_token")
     openai_key_value = _from_body(body, openai_key, "openai_key")
+    
+    # Enforce local provider in offline mode
+    if is_offline():
+        provider_value = "local"
 
     folder = Path(dir_value)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
 
+    from infra.video_index_store import VideoIndexStore
     video_store = VideoIndexStore(folder)
     if not video_store.load():
         return SearchResponse(search_id="video-empty", results=[])
@@ -1238,6 +1273,7 @@ def api_search_video_like(
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
 
+    from infra.video_index_store import VideoIndexStore
     video_store = VideoIndexStore(folder)
     if not video_store.load():
         return SearchResponse(search_id="video-like-empty", results=[])

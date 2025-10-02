@@ -13,12 +13,13 @@ from pydantic import BaseModel
 
 from adapters.provider_factory import get_provider
 from domain.models import SUPPORTED_EXTS
-from infra.index_store import IndexStore
+# Lazy import: from infra.index_store import IndexStore  # imports numpy
 from infra.analytics import _write_event as _write_event_infra
 from infra.watcher import WatchManager
 from usecases.index_photos import index_photos
 from api.auth import require_auth
 from api.utils import _from_body, _require, _emb
+from api.runtime_flags import is_offline
 
 
 router = APIRouter(prefix="/api", tags=["indexing"])
@@ -50,7 +51,12 @@ def api_index(req: IndexRequest, _auth=Depends(require_auth)) -> Dict[str, Any]:
     except Exception as e:
         raise HTTPException(400, f"Cannot access folder: {str(e)}")
 
-    emb = _emb(req.provider, req.hf_token, req.openai_key)
+    # Enforce local provider in offline mode
+    provider = req.provider
+    if is_offline():
+        provider = "local"
+
+    emb = _emb(provider, req.hf_token, req.openai_key)
 
     job_id = f"index-{uuid.uuid4().hex[:8]}"
 
@@ -164,6 +170,11 @@ def api_index_status(dir: str, provider: str = "local", hf_token: Optional[str] 
     folder = Path(dir)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
+    
+    # Enforce local provider in offline mode
+    if is_offline():
+        provider = "local"
+    
     emb = _emb(provider, hf_token, openai_key)
     store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
     status_file = store.index_dir / 'index_status.json'

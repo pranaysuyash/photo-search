@@ -1,8 +1,14 @@
 import React, { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/shadcn/card";
-import { Button } from "./ui/shadcn/button";
-import { Badge } from "./ui/badge";
 import { cn } from "../lib/utils";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/shadcn/button";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "./ui/shadcn/card";
 
 interface PowerUserFeature {
 	id: string;
@@ -92,12 +98,19 @@ const CATEGORY_LABELS = {
 };
 
 export function PowerUserPanel({ isOpen, onClose }: PowerUserPanelProps) {
-	const [selectedCategory, setSelectedCategory] = useState<PowerUserFeature["category"] | "all">("all");
-	const [enabledFeatures, setEnabledFeatures] = useState<Set<string>>(new Set());
+	const [selectedCategory, setSelectedCategory] = useState<
+		PowerUserFeature["category"] | "all"
+	>("all");
+	const [enabledFeatures, setEnabledFeatures] = useState<Set<string>>(
+		new Set(),
+	);
 
-	const filteredFeatures = selectedCategory === "all"
-		? POWER_USER_FEATURES
-		: POWER_USER_FEATURES.filter(feature => feature.category === selectedCategory);
+	const filteredFeatures =
+		selectedCategory === "all"
+			? POWER_USER_FEATURES
+			: POWER_USER_FEATURES.filter(
+					(feature) => feature.category === selectedCategory,
+				);
 
 	const toggleFeature = (featureId: string) => {
 		const newEnabled = new Set(enabledFeatures);
@@ -142,7 +155,9 @@ export function PowerUserPanel({ isOpen, onClose }: PowerUserPanelProps) {
 								key={key}
 								variant={selectedCategory === key ? "default" : "outline"}
 								size="sm"
-								onClick={() => setSelectedCategory(key as PowerUserFeature["category"])}
+								onClick={() =>
+									setSelectedCategory(key as PowerUserFeature["category"])
+								}
 							>
 								{label}
 							</Button>
@@ -157,16 +172,21 @@ export function PowerUserPanel({ isOpen, onClose }: PowerUserPanelProps) {
 									key={feature.id}
 									className={cn(
 										"transition-all hover:shadow-md",
-										enabledFeatures.has(feature.id) && "ring-2 ring-primary"
+										enabledFeatures.has(feature.id) && "ring-2 ring-primary",
 									)}
 								>
 									<CardHeader className="pb-3">
 										<div className="flex items-start justify-between">
 											<div className="space-y-1">
-												<CardTitle className="text-lg">{feature.title}</CardTitle>
+												<CardTitle className="text-lg">
+													{feature.title}
+												</CardTitle>
 												<Badge
 													variant="secondary"
-													className={cn("text-xs", CATEGORY_COLORS[feature.category])}
+													className={cn(
+														"text-xs",
+														CATEGORY_COLORS[feature.category],
+													)}
 												>
 													{CATEGORY_LABELS[feature.category]}
 												</Badge>
@@ -205,7 +225,11 @@ export function PowerUserPanel({ isOpen, onClose }: PowerUserPanelProps) {
 							{enabledFeatures.size} features enabled
 						</div>
 						<div className="flex gap-2">
-							<Button variant="outline" size="sm" onClick={() => setEnabledFeatures(new Set())}>
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => setEnabledFeatures(new Set())}
+							>
 								Clear All
 							</Button>
 							<Button size="sm" onClick={onClose}>

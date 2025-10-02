@@ -29,7 +29,7 @@ describe("Collections", () => {
 			/>,
 		);
 		expect(screen.getByText("Summer")).toBeInTheDocument();
-		expect(screen.getByText("2 items")).toBeInTheDocument();
+		expect(screen.getByText("2 photos")).toBeInTheDocument();
 		fireEvent.click(screen.getByText("Refresh"));
 		expect(onLoad).toHaveBeenCalled();
 	});

@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 
 interface OnboardingProgress {
 	completedSteps: string[];
 	currentStep: number;
 	skipCount: number;
 	lastInteraction: number;
-	flowType: 'quick-start' | 'custom' | 'demo' | 'none';
+	flowType: "quick-start" | "custom" | "demo" | "none";
 	preferences: {
 		includeVideos: boolean;
 		enableFaceRecognition: boolean;
@@ -15,8 +15,8 @@ interface OnboardingProgress {
 	version: string;
 }
 
-const ONBOARDING_VERSION = '1.0.0';
-const STORAGE_KEY = 'photosearch-onboarding-progress';
+const ONBOARDING_VERSION = "1.0.0";
+const STORAGE_KEY = "photosearch-onboarding-progress";
 
 // Helper function to get default progress - moved before hook to avoid TDZ
 const getDefaultProgress = (): OnboardingProgress => ({
@@ -24,7 +24,7 @@ const getDefaultProgress = (): OnboardingProgress => ({
 	currentStep: 0,
 	skipCount: 0,
 	lastInteraction: Date.now(),
-	flowType: 'none',
+	flowType: "none",
 	preferences: {
 		includeVideos: false,
 		enableFaceRecognition: true,
@@ -60,7 +60,7 @@ export const useOnboardingProgress = (): UseOnboardingProgressReturn => {
 				return parsed;
 			}
 		} catch (error) {
-			console.debug('Failed to load onboarding progress:', error);
+			console.debug("Failed to load onboarding progress:", error);
 		}
 		return getDefaultProgress();
 	});
@@ -69,7 +69,7 @@ export const useOnboardingProgress = (): UseOnboardingProgressReturn => {
 
 	// Check completion status
 	useEffect(() => {
-		const completed = localStorage.getItem('onboarding-completed') === 'true';
+		const completed = localStorage.getItem("onboarding-completed") === "true";
 		setHasCompletedOnboarding(completed);
 	}, []);
 
@@ -77,7 +77,7 @@ export const useOnboardingProgress = (): UseOnboardingProgressReturn => {
 		try {
 			localStorage.setItem(STORAGE_KEY, JSON.stringify(newProgress));
 		} catch (error) {
-			console.debug('Failed to save onboarding progress:', error);
+			console.debug("Failed to save onboarding progress:", error);
 		}
 	};
 
@@ -106,7 +106,7 @@ export const useOnboardingProgress = (): UseOnboardingProgressReturn => {
 			...progress,
 			skipCount: progress.skipCount + 1,
 			lastInteraction: Date.now(),
-			flowType: 'none',
+			flowType: "none",
 		};
 		setProgress(newProgress);
 		saveProgress(newProgress);
@@ -114,9 +114,9 @@ export const useOnboardingProgress = (): UseOnboardingProgressReturn => {
 		// Mark as completed if skipped multiple times
 		if (newProgress.skipCount >= 2) {
 			try {
-				localStorage.setItem('onboarding-completed', 'true');
+				localStorage.setItem("onboarding-completed", "true");
 			} catch (error) {
-				console.debug('Failed to mark onboarding as completed:', error);
+				console.debug("Failed to mark onboarding as completed:", error);
 			}
 		}
 	};
@@ -127,9 +127,9 @@ export const useOnboardingProgress = (): UseOnboardingProgressReturn => {
 		saveProgress(newProgress);
 
 		try {
-			localStorage.removeItem('onboarding-completed');
+			localStorage.removeItem("onboarding-completed");
 		} catch (error) {
-			console.debug('Failed to remove onboarding completion:', error);
+			console.debug("Failed to remove onboarding completion:", error);
 		}
 	};
 
@@ -155,7 +155,7 @@ export const useOnboardingProgress = (): UseOnboardingProgressReturn => {
 		if (hasCompletedOnboarding) return false;
 		if (progress.skipCount >= 2) return false;
 
-		const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
+		const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
 		return progress.lastInteraction < oneDayAgo;
 	};
 
@@ -179,28 +179,28 @@ export const useWelcomeState = () => {
 
 	useEffect(() => {
 		try {
-			const seen = localStorage.getItem('welcome-seen') === 'true';
+			const seen = localStorage.getItem("welcome-seen") === "true";
 			setHasSeenWelcome(seen);
 		} catch (error) {
-			console.debug('Failed to load welcome state:', error);
+			console.debug("Failed to load welcome state:", error);
 		}
 	}, []);
 
 	const markWelcomeSeen = () => {
 		try {
-			localStorage.setItem('welcome-seen', 'true');
+			localStorage.setItem("welcome-seen", "true");
 			setHasSeenWelcome(true);
 		} catch (error) {
-			console.debug('Failed to save welcome state:', error);
+			console.debug("Failed to save welcome state:", error);
 		}
 	};
 
 	const resetWelcome = () => {
 		try {
-			localStorage.removeItem('welcome-seen');
+			localStorage.removeItem("welcome-seen");
 			setHasSeenWelcome(false);
 		} catch (error) {
-			console.debug('Failed to reset welcome state:', error);
+			console.debug("Failed to reset welcome state:", error);
 		}
 	};
 
@@ -214,43 +214,57 @@ export const useWelcomeState = () => {
 // Hook for contextual hints and progressive disclosure
 export const useContextualHints = () => {
 	const [dismissedHints, setDismissedHints] = useState<Set<string>>(new Set());
-	const [hintHistory, setHintHistory] = useState<Array<{ id: string; timestamp: number; action: string }>>([]);
+	const [hintHistory, setHintHistory] = useState<
+		Array<{ id: string; timestamp: number; action: string }>
+	>([]);
 
 	useEffect(() => {
 		try {
-			const stored = localStorage.getItem('dismissed-hints');
+			const stored = localStorage.getItem("dismissed-hints");
 			if (stored) {
 				setDismissedHints(new Set(JSON.parse(stored)));
 			}
 
-			const history = localStorage.getItem('hint-history');
+			const history = localStorage.getItem("hint-history");
 			if (history) {
 				setHintHistory(JSON.parse(history));
 			}
 		} catch (error) {
-			console.debug('Failed to load hint state:', error);
+			console.debug("Failed to load hint state:", error);
 		}
 	}, []);
 
-	const saveHintState = (newDismissed: Set<string>, newHistory: Array<{ id: string; timestamp: number; action: string }>) => {
+	const saveHintState = (
+		newDismissed: Set<string>,
+		newHistory: Array<{ id: string; timestamp: number; action: string }>,
+	) => {
 		try {
-			localStorage.setItem('dismissed-hints', JSON.stringify([...newDismissed]));
-			localStorage.setItem('hint-history', JSON.stringify(newHistory));
+			localStorage.setItem(
+				"dismissed-hints",
+				JSON.stringify([...newDismissed]),
+			);
+			localStorage.setItem("hint-history", JSON.stringify(newHistory));
 		} catch (error) {
-			console.debug('Failed to save hint state:', error);
+			console.debug("Failed to save hint state:", error);
 		}
 	};
 
 	const dismissHint = (hintId: string) => {
 		const newDismissed = new Set([...dismissedHints, hintId]);
-		const newHistory = [...hintHistory, { id: hintId, timestamp: Date.now(), action: 'dismiss' }];
+		const newHistory = [
+			...hintHistory,
+			{ id: hintId, timestamp: Date.now(), action: "dismiss" },
+		];
 		setDismissedHints(newDismissed);
 		setHintHistory(newHistory);
 		saveHintState(newDismissed, newHistory);
 	};
 
 	const triggerHint = (hintId: string) => {
-		const newHistory = [...hintHistory, { id: hintId, timestamp: Date.now(), action: 'trigger' }];
+		const newHistory = [
+			...hintHistory,
+			{ id: hintId, timestamp: Date.now(), action: "trigger" },
+		];
 		setHintHistory(newHistory);
 		saveHintState(dismissedHints, newHistory);
 	};
@@ -260,9 +274,12 @@ export const useContextualHints = () => {
 		if (dismissedHints.has(hintId)) return false;
 
 		// Don't show if triggered too recently (within last 5 minutes)
-		const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+		const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
 		const recentTriggers = hintHistory.filter(
-			h => h.id === hintId && h.action === 'trigger' && h.timestamp > fiveMinutesAgo
+			(h) =>
+				h.id === hintId &&
+				h.action === "trigger" &&
+				h.timestamp > fiveMinutesAgo,
 		);
 
 		return recentTriggers.length === 0;
@@ -270,7 +287,10 @@ export const useContextualHints = () => {
 
 	const resetHints = () => {
 		const newDismissed = new Set<string>();
-		const newHistory = [...hintHistory, { id: 'reset', timestamp: Date.now(), action: 'reset' }];
+		const newHistory = [
+			...hintHistory,
+			{ id: "reset", timestamp: Date.now(), action: "reset" },
+		];
 		setDismissedHints(newDismissed);
 		setHintHistory(newHistory);
 		saveHintState(newDismissed, newHistory);

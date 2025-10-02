@@ -26,6 +26,7 @@ export interface RoutesHostProps {
 		etaSeconds: number;
 	};
 	results: Array<{ path: string; score: number }>;
+	searchId: string | null;
 	searchText: string;
 	altSearch: { active: boolean; applied: string; original: string };
 	ratingMap: Record<string, number>;
@@ -78,6 +79,7 @@ export function RoutesHost({
 	library,
 	libState,
 	results,
+	searchId,
 	searchText,
 	altSearch,
 	ratingMap,
@@ -164,6 +166,7 @@ export function RoutesHost({
 							dir={dir ?? ""}
 							engine={engine ?? "local"}
 							results={results}
+							searchId={searchId}
 							searchText={searchText}
 							altSearch={altSearch}
 							ratingMap={ratingMap}

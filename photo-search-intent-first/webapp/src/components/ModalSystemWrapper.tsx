@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from "react";
+import type React from "react";
+import { useCallback, useEffect, useState } from "react";
+import { EnhancedModalProvider } from "../contexts/EnhancedModalContext";
 import { ModalsHost } from "./chrome/ModalsHost";
 import { EnhancedModalManager } from "./EnhancedModalManager";
-import { EnhancedModalProvider } from "../contexts/EnhancedModalContext";
 
 // Feature flag to control which modal system to use
 const USE_ENHANCED_MODAL_SYSTEM = false;
@@ -12,15 +13,19 @@ interface ModalSystemWrapperProps {
 }
 
 export function ModalSystemWrapper({ children }: ModalSystemWrapperProps) {
-	const [useEnhancedSystem, setUseEnhancedSystem] = useState(USE_ENHANCED_MODAL_SYSTEM);
+	const [useEnhancedSystem, setUseEnhancedSystem] = useState(
+		USE_ENHANCED_MODAL_SYSTEM,
+	);
 
 	// Allow runtime switching for testing
 	useEffect(() => {
 		if (typeof window !== "undefined") {
 			// @ts-ignore - for testing purposes
 			window.toggleModalSystem = () => {
-				setUseEnhancedSystem(prev => !prev);
-				console.log(`Switched to ${!useEnhancedSystem ? "enhanced" : "legacy"} modal system`);
+				setUseEnhancedSystem((prev) => !prev);
+				console.log(
+					`Switched to ${!useEnhancedSystem ? "enhanced" : "legacy"} modal system`,
+				);
 			};
 		}
 	}, []);
@@ -50,6 +55,6 @@ export function useModalSystem() {
 				// @ts-ignore - for testing purposes
 				window.toggleModalSystem?.();
 			}
-		}
+		},
 	};
 }

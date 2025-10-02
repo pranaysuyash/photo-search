@@ -1,10 +1,10 @@
 import {
 	AlertTriangle,
 	CheckCircle,
+	Cloud,
 	Cpu,
 	HardDrive,
 	Loader2,
-	Cloud,
 	XCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -119,7 +119,10 @@ export function ModelStatusIndicator() {
 					{getStatusIcon()}
 					{getStatusText()}
 					{!status.offline_mode && (
-						<Badge variant="outline" className="ml-auto border-blue-200 text-blue-700">
+						<Badge
+							variant="outline"
+							className="ml-auto border-blue-200 text-blue-700"
+						>
 							<Cloud className="w-3 h-3 mr-1" />
 							Online Features
 						</Badge>

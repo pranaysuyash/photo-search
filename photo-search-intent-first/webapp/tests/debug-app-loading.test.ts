@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 test.describe("Debug App Loading", () => {
 	test("check if app loads properly", async ({ page }) => {
@@ -6,8 +6,8 @@ test.describe("Debug App Loading", () => {
 		const consoleErrors: string[] = [];
 		const networkErrors: string[] = [];
 
-		page.on('console', msg => {
-			if (msg.type() === 'error') {
+		page.on("console", (msg) => {
+			if (msg.type() === "error") {
 				consoleErrors.push(msg.text());
 				console.log("Console error:", msg.text());
 			} else {
@@ -15,9 +15,14 @@ test.describe("Debug App Loading", () => {
 			}
 		});
 
-		page.on('requestfailed', request => {
+		page.on("requestfailed", (request) => {
 			networkErrors.push(`${request.url()} - ${request.failure()?.errorText}`);
-			console.log("Network error:", request.url(), "-", request.failure()?.errorText);
+			console.log(
+				"Network error:",
+				request.url(),
+				"-",
+				request.failure()?.errorText,
+			);
 		});
 
 		// Navigate to the app
@@ -36,20 +41,23 @@ test.describe("Debug App Loading", () => {
 		await page.waitForTimeout(3000);
 
 		// Check the content of root
-		const rootContent = await page.$eval("#root", el => el.innerHTML);
+		const rootContent = await page.$eval("#root", (el) => el.innerHTML);
 		console.log("Root content length:", rootContent.length);
 		console.log("Root content preview:", rootContent.substring(0, 200));
 
 		// Check if there's any content in the body
-		const bodyContent = await page.$eval("body", el => el.innerHTML);
+		const bodyContent = await page.$eval("body", (el) => el.innerHTML);
 		console.log("Body content length:", bodyContent.length);
 
 		// Check for React error boundary content
-		const hasErrorBoundary = await page.locator('text=/Something went wrong/').count();
+		const hasErrorBoundary = await page
+			.locator("text=/Something went wrong/")
+			.count();
 		console.log("Error boundary visible:", hasErrorBoundary > 0);
 
 		// Check for any React-related content
-		const hasReactContent = bodyContent.includes("react") || bodyContent.includes("data-reactroot");
+		const hasReactContent =
+			bodyContent.includes("react") || bodyContent.includes("data-reactroot");
 		console.log("Has React content:", hasReactContent);
 
 		// Show what's actually in the body
@@ -57,7 +65,10 @@ test.describe("Debug App Loading", () => {
 
 		// Check if the React script loaded by looking for React in the page
 		const hasReactLoaded = await page.evaluate(() => {
-			return typeof window.React !== 'undefined' && typeof window.ReactDOM !== 'undefined';
+			return (
+				typeof window.React !== "undefined" &&
+				typeof window.ReactDOM !== "undefined"
+			);
 		});
 		console.log("React loaded:", hasReactLoaded);
 

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { BREAKPOINTS } from '../constants/responsiveSpacing';
+import { useEffect, useState } from "react";
+import { BREAKPOINTS } from "../constants/responsiveSpacing";
 
 type Breakpoint = keyof typeof BREAKPOINTS;
 
@@ -16,14 +16,14 @@ interface BreakpointHook {
 
 export const useBreakpoint = (): BreakpointHook => {
 	const [windowSize, setWindowSize] = useState({
-		width: typeof window !== 'undefined' ? window.innerWidth : 1024,
-		height: typeof window !== 'undefined' ? window.innerHeight : 768,
+		width: typeof window !== "undefined" ? window.innerWidth : 1024,
+		height: typeof window !== "undefined" ? window.innerHeight : 768,
 	});
 
-	const [breakpoint, setBreakpoint] = useState<Breakpoint>('lg');
+	const [breakpoint, setBreakpoint] = useState<Breakpoint>("lg");
 
 	useEffect(() => {
-		if (typeof window === 'undefined') return;
+		if (typeof window === "undefined") return;
 
 		const handleResize = () => {
 			const width = window.innerWidth;
@@ -31,19 +31,19 @@ export const useBreakpoint = (): BreakpointHook => {
 			setWindowSize({ width, height });
 
 			// Determine current breakpoint
-			let currentBreakpoint: Breakpoint = 'lg';
+			let currentBreakpoint: Breakpoint = "lg";
 			if (width < parseInt(BREAKPOINTS.sm)) {
-				currentBreakpoint = 'xs';
+				currentBreakpoint = "xs";
 			} else if (width < parseInt(BREAKPOINTS.md)) {
-				currentBreakpoint = 'sm';
+				currentBreakpoint = "sm";
 			} else if (width < parseInt(BREAKPOINTS.lg)) {
-				currentBreakpoint = 'md';
+				currentBreakpoint = "md";
 			} else if (width < parseInt(BREAKPOINTS.xl)) {
-				currentBreakpoint = 'lg';
-			} else if (width < parseInt(BREAKPOINTS['2xl'])) {
-				currentBreakpoint = 'xl';
+				currentBreakpoint = "lg";
+			} else if (width < parseInt(BREAKPOINTS["2xl"])) {
+				currentBreakpoint = "xl";
 			} else {
-				currentBreakpoint = '2xl';
+				currentBreakpoint = "2xl";
 			}
 
 			setBreakpoint(currentBreakpoint);
@@ -59,17 +59,18 @@ export const useBreakpoint = (): BreakpointHook => {
 			timeoutId = window.setTimeout(handleResize, 100);
 		};
 
-		window.addEventListener('resize', debouncedResize);
+		window.addEventListener("resize", debouncedResize);
 
 		return () => {
-			window.removeEventListener('resize', debouncedResize);
+			window.removeEventListener("resize", debouncedResize);
 			clearTimeout(timeoutId);
 		};
 	}, []);
 
-	const isMobile = breakpoint === 'xs' || breakpoint === 'sm';
-	const isTablet = breakpoint === 'md';
-	const isDesktop = breakpoint === 'lg' || breakpoint === 'xl' || breakpoint === '2xl';
+	const isMobile = breakpoint === "xs" || breakpoint === "sm";
+	const isTablet = breakpoint === "md";
+	const isDesktop =
+		breakpoint === "lg" || breakpoint === "xl" || breakpoint === "2xl";
 
 	return {
 		breakpoint,

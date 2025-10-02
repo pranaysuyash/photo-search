@@ -1,8 +1,9 @@
-import React, { lazy, Suspense, useEffect, useCallback } from "react";
+import type React from "react";
+import { lazy, Suspense, useCallback, useEffect } from "react";
+import { FOLDER_MODAL_EVENT } from "@/constants/events";
 import { useEnhancedModal } from "../contexts/EnhancedModalContext";
 import { ModalContainer } from "./modals/ModalContainer";
 import { SuspenseFallback } from "./SuspenseFallback";
-import { FOLDER_MODAL_EVENT } from "@/constants/events";
 
 // Lazy-loaded modals for performance
 const LazyModals = {
@@ -67,12 +68,17 @@ export function EnhancedModalManager() {
 		};
 	}, []);
 
-	const handleClose = useCallback((modalId: string) => {
-		closeModal(modalId);
-	}, [closeModal]);
+	const handleClose = useCallback(
+		(modalId: string) => {
+			closeModal(modalId);
+		},
+		[closeModal],
+	);
 
 	// Sort modals by zIndex for proper stacking
-	const sortedModals = [...state.openModals].sort((a, b) => a.zIndex - b.zIndex);
+	const sortedModals = [...state.openModals].sort(
+		(a, b) => a.zIndex - b.zIndex,
+	);
 
 	return (
 		<>
@@ -89,7 +95,10 @@ export function EnhancedModalManager() {
 
 				if (isDrawer) {
 					return (
-						<Suspense key={modal.id} fallback={<SuspenseFallback label="Loading..." />}>
+						<Suspense
+							key={modal.id}
+							fallback={<SuspenseFallback label="Loading..." />}
+						>
 							<ModalComponent
 								open={true}
 								onClose={() => handleClose(modal.id)}
@@ -101,7 +110,10 @@ export function EnhancedModalManager() {
 
 				if (isOverlay) {
 					return (
-						<Suspense key={modal.id} fallback={<SuspenseFallback label="Opening search..." />}>
+						<Suspense
+							key={modal.id}
+							fallback={<SuspenseFallback label="Opening search..." />}
+						>
 							<ModalComponent
 								open={true}
 								onClose={() => handleClose(modal.id)}
@@ -136,17 +148,24 @@ export function EnhancedModalManager() {
 
 // Hook for easy modal management
 export function useModalManager() {
-	const { openModal, closeModal, isModalOpen, getTopModal } = useEnhancedModal();
+	const { openModal, closeModal, isModalOpen, getTopModal } =
+		useEnhancedModal();
 
-	const showModal = useCallback((type: string, props?: Record<string, any>) => {
-		const id = `${type}-${Date.now()}`;
-		openModal(id, type, props);
-		return id;
-	}, [openModal]);
+	const showModal = useCallback(
+		(type: string, props?: Record<string, any>) => {
+			const id = `${type}-${Date.now()}`;
+			openModal(id, type, props);
+			return id;
+		},
+		[openModal],
+	);
 
-	const hideModal = useCallback((typeOrId: string) => {
-		closeModal(typeOrId);
-	}, [closeModal]);
+	const hideModal = useCallback(
+		(typeOrId: string) => {
+			closeModal(typeOrId);
+		},
+		[closeModal],
+	);
 
 	const isAnyModalOpen = useCallback(() => {
 		return getTopModal() !== null;

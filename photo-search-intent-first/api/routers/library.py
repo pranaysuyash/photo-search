@@ -10,8 +10,9 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Query, Header
 
 from api.utils import _emb
+from api.runtime_flags import is_offline
 from domain.models import SUPPORTED_EXTS, SUPPORTED_VIDEO_EXTS
-from infra.index_store import IndexStore
+# Lazy import: from infra.index_store import IndexStore  # imports numpy
 from services.directory_scanner import DirectoryScanner
 
 router = APIRouter()
@@ -95,9 +96,15 @@ def api_library(
     openai_key: Optional[str] = None
 ) -> Dict[str, Any]:
     """Return a slice of the indexed library paths for quick browse grids."""
+    from infra.index_store import IndexStore
     folder = Path(directory)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
+    
+    # Enforce local provider in offline mode
+    if is_offline():
+        provider = "local"
+    
     emb = _emb(provider, hf_token, openai_key)
     store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
     store.load()

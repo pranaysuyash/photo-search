@@ -6,6 +6,7 @@ import { ThemeProvider } from "./components/ThemeProvider";
 import { JobsProvider } from "./contexts/JobsContext";
 import { LibraryProvider } from "./contexts/LibraryContext";
 import { ModalProvider } from "./contexts/ModalContext";
+import { SearchFeedbackProvider } from "./contexts/SearchFeedbackContext";
 import { AccessibilityProvider } from "./framework/AccessibilityFramework";
 
 interface AppProvidersProps {
@@ -30,17 +31,19 @@ export function AppProviders({ children }: AppProvidersProps) {
 	return (
 		<QueryClientProvider client={queryClient}>
 			<AccessibilityProvider>
-				<JobsProvider>
-					<LibraryProvider>
-						<ErrorBoundary>
-							<ThemeProvider>
-								<HintProvider>
-									<ModalProvider>{children}</ModalProvider>
-								</HintProvider>
-							</ThemeProvider>
-						</ErrorBoundary>
-					</LibraryProvider>
-				</JobsProvider>
+				<SearchFeedbackProvider>
+					<JobsProvider>
+						<LibraryProvider>
+							<ErrorBoundary>
+								<ThemeProvider>
+									<HintProvider>
+										<ModalProvider>{children}</ModalProvider>
+									</HintProvider>
+								</ThemeProvider>
+							</ErrorBoundary>
+						</LibraryProvider>
+					</JobsProvider>
+				</SearchFeedbackProvider>
 			</AccessibilityProvider>
 		</QueryClientProvider>
 	);

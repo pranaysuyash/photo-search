@@ -12,6 +12,7 @@ from infra.index_store import IndexStore
 
 def main():
     parser = argparse.ArgumentParser(description="Photo Search – Intent-First CLI")
+    parser.add_argument("--offline", action="store_true", help="Enable offline mode (use local models only)")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     p_index = sub.add_parser("index", help="Build or update index for a folder")
@@ -47,6 +48,12 @@ def main():
     p_fast_status.add_argument("--openai-api-key", default=None)
 
     args = parser.parse_args()
+    
+    # Set offline mode if requested
+    if getattr(args, 'offline', False):
+        from api.runtime_flags import set_offline
+        set_offline(True)
+    
     folder = Path(args.dir).expanduser().resolve()
 
     if args.cmd == "index":

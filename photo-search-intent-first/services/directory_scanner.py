@@ -1,176 +1,179 @@
-"""Directory scanning service for finding default photo directories.
-
-Extracted from server.py _default_photo_dir_candidates function to reduce
-cyclomatic complexity from CCN 15 to 3-4 per method.
-"""
+# services/directory_scanner.py
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict
 import os
+import platform
 
 
 class OSDirectoryProvider(ABC):
-    """Abstract base class for OS-specific directory providers."""
-    
     @abstractmethod
     def get_directories(self, home: Path) -> List[Dict[str, str]]:
-        """Get OS-specific photo directories."""
         pass
-    
-    def _safe_add(self, path: Path, label: str, source: str) -> Optional[Dict[str, str]]:
-        """Safely add a directory if it exists."""
-        try:
-            if path.exists() and path.is_dir():
-                return {"path": str(path), "label": label, "source": source}
-        except Exception:
-            pass
-        return None
 
 
 class CommonDirectoryProvider(OSDirectoryProvider):
-    """Provider for common directories across all operating systems."""
-    
     def get_directories(self, home: Path) -> List[Dict[str, str]]:
-        """Get common directories like Pictures and Downloads."""
-        dirs = [
-            self._safe_add(home / "Pictures", "Pictures", "home"),
-            self._safe_add(home / "Downloads", "Downloads", "home"),
-        ]
-        return [d for d in dirs if d is not None]
+        dirs = []
+        
+        # Pictures directory (common on all platforms)
+        pictures = home / "Pictures"
+        if pictures.exists() and pictures.is_dir():
+            dirs.append({"path": str(pictures), "label": "Pictures", "source": "home"})
+        
+        # Downloads directory (common on all platforms)
+        downloads = home / "Downloads"
+        if downloads.exists() and downloads.is_dir():
+            dirs.append({"path": str(downloads), "label": "Downloads", "source": "home"})
+        
+        return dirs
 
 
 class WindowsDirectoryProvider(OSDirectoryProvider):
-    """Provider for Windows-specific directories."""
-    
     def get_directories(self, home: Path) -> List[Dict[str, str]]:
-        """Get Windows-specific directories like OneDrive and Public folders."""
         dirs = []
         
-        # OneDrive directories
-        if onedrive := os.environ.get("OneDrive"):
-            onedrive_pics = self._safe_add(
-                Path(onedrive) / "Pictures", 
-                "OneDrive Pictures", 
-                "onedrive"
-            )
-            if onedrive_pics:
-                dirs.append(onedrive_pics)
+        # OneDrive Pictures
+        onedrive = os.environ.get("OneDrive")
+        if onedrive:
+            onedrive_path = Path(onedrive)
+            pictures_path = onedrive_path / "Pictures"
+            if pictures_path.exists() and pictures_path.is_dir():
+                dirs.append({
+                    "path": str(pictures_path), 
+                    "label": "OneDrive Pictures", 
+                    "source": "onedrive"
+                })
         
-        # Public directories  
-        if public := os.environ.get("PUBLIC"):
-            public_pics = self._safe_add(
-                Path(public) / "Pictures", 
-                "Public Pictures", 
-                "windows"
-            )
-            if public_pics:
-                dirs.append(public_pics)
-                
+        # Public Pictures
+        public = os.environ.get("PUBLIC")
+        if public:
+            public_path = Path(public)
+            pictures_path = public_path / "Pictures"
+            if pictures_path.exists() and pictures_path.is_dir():
+                dirs.append({
+                    "path": str(pictures_path), 
+                    "label": "Public Pictures", 
+                    "source": "windows"
+                })
+        
         return dirs
 
 
 class MacOSDirectoryProvider(OSDirectoryProvider):
-    """Provider for macOS-specific directories."""
-    
     def get_directories(self, home: Path) -> List[Dict[str, str]]:
-        """Get macOS-specific directories like iCloud Drive."""
         dirs = []
+        
+        # iCloud Drive directories
         icloud_docs = home / "Library" / "Mobile Documents" / "com~apple~CloudDocs"
+        if icloud_docs.exists() and icloud_docs.is_dir():
+            photos_path = icloud_docs / "Photos"
+            if photos_path.exists() and photos_path.is_dir():
+                dirs.append({
+                    "path": str(photos_path), 
+                    "label": "iCloud Drive Photos", 
+                    "source": "icloud"
+                })
+            
+            pictures_path = icloud_docs / "Pictures"
+            if pictures_path.exists() and pictures_path.is_dir():
+                dirs.append({
+                    "path": str(pictures_path), 
+                    "label": "iCloud Drive Pictures", 
+                    "source": "icloud"
+                })
         
-        icloud_candidates = [
-            (icloud_docs / "Photos", "iCloud Drive Photos", "icloud"),
-            (icloud_docs / "Pictures", "iCloud Drive Pictures", "icloud"),
-            (home / "Library" / "CloudStorage" / "iCloud Drive" / "Photos", "iCloud Photos", "icloud"),
-        ]
+        # Newer iCloud Photos path
+        icloud_photos = home / "Library" / "CloudStorage" / "iCloud Drive" / "Photos"
+        if icloud_photos.exists() and icloud_photos.is_dir():
+            dirs.append({
+                "path": str(icloud_photos), 
+                "label": "iCloud Photos", 
+                "source": "icloud"
+            })
         
-        for path, label, source in icloud_candidates:
-            if result := self._safe_add(path, label, source):
-                dirs.append(result)
-                
         return dirs
 
 
 class LinuxDirectoryProvider(OSDirectoryProvider):
-    """Provider for Linux-specific directories."""
-    
     def get_directories(self, home: Path) -> List[Dict[str, str]]:
-        """Get Linux-specific directories from XDG configuration."""
         dirs = []
-        try:
-            user_dirs = home / ".config" / "user-dirs.dirs"
-            if user_dirs.exists():
-                dirs.extend(self._parse_xdg_config(user_dirs, home))
-        except Exception:
-            pass
-        return dirs
-    
-    def _parse_xdg_config(self, config_file: Path, home: Path) -> List[Dict[str, str]]:
-        """Parse XDG user directories configuration."""
-        dirs = []
-        try:
-            text = config_file.read_text(encoding="utf-8")
-            for line in text.splitlines():
-                if line.startswith("XDG_PICTURES_DIR") or line.startswith("XDG_DOWNLOAD_DIR"):
-                    parts = line.split("=")
-                    if len(parts) == 2:
-                        raw = parts[1].strip().strip('"')
-                        resolved = raw.replace("$HOME", str(home))
-                        label = "Pictures" if "PICTURES" in parts[0] else "Downloads"
-                        if result := self._safe_add(Path(resolved), label, "xdg"):
-                            dirs.append(result)
-        except Exception:
-            pass
+        
+        # XDG user directories from config file
+        user_dirs_file = home / ".config" / "user-dirs.dirs"
+        if user_dirs_file.exists():
+            try:
+                with open(user_dirs_file, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    
+                # Simple parsing of XDG directory config
+                for line in content.splitlines():
+                    line = line.strip()
+                    if line.startswith('XDG_PICTURE_DIR'):
+                        # Extract path from line like: XDG_PICTURE_DIR="$HOME/Pictures"
+                        path_part = line.split('=', 1)[1].strip().strip('"')
+                        path_part = path_part.replace('$HOME', str(home))
+                        picture_path = Path(path_part)
+                        if picture_path.exists() and picture_path.is_dir():
+                            dirs.append({
+                                "path": str(picture_path), 
+                                "label": "Pictures", 
+                                "source": "xdg"
+                            })
+                        break
+            except Exception:
+                # If parsing fails, silently continue
+                pass
+        
         return dirs
 
 
 class DirectoryScanner:
-    """Main service for scanning and finding default photo directories."""
-    
     def __init__(self):
-        """Initialize with OS-specific providers."""
         self.providers = {
             'common': CommonDirectoryProvider(),
             'windows': WindowsDirectoryProvider(),
-            'darwin': MacOSDirectoryProvider(), 
+            'darwin': MacOSDirectoryProvider(),
             'linux': LinuxDirectoryProvider(),
         }
-    
+
     def get_default_photo_directories(self) -> List[Dict[str, str]]:
-        """Get default photo directories for the current OS."""
         all_dirs = []
         home = Path.home()
-        sysname = self._get_system_name()
+        sysname = platform.system().lower()
         
         # Always add common directories
         all_dirs.extend(self.providers['common'].get_directories(home))
         
-        # Add OS-specific directories
-        if sysname in self.providers:
-            all_dirs.extend(self.providers[sysname].get_directories(home))
-            
-        return self._deduplicate_directories(all_dirs)
-    
-    def _get_system_name(self) -> str:
-        """Get the current operating system name."""
-        return (os.uname().sysname if hasattr(os, 'uname') else os.name).lower()
+        # Add OS-specific directories if they exist
+        if sysname == 'windows':
+            all_dirs.extend(self.providers['windows'].get_directories(home))
+        elif sysname == 'darwin':  # macOS
+            all_dirs.extend(self.providers['darwin'].get_directories(home))
+        elif sysname == 'linux':
+            all_dirs.extend(self.providers['linux'].get_directories(home))
         
+        return self._deduplicate_directories(all_dirs)
+
     def _deduplicate_directories(self, dirs: List[Dict[str, str]]) -> List[Dict[str, str]]:
-        """Remove duplicate directories based on normalized paths."""
         seen = set()
         unique = []
         for d in dirs:
             if d is None:
                 continue
+            # Normalize the path to handle different representations of the same path
             key = self._normalize_path(d["path"])
             if key not in seen:
                 seen.add(key)
                 unique.append(d)
         return unique
-    
+
     def _normalize_path(self, path: str) -> str:
-        """Normalize path for comparison (case-insensitive on Windows/macOS)."""
-        normalized = str(Path(path).resolve())
-        # Case-insensitive comparison on case-insensitive filesystems
-        if os.name == 'nt' or 'darwin' in self._get_system_name():
-            normalized = normalized.lower()
-        return normalized
+        """Normalize a path string for comparison."""
+        try:
+            # Convert to Path object and resolve to handle things like .. and .
+            p = Path(path).resolve()
+            return str(p)
+        except Exception:
+            # If we can't resolve the path, return the original
+            return path.strip().lower()

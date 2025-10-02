@@ -94,15 +94,19 @@ export const AppShell: React.FC<AppShellProps> = ({
 			) : null}
 
 			{/* Main column */}
-			<div className={clsx(
-				"flex-1 flex flex-col overflow-hidden bg-background min-h-screen",
-				getLayout('mainContent')
-			)}>
-				<header className={clsx(
-					"bg-card border-b border-border shadow-sm flex flex-col flex-shrink-0",
-					classes.header,
-					"gap-1 sm:gap-2 md:gap-3"
-				)}>
+			<div
+				className={clsx(
+					"flex-1 flex flex-col overflow-hidden bg-background min-h-screen",
+					getLayout("mainContent"),
+				)}
+			>
+				<header
+					className={clsx(
+						"bg-card border-b border-border shadow-sm flex flex-col flex-shrink-0",
+						classes.header,
+						"gap-1 sm:gap-2 md:gap-3",
+					)}
+				>
 					<TopBar {...topBarProps} />
 					{quickActions ? <HeaderQuickActions {...quickActions} /> : null}
 				</header>
@@ -111,7 +115,7 @@ export const AppShell: React.FC<AppShellProps> = ({
 					id="main-content"
 					className={clsx(
 						"flex-1 overflow-y-auto overflow-x-hidden",
-						classes.container
+						classes.container,
 					)}
 				>
 					{children}

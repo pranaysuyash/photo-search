@@ -53,9 +53,11 @@ import { useDataContext } from "../contexts/DataContext";
 import { useLayoutContext } from "../contexts/LayoutContext";
 import { useOnboardingContext } from "../contexts/OnboardingContext";
 import { useViewStateContext } from "../contexts/ViewStateContext";
-import { useOnboardingProgress, useWelcomeState } from "../hooks/useOnboardingProgress";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
-import { PowerUserPanel } from "./PowerUserPanel";
+import {
+	useOnboardingProgress,
+	useWelcomeState,
+} from "../hooks/useOnboardingProgress";
 import type { FilterPreset } from "../models/FilterPreset";
 import {
 	isMobileTestPath,
@@ -68,26 +70,22 @@ import { AppShell } from "./AppShell";
 import { BottomNavigation } from "./BottomNavigation";
 import { ContextualHelp } from "./ContextualHelp";
 // Chrome islands
-import {
-	AuthTokenBar,
-	JobsFab,
-	PanelsHost,
-	RoutesHost,
-} from "./chrome";
-import { ModalSystemWrapper } from "./ModalSystemWrapper";
+import { AuthTokenBar, JobsFab, PanelsHost, RoutesHost } from "./chrome";
 import ErrorBoundary from "./ErrorBoundary";
 import { HintManager, useHintTriggers } from "./HintSystem";
 import { type Job, JobsCenter } from "./JobsCenter";
 import { MobileOptimizations } from "./MobileOptimizations";
 import MobilePWATest from "./MobilePWATest";
+import { ModalSystemWrapper } from "./ModalSystemWrapper";
 import { ModelStatusIndicator } from "./ModelStatusIndicator";
 import FirstRunSetup from "./modals/FirstRunSetup";
-import { EnhancedFirstRunOnboarding } from "./onboarding";
 import { OfflineIndicator } from "./OfflineIndicator";
 import { OnboardingChecklist } from "./OnboardingChecklist";
 import { OnboardingTour } from "./OnboardingTour";
 import { OverlayLayer } from "./OverlayLayer";
+import { EnhancedFirstRunOnboarding } from "./onboarding";
 import PerformanceMonitor from "./PerformanceMonitor";
+import { PowerUserPanel } from "./PowerUserPanel";
 import { RecentActivityPanel } from "./RecentActivityPanel";
 import { SearchHistoryPanel } from "./SearchHistoryPanel";
 import ShareViewer from "./ShareViewer";
@@ -203,7 +201,11 @@ export function AppChrome({
 	useEffect(() => {
 		const handleOpenPowerUserPanel = () => setShowPowerUserPanel(true);
 		window.addEventListener("open-power-user-panel", handleOpenPowerUserPanel);
-		return () => window.removeEventListener("open-power-user-panel", handleOpenPowerUserPanel);
+		return () =>
+			window.removeEventListener(
+				"open-power-user-panel",
+				handleOpenPowerUserPanel,
+			);
 	}, []);
 
 	const {
@@ -432,11 +434,11 @@ export function AppChrome({
 
 	const handleEnhancedOnboardingComplete = (data: unknown) => {
 		// Mark onboarding as completed
-		markStepComplete('welcome');
-		markStepComplete('directory-selection');
-		markStepComplete('options');
-		markStepComplete('demo');
-		markStepComplete('complete');
+		markStepComplete("welcome");
+		markStepComplete("directory-selection");
+		markStepComplete("options");
+		markStepComplete("demo");
+		markStepComplete("complete");
 
 		// Handle the setup data from enhanced onboarding
 		if (data.directory) {
@@ -671,6 +673,7 @@ export function AppChrome({
 											path: r.path,
 											score: r.score,
 										}))}
+										searchId={null} // TODO: Connect to actual search ID from search context
 										searchText={searchText}
 										altSearch={
 											altSearch || { active: false, applied: "", original: "" }

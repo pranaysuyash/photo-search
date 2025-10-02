@@ -1,10 +1,18 @@
+import { AnimatePresence, motion } from "framer-motion";
+import {
+	CheckCircle,
+	ChevronLeft,
+	ChevronRight,
+	FolderOpen,
+	Play,
+	Sparkles,
+	Zap,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle, ChevronLeft, ChevronRight, FolderOpen, Play, Sparkles, Zap } from "lucide-react";
 import { API_BASE } from "../../api";
-import { useSimpleStore } from "../../stores/SimpleStore";
 import { useResponsiveSpacing } from "../../hooks/useResponsiveSpacing";
 import { cn } from "../../lib/utils";
+import { useSimpleStore } from "../../stores/SimpleStore";
 
 interface EnhancedFirstRunOnboardingProps {
 	isOpen: boolean;
@@ -32,52 +40,52 @@ interface OnboardingStep {
 	id: string;
 	title: string;
 	description: string;
-	type: 'welcome' | 'directory' | 'options' | 'demo' | 'complete';
+	type: "welcome" | "directory" | "options" | "demo" | "complete";
 }
 
 const onboardingSteps: OnboardingStep[] = [
 	{
-		id: 'welcome',
-		title: 'Welcome to Photo Search',
-		description: 'Find any photo instantly with AI-powered search',
-		type: 'welcome'
+		id: "welcome",
+		title: "Welcome to Photo Search",
+		description: "Find any photo instantly with AI-powered search",
+		type: "welcome",
 	},
 	{
-		id: 'directory',
-		title: 'Choose Your Photos',
-		description: 'Select where your photos are stored',
-		type: 'directory'
+		id: "directory",
+		title: "Choose Your Photos",
+		description: "Select where your photos are stored",
+		type: "directory",
 	},
 	{
-		id: 'options',
-		title: 'Customize Your Experience',
-		description: 'Configure indexing options and preferences',
-		type: 'options'
+		id: "options",
+		title: "Customize Your Experience",
+		description: "Configure indexing options and preferences",
+		type: "options",
 	},
 	{
-		id: 'demo',
-		title: 'Try It Out',
-		description: 'Experience the magic with sample photos',
-		type: 'demo'
+		id: "demo",
+		title: "Try It Out",
+		description: "Experience the magic with sample photos",
+		type: "demo",
 	},
 	{
-		id: 'complete',
+		id: "complete",
 		title: "You're All Set!",
-		description: 'Start searching your photos naturally',
-		type: 'complete'
-	}
+		description: "Start searching your photos naturally",
+		type: "complete",
+	},
 ];
 
 export function EnhancedFirstRunOnboarding({
 	isOpen,
 	onClose,
-	onComplete
+	onComplete,
 }: EnhancedFirstRunOnboardingProps) {
 	const [currentStep, setCurrentStep] = useState(0);
 	const [setupData, setSetupData] = useState<OnboardingSetupData>({
 		includeVideos: false,
 		enableDemo: false,
-		completedSteps: []
+		completedSteps: [],
 	});
 	const [scanItems, setScanItems] = useState<ScanItem[]>([]);
 	const [loading, setLoading] = useState(false);
@@ -86,7 +94,7 @@ export function EnhancedFirstRunOnboarding({
 	const [isTransitioning, setIsTransitioning] = useState(false);
 
 	const { classes, getComponentSpacing } = useResponsiveSpacing();
-	const modalSpacing = getComponentSpacing('modal');
+	const modalSpacing = getComponentSpacing("modal");
 	const store = useSimpleStore();
 	const containerRef = useRef<HTMLDivElement>(null);
 
@@ -102,17 +110,17 @@ export function EnhancedFirstRunOnboarding({
 
 	// Load default scan locations
 	useEffect(() => {
-		if (!isOpen || currentStepData.type !== 'directory') return;
+		if (!isOpen || currentStepData.type !== "directory") return;
 
 		const loadDefaults = async () => {
 			setLoading(true);
 			try {
 				const resp = await fetch(
-					`${API_BASE}/library/defaults?include_videos=${setupData.includeVideos ? "1" : "0"}`
+					`${API_BASE}/library/defaults?include_videos=${setupData.includeVideos ? "1" : "0"}`,
 				);
 				if (!resp.ok) return;
 
-				const data = await resp.json() as { items?: ScanItem[] };
+				const data = (await resp.json()) as { items?: ScanItem[] };
 				if (Array.isArray(data.items) && data.items.length > 0) {
 					setScanItems(data.items);
 				}
@@ -138,18 +146,21 @@ export function EnhancedFirstRunOnboarding({
 		return `${v.toFixed(v < 10 ? 1 : 0)} ${units[i]}`;
 	};
 
-	const totalFiles = scanItems.reduce((sum, item) => sum + (item.files || 0), 0);
+	const totalFiles = scanItems.reduce(
+		(sum, item) => sum + (item.files || 0),
+		0,
+	);
 	const totalSize = scanItems.reduce((sum, item) => sum + (item.bytes || 0), 0);
 
 	const handleNext = () => {
 		if (currentStep < onboardingSteps.length - 1) {
 			setIsTransitioning(true);
-			setSetupData(prev => ({
+			setSetupData((prev) => ({
 				...prev,
-				completedSteps: [...prev.completedSteps, currentStepData.id]
+				completedSteps: [...prev.completedSteps, currentStepData.id],
 			}));
 			setTimeout(() => {
-				setCurrentStep(prev => prev + 1);
+				setCurrentStep((prev) => prev + 1);
 				setIsTransitioning(false);
 			}, 200);
 		}
@@ -159,14 +170,16 @@ export function EnhancedFirstRunOnboarding({
 		if (currentStep > 0) {
 			setIsTransitioning(true);
 			setTimeout(() => {
-				setCurrentStep(prev => prev - 1);
+				setCurrentStep((prev) => prev - 1);
 				setIsTransitioning(false);
 			}, 200);
 		}
 	};
 
 	const handleQuickStart = async () => {
-		const existingPaths = scanItems.filter(item => item.exists).map(item => item.path);
+		const existingPaths = scanItems
+			.filter((item) => item.exists)
+			.map((item) => item.path);
 		if (existingPaths.length === 0) return;
 
 		setStarting(true);
@@ -176,7 +189,7 @@ export function EnhancedFirstRunOnboarding({
 			await onComplete({
 				...setupData,
 				directory: existingPaths[0],
-				completedSteps: [...setupData.completedSteps, currentStepData.id]
+				completedSteps: [...setupData.completedSteps, currentStepData.id],
 			});
 
 			// Show progress feedback
@@ -184,18 +197,20 @@ export function EnhancedFirstRunOnboarding({
 			for (let i = 0; i < 7; i++) {
 				try {
 					const r = await fetch(
-						`${API_BASE}/analytics?dir=${encodeURIComponent(firstPath)}&limit=5`
+						`${API_BASE}/analytics?dir=${encodeURIComponent(firstPath)}&limit=5`,
 					);
 					if (r.ok) {
-						const js = await r.json() as unknown;
-						const ev = (js.events || []).find((e: React.MouseEvent) => e.type === "index");
+						const js = (await r.json()) as unknown;
+						const ev = (js.events || []).find(
+							(e: React.MouseEvent) => e.type === "index",
+						);
 						if (ev) {
 							setStatus(`Indexed ${ev.new}+${ev.updated} (total ${ev.total})`);
 							break;
 						}
 					}
 				} catch {}
-				await new Promise(res => setTimeout(res, 1000));
+				await new Promise((res) => setTimeout(res, 1000));
 			}
 		} finally {
 			setTimeout(() => {
@@ -216,7 +231,7 @@ export function EnhancedFirstRunOnboarding({
 				await onComplete({
 					...setupData,
 					directory: path,
-					completedSteps: [...setupData.completedSteps, currentStepData.id]
+					completedSteps: [...setupData.completedSteps, currentStepData.id],
 				});
 				onClose();
 			}
@@ -229,14 +244,14 @@ export function EnhancedFirstRunOnboarding({
 		await onComplete({
 			...setupData,
 			enableDemo: true,
-			completedSteps: [...setupData.completedSteps, currentStepData.id]
+			completedSteps: [...setupData.completedSteps, currentStepData.id],
 		});
 		onClose();
 	};
 
 	const renderStepContent = () => {
 		switch (currentStepData.type) {
-			case 'welcome':
+			case "welcome":
 				return (
 					<motion.div
 						initial={{ opacity: 0, y: 20 }}
@@ -291,7 +306,7 @@ export function EnhancedFirstRunOnboarding({
 					</motion.div>
 				);
 
-			case 'directory':
+			case "directory":
 				return (
 					<motion.div
 						initial={{ opacity: 0, y: 20 }}
@@ -353,11 +368,15 @@ export function EnhancedFirstRunOnboarding({
 											</div>
 										)}
 
-										<button type="button" onClick={handleQuickStart}
+										<button
+											type="button"
+											onClick={handleQuickStart}
 											disabled={loading || starting || totalFiles === 0}
 											className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 										>
-											{starting ? status || "Starting..." : `Start Indexing (${totalFiles} files)`}
+											{starting
+												? status || "Starting..."
+												: `Start Indexing (${totalFiles} files)`}
 										</button>
 									</div>
 								)}
@@ -372,7 +391,9 @@ export function EnhancedFirstRunOnboarding({
 								</p>
 
 								<div className="space-y-3">
-									<button type="button" onClick={handleSelectDirectory}
+									<button
+										type="button"
+										onClick={handleSelectDirectory}
 										className="w-full px-4 py-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-gray-400 dark:hover:border-gray-500 transition-colors"
 									>
 										<FolderOpen className="w-6 h-6 mx-auto mb-2 text-gray-400" />
@@ -385,7 +406,9 @@ export function EnhancedFirstRunOnboarding({
 									</button>
 
 									{(window as unknown).electronAPI?.selectFolder && (
-										<button type="button" onClick={handleSelectDirectory}
+										<button
+											type="button"
+											onClick={handleSelectDirectory}
 											className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
 										>
 											Choose with System Dialog
@@ -398,13 +421,18 @@ export function EnhancedFirstRunOnboarding({
 										type="checkbox"
 										id="include-videos"
 										checked={setupData.includeVideos}
-										onChange={(e) => setSetupData(prev => ({
-											...prev,
-											includeVideos: e.target.checked
-										}))}
+										onChange={(e) =>
+											setSetupData((prev) => ({
+												...prev,
+												includeVideos: e.target.checked,
+											}))
+										}
 										className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
 									/>
-									<label htmlFor="include-videos" className="text-sm text-gray-700 dark:text-gray-300">
+									<label
+										htmlFor="include-videos"
+										className="text-sm text-gray-700 dark:text-gray-300"
+									>
 										Include videos (takes longer)
 									</label>
 								</div>
@@ -413,7 +441,7 @@ export function EnhancedFirstRunOnboarding({
 					</motion.div>
 				);
 
-			case 'options':
+			case "options":
 				return (
 					<motion.div
 						initial={{ opacity: 0, y: 20 }}
@@ -438,10 +466,12 @@ export function EnhancedFirstRunOnboarding({
 									<input
 										type="checkbox"
 										checked={setupData.includeVideos}
-										onChange={(e) => setSetupData(prev => ({
-											...prev,
-											includeVideos: e.target.checked
-										}))}
+										onChange={(e) =>
+											setSetupData((prev) => ({
+												...prev,
+												includeVideos: e.target.checked,
+											}))
+										}
 										className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
 									/>
 								</div>
@@ -486,7 +516,7 @@ export function EnhancedFirstRunOnboarding({
 					</motion.div>
 				);
 
-			case 'demo':
+			case "demo":
 				return (
 					<motion.div
 						initial={{ opacity: 0, y: 20 }}
@@ -507,7 +537,9 @@ export function EnhancedFirstRunOnboarding({
 
 						<div className="grid md:grid-cols-2 gap-4 max-w-lg mx-auto">
 							<div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-								<div className="text-purple-600 dark:text-purple-400 mb-2">🏖️</div>
+								<div className="text-purple-600 dark:text-purple-400 mb-2">
+									🏖️
+								</div>
 								<h4 className="font-medium text-gray-900 dark:text-white mb-1">
 									Beach & Nature
 								</h4>
@@ -517,7 +549,9 @@ export function EnhancedFirstRunOnboarding({
 							</div>
 
 							<div className="p-4 bg-pink-50 dark:bg-pink-900/20 rounded-lg">
-								<div className="text-pink-600 dark:text-pink-400 mb-2">👨‍👩‍👧‍👦</div>
+								<div className="text-pink-600 dark:text-pink-400 mb-2">
+									👨‍👩‍👧‍👦
+								</div>
 								<h4 className="font-medium text-gray-900 dark:text-white mb-1">
 									Family & Friends
 								</h4>
@@ -527,7 +561,9 @@ export function EnhancedFirstRunOnboarding({
 							</div>
 						</div>
 
-						<button type="button" onClick={handleDemoMode}
+						<button
+							type="button"
+							onClick={handleDemoMode}
 							className="px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-semibold hover:from-purple-600 hover:to-pink-600 transition-all transform hover:scale-105 shadow-lg"
 						>
 							Start Demo Experience
@@ -539,7 +575,7 @@ export function EnhancedFirstRunOnboarding({
 					</motion.div>
 				);
 
-			case 'complete':
+			case "complete":
 				return (
 					<motion.div
 						initial={{ opacity: 0, y: 20 }}
@@ -564,7 +600,8 @@ export function EnhancedFirstRunOnboarding({
 								Pro Tip
 							</h4>
 							<p className="text-sm text-blue-700 dark:text-blue-300">
-								Try searching for "sunset", "beach", or "birthday" to see AI search in action!
+								Try searching for "sunset", "beach", or "birthday" to see AI
+								search in action!
 							</p>
 						</div>
 
@@ -597,7 +634,7 @@ export function EnhancedFirstRunOnboarding({
 				tabIndex={-1}
 				className={cn(
 					"relative bg-background border border-border rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden focus:outline-none",
-					modalSpacing.container
+					modalSpacing.container,
 				)}
 			>
 				{/* Progress Bar */}
@@ -626,7 +663,9 @@ export function EnhancedFirstRunOnboarding({
 						</div>
 					</div>
 
-					<button type="button" onClick={onClose}
+					<button
+						type="button"
+						onClick={onClose}
 						className="p-2 hover:bg-accent rounded-lg transition-colors"
 						aria-label="Close onboarding"
 					>
@@ -657,7 +696,9 @@ export function EnhancedFirstRunOnboarding({
 
 					<div className="flex items-center gap-3">
 						{currentStep > 0 && (
-							<button type="button" onClick={handlePrev}
+							<button
+								type="button"
+								onClick={handlePrev}
 								className="px-4 py-2 text-sm font-medium text-foreground hover:bg-accent rounded-lg transition-colors flex items-center gap-2"
 							>
 								<ChevronLeft className="w-4 h-4" />
@@ -666,14 +707,18 @@ export function EnhancedFirstRunOnboarding({
 						)}
 
 						{currentStep < onboardingSteps.length - 1 ? (
-							<button type="button" onClick={handleNext}
+							<button
+								type="button"
+								onClick={handleNext}
 								className="px-4 py-2 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2"
 							>
 								Next
 								<ChevronRight className="w-4 h-4" />
 							</button>
 						) : (
-							<button type="button" onClick={onClose}
+							<button
+								type="button"
+								onClick={onClose}
 								className="px-6 py-2 bg-green-500 text-white text-sm font-medium rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2"
 							>
 								Get Started

@@ -1,7 +1,9 @@
 import type React from "react";
 import { useCallback, useEffect, useMemo } from "react";
 import { EnhancedEmptyState } from "../components/EnhancedEmptyState";
+import EnhancedJustifiedResults from "../components/EnhancedJustifiedResults";
 import ErrorBoundary from "../components/ErrorBoundary";
+import FilmstripResults from "../components/FilmstripResults";
 import JustifiedResults from "../components/JustifiedResults";
 import TimelineResults from "../components/TimelineResults";
 import { useFeatureFlag } from "../components/topbar/utils/featureFlags";
@@ -20,6 +22,7 @@ export interface ResultsViewProps {
 	dir: string;
 	engine: string;
 	results: Array<{ path: string; score?: number }>;
+	searchId: string | null;
 	searchText: string;
 	altSearch?: { active: boolean; applied: string; original: string } | null;
 	ratingMap?: Record<string, number>;
@@ -43,6 +46,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
 	dir,
 	engine,
 	results,
+	searchId,
 	searchText,
 	altSearch,
 	ratingMap,
@@ -170,7 +174,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
 							/>
 						</div>
 					) : resultView === "grid" ? (
-						<JustifiedResults
+						<EnhancedJustifiedResults
 							dir={dir}
 							engine={engine}
 							items={(results || []).map((r) => ({
@@ -185,7 +189,21 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
 							onLayout={onLayout}
 							ratingMap={ratingMap}
 							showInfoOverlay={showInfoOverlay}
+							searchId={searchId}
+							query={searchText}
 						/>
+					) : resultView === "film" ? (
+						<div className="filmstrip-container p-4">
+							<FilmstripResults
+								dir={dir}
+								engine={engine}
+								results={results || []}
+								selected={selected}
+								onToggleSelect={toggleSelect}
+								onOpen={openDetailByPath}
+								ratingMap={ratingMap}
+							/>
+						</div>
 					) : (
 						<div className="relative" onWheel={handleWheelZoom}>
 							{timelineZoomEnabled && (

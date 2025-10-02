@@ -405,6 +405,14 @@ export function IndexingAndViewControls({
 				</button>
 				<button
 					type="button"
+					className={`view-button ${resultView === "film" ? "active" : ""}`}
+					onClick={() => setResultView("film")}
+					aria-label="Show results as filmstrip"
+				>
+					Filmstrip
+				</button>
+				<button
+					type="button"
 					className={`view-button ${resultView === "timeline" ? "active" : ""}`}
 					onClick={() => setResultView("timeline")}
 					aria-label="Show results as timeline"

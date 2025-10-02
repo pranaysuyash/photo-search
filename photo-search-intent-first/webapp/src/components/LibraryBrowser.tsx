@@ -3,10 +3,10 @@ import { ArrowUpDown, BarChart3, Check, Play, Settings } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { apiThumbBatch, thumbUrl } from "../api";
+import { useMemoryManager } from "../hooks/useMemoryManager";
 import { VideoService } from "../services/VideoService";
 import { ScrollLoader } from "../utils/loading";
 import { VirtualizedPhotoGrid } from "./VirtualizedPhotoGrid";
-import { useMemoryManager } from "../hooks/useMemoryManager";
 
 type SortOption = "name" | "date" | "size" | "rating" | "camera";
 type SortDirection = "asc" | "desc";
@@ -58,9 +58,11 @@ const LibraryBrowser = memo(function LibraryBrowser({
 			}
 		},
 		onMemoryCritical: (usageMB) => {
-			console.error(`Memory critical: ${usageMB}MB used - enabling virtualized grid`);
+			console.error(
+				`Memory critical: ${usageMB}MB used - enabling virtualized grid`,
+			);
 			setUseVirtualizedGrid(true);
-		}
+		},
 	});
 
 	// Animation variants for micro-interactions
@@ -114,7 +116,9 @@ const LibraryBrowser = memo(function LibraryBrowser({
 	useEffect(() => {
 		// Enable virtualized grid for large collections to improve performance
 		if (library.length > 2000 && !useVirtualizedGrid) {
-			console.log(`Large collection detected (${library.length} items), enabling virtualized grid`);
+			console.log(
+				`Large collection detected (${library.length} items), enabling virtualized grid`,
+			);
 			setUseVirtualizedGrid(true);
 		} else if (library.length <= 1000 && useVirtualizedGrid) {
 			// Disable for small collections to maintain smooth animations

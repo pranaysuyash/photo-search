@@ -9,13 +9,13 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Body, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
-from PIL import Image, ExifTags
+# Lazy import: from PIL import Image, ExifTags  # Can cause threading issues if imported at top level
 
 from api.schemas.v1 import CachedSearchRequest, SearchRequest
 from api.utils import _as_bool, _as_str_list, _emb, _from_body, _require
 from infra.analytics import log_search, _write_event as _write_event_infra
-from infra.faces import load_faces as _faces_load
-from infra.index_store import IndexStore
+# Lazy import: from infra.faces import load_faces as _faces_load  # imports numpy and PIL
+# Lazy import: from infra.index_store import IndexStore  # imports numpy
 from infra.thumbs import get_or_create_face_thumb, get_or_create_thumb
 
 # Legacy router without prefix for parity with original_server.py routes
@@ -67,6 +67,7 @@ def api_export(
                     pass
             if strip_exif_value:
                 try:
+                    from PIL import Image
                     with Image.open(src) as img:
                         img = img.convert('RGB') if img.mode not in ('RGB','L') else img
                         img.save(out)
@@ -84,6 +85,8 @@ def api_export(
 @router.get("/map")
 def api_map(directory: str = Query(..., alias="dir"), limit: int = 1000) -> Dict[str, Any]:
     """Extract GPS coordinates from EXIF data of photos for map visualization."""
+    from PIL import ExifTags
+    from infra.index_store import IndexStore
     folder = Path(directory)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
@@ -101,6 +104,7 @@ def api_map(directory: str = Query(..., alias="dir"), limit: int = 1000) -> Dict
             return None
     for sp in (store.state.paths or [])[:limit]:
         try:
+            from PIL import Image
             img = Image.open(sp)
             ex = img._getexif() or {}
             gps = ex.get(inv.get('GPSInfo', -1)) or {}
@@ -141,6 +145,7 @@ def search_paginated(
     body: Optional[Dict[str, Any]] = Body(None),
 ) -> Dict[str, Any]:
     """Paginated search with cursor support for large result sets."""
+    from infra.index_store import IndexStore
     # Extract pagination parameters
     limit_value = _from_body(body, limit, "limit", default=24, cast=lambda v: int(v)) or 24
     offset_value = _from_body(body, offset, "offset", default=0, cast=lambda v: int(v)) or 0
@@ -265,6 +270,7 @@ def thumb_batch(
     body: Optional[Dict[str, Any]] = Body(None),
 ) -> Dict[str, Any]:
     """Generate thumbnails for multiple images in batch to reduce API calls."""
+    from infra.index_store import IndexStore
     dir_value = _require(_from_body(body, dir, "dir"), "dir")
     paths_value = _from_body(body, paths, "paths", default=[], cast=_as_str_list) or []
     size_value = _from_body(body, size, "size", default=256, cast=int) or 256
@@ -318,6 +324,8 @@ def get_face_thumbnail(
     openai_key: Optional[str] = None
 ):
     """Get thumbnail of a face from a photo."""
+    from infra.index_store import IndexStore
+    from infra.faces import load as _faces_load
     folder = Path(directory)
     if not folder.exists():
         raise HTTPException(400, "Folder not found")
@@ -368,6 +376,7 @@ def search_like(
     body: Optional[Dict[str, Any]] = Body(None),
 ) -> Dict[str, Any]:
     """Find similar photos to a given photo."""
+    from infra.index_store import IndexStore
     dir_value = _require(_from_body(body, dir, "dir"), "dir")
     path_value = _require(_from_body(body, path, "path"), "path")
     top_k_value = _from_body(body, top_k, "top_k", default=12, cast=int) or 12
@@ -399,6 +408,7 @@ def search_like_plus(
     body: Optional[Dict[str, Any]] = Body(None),
 ) -> Dict[str, Any]:
     """Enhanced similarity search with text weighting."""
+    from infra.index_store import IndexStore
     dir_value = _require(_from_body(body, dir, "dir"), "dir")
     path_value = _require(_from_body(body, path, "path"), "path")
     top_k_value = _from_body(body, top_k, "top_k", default=12, cast=int) or 12
@@ -440,6 +450,7 @@ def search_cached(
     req: CachedSearchRequest = Body(...),
 ) -> Dict[str, Any]:
     """Perform a semantic search with lightweight result caching."""
+    from infra.index_store import IndexStore
     folder = Path(req.dir).expanduser().resolve()
     if not folder.exists() or not folder.is_dir():
         raise HTTPException(400, "Folder not found")
@@ -510,6 +521,7 @@ def build_thumbnails(
     body: Optional[Dict[str, Any]] = Body(None),
 ) -> Dict[str, Any]:
     """Build thumbnails for all photos in directory."""
+    from infra.index_store import IndexStore
     dir_value = _require(_from_body(body, dir, "dir"), "dir")
     size_value = _from_body(body, size, "size", default=512, cast=int) or 512
     provider_value = _from_body(body, provider, "provider", default="local") or "local"

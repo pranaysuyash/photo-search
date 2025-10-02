@@ -199,7 +199,7 @@ function AppWithModalControls() {
 	// Individual hooks for photo
 	const results = useSearchResults();
 	const query = useSearchQuery();
-	// const searchId = useSearchId()
+	const searchId = useSearchId();
 	const fav = useFavorites();
 	const favOnly = useFavOnly();
 	const topK = useTopK();
@@ -738,7 +738,8 @@ function AppWithModalControls() {
 				}
 
 				// Use larger batch sizes for better performance with large collections
-				const optimizedLimit = library && library.length > 2000 ? Math.max(limit, 500) : limit;
+				const optimizedLimit =
+					library && library.length > 2000 ? Math.max(limit, 500) : limit;
 
 				const r = await apiLibrary(dir, engine, optimizedLimit, offset, {
 					openaiKey: needsOAI ? openaiKey : undefined,
@@ -757,7 +758,9 @@ function AppWithModalControls() {
 						photoActions.appendLibrary(r.paths);
 						// Log performance metrics for large collections
 						if (library && library.length > 1000) {
-							console.log(`Loaded ${r.paths.length} items, total: ${library.length + r.paths.length}, memory: ${Math.round(performance.memory ? performance.memory.usedJSHeapSize / 1024 / 1024 : 0)}MB`);
+							console.log(
+								`Loaded ${r.paths.length} items, total: ${library.length + r.paths.length}, memory: ${Math.round(performance.memory ? performance.memory.usedJSHeapSize / 1024 / 1024 : 0)}MB`,
+							);
 						}
 					}
 				} else {

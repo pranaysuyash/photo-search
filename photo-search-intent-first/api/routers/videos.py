@@ -9,6 +9,7 @@ from fastapi import APIRouter, Body, HTTPException, Query
 from fastapi.responses import FileResponse
 
 from api.utils import _from_body, _require
+from api.runtime_flags import is_offline
 from infra.index_store import IndexStore
 from infra.video_index_store import VideoIndexStore
 
@@ -70,6 +71,10 @@ def api_index_videos(
     """Index video files for search (extract metadata and generate thumbnails)."""
     dir_value = _require(_from_body(body, directory, "directory") or _from_body(body, None, "dir"), "directory")
     provider_value = _from_body(body, provider, "provider", default="local") or "local"
+    
+    # Enforce local provider in offline mode
+    if is_offline():
+        provider_value = "local"
 
     folder = Path(dir_value)
     if not folder.exists():

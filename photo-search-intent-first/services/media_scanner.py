@@ -1,98 +1,98 @@
-"""
-MediaScanner Service
-
-Extracted from server.py _scan_media_counts function to reduce
-cyclomatic complexity (CCN: 11 → 3-4 per method).
-
-Handles scanning directories for media files (images and videos),
-counting files and calculating total sizes for quick previews.
-"""
-
-import os
+# services/media_scanner.py
 from pathlib import Path
 from typing import List, Dict, Any, Set
+from dataclasses import dataclass
 
-from domain.models import SUPPORTED_EXTS, SUPPORTED_VIDEO_EXTS
+
+@dataclass
+class MediaCounts:
+    path: str
+    count: int = 0
+    bytes: int = 0
 
 
-class MediaScanResult:
-    """Result of a media scan operation."""
+@dataclass
+class ScanResult:
+    items: List[MediaCounts]
+    total_files: int
+    total_bytes: int
+
+
+class FileTypeFilter:
+    def __init__(self, img_exts: Set[str], vid_exts: Set[str]):
+        self.allowed_extensions = img_exts | vid_exts
+        
+    def is_media_file(self, file_path: Path) -> bool:
+        return file_path.suffix.lower() in self.allowed_extensions
+
+
+class DirectoryScanner:
+    def __init__(self, file_filter: FileTypeFilter):
+        self.file_filter = file_filter
+        
+    def scan_directory(self, directory: Path) -> MediaCounts:
+        if not (directory.exists() and directory.is_dir()):
+            return MediaCounts(path=str(directory))
+            
+        count = 0
+        size = 0
+        
+        try:
+            for file_path in self._walk_directory(directory):
+                if self.file_filter.is_media_file(file_path):
+                    count += 1
+                    size += self._get_file_size(file_path)
+        except Exception:
+            # Reset on error
+            count = 0
+            size = 0
+            
+        return MediaCounts(path=str(directory), count=count, bytes=size)
     
-    def __init__(self, path: str, count: int, size: int):
-        self.path = path
-        self.count = count
-        self.size = size
-    
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary format."""
-        return {"path": self.path, "count": self.count, "bytes": self.size}
+    def _walk_directory(self, directory: Path):
+        for root, _, files in os.walk(directory):
+            for name in files:
+                yield Path(root) / name
+                
+    def _get_file_size(self, file_path: Path) -> int:
+        try:
+            return file_path.stat().st_size
+        except Exception:
+            return 0
 
 
 class MediaScanner:
-    """Service for scanning directories and counting media files."""
-    
-    def scan_directories(self, paths: List[str], include_videos: bool = True) -> Dict[str, Any]:
-        """Count image/video files and bytes for quick previews; privacy-friendly."""
-        file_extensions = self._get_file_extensions(include_videos)
-        scan_results = []
+    def __init__(self):
+        # Define common image and video extensions
+        self.img_exts = {
+            '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif', 
+            '.webp', '.heic', '.heif', '.raw', '.cr2', '.nef', '.arw'
+        }
+        self.vid_exts = {
+            '.mp4', '.mov', '.avi', '.mkv', '.wmv', '.flv', '.webm', 
+            '.m4v', '.3gp', '.3g2', '.m2ts', '.mts'
+        }
+
+    def scan_media_counts(self, paths: List[str], include_videos: bool = True) -> Dict[str, Any]:
+        file_filter = FileTypeFilter(
+            self.img_exts, 
+            self.vid_exts if include_videos else set()
+        )
+        scanner = DirectoryScanner(file_filter)
+        
+        results = []
         total_files = 0
         total_bytes = 0
         
-        for path in paths:
-            result = self._scan_single_directory(path, file_extensions)
-            scan_results.append(result)
-            total_files += result.count
-            total_bytes += result.size
-        
-        return {
-            "items": [result.to_dict() for result in scan_results],
-            "total_files": total_files,
-            "total_bytes": total_bytes
-        }
-    
-    def _get_file_extensions(self, include_videos: bool) -> Set[str]:
-        """Get the set of file extensions to scan for."""
-        extensions = SUPPORTED_EXTS.copy()
-        if include_videos:
-            extensions.update(SUPPORTED_VIDEO_EXTS)
-        return extensions
-    
-    def _scan_single_directory(self, path: str, file_extensions: Set[str]) -> MediaScanResult:
-        """Scan a single directory for media files."""
-        try:
-            pth = Path(path).expanduser()
-            count, size = self._count_media_files(pth, file_extensions)
-            return MediaScanResult(str(pth), count, size)
-        except Exception:
-            # Return zero counts for any directory that fails to scan
-            return MediaScanResult(path, 0, 0)
-    
-    def _count_media_files(self, directory: Path, file_extensions: Set[str]) -> tuple[int, int]:
-        """Count media files and calculate total size in a directory."""
-        if not directory.exists() or not directory.is_dir():
-            return 0, 0
-        
-        count = 0
-        total_size = 0
-        
-        try:
-            for root, _, files in os.walk(directory):
-                for filename in files:
-                    if self._is_media_file(filename, file_extensions):
-                        count += 1
-                        try:
-                            file_path = Path(root) / filename
-                            total_size += file_path.stat().st_size
-                        except Exception:
-                            # Skip files that can't be stat'd (permissions, etc.)
-                            continue
-        except Exception:
-            # Return partial results if walk fails
-            pass
-        
-        return count, total_size
-    
-    def _is_media_file(self, filename: str, file_extensions: Set[str]) -> bool:
-        """Check if a file is a supported media file."""
-        ext = Path(filename).suffix.lower()
-        return ext in file_extensions
+        for path_str in paths:
+            path = Path(path_str).expanduser()
+            counts = scanner.scan_directory(path)
+            results.append(counts)
+            total_files += counts.count
+            total_bytes += counts.bytes
+            
+        return ScanResult(
+            items=[{"path": r.path, "count": r.count, "bytes": r.bytes} for r in results],
+            total_files=total_files,
+            total_bytes=total_bytes
+        ).__dict__

@@ -10,8 +10,11 @@ import {
 	useState,
 } from "react";
 import { searchHistoryService } from "../services/SearchHistoryService";
-import { synonymAlternates } from "../utils/searchSynonyms";
+import { SearchIntentRecognizer, type SearchIntent } from "../services/SearchIntentRecognizer";
+import { didYouMean, synonymAlternates } from "../utils/searchSynonyms";
+import { EnhancedSearchSuggestions } from "./EnhancedSearchSuggestions";
 import { SearchHistoryPanel } from "./SearchHistoryPanel";
+import { SearchIntentInfo } from "./SearchIntentInfo";
 
 interface SearchBarProps {
 	searchText: string;
@@ -50,6 +53,8 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 		const [suggestOpen, setSuggestOpen] = useState(false);
 		const [activeIdx, setActiveIdx] = useState<number>(-1);
 		const [showHistoryPanel, setShowHistoryPanel] = useState(false);
+		const [currentIntent, setCurrentIntent] = useState<SearchIntent | undefined>();
+		const [useEnhancedSuggestions, setUseEnhancedSuggestions] = useState(true);
 		const searchInputRef = useRef<HTMLInputElement>(null);
 		const suggestionRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
@@ -84,6 +89,21 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 			}>
 		>([]);
 
+		// Recognize intent when query changes
+		useEffect(() => {
+			if (searchText.trim()) {
+				const intent = SearchIntentRecognizer.recognizeIntent(searchText, {
+					recentSearches: searchHistoryService.getHistory().slice(0, 5).map(h => h.query),
+					availableTags: allTags,
+					availablePeople: clusters.map(c => c.name || "").filter(Boolean),
+					availableLocations: meta.places?.map(p => String(p)) || [],
+				});
+				setCurrentIntent(intent);
+			} else {
+				setCurrentIntent(undefined);
+			}
+		}, [searchText, allTags, clusters, meta.places]);
+
 		useEffect(() => {
 			if (!suggestOpen) return;
 			debouncedSearch(() => {
@@ -99,6 +119,17 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 				setHistorySuggestions(historySuggs);
 			});
 		}, [debouncedSearch, searchText, suggestOpen]);
+
+		// Handle enhanced suggestion selection
+		const handleEnhancedSuggestionSelect = useCallback((suggestion: string, intent?: SearchIntent) => {
+			setSearchText(suggestion);
+			setCurrentIntent(intent);
+			setSuggestOpen(false);
+			setActiveIdx(-1);
+			setTimeout(() => {
+				onSearch(suggestion);
+			}, 0);
+		}, [setSearchText, onSearch]);
 
 		const handleSearch = useCallback(
 			(text: string) => {
@@ -200,17 +231,64 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 
 			const alts = synonymAlternates(searchText || "");
 			const fallback = ["family dinner", "golden hour", "mountain hike"];
-			const altList = Array.from(new Set([...(alts || []), ...fallback])).slice(
-				0,
-				6,
-			);
-			return altList.map((label) => ({
-				cat: "Suggestion",
-				label,
-				type: "alternate" as const,
-				subtitle: "Press Enter to search",
-				icon: undefined,
-			}));
+
+			// Get spelling corrections if query is long enough
+			const allCandidates = [
+				...clusters.map((c) => c.name || "").filter(Boolean),
+				...allTags,
+				...fallback,
+			];
+			const corrections = didYouMean(searchText || "", allCandidates, 2);
+
+			// Build enhanced suggestions
+			const suggestions: Array<{
+				cat: string;
+				label: string;
+				type: SuggestionType;
+				subtitle?: string;
+				icon?: React.ComponentType<LucideProps>;
+			}> = [];
+
+			// Add spelling corrections first (if any)
+			if (corrections.length > 0) {
+				suggestions.push(
+					...corrections.map((correction) => ({
+						cat: "Did you mean?",
+						label: correction,
+						type: "alternate" as const,
+						subtitle: "Spelling suggestion",
+						icon: undefined,
+					})),
+				);
+			}
+
+			// Add synonym alternatives
+			if (alts.length > 0) {
+				suggestions.push(
+					...alts.map((alt) => ({
+						cat: "Try also",
+						label: alt,
+						type: "alternate" as const,
+						subtitle: "Synonym suggestion",
+						icon: undefined,
+					})),
+				);
+			}
+
+			// Add fallback suggestions if needed
+			if (suggestions.length < 3) {
+				suggestions.push(
+					...fallback.map((fallbackItem) => ({
+						cat: "Popular searches",
+						label: fallbackItem,
+						type: "alternate" as const,
+						subtitle: "Press Enter to search",
+						icon: undefined,
+					})),
+				);
+			}
+
+			return suggestions.slice(0, 6);
 		}, [
 			suggestOpen,
 			historySuggestions,
@@ -409,6 +487,17 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 						))}
 					</div>
 				)}
+
+				{/* Show search intent info when intent is recognized with high confidence */}
+				{currentIntent && currentIntent.confidence > 0.6 && (
+					<div className="mt-2 mx-1">
+						<SearchIntentInfo
+							intent={currentIntent}
+							query={searchText}
+							onClose={() => setCurrentIntent(undefined)}
+						/>
+					</div>
+				)}
 				{suggestOpen && (
 					<div
 						className="suggestions-dropdown"
@@ -416,48 +505,77 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 						role="listbox"
 						aria-label="Search suggestions"
 					>
-						{suggestions.length === 0 ? (
-							<div className="px-3 py-2 text-gray-600 text-sm">
-								No suggestions available.
-							</div>
+						{useEnhancedSuggestions ? (
+							<EnhancedSearchSuggestions
+								query={searchText}
+								onSuggestionSelect={handleEnhancedSuggestionSelect}
+								availableTags={allTags}
+								availablePeople={clusters.map(c => c.name || "").filter(Boolean)}
+								availableLocations={meta.places?.map(p => String(p)) || []}
+								availableCameras={meta.cameras || []}
+								className="max-h-96 overflow-y-auto"
+							/>
 						) : (
-							suggestions.map((s, i) => (
-								<button
-									type="button"
-									key={`${s.cat}:${s.label}`}
-									id={`sug-${i}`}
-									className="suggestion-item"
-									data-active={activeIdx === i ? "true" : undefined}
-									onMouseEnter={() => setActiveIdx(i)}
-									onMouseDown={(e) => {
-										e.preventDefault();
-										applySuggestion(s);
-									}}
-									role="option"
-									aria-selected={activeIdx === i}
-									tabIndex={-1}
-									ref={(el) => {
-										suggestionRefs.current[i] = el;
-									}}
-								>
-									<div className="suggestion-content">
-										{s.icon && (
-											<s.icon className="suggestion-icon" aria-hidden="true" />
-										)}
-										<div className="suggestion-text">
-											<div className="suggestion-main">
-												<span className="suggestion-category">{s.cat}</span>
-												<span className="suggestion-label">{s.label}</span>
-											</div>
-											{s.subtitle && (
-												<div className="suggestion-subtitle">{s.subtitle}</div>
-											)}
-										</div>
+							<>
+								{suggestions.length === 0 ? (
+									<div className="px-3 py-2 text-gray-600 text-sm">
+										No suggestions available.
 									</div>
-									<span className="suggestion-hint">↵</span>
-								</button>
-							))
+								) : (
+									suggestions.map((s, i) => (
+										<button
+											type="button"
+											key={`${s.cat}:${s.label}`}
+											id={`sug-${i}`}
+											className="suggestion-item"
+											data-active={activeIdx === i ? "true" : undefined}
+											onMouseEnter={() => setActiveIdx(i)}
+											onMouseDown={(e) => {
+												e.preventDefault();
+												applySuggestion(s);
+											}}
+											role="option"
+											aria-selected={activeIdx === i}
+											tabIndex={-1}
+											ref={(el) => {
+												suggestionRefs.current[i] = el;
+											}}
+										>
+											<div className="suggestion-content">
+												{s.icon && (
+													<s.icon className="suggestion-icon" aria-hidden="true" />
+												)}
+												<div className="suggestion-text">
+													<div className="suggestion-main">
+														<span className="suggestion-category">{s.cat}</span>
+														<span className="suggestion-label">{s.label}</span>
+													</div>
+													{s.subtitle && (
+														<div className="suggestion-subtitle">{s.subtitle}</div>
+													)}
+												</div>
+											</div>
+											<span className="suggestion-hint">↵</span>
+										</button>
+									))
+								)}
+							</>
 						)}
+
+						{/* Toggle for enhanced suggestions */}
+						<div className="border-t border-border p-2 flex items-center justify-between">
+							<span className="text-xs text-muted-foreground">
+								{useEnhancedSuggestions ? "AI-Powered Suggestions" : "Classic Suggestions"}
+							</span>
+							<button
+								type="button"
+								onClick={() => setUseEnhancedSuggestions(!useEnhancedSuggestions)}
+								className="text-xs px-2 py-1 rounded bg-muted hover:bg-muted/70 transition-colors"
+								aria-label={`Switch to ${useEnhancedSuggestions ? "classic" : "enhanced"} suggestions`}
+							>
+								{useEnhancedSuggestions ? "Classic" : "Enhanced"}
+							</button>
+						</div>
 					</div>
 				)}
 				{showHistoryPanel && (

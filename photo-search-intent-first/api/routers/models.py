@@ -20,6 +20,7 @@ import time
 from fastapi import APIRouter
 
 from infra.config import config
+from api.runtime_flags import is_offline as runtime_is_offline
 
 router = APIRouter(tags=["models"])  # No prefix to stay consistent with other legacy routes
 
@@ -193,10 +194,13 @@ def _build_status_payload() -> Dict[str, Any]:
     model_dir = _candidate_model_dir()
     models = _collect_models(model_dir)
     _augment_from_manifest(models, model_dir)
+    # Respect runtime toggle (admin endpoint) in addition to config/env defaults
     payload = {
         "ok": True,
         "models": models,
-        "offline_mode": bool(config.offline_mode or os.getenv("OFFLINE_MODE") == "1"),
+        "offline_mode": bool(
+            config.offline_mode or os.getenv("OFFLINE_MODE") == "1" or runtime_is_offline()
+        ),
         "model_dir": str(model_dir) if model_dir else None,
         "capabilities": _capabilities(models),
     }
