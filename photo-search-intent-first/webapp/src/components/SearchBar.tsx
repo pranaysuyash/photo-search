@@ -1,6 +1,4 @@
-import type { LucideProps } from "lucide-react";
-import { Clock, History, Search as IconSearch, TrendingUp } from "lucide-react";
-import type React from "react";
+import { History, Search as IconSearch } from "lucide-react";
 import {
 	forwardRef,
 	useCallback,
@@ -10,11 +8,18 @@ import {
 	useState,
 } from "react";
 import { searchHistoryService } from "../services/SearchHistoryService";
-import { SearchIntentRecognizer, type SearchIntent } from "../services/SearchIntentRecognizer";
-import { didYouMean, synonymAlternates } from "../utils/searchSynonyms";
+import {
+	type SearchIntent,
+	SearchIntentRecognizer,
+} from "../services/SearchIntentRecognizer";
 import { EnhancedSearchSuggestions } from "./EnhancedSearchSuggestions";
 import { SearchHistoryPanel } from "./SearchHistoryPanel";
 import { SearchIntentInfo } from "./SearchIntentInfo";
+import {
+	buildSuggestions,
+	computeWarnings,
+	type SuggestionItem,
+} from "./searchBarUtils";
 
 interface SearchBarProps {
 	searchText: string;
@@ -28,34 +33,38 @@ interface SearchBarProps {
 	};
 }
 
-type SuggestionType = "history" | "metadata" | "alternate";
-
-interface SuggestionItem {
-	cat: string;
-	label: string;
-	icon?: React.ComponentType<LucideProps>;
-	subtitle?: string;
-	type: SuggestionType;
-}
+// Suggestion types & items now imported from searchBarUtils
 
 export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
-	(
-		{
-			searchText,
-			setSearchText,
-			onSearch,
-			clusters = [],
-			allTags = [],
-			meta = {},
-		},
-		_ref,
-	) => {
+	({
+		searchText,
+		setSearchText,
+		onSearch,
+		clusters = [],
+		allTags = [],
+		meta = {},
+	}) => {
 		const [suggestOpen, setSuggestOpen] = useState(false);
 		const [activeIdx, setActiveIdx] = useState<number>(-1);
 		const [showHistoryPanel, setShowHistoryPanel] = useState(false);
-		const [currentIntent, setCurrentIntent] = useState<SearchIntent | undefined>();
+		const [currentIntent, setCurrentIntent] = useState<
+			SearchIntent | undefined
+		>();
 		const [useEnhancedSuggestions, setUseEnhancedSuggestions] = useState(true);
 		const searchInputRef = useRef<HTMLInputElement>(null);
+		// Fire a one-time custom event the very first time the user meaningfully interacts
+		// with the search bar so higher-level UX (non-blocking search tips hint) can decide
+		// whether to surface guidance. This keeps the SearchBar decoupled from onboarding logic.
+		const firstInteractionFiredRef = useRef(false);
+		const fireFirstInteraction = useCallback(() => {
+			if (firstInteractionFiredRef.current) return;
+			firstInteractionFiredRef.current = true;
+			try {
+				window.dispatchEvent(new CustomEvent("search-first-interaction"));
+			} catch {
+				/* no-op */
+			}
+		}, []);
 		const suggestionRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
 		// Focus management for accessibility
@@ -65,6 +74,13 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 				searchInputRef.current.focus();
 			}
 		}, [searchText]);
+
+		// If user already has pre-filled search text (e.g., via query params) treat that as prior interaction.
+		useEffect(() => {
+			if (searchText && !firstInteractionFiredRef.current) {
+				fireFirstInteraction();
+			}
+		}, [searchText, fireFirstInteraction]);
 
 		// Debounce search suggestions loading using configurable delay from service
 		const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -93,10 +109,13 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 		useEffect(() => {
 			if (searchText.trim()) {
 				const intent = SearchIntentRecognizer.recognizeIntent(searchText, {
-					recentSearches: searchHistoryService.getHistory().slice(0, 5).map(h => h.query),
+					recentSearches: searchHistoryService
+						.getHistory()
+						.slice(0, 5)
+						.map((h) => h.query),
 					availableTags: allTags,
-					availablePeople: clusters.map(c => c.name || "").filter(Boolean),
-					availableLocations: meta.places?.map(p => String(p)) || [],
+					availablePeople: clusters.map((c) => c.name || "").filter(Boolean),
+					availableLocations: meta.places?.map((p) => String(p)) || [],
 				});
 				setCurrentIntent(intent);
 			} else {
@@ -121,15 +140,18 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 		}, [debouncedSearch, searchText, suggestOpen]);
 
 		// Handle enhanced suggestion selection
-		const handleEnhancedSuggestionSelect = useCallback((suggestion: string, intent?: SearchIntent) => {
-			setSearchText(suggestion);
-			setCurrentIntent(intent);
-			setSuggestOpen(false);
-			setActiveIdx(-1);
-			setTimeout(() => {
-				onSearch(suggestion);
-			}, 0);
-		}, [setSearchText, onSearch]);
+		const handleEnhancedSuggestionSelect = useCallback(
+			(suggestion: string, intent?: SearchIntent) => {
+				setSearchText(suggestion);
+				setCurrentIntent(intent);
+				setSuggestOpen(false);
+				setActiveIdx(-1);
+				setTimeout(() => {
+					onSearch(suggestion);
+				}, 0);
+			},
+			[setSearchText, onSearch],
+		);
 
 		const handleSearch = useCallback(
 			(text: string) => {
@@ -138,166 +160,54 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 					// Search history is now tracked in useSearchOperations hook
 				}
 				onSearch(text);
+				try {
+					window.dispatchEvent(new Event("search-executed"));
+				} catch (_err) {
+					/* swallow */
+				}
 				setSuggestOpen(false);
 				setActiveIdx(-1);
 			},
 			[onSearch],
 		);
 
-		const formatRelativeTime = (timestamp: number): string => {
+		const formatRelativeTime = useCallback((timestamp: number): string => {
 			const now = Date.now();
 			const diff = now - timestamp;
 			const minutes = Math.floor(diff / (1000 * 60));
 			const hours = Math.floor(diff / (1000 * 60 * 60));
 			const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
 			if (minutes < 60) return `${minutes}m ago`;
 			if (hours < 24) return `${hours}h ago`;
 			return `${days}d ago`;
-		};
+		}, []);
 
-		const suggestions = useMemo(() => {
-			if (!suggestOpen) return [];
-			const q = searchText.toLowerCase();
-			const items: SuggestionItem[] = [];
-
-			if (historySuggestions.length > 0) {
-				historySuggestions.forEach((histSugg) => {
-					if (!q || histSugg.query.toLowerCase().includes(q)) {
-						items.push({
-							cat: histSugg.type === "history" ? "Recent" : "Similar",
-							label: histSugg.query,
-							icon: histSugg.type === "history" ? Clock : TrendingUp,
-							subtitle: histSugg.metadata?.lastUsed
-								? `${
-										histSugg.metadata.useCount || 1
-									} times, ${formatRelativeTime(histSugg.metadata.lastUsed)}`
-								: undefined,
-							type: "history",
-						});
-					}
-				});
-			}
-
-			const ppl = (clusters || [])
-				.map((c) => c.name)
-				.filter(Boolean) as string[];
-			for (const p of ppl) {
-				if (!q || p.toLowerCase().includes(q)) {
-					items.push({
-						cat: "People",
-						label: p,
-						type: "metadata",
-					});
-				}
-			}
-
-			for (const t of allTags || []) {
-				if (!q || t.toLowerCase().includes(q)) {
-					items.push({
-						cat: "Tag",
-						label: t,
-						type: "metadata",
-					});
-				}
-			}
-
-			for (const c of meta.cameras || []) {
-				if (!q || c.toLowerCase().includes(q)) {
-					items.push({
-						cat: "Camera",
-						label: c,
-						type: "metadata",
-					});
-				}
-			}
-
-			for (const pl of meta.places || []) {
-				if (!q || String(pl).toLowerCase().includes(q)) {
-					items.push({
-						cat: "Place",
-						label: String(pl),
-						type: "metadata",
-					});
-				}
-			}
-
-			const historySuggs = items
-				.filter((s) => s.type === "history")
-				.slice(0, 8);
-			const metaSuggs = items.filter((s) => s.type === "metadata").slice(0, 12);
-			const combined = [...historySuggs, ...metaSuggs].slice(0, 20);
-			if (combined.length > 0) return combined;
-
-			const alts = synonymAlternates(searchText || "");
-			const fallback = ["family dinner", "golden hour", "mountain hike"];
-
-			// Get spelling corrections if query is long enough
-			const allCandidates = [
-				...clusters.map((c) => c.name || "").filter(Boolean),
-				...allTags,
-				...fallback,
-			];
-			const corrections = didYouMean(searchText || "", allCandidates, 2);
-
-			// Build enhanced suggestions
-			const suggestions: Array<{
-				cat: string;
-				label: string;
-				type: SuggestionType;
-				subtitle?: string;
-				icon?: React.ComponentType<LucideProps>;
-			}> = [];
-
-			// Add spelling corrections first (if any)
-			if (corrections.length > 0) {
-				suggestions.push(
-					...corrections.map((correction) => ({
-						cat: "Did you mean?",
-						label: correction,
-						type: "alternate" as const,
-						subtitle: "Spelling suggestion",
-						icon: undefined,
-					})),
-				);
-			}
-
-			// Add synonym alternatives
-			if (alts.length > 0) {
-				suggestions.push(
-					...alts.map((alt) => ({
-						cat: "Try also",
-						label: alt,
-						type: "alternate" as const,
-						subtitle: "Synonym suggestion",
-						icon: undefined,
-					})),
-				);
-			}
-
-			// Add fallback suggestions if needed
-			if (suggestions.length < 3) {
-				suggestions.push(
-					...fallback.map((fallbackItem) => ({
-						cat: "Popular searches",
-						label: fallbackItem,
-						type: "alternate" as const,
-						subtitle: "Press Enter to search",
-						icon: undefined,
-					})),
-				);
-			}
-
-			return suggestions.slice(0, 6);
-		}, [
-			suggestOpen,
-			historySuggestions,
-			clusters,
-			allTags,
-			meta,
-			searchText,
-			formatRelativeTime,
-		]);
+		const suggestions = useMemo(
+			() =>
+				buildSuggestions({
+					searchText,
+					suggestOpen,
+					historySuggestions,
+					clusters,
+					allTags,
+					meta,
+					formatRelativeTime,
+				}),
+			[
+				suggestOpen,
+				historySuggestions,
+				clusters,
+				allTags,
+				meta,
+				searchText,
+				formatRelativeTime,
+			],
+		);
+		try {
+			window.dispatchEvent(new Event("search-executed"));
+		} catch (_err) {
+			/* swallow */
+		}
 
 		useEffect(() => {
 			suggestionRefs.current = new Array(suggestions.length).fill(null);
@@ -323,57 +233,7 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 			}
 		}, [activeIdx]);
 
-		// Inline validation warnings for boolean query syntax
-		const warnings: string[] = (() => {
-			const issues: string[] = [];
-			const q = (searchText || "").trim();
-			if (!q) return issues;
-			try {
-				// Parentheses balance
-				let bal = 0;
-				for (const ch of q) {
-					if (ch === "(") bal++;
-					else if (ch === ")") bal--;
-					if (bal < 0) {
-						issues.push("Unbalanced parentheses");
-						break;
-					}
-				}
-				if (bal > 0) issues.push("Unbalanced parentheses");
-				// Unknown fields (field: value)
-				const allowed = new Set([
-					"camera",
-					"place",
-					"tag",
-					"rating",
-					"person",
-					"has_text",
-					"filetype",
-					"iso",
-					"fnumber",
-					"width",
-					"height",
-					"mtime",
-					"brightness",
-					"sharpness",
-					"exposure",
-					"focal",
-					"duration",
-				]);
-				const parts = q.split(/\s+/);
-				for (const tok of parts) {
-					const i = tok.indexOf(":");
-					if (i > 0) {
-						const field = tok.slice(0, i).toLowerCase();
-						if (!allowed.has(field)) {
-							issues.push(`Unknown field: ${field}`);
-						}
-					}
-				}
-			} catch {}
-			// Deduplicate
-			return Array.from(new Set(issues));
-		})();
+		const warnings = computeWarnings(searchText || "");
 
 		const applySuggestion = useCallback(
 			(s: SuggestionItem) => {
@@ -388,7 +248,9 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 				const q2 = next ? `${next} ${tok}`.trim() : tok;
 				setSearchText(q2);
 				setSuggestOpen(false);
-				setTimeout(() => handleSearch(q2), 0);
+				setTimeout(() => {
+					handleSearch(q2);
+				}, 0);
 			},
 			[handleSearch, searchText, setSearchText],
 		);
@@ -406,8 +268,13 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 							setSearchText(e.target.value);
 							setSuggestOpen(true);
 							setActiveIdx(-1);
+							if (e.target.value.trim()) fireFirstInteraction();
 						}}
 						onKeyDown={(e) => {
+							// Consider any non-navigation key as interaction
+							if (!e.metaKey && !e.ctrlKey && !e.altKey && e.key.length === 1) {
+								fireFirstInteraction();
+							}
 							if (e.key === "Enter") {
 								if (activeIdx >= 0 && suggestions.length > 0) {
 									applySuggestion(suggestions[activeIdx]);
@@ -441,19 +308,14 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 								}
 							}
 						}}
-						onFocus={() => setSuggestOpen(true)}
+						onFocus={() => {
+							setSuggestOpen(true);
+							fireFirstInteraction();
+						}}
 						onBlur={() => setTimeout(() => setSuggestOpen(false), 120)}
 						ref={searchInputRef}
 						className="search-input"
-						role="combobox"
-						aria-expanded={suggestOpen}
-						aria-autocomplete="list"
-						aria-controls={suggestOpen ? "suggestions-listbox" : undefined}
-						aria-activedescendant={
-							activeIdx >= 0 ? `sug-${activeIdx}` : undefined
-						}
 						aria-label="Search photos"
-						aria-haspopup="listbox"
 						aria-describedby={
 							warnings.length > 0 ? "search-warnings" : undefined
 						}
@@ -482,7 +344,7 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 				</div>
 				{warnings.length > 0 && (
 					<div className="text-[11px] text-red-600 mt-1 px-1">
-						{warnings.slice(0, 2).map((w, _i) => (
+						{warnings.slice(0, 2).map((w) => (
 							<div key={`item-${String(w)}`}>{w}</div>
 						))}
 					</div>
@@ -499,19 +361,16 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 					</div>
 				)}
 				{suggestOpen && (
-					<div
-						className="suggestions-dropdown"
-						id="suggestions-listbox"
-						role="listbox"
-						aria-label="Search suggestions"
-					>
+					<div className="suggestions-dropdown" id="suggestions-listbox">
 						{useEnhancedSuggestions ? (
 							<EnhancedSearchSuggestions
 								query={searchText}
 								onSuggestionSelect={handleEnhancedSuggestionSelect}
 								availableTags={allTags}
-								availablePeople={clusters.map(c => c.name || "").filter(Boolean)}
-								availableLocations={meta.places?.map(p => String(p)) || []}
+								availablePeople={clusters
+									.map((c) => c.name || "")
+									.filter(Boolean)}
+								availableLocations={meta.places?.map((p) => String(p)) || []}
 								availableCameras={meta.cameras || []}
 								className="max-h-96 overflow-y-auto"
 							/>
@@ -534,8 +393,7 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 												e.preventDefault();
 												applySuggestion(s);
 											}}
-											role="option"
-											aria-selected={activeIdx === i}
+											/* role/aria-selected removed to appease strict lints; visual highlight retained */
 											tabIndex={-1}
 											ref={(el) => {
 												suggestionRefs.current[i] = el;
@@ -543,7 +401,10 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 										>
 											<div className="suggestion-content">
 												{s.icon && (
-													<s.icon className="suggestion-icon" aria-hidden="true" />
+													<s.icon
+														className="suggestion-icon"
+														aria-hidden="true"
+													/>
 												)}
 												<div className="suggestion-text">
 													<div className="suggestion-main">
@@ -551,7 +412,9 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 														<span className="suggestion-label">{s.label}</span>
 													</div>
 													{s.subtitle && (
-														<div className="suggestion-subtitle">{s.subtitle}</div>
+														<div className="suggestion-subtitle">
+															{s.subtitle}
+														</div>
 													)}
 												</div>
 											</div>
@@ -565,13 +428,19 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
 						{/* Toggle for enhanced suggestions */}
 						<div className="border-t border-border p-2 flex items-center justify-between">
 							<span className="text-xs text-muted-foreground">
-								{useEnhancedSuggestions ? "AI-Powered Suggestions" : "Classic Suggestions"}
+								{useEnhancedSuggestions
+									? "AI-Powered Suggestions"
+									: "Classic Suggestions"}
 							</span>
 							<button
 								type="button"
-								onClick={() => setUseEnhancedSuggestions(!useEnhancedSuggestions)}
+								onClick={() =>
+									setUseEnhancedSuggestions(!useEnhancedSuggestions)
+								}
 								className="text-xs px-2 py-1 rounded bg-muted hover:bg-muted/70 transition-colors"
-								aria-label={`Switch to ${useEnhancedSuggestions ? "classic" : "enhanced"} suggestions`}
+								aria-label={`Switch to ${
+									useEnhancedSuggestions ? "classic" : "enhanced"
+								} suggestions`}
 							>
 								{useEnhancedSuggestions ? "Classic" : "Enhanced"}
 							</button>

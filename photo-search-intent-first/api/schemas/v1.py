@@ -9,10 +9,29 @@ from __future__ import annotations
 from typing import List, Optional, Annotated, Dict, Any
 
 from pydantic import BaseModel, Field
+try:  # Pydantic v2 specific utility
+    from pydantic import ConfigDict
+except ImportError:  # pragma: no cover - Pydantic v1 fallback
+    ConfigDict = None  # type: ignore[attr-defined]
 try:  # Pydantic v2
     from pydantic import model_validator  # type: ignore
 except Exception:  # pragma: no cover
     model_validator = None  # type: ignore
+
+
+if ConfigDict is not None:
+    class PopulateByNameModel(BaseModel):
+        """Base model enabling name-based population under Pydantic v2."""
+
+        model_config = ConfigDict(populate_by_name=True)
+
+
+else:  # pragma: no cover - executed only with Pydantic v1
+    class PopulateByNameModel(BaseModel):
+        """Fallback base model supporting name-based population for Pydantic v1."""
+
+        class Config:
+            allow_population_by_field_name = True
 
 
 class BaseResponse(BaseModel):
@@ -149,7 +168,7 @@ class HealthResponse(BaseResponse):
     version: Optional[str] = None
 
 
-class SearchRequest(BaseModel):
+class SearchRequest(PopulateByNameModel):
     dir: str = Field(..., description="Absolute path to the photo directory")
     query: str = Field(..., description="Text query to search for")
     top_k: Annotated[int, Field(ge=1, le=500, description="Number of results to return")] = 12
@@ -190,10 +209,6 @@ class SearchRequest(BaseModel):
     exclude_underexp: bool = Field(default=False, description="Exclude underexposed photos")
     exclude_overexp: bool = Field(default=False, description="Exclude overexposed photos")
 
-    class Config:
-        # Support both pydantic v1 and v2
-        allow_population_by_field_name = True  # pydantic v1
-        populate_by_name = True  # pydantic v2
 
 
 class SearchResultItem(BaseModel):
@@ -213,7 +228,7 @@ class SearchResponse(BaseModel):
     offline_mode: Optional[bool] = None
 
 
-class IndexRequest(BaseModel):
+class IndexRequest(PopulateByNameModel):
     """Index build/update request.
 
     Canonical field is now 'directory'; legacy clients still send 'dir'.
@@ -241,12 +256,9 @@ class IndexRequest(BaseModel):
                 raise ValueError("directory required")
             return self
 
-    class Config:
-        allow_population_by_field_name = True  # pydantic v1
-        populate_by_name = True  # pydantic v2
 
 
-class TagsRequest(BaseModel):
+class TagsRequest(PopulateByNameModel):
     """Tag mutation request.
 
     New canonical field is 'directory'; legacy clients still send 'dir'.
@@ -268,12 +280,9 @@ class TagsRequest(BaseModel):
                 raise ValueError("directory required")
             return self
 
-    class Config:
-        allow_population_by_field_name = True  # pydantic v1
-        populate_by_name = True  # pydantic v2
 
 
-class FavoritesRequest(BaseModel):
+class FavoritesRequest(PopulateByNameModel):
     """Favorite toggle request with directory alias migration."""
 
     dir: Optional[str] = Field(default=None, description="Deprecated; use 'directory'")
@@ -290,12 +299,9 @@ class FavoritesRequest(BaseModel):
                 raise ValueError("directory required")
             return self
 
-    class Config:
-        allow_population_by_field_name = True  # pydantic v1
-        populate_by_name = True  # pydantic v2
 
 
-class ShareRequest(BaseModel):
+class ShareRequest(PopulateByNameModel):
     """Share request with directory alias migration."""
 
     dir: Optional[str] = Field(default=None, description="Deprecated; use 'directory'")
@@ -316,18 +322,12 @@ class ShareRequest(BaseModel):
                 raise ValueError("directory required")
             return self
 
-    class Config:
-        allow_population_by_field_name = True  # pydantic v1
-        populate_by_name = True  # pydantic v2
 
 
 class ShareRevokeRequest(BaseModel):
     """Request to revoke a share token."""
     token: str
 
-    class Config:
-        allow_population_by_field_name = True  # pydantic v1
-        populate_by_name = True  # pydantic v2
 
 
 class CachedSearchRequest(SearchRequest):
@@ -338,9 +338,6 @@ class CachedSearchRequest(SearchRequest):
     use_fast: bool = False
     fast_kind: Optional[str] = None
 
-    class Config:
-        allow_population_by_field_name = True  # pydantic v1
-        populate_by_name = True  # pydantic v2
 
 
 class WorkspaceSearchRequest(SearchRequest):
@@ -354,10 +351,6 @@ class WorkspaceSearchRequest(SearchRequest):
     has_text: bool = False
     person: Optional[str] = None
     persons: List[str] = Field(default_factory=list)
-
-    class Config:
-        allow_population_by_field_name = True  # pydantic v1
-        populate_by_name = True  # pydantic v2
 
 
 __all__ = [

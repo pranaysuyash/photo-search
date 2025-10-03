@@ -62,7 +62,7 @@ export interface DuplicateInfo {
 export interface EventInfo {
 	id: string;
 	name: string;
-	type: 'event' | 'location' | 'time' | 'holiday' | 'custom';
+	type: "event" | "location" | "time" | "holiday" | "custom";
 	start_date: Date;
 	end_date: Date;
 	photos: string[];
@@ -74,8 +74,8 @@ export interface EventInfo {
 
 export interface FaceInfo {
 	id: string;
-	age_group: 'child' | 'teen' | 'adult' | 'senior';
-	gender?: 'male' | 'female' | 'unknown';
+	age_group: "child" | "teen" | "adult" | "senior";
+	gender?: "male" | "female" | "unknown";
 	confidence: number;
 	emotions: EmotionData[];
 	face_count: number;
@@ -83,17 +83,24 @@ export interface FaceInfo {
 }
 
 export interface EmotionData {
-	emotion: 'happy' | 'sad' | 'angry' | 'surprised' | 'neutral' | 'fear' | 'disgust';
+	emotion:
+		| "happy"
+		| "sad"
+		| "angry"
+		| "surprised"
+		| "neutral"
+		| "fear"
+		| "disgust";
 	confidence: number;
 }
 
 export interface LocationInfo {
 	name: string;
-	type: 'country' | 'city' | 'landmark' | 'venue' | 'nature' | 'home' | 'work';
+	type: "country" | "city" | "landmark" | "venue" | "nature" | "home" | "work";
 	coordinates?: { lat: number; lng: number };
 	confidence: number;
 	weather?: string;
-	time_of_day?: 'morning' | 'afternoon' | 'evening' | 'night';
+	time_of_day?: "morning" | "afternoon" | "evening" | "night";
 }
 
 export interface PhotoMetadata {
@@ -118,7 +125,14 @@ export interface PhotoMetadata {
 export interface SmartCollectionSuggestion {
 	name: string;
 	description: string;
-	type: 'quality' | 'event' | 'people' | 'location' | 'time' | 'theme' | 'cleanup';
+	type:
+		| "quality"
+		| "event"
+		| "people"
+		| "location"
+		| "time"
+		| "theme"
+		| "cleanup";
 	photos: string[];
 	confidence: number;
 	auto_generated_name: string;
@@ -130,12 +144,17 @@ export interface SmartCollectionSuggestion {
 }
 
 export interface CurationAction {
-	type: 'create_collection' | 'move_photos' | 'delete_duplicates' | 'rate_photos' | 'tag_photos';
+	type:
+		| "create_collection"
+		| "move_photos"
+		| "delete_duplicates"
+		| "rate_photos"
+		| "tag_photos";
 	description: string;
 	photos: string[];
 	target_collection?: string;
 	confidence: number;
-	impact: 'high' | 'medium' | 'low';
+	impact: "high" | "medium" | "low";
 }
 
 export interface CurationProgress {
@@ -178,7 +197,7 @@ export class AutoCurationEngine {
 			qualityThreshold: 50,
 			duplicateThreshold: 85,
 			maxPhotosPerCollection: 100,
-			...options
+			...options,
 		};
 	}
 
@@ -192,7 +211,10 @@ export class AutoCurationEngine {
 	/**
 	 * Analyze photos and generate auto-curation suggestions
 	 */
-	async analyzePhotos(photoPaths: string[], onProgress?: (progress: CurationProgress) => void): Promise<AutoCurationResult> {
+	async analyzePhotos(
+		photoPaths: string[],
+		onProgress?: (progress: CurationProgress) => void,
+	): Promise<AutoCurationResult> {
 		const startTime = Date.now();
 		const analysis: PhotoAnalysis[] = [];
 		const actions: CurationAction[] = [];
@@ -206,10 +228,14 @@ export class AutoCurationEngine {
 				onProgress({
 					processed_photos: i,
 					total_photos: photoPaths.length,
-					current_step: `Analyzing ${path.split('/').pop()}`,
-					estimated_time_remaining: this.calculateETA(i, photoPaths.length, startTime),
+					current_step: `Analyzing ${path.split("/").pop()}`,
+					estimated_time_remaining: this.calculateETA(
+						i,
+						photoPaths.length,
+						startTime,
+					),
 					actions_suggested: actions.length,
-					completed_actions: []
+					completed_actions: [],
 				});
 			}
 
@@ -219,7 +245,6 @@ export class AutoCurationEngine {
 				this.cache.set(path, photoAnalysis);
 			} catch (error) {
 				console.error(`Failed to analyze photo ${path}:`, error);
-				continue;
 			}
 		}
 
@@ -250,11 +275,14 @@ export class AutoCurationEngine {
 		return {
 			summary: {
 				total_photos_analyzed: analysis.length,
-				duplicates_found: actions.filter(a => a.type === 'delete_duplicates').length,
-				events_detected: collections.filter(c => c.type === 'event').length,
+				duplicates_found: actions.filter((a) => a.type === "delete_duplicates")
+					.length,
+				events_detected: collections.filter((c) => c.type === "event").length,
 				smart_collections_suggested: collections.length,
-				quality_ratings_assigned: actions.filter(a => a.type === 'rate_photos').length,
-				processing_time
+				quality_ratings_assigned: actions.filter(
+					(a) => a.type === "rate_photos",
+				).length,
+				processing_time,
 			},
 			actions,
 			collections,
@@ -262,11 +290,11 @@ export class AutoCurationEngine {
 			progress: {
 				processed_photos: photoPaths.length,
 				total_photos: photoPaths.length,
-				current_step: 'Analysis complete',
+				current_step: "Analysis complete",
 				estimated_time_remaining: 0,
 				actions_suggested: actions.length,
-				completed_actions: []
-			}
+				completed_actions: [],
+			},
 		};
 	}
 
@@ -293,14 +321,17 @@ export class AutoCurationEngine {
 			faces,
 			locations,
 			tags,
-			metadata
+			metadata,
 		};
 	}
 
 	/**
 	 * Assess photo quality using multiple metrics
 	 */
-	private async assessQuality(photoPath: string, metadata: PhotoMetadata): Promise<QualityMetrics> {
+	private async assessQuality(
+		photoPath: string,
+		metadata: PhotoMetadata,
+	): Promise<QualityMetrics> {
 		// Simulate quality assessment
 		const factors = {
 			blurriness: Math.random() * 100,
@@ -311,12 +342,23 @@ export class AutoCurationEngine {
 			composition_score: Math.random() * 100,
 			rule_of_thirds: Math.random() * 100,
 			leading_lines: Math.random() * 100,
-			symmetry: Math.random() * 100
+			symmetry: Math.random() * 100,
 		};
 
 		const technical = (100 - factors.blurriness - factors.noise) / 2;
-		const composition = (factors.composition_score + factors.rule_of_thirds + factors.leading_lines + factors.symmetry) / 4;
-		const overall = (technical + composition + factors.contrast + factors.brightness + factors.saturation) / 5;
+		const composition =
+			(factors.composition_score +
+				factors.rule_of_thirds +
+				factors.leading_lines +
+				factors.symmetry) /
+			4;
+		const overall =
+			(technical +
+				composition +
+				factors.contrast +
+				factors.brightness +
+				factors.saturation) /
+			5;
 
 		return {
 			overall,
@@ -325,7 +367,7 @@ export class AutoCurationEngine {
 			sharpness: 100 - factors.blurriness,
 			exposure: factors.brightness,
 			colors: factors.saturation,
-			factors
+			factors,
 		};
 	}
 
@@ -341,7 +383,10 @@ export class AutoCurationEngine {
 	/**
 	 * Detect events based on photo metadata and content
 	 */
-	private async detectPhotoEvents(photoPath: string, metadata: PhotoMetadata): Promise<EventInfo[]> {
+	private async detectPhotoEvents(
+		photoPath: string,
+		metadata: PhotoMetadata,
+	): Promise<EventInfo[]> {
 		// Simulate event detection
 		const date = metadata.date_taken;
 		const events: EventInfo[] = [];
@@ -352,14 +397,14 @@ export class AutoCurationEngine {
 			events.push({
 				id: `holiday-${holiday.name}`,
 				name: holiday.name,
-				type: 'holiday',
+				type: "holiday",
 				start_date: holiday.date,
 				end_date: holiday.date,
 				photos: [photoPath],
 				confidence: 0.8,
 				related_events: [],
 				theme: holiday.theme,
-				ai_generated_name: `${holiday.name} ${date.getFullYear()}`
+				ai_generated_name: `${holiday.name} ${date.getFullYear()}`,
 			});
 		}
 
@@ -373,22 +418,25 @@ export class AutoCurationEngine {
 	/**
 	 * Generate smart tags based on content analysis
 	 */
-	private async generateTags(photoPath: string, metadata: PhotoMetadata): Promise<string[]> {
+	private async generateTags(
+		photoPath: string,
+		metadata: PhotoMetadata,
+	): Promise<string[]> {
 		const tags: string[] = [];
 
 		// Time-based tags
 		const hour = metadata.date_taken.getHours();
-		if (hour >= 6 && hour < 12) tags.push('morning');
-		else if (hour >= 12 && hour < 18) tags.push('afternoon');
-		else if (hour >= 18 && hour < 22) tags.push('evening');
-		else tags.push('night');
+		if (hour >= 6 && hour < 12) tags.push("morning");
+		else if (hour >= 12 && hour < 18) tags.push("afternoon");
+		else if (hour >= 18 && hour < 22) tags.push("evening");
+		else tags.push("night");
 
 		// Season tags
 		const month = metadata.date_taken.getMonth();
-		if (month >= 2 && month <= 4) tags.push('spring');
-		else if (month >= 5 && month <= 7) tags.push('summer');
-		else if (month >= 8 && month <= 10) tags.push('fall');
-		else tags.push('winter');
+		if (month >= 2 && month <= 4) tags.push("spring");
+		else if (month >= 5 && month <= 7) tags.push("summer");
+		else if (month >= 8 && month <= 10) tags.push("fall");
+		else tags.push("winter");
 
 		// Camera equipment tags
 		tags.push(metadata.camera);
@@ -396,8 +444,8 @@ export class AutoCurationEngine {
 
 		// Quality tags
 		const quality = await this.assessQuality(photoPath, metadata);
-		if (quality.overall > 80) tags.push('high-quality');
-		else if (quality.overall < 30) tags.push('low-quality');
+		if (quality.overall > 80) tags.push("high-quality");
+		else if (quality.overall < 30) tags.push("low-quality");
 
 		return tags;
 	}
@@ -405,34 +453,39 @@ export class AutoCurationEngine {
 	/**
 	 * Find duplicate photos across the analyzed set
 	 */
-	private async findDuplicates(analysis: PhotoAnalysis[]): Promise<CurationAction[]> {
+	private async findDuplicates(
+		analysis: PhotoAnalysis[],
+	): Promise<CurationAction[]> {
 		const actions: CurationAction[] = [];
 		const processed = new Set<string>();
 
 		for (const photo of analysis) {
 			if (processed.has(photo.path)) continue;
 
-			const duplicates = photo.duplicates.filter(d => !processed.has(d.path));
+			const duplicates = photo.duplicates.filter((d) => !processed.has(d.path));
 			if (duplicates.length > 0) {
 				processed.add(photo.path);
-				duplicates.forEach(d => processed.add(d.path));
+				duplicates.forEach((d) => processed.add(d.path));
 
-				const allPhotos = [photo.path, ...duplicates.map(d => d.path)];
-				const bestPhoto = this.selectBestPhoto([photo, ...duplicates.map(d => {
-					// Find the corresponding analysis for each duplicate
-					const dupAnalysis = analysis.find(a => a.path === d.path);
-					return dupAnalysis || photo;
-				})]);
+				const allPhotos = [photo.path, ...duplicates.map((d) => d.path)];
+				const bestPhoto = this.selectBestPhoto([
+					photo,
+					...duplicates.map((d) => {
+						// Find the corresponding analysis for each duplicate
+						const dupAnalysis = analysis.find((a) => a.path === d.path);
+						return dupAnalysis || photo;
+					}),
+				]);
 
-				const photosToDelete = allPhotos.filter(p => p !== bestPhoto.path);
+				const photosToDelete = allPhotos.filter((p) => p !== bestPhoto.path);
 
 				if (photosToDelete.length > 0) {
 					actions.push({
-						type: 'delete_duplicates',
+						type: "delete_duplicates",
 						description: `Delete ${photosToDelete.length} duplicate photo(s) keeping the best quality one`,
 						photos: photosToDelete,
 						confidence: 0.9,
-						impact: 'medium'
+						impact: "medium",
 					});
 				}
 			}
@@ -444,25 +497,27 @@ export class AutoCurationEngine {
 	/**
 	 * Suggest quality-based ratings
 	 */
-	private async suggestQualityRatings(analysis: PhotoAnalysis[]): Promise<CurationAction[]> {
+	private async suggestQualityRatings(
+		analysis: PhotoAnalysis[],
+	): Promise<CurationAction[]> {
 		const actions: CurationAction[] = [];
 
 		for (const photo of analysis) {
 			if (photo.quality.overall > 80) {
 				actions.push({
-					type: 'rate_photos',
+					type: "rate_photos",
 					description: `Rate as 5-star (excellent quality: ${Math.round(photo.quality.overall)}%)`,
 					photos: [photo.path],
 					confidence: 0.8,
-					impact: 'low'
+					impact: "low",
 				});
 			} else if (photo.quality.overall < 30) {
 				actions.push({
-					type: 'rate_photos',
+					type: "rate_photos",
 					description: `Rate as 1-star (low quality: ${Math.round(photo.quality.overall)}%)`,
 					photos: [photo.path],
 					confidence: 0.7,
-					impact: 'low'
+					impact: "low",
 				});
 			}
 		}
@@ -473,7 +528,9 @@ export class AutoCurationEngine {
 	/**
 	 * Detect events from photo clusters
 	 */
-	private async detectEvents(analysis: PhotoAnalysis[]): Promise<SmartCollectionSuggestion[]> {
+	private async detectEvents(
+		analysis: PhotoAnalysis[],
+	): Promise<SmartCollectionSuggestion[]> {
 		const collections: SmartCollectionSuggestion[] = [];
 		const eventGroups = new Map<string, PhotoAnalysis[]>();
 
@@ -489,20 +546,23 @@ export class AutoCurationEngine {
 
 		// Create collection suggestions for each event
 		for (const [eventId, photos] of eventGroups) {
-			if (photos.length >= 3) { // Only suggest collections with 3+ photos
-				const event = photos[0].events.find(e => e.id === eventId)!;
+			if (photos.length >= 3) {
+				// Only suggest collections with 3+ photos
+				const event = photos[0].events.find((e) => e.id === eventId)!;
 				collections.push({
 					name: event.ai_generated_name,
 					description: `${photos.length} photos from ${event.name}`,
-					type: 'event',
-					photos: photos.map(p => p.path),
+					type: "event",
+					photos: photos.map((p) => p.path),
 					confidence: event.confidence,
 					auto_generated_name: event.ai_generated_name,
-					preview_photos: photos.slice(0, 4).map(p => p.path),
-					tags: ['event', event.type, event.theme],
+					preview_photos: photos.slice(0, 4).map((p) => p.path),
+					tags: ["event", event.type, event.theme],
 					reason: `Photos clustered by ${event.type} detection`,
 					estimated_size: photos.length,
-					quality_score: photos.reduce((sum, p) => sum + p.quality.overall, 0) / photos.length
+					quality_score:
+						photos.reduce((sum, p) => sum + p.quality.overall, 0) /
+						photos.length,
 				});
 			}
 		}
@@ -513,24 +573,28 @@ export class AutoCurationEngine {
 	/**
 	 * Generate smart collections based on various patterns
 	 */
-	private async generateSmartCollections(analysis: PhotoAnalysis[]): Promise<SmartCollectionSuggestion[]> {
+	private async generateSmartCollections(
+		analysis: PhotoAnalysis[],
+	): Promise<SmartCollectionSuggestion[]> {
 		const collections: SmartCollectionSuggestion[] = [];
 
 		// Quality-based collections
-		const highQuality = analysis.filter(p => p.quality.overall > 80);
+		const highQuality = analysis.filter((p) => p.quality.overall > 80);
 		if (highQuality.length >= 5) {
 			collections.push({
-				name: 'Best Photos',
+				name: "Best Photos",
 				description: `My ${highQuality.length} best quality photos`,
-				type: 'quality',
-				photos: highQuality.map(p => p.path),
+				type: "quality",
+				photos: highQuality.map((p) => p.path),
 				confidence: 0.9,
-				auto_generated_name: 'Best Photos Collection',
-				preview_photos: highQuality.slice(0, 4).map(p => p.path),
-				tags: ['best', 'high-quality', 'favorites'],
-				reason: 'High quality photos (80%+ score)',
+				auto_generated_name: "Best Photos Collection",
+				preview_photos: highQuality.slice(0, 4).map((p) => p.path),
+				tags: ["best", "high-quality", "favorites"],
+				reason: "High quality photos (80%+ score)",
 				estimated_size: highQuality.length,
-				quality_score: highQuality.reduce((sum, p) => sum + p.quality.overall, 0) / highQuality.length
+				quality_score:
+					highQuality.reduce((sum, p) => sum + p.quality.overall, 0) /
+					highQuality.length,
 			});
 		}
 
@@ -550,14 +614,14 @@ export class AutoCurationEngine {
 				collections.push({
 					name: `Photos from ${locationName}`,
 					description: `${photos.length} photos taken at ${locationName}`,
-					type: 'location',
-					photos: photos.map(p => p.path),
+					type: "location",
+					photos: photos.map((p) => p.path),
 					confidence: 0.8,
 					auto_generated_name: `${locationName} Photos`,
-					preview_photos: photos.slice(0, 4).map(p => p.path),
-					tags: ['location', locationName.toLowerCase()],
+					preview_photos: photos.slice(0, 4).map((p) => p.path),
+					tags: ["location", locationName.toLowerCase()],
 					reason: `Photos grouped by location: ${locationName}`,
-					estimated_size: photos.length
+					estimated_size: photos.length,
 				});
 			}
 		}
@@ -565,7 +629,10 @@ export class AutoCurationEngine {
 		// Time-based collections
 		const timeGroups = new Map<string, PhotoAnalysis[]>();
 		for (const photo of analysis) {
-			const month = photo.metadata.date_taken.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+			const month = photo.metadata.date_taken.toLocaleDateString("en-US", {
+				month: "long",
+				year: "numeric",
+			});
 			if (!timeGroups.has(month)) {
 				timeGroups.set(month, []);
 			}
@@ -577,14 +644,14 @@ export class AutoCurationEngine {
 				collections.push({
 					name: month,
 					description: `${photos.length} photos from ${month}`,
-					type: 'time',
-					photos: photos.map(p => p.path),
+					type: "time",
+					photos: photos.map((p) => p.path),
 					confidence: 0.7,
 					auto_generated_name: `${month} Collection`,
-					preview_photos: photos.slice(0, 4).map(p => p.path),
-					tags: ['time', month.toLowerCase().replace(/\s+/g, '-')],
+					preview_photos: photos.slice(0, 4).map((p) => p.path),
+					tags: ["time", month.toLowerCase().replace(/\s+/g, "-")],
 					reason: `Photos grouped by month: ${month}`,
-					estimated_size: photos.length
+					estimated_size: photos.length,
 				});
 			}
 		}
@@ -597,7 +664,7 @@ export class AutoCurationEngine {
 	 */
 	private selectBestPhoto(photos: PhotoAnalysis[]): PhotoAnalysis {
 		return photos.reduce((best, current) =>
-			current.quality.overall > best.quality.overall ? current : best
+			current.quality.overall > best.quality.overall ? current : best,
 		);
 	}
 
@@ -611,29 +678,31 @@ export class AutoCurationEngine {
 
 		return {
 			date_taken: new Date(Math.random() * Date.now()),
-			camera: 'Canon EOS R5',
-			lens: 'RF 24-70mm f/2.8L IS USM',
+			camera: "Canon EOS R5",
+			lens: "RF 24-70mm f/2.8L IS USM",
 			settings: {
 				iso: 100 + Math.floor(Math.random() * 3200),
 				aperture: `f/${1.4 + Math.random() * 8}`,
 				shutter_speed: `1/${Math.floor(30 + Math.random() * 8000)}`,
 				focal_length: `${Math.floor(24 + Math.random() * 200)}mm`,
-				flash_used: Math.random() > 0.7
+				flash_used: Math.random() > 0.7,
 			},
-			file_info: stats
+			file_info: stats,
 		};
 	}
 
 	/**
 	 * Get file statistics
 	 */
-	private async getFileStats(photoPath: string): Promise<PhotoMetadata['file_info']> {
+	private async getFileStats(
+		photoPath: string,
+	): Promise<PhotoMetadata["file_info"]> {
 		// Simulate file stats
 		return {
 			size_bytes: Math.floor(1000000 + Math.random() * 10000000),
-			format: 'JPEG',
+			format: "JPEG",
 			dimensions: { width: 6000, height: 4000 },
-			color_space: 'sRGB'
+			color_space: "sRGB",
 		};
 	}
 
@@ -649,15 +718,23 @@ export class AutoCurationEngine {
 		for (let i = 0; i < faceCount; i++) {
 			faces.push({
 				id: `face-${Math.random().toString(36).substr(2, 9)}`,
-				age_group: ['child', 'teen', 'adult', 'senior'][Math.floor(Math.random() * 4)] as any,
-				gender: ['male', 'female', 'unknown'][Math.floor(Math.random() * 3)] as any,
+				age_group: ["child", "teen", "adult", "senior"][
+					Math.floor(Math.random() * 4)
+				] as unknown,
+				gender: ["male", "female", "unknown"][
+					Math.floor(Math.random() * 3)
+				] as unknown,
 				confidence: 0.7 + Math.random() * 0.3,
-				emotions: [{
-					emotion: ['happy', 'neutral', 'surprised'][Math.floor(Math.random() * 3)] as any,
-					confidence: 0.6 + Math.random() * 0.4
-				}],
+				emotions: [
+					{
+						emotion: ["happy", "neutral", "surprised"][
+							Math.floor(Math.random() * 3)
+						] as unknown,
+						confidence: 0.6 + Math.random() * 0.4,
+					},
+				],
 				face_count: faceCount,
-				is_primary_subject: i === 0
+				is_primary_subject: i === 0,
 			});
 		}
 
@@ -667,25 +744,50 @@ export class AutoCurationEngine {
 	/**
 	 * Detect locations from photos
 	 */
-	private async detectLocations(photoPath: string, metadata: PhotoMetadata): Promise<LocationInfo[]> {
+	private async detectLocations(
+		photoPath: string,
+		metadata: PhotoMetadata,
+	): Promise<LocationInfo[]> {
 		// Simulate location detection
 		const locations: LocationInfo[] = [];
 
 		// Randomly detect locations
 		if (Math.random() > 0.3) {
-			const locationTypes = ['city', 'landmark', 'venue', 'nature', 'home', 'work'];
-			const locationNames = ['Paris', 'Tokyo', 'New York', 'London', 'Home', 'Office', 'Beach', 'Mountains'];
+			const locationTypes = [
+				"city",
+				"landmark",
+				"venue",
+				"nature",
+				"home",
+				"work",
+			];
+			const locationNames = [
+				"Paris",
+				"Tokyo",
+				"New York",
+				"London",
+				"Home",
+				"Office",
+				"Beach",
+				"Mountains",
+			];
 
 			locations.push({
 				name: locationNames[Math.floor(Math.random() * locationNames.length)],
-				type: locationTypes[Math.floor(Math.random() * locationTypes.length)] as any,
+				type: locationTypes[
+					Math.floor(Math.random() * locationTypes.length)
+				] as unknown,
 				coordinates: {
 					lat: -90 + Math.random() * 180,
-					lng: -180 + Math.random() * 360
+					lng: -180 + Math.random() * 360,
 				},
 				confidence: 0.6 + Math.random() * 0.4,
-				weather: ['sunny', 'cloudy', 'rainy', 'snowy'][Math.floor(Math.random() * 4)],
-				time_of_day: ['morning', 'afternoon', 'evening', 'night'][Math.floor(Math.random() * 4)] as any
+				weather: ["sunny", "cloudy", "rainy", "snowy"][
+					Math.floor(Math.random() * 4)
+				],
+				time_of_day: ["morning", "afternoon", "evening", "night"][
+					Math.floor(Math.random() * 4)
+				] as unknown,
 			});
 		}
 
@@ -695,7 +797,9 @@ export class AutoCurationEngine {
 	/**
 	 * Get holidays for a given date
 	 */
-	private getHolidays(date: Date): Array<{ name: string; date: Date; theme: string }> {
+	private getHolidays(
+		date: Date,
+	): Array<{ name: string; date: Date; theme: string }> {
 		const holidays: Array<{ name: string; date: Date; theme: string }> = [];
 		const year = date.getFullYear();
 
@@ -703,9 +807,24 @@ export class AutoCurationEngine {
 		const month = date.getMonth();
 		const day = date.getDate();
 
-		if (month === 11 && day === 25) holidays.push({ name: 'Christmas', date: new Date(year, 11, 25), theme: 'holiday-christmas' });
-		if (month === 0 && day === 1) holidays.push({ name: 'New Year', date: new Date(year, 0, 1), theme: 'holiday-new-year' });
-		if (month === 9 && day === 31) holidays.push({ name: 'Halloween', date: new Date(year, 9, 31), theme: 'holiday-halloween' });
+		if (month === 11 && day === 25)
+			holidays.push({
+				name: "Christmas",
+				date: new Date(year, 11, 25),
+				theme: "holiday-christmas",
+			});
+		if (month === 0 && day === 1)
+			holidays.push({
+				name: "New Year",
+				date: new Date(year, 0, 1),
+				theme: "holiday-new-year",
+			});
+		if (month === 9 && day === 31)
+			holidays.push({
+				name: "Halloween",
+				date: new Date(year, 9, 31),
+				theme: "holiday-halloween",
+			});
 
 		return holidays;
 	}
@@ -719,16 +838,24 @@ export class AutoCurationEngine {
 		// Weekend events
 		if (date.getDay() === 0 || date.getDay() === 6) {
 			events.push({
-				id: `weekend-${date.toISOString().split('T')[0]}`,
-				name: 'Weekend',
-				type: 'time',
-				start_date: new Date(date.getFullYear(), date.getMonth(), date.getDate() - date.getDay()),
-				end_date: new Date(date.getFullYear(), date.getMonth(), date.getDate() - date.getDay() + 6),
+				id: `weekend-${date.toISOString().split("T")[0]}`,
+				name: "Weekend",
+				type: "time",
+				start_date: new Date(
+					date.getFullYear(),
+					date.getMonth(),
+					date.getDate() - date.getDay(),
+				),
+				end_date: new Date(
+					date.getFullYear(),
+					date.getMonth(),
+					date.getDate() - date.getDay() + 6,
+				),
 				photos: [],
 				confidence: 0.7,
 				related_events: [],
-				theme: 'weekend',
-				ai_generated_name: `Weekend ${date.toLocaleDateString()}`
+				theme: "weekend",
+				ai_generated_name: `Weekend ${date.toLocaleDateString()}`,
 			});
 		}
 
@@ -738,7 +865,11 @@ export class AutoCurationEngine {
 	/**
 	 * Calculate estimated time remaining
 	 */
-	private calculateETA(processed: number, total: number, startTime: number): number {
+	private calculateETA(
+		processed: number,
+		total: number,
+		startTime: number,
+	): number {
 		if (processed === 0) return 0;
 
 		const elapsed = Date.now() - startTime;

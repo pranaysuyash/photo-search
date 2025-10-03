@@ -64,7 +64,7 @@ export default function DiagnosticsDrawer({
 		<div className="fixed inset-0 z-50">
 			<button
 				type="button"
-				className="absolute inset-0 bg-black/30"
+				className="absolute inset-0 bg-black/30 backdrop-blur-md supports-[backdrop-filter]:bg-black/25 supports-[backdrop-filter]:backdrop-blur-xl transition-all duration-300 ease-out"
 				aria-label="Close diagnostics"
 				onClick={onClose}
 				onKeyDown={(e) => {

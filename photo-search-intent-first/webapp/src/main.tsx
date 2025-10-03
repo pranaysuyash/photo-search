@@ -74,10 +74,14 @@ if (import.meta.env.DEV) {
 }
 
 // Register service worker for PWA functionality
-if ("serviceWorker" in navigator && import.meta.env.PROD) {
+if (
+	"serviceWorker" in navigator &&
+	import.meta.env.PROD &&
+	!window.process?.versions?.electron
+) {
 	window.addEventListener("load", () => {
 		navigator.serviceWorker
-			.register(`${import.meta.env.BASE_URL}service-worker.js`)
+			.register(`${import.meta.env.BASE_URL}sw.js`)
 			.then((registration) => {
 				console.log("ServiceWorker registered:", registration.scope);
 

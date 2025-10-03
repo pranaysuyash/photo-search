@@ -15,6 +15,7 @@ from api.managers.search_filter_manager import SearchFilterManager
 from api.managers.ann_manager import ANNManager, ANNIndexType
 from api.managers.ocr_manager import OCRManager
 from api.managers.caption_manager import CaptionManager
+from api.managers.search_cache_manager import search_cache_manager
 from adapters.provider_factory import get_provider
 from infra.index_store import IndexStore
 
@@ -66,6 +67,48 @@ class SearchOrchestrator:
         """
         start_time = time.time()
 
+        # Create search parameters dict for caching
+        search_params = {
+            'dir': request.dir,
+            'query': request.query,
+            'provider': request.provider.value,
+            'top_k': request.limit,
+            'use_fast': request.features.use_fast,
+            'fast_kind': request.features.fast_kind.value if request.features.fast_kind else None,
+            'use_captions': request.features.use_captions,
+            'use_ocr': request.features.use_ocr,
+            'favorites_only': request.filters.favorites_only,
+            'tags': request.filters.tags,
+            'date_from': request.filters.date_from,
+            'date_to': request.filters.date_to,
+            'camera': request.filters.camera,
+            'iso_min': request.filters.iso_min,
+            'iso_max': request.filters.iso_max,
+            'f_min': request.filters.f_min,
+            'f_max': request.filters.f_max,
+            'place': request.filters.place,
+            'person': request.filters.person,
+        }
+
+        # Check if this search is already cached
+        cached_dto = search_cache_manager.get_search_results(search_params)
+        if cached_dto is not None:
+            self.logger.debug(f"Cache hit for query: {request.query}")
+            
+            # Convert DTO to SearchResponse
+            results = [SearchResult(**result_data) for result_data in cached_dto["results"]]
+            response = SearchResponse(
+                results=results,
+                total_count=cached_dto["total_count"],
+                query=cached_dto["query"],
+                filters_applied=cached_dto.get("filters_applied", []),
+                search_time_ms=(time.time() - start_time) * 1000,
+                provider_used=SearchProvider(cached_dto["provider"]) if cached_dto["provider"] in SearchProvider.__members__ else SearchProvider.LOCAL,
+                is_cached=True,
+                cache_hit=True
+            )
+            return response
+
         try:
             # Initialize search context
             context = self._create_search_context(request, start_time)
@@ -95,7 +138,10 @@ class SearchOrchestrator:
             # Step 6: Build response
             response = self._build_search_response(context, final_results)
 
-            # Step 7: Log search analytics
+            # Step 7: Cache the results
+            search_cache_manager.cache_search_results(search_params, response, ttl=600)  # 10 minutes
+
+            # Step 8: Log search analytics
             self._log_search_analytics(context, response)
 
             return response
@@ -109,7 +155,9 @@ class SearchOrchestrator:
                 query=request.query,
                 filters_applied=[],
                 search_time_ms=(time.time() - start_time) * 1000,
-                provider_used=request.provider
+                provider_used=request.provider,
+                is_cached=False,
+                cache_hit=False
             )
 
     def _create_search_context(self, request: SearchRequest, start_time: float) -> SearchContext:

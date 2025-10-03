@@ -67,6 +67,12 @@ electron/   # Desktop shell packaging
 
 ### Backend Development
 
+**CRITICAL: Always activate the virtual environment before any Python commands:**
+```bash
+cd photo-search-intent-first
+source .venv/bin/activate
+```
+
 ```bash
 # Setup Python environment (uses existing .venv)
 cd photo-search-intent-first && source .venv/bin/activate  # Virtual environment already exists with all dependencies

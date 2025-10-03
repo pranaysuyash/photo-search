@@ -5,7 +5,7 @@ import { ModalsHost } from "./chrome/ModalsHost";
 import { EnhancedModalManager } from "./EnhancedModalManager";
 
 // Feature flag to control which modal system to use
-const USE_ENHANCED_MODAL_SYSTEM = false;
+const USE_ENHANCED_MODAL_SYSTEM = true;
 
 interface ModalSystemWrapperProps {
 	// Props for old system

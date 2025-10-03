@@ -9,6 +9,9 @@ import {
 	useModalDataContext,
 } from "../contexts/ModalDataContext";
 import { useModalStatus } from "../hooks/useModalStatus";
+import { ShareManager } from "../modules/ShareManager";
+// Services
+import { ModalActionsService } from "../services/ModalActionsService";
 import { FocusTrap } from "../utils/accessibility";
 import { viewToPath } from "../utils/router";
 // Modals
@@ -24,7 +27,7 @@ import {
 import { SuspenseFallback } from "./SuspenseFallback";
 
 const _DiagnosticsDrawer = lazy(() => import("./DiagnosticsDrawer"));
-const JobsDrawer = lazy(() => import("./JobsDrawer"));
+const JobsDrawer = lazy(() => import("./EnhancedJobsDrawer"));
 const AdvancedSearchModal = lazy(() => import("./modals/AdvancedSearchModal"));
 const EnhancedSharingModal = lazy(() =>
 	import("./modals/EnhancedSharingModal").then((m) => ({
@@ -37,10 +40,9 @@ const ThemeSettingsModal = lazy(() =>
 	})),
 );
 const SearchOverlay = lazy(() => import("./SearchOverlay"));
-
-import { ShareManager } from "../modules/ShareManager";
-import { ModalActionsService } from "../services/ModalActionsService";
-import { HelpModal } from "./HelpModal";
+const HelpModal = lazy(() =>
+	import("./HelpModal").then((m) => ({ default: m.HelpModal })),
+);
 
 export const ModalManager: React.FC = () => {
 	// Get data and actions from context
@@ -310,11 +312,15 @@ export const ModalManager: React.FC = () => {
 			)}
 
 			{/* Help / Theme */}
-			<HelpModal
-				isOpen={modalStatus.isOpen("help")}
-				onClose={() => modal.close("help")}
-				initialSection="getting-started"
-			/>
+			{modalStatus.isOpen("help") && (
+				<Suspense fallback={<SuspenseFallback label="Loading help…" />}>
+					<HelpModal
+						isOpen={true}
+						onClose={() => modal.close("help")}
+						initialSection="getting-started"
+					/>
+				</Suspense>
+			)}
 			{modalStatus.isOpen("theme") && (
 				<Suspense
 					fallback={<SuspenseFallback label="Loading theme settings…" />}

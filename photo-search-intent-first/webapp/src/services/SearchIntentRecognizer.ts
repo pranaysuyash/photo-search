@@ -15,18 +15,18 @@ export interface SearchIntent {
 }
 
 export type SearchIntentType =
-	| "discovery"     // Browsing, exploring
-	| "specific"      // Looking for something specific
-	| "comparison"    // Comparing photos
-	| "narrative"     // Telling a story
-	| "technical"     // Technical specifications
-	| "emotional"     // Mood/feeling based
-	| "temporal"      // Time-based search
-	| "location"      // Place-based search
-	| "person"        // People-focused
-	| "activity"      // Action/event focused
-	| "quality"       // Quality/aesthetic focused
-	| "unknown";      // Couldn't determine intent
+	| "discovery" // Browsing, exploring
+	| "specific" // Looking for something specific
+	| "comparison" // Comparing photos
+	| "narrative" // Telling a story
+	| "technical" // Technical specifications
+	| "emotional" // Mood/feeling based
+	| "temporal" // Time-based search
+	| "location" // Place-based search
+	| "person" // People-focused
+	| "activity" // Action/event focused
+	| "quality" // Quality/aesthetic focused
+	| "unknown"; // Couldn't determine intent
 
 export interface IntentContext {
 	timeFrame?: TimeFrame;
@@ -202,7 +202,13 @@ export class SearchIntentRecognizer {
 	private static readonly CONTEXT_KEYWORDS = {
 		time: {
 			recent: ["today", "yesterday", "recent", "latest", "new", "now"],
-			specific: ["last week", "last month", "last year", "june 2023", "christmas"],
+			specific: [
+				"last week",
+				"last month",
+				"last year",
+				"june 2023",
+				"christmas",
+			],
 			relative: ["few days ago", "weeks ago", "months ago", "years ago"],
 			seasonal: ["summer", "winter", "spring", "fall", "autumn"],
 			holiday: ["christmas", "thanksgiving", "easter", "halloween", "new year"],
@@ -230,45 +236,63 @@ export class SearchIntentRecognizer {
 	/**
 	 * Analyze a query and recognize search intent
 	 */
-	static recognizeIntent(query: string, context?: {
-		recentSearches?: string[];
-		availableTags?: string[];
-		availablePeople?: string[];
-		availableLocations?: string[];
-	}): SearchIntent {
+	static recognizeIntent(
+		query: string,
+		context?: {
+			recentSearches?: string[];
+			availableTags?: string[];
+			availablePeople?: string[];
+			availableLocations?: string[];
+		},
+	): SearchIntent {
 		const normalizedQuery = query.toLowerCase().trim();
 
 		if (!normalizedQuery) {
-			return this.createDefaultIntent();
+			return SearchIntentRecognizer.createDefaultIntent();
 		}
 
 		// Calculate confidence scores for each intent type
-		const intentScores = this.calculateIntentScores(normalizedQuery);
-		const primaryIntent = Object.entries(intentScores)
-			.sort(([, a], [, b]) => b - a)[0];
+		const intentScores =
+			SearchIntentRecognizer.calculateIntentScores(normalizedQuery);
+		const primaryIntent = Object.entries(intentScores).sort(
+			([, a], [, b]) => b - a,
+		)[0];
 
 		// Extract context information
-		const intentContext = this.extractContext(normalizedQuery, context);
+		const intentContext = SearchIntentRecognizer.extractContext(
+			normalizedQuery,
+			context,
+		);
 
 		// Extract modifiers
-		const modifiers = this.extractModifiers(normalizedQuery);
+		const modifiers = SearchIntentRecognizer.extractModifiers(normalizedQuery);
 
 		// Generate suggested queries
-		const suggestedQueries = this.generateSuggestions(
+		const suggestedQueries = SearchIntentRecognizer.generateSuggestions(
 			normalizedQuery,
 			primaryIntent[0] as SearchIntentType,
 			intentContext,
-			context
+			context,
 		);
 
 		// Generate search filters
-		const filters = this.generateFilters(normalizedQuery, intentContext, modifiers);
+		const filters = SearchIntentRecognizer.generateFilters(
+			normalizedQuery,
+			intentContext,
+			modifiers,
+		);
 
 		// Categorize the query
-		const categories = this.categorizeQuery(normalizedQuery, primaryIntent[0] as SearchIntentType);
+		const categories = SearchIntentRecognizer.categorizeQuery(
+			normalizedQuery,
+			primaryIntent[0] as SearchIntentType,
+		);
 
 		// Calculate query complexity
-		const complexity = this.calculateComplexity(normalizedQuery, primaryIntent[0] as SearchIntentType);
+		const complexity = SearchIntentRecognizer.calculateComplexity(
+			normalizedQuery,
+			primaryIntent[0] as SearchIntentType,
+		);
 
 		return {
 			primary: primaryIntent[0] as SearchIntentType,
@@ -285,11 +309,16 @@ export class SearchIntentRecognizer {
 	/**
 	 * Calculate confidence scores for each intent type
 	 */
-	private static calculateIntentScores(query: string): Record<SearchIntentType, number> {
+	private static calculateIntentScores(
+		query: string,
+	): Record<SearchIntentType, number> {
 		const scores: Partial<Record<SearchIntentType, number>> = {};
 
-		for (const [intentType, patterns] of Object.entries(this.INTENT_PATTERNS)) {
-			scores[intentType as SearchIntentType] = this.calculatePatternScore(query, patterns);
+		for (const [intentType, patterns] of Object.entries(
+			SearchIntentRecognizer.INTENT_PATTERNS,
+		)) {
+			scores[intentType as SearchIntentType] =
+				SearchIntentRecognizer.calculatePatternScore(query, patterns);
 		}
 
 		// Normalize scores to 0-1 range
@@ -299,7 +328,7 @@ export class SearchIntentRecognizer {
 		}
 
 		const normalizedScores = Object.fromEntries(
-			Object.entries(scores).map(([key, value]) => [key, value / maxScore])
+			Object.entries(scores).map(([key, value]) => [key, value / maxScore]),
 		);
 
 		return normalizedScores as Record<SearchIntentType, number>;
@@ -308,7 +337,10 @@ export class SearchIntentRecognizer {
 	/**
 	 * Calculate how well query matches patterns
 	 */
-	private static calculatePatternScore(query: string, patterns: RegExp[]): number {
+	private static calculatePatternScore(
+		query: string,
+		patterns: RegExp[],
+	): number {
 		let score = 0;
 		for (const pattern of patterns) {
 			if (pattern.test(query)) {
@@ -321,43 +353,54 @@ export class SearchIntentRecognizer {
 	/**
 	 * Extract contextual information from the query
 	 */
-	private static extractContext(query: string, externalContext?: any): IntentContext {
+	private static extractContext(
+		query: string,
+		externalContext?: any,
+	): IntentContext {
 		const context: IntentContext = {};
 
 		// Time context
-		context.timeFrame = this.extractTimeContext(query);
+		context.timeFrame = SearchIntentRecognizer.extractTimeContext(query);
 
 		// Location context
-		context.location = this.extractLocationContext(query, externalContext?.availableLocations);
+		context.location = SearchIntentRecognizer.extractLocationContext(
+			query,
+			externalContext?.availableLocations,
+		);
 
 		// Person context
-		context.people = this.extractPersonContext(query, externalContext?.availablePeople);
+		context.people = SearchIntentRecognizer.extractPersonContext(
+			query,
+			externalContext?.availablePeople,
+		);
 
 		// Activity context
-		context.activity = this.extractActivityContext(query);
+		context.activity = SearchIntentRecognizer.extractActivityContext(query);
 
 		// Mood context
-		context.mood = this.extractMoodContext(query);
+		context.mood = SearchIntentRecognizer.extractMoodContext(query);
 
 		// Quality context
-		context.quality = this.extractQualityContext(query);
+		context.quality = SearchIntentRecognizer.extractQualityContext(query);
 
 		// Technical context
-		context.technical = this.extractTechnicalContext(query);
+		context.technical = SearchIntentRecognizer.extractTechnicalContext(query);
 
 		return context;
 	}
 
 	private static extractTimeContext(query: string): TimeFrame | undefined {
 		// Specific dates
-		const dateMatch = query.match(/\b(\d{4}|\d{1,2}\/\d{1,2}|\d{1,2}-\d{1,2})\b/);
+		const dateMatch = query.match(
+			/\b(\d{4}|\d{1,2}\/\d{1,2}|\d{1,2}-\d{1,2})\b/,
+		);
 		if (dateMatch) {
 			return { type: "specific", value: dateMatch[1] };
 		}
 
 		// Recent time indicators
 		const recentWords = ["today", "yesterday", "recent", "latest", "new"];
-		if (recentWords.some(word => query.includes(word))) {
+		if (recentWords.some((word) => query.includes(word))) {
 			return { type: "recent" };
 		}
 
@@ -370,8 +413,14 @@ export class SearchIntentRecognizer {
 		}
 
 		// Holidays
-		const holidays = ["christmas", "thanksgiving", "easter", "halloween", "new year"];
-		const foundHolidays = holidays.filter(holiday => query.includes(holiday));
+		const holidays = [
+			"christmas",
+			"thanksgiving",
+			"easter",
+			"halloween",
+			"new year",
+		];
+		const foundHolidays = holidays.filter((holiday) => query.includes(holiday));
 		if (foundHolidays.length > 0) {
 			return { type: "holiday", holidays: foundHolidays };
 		}
@@ -379,7 +428,10 @@ export class SearchIntentRecognizer {
 		return undefined;
 	}
 
-	private static extractLocationContext(query: string, availableLocations?: string[]): LocationContext | undefined {
+	private static extractLocationContext(
+		query: string,
+		availableLocations?: string[],
+	): LocationContext | undefined {
 		// Check for specific locations from available data
 		if (availableLocations) {
 			for (const location of availableLocations) {
@@ -408,14 +460,21 @@ export class SearchIntentRecognizer {
 		}
 
 		// Travel context
-		if (["vacation", "trip", "holiday", "travel"].some(word => query.includes(word))) {
+		if (
+			["vacation", "trip", "holiday", "travel"].some((word) =>
+				query.includes(word),
+			)
+		) {
 			return { type: "travel" };
 		}
 
 		return undefined;
 	}
 
-	private static extractPersonContext(query: string, availablePeople?: string[]): PersonContext | undefined {
+	private static extractPersonContext(
+		query: string,
+		availablePeople?: string[],
+	): PersonContext | undefined {
 		// Check for specific people from available data
 		if (availablePeople) {
 			for (const person of availablePeople) {
@@ -426,7 +485,15 @@ export class SearchIntentRecognizer {
 		}
 
 		// Family relationships
-		const relationships = ["mom", "dad", "mother", "father", "brother", "sister", "family"];
+		const relationships = [
+			"mom",
+			"dad",
+			"mother",
+			"father",
+			"brother",
+			"sister",
+			"family",
+		];
 		for (const relationship of relationships) {
 			if (query.includes(relationship)) {
 				return { type: "relationship", relationship };
@@ -443,16 +510,29 @@ export class SearchIntentRecognizer {
 		}
 
 		// Group indicators
-		if (["group", "together", "team", "class"].some(word => query.includes(word))) {
+		if (
+			["group", "together", "team", "class"].some((word) =>
+				query.includes(word),
+			)
+		) {
 			return { type: "group" };
 		}
 
 		return undefined;
 	}
 
-	private static extractActivityContext(query: string): ActivityContext | undefined {
+	private static extractActivityContext(
+		query: string,
+	): ActivityContext | undefined {
 		// Events
-		const events = ["party", "celebration", "wedding", "birthday", "dinner", "lunch"];
+		const events = [
+			"party",
+			"celebration",
+			"wedding",
+			"birthday",
+			"dinner",
+			"lunch",
+		];
 		for (const event of events) {
 			if (query.includes(event)) {
 				return { type: "event", value: event };
@@ -479,12 +559,27 @@ export class SearchIntentRecognizer {
 	}
 
 	private static extractMoodContext(query: string): MoodContext | undefined {
-		const positiveWords = ["happy", "joy", "love", "excited", "beautiful", "amazing", "wonderful"];
-		const negativeWords = ["sad", "angry", "boring", "ugly", "terrible", "awful"];
+		const positiveWords = [
+			"happy",
+			"joy",
+			"love",
+			"excited",
+			"beautiful",
+			"amazing",
+			"wonderful",
+		];
+		const negativeWords = [
+			"sad",
+			"angry",
+			"boring",
+			"ugly",
+			"terrible",
+			"awful",
+		];
 		const neutralWords = ["calm", "peaceful", "quiet", "serene", "normal"];
 
 		const moodWords = [...positiveWords, ...negativeWords, ...neutralWords];
-		const foundMood = moodWords.find(word => query.includes(word));
+		const foundMood = moodWords.find((word) => query.includes(word));
 
 		if (foundMood) {
 			let valence: "positive" | "negative" | "neutral" = "neutral";
@@ -508,35 +603,72 @@ export class SearchIntentRecognizer {
 		return undefined;
 	}
 
-	private static extractQualityContext(query: string): QualityContext | undefined {
-		let qualityType: "professional" | "casual" | "artistic" | "technical" | undefined;
-		const aspects: ("composition" | "lighting" | "focus" | "color" | "clarity")[] = [];
+	private static extractQualityContext(
+		query: string,
+	): QualityContext | undefined {
+		let qualityType:
+			| "professional"
+			| "casual"
+			| "artistic"
+			| "technical"
+			| undefined;
+		const aspects: (
+			| "composition"
+			| "lighting"
+			| "focus"
+			| "color"
+			| "clarity"
+		)[] = [];
 
 		// Quality type
-		if (["professional", "pro", "studio"].some(word => query.includes(word))) {
+		if (
+			["professional", "pro", "studio"].some((word) => query.includes(word))
+		) {
 			qualityType = "professional";
-		} else if (["casual", "snapshot", "quick"].some(word => query.includes(word))) {
+		} else if (
+			["casual", "snapshot", "quick"].some((word) => query.includes(word))
+		) {
 			qualityType = "casual";
-		} else if (["artistic", "creative", "fine art"].some(word => query.includes(word))) {
+		} else if (
+			["artistic", "creative", "fine art"].some((word) => query.includes(word))
+		) {
 			qualityType = "artistic";
-		} else if (["technical", "settings", "camera"].some(word => query.includes(word))) {
+		} else if (
+			["technical", "settings", "camera"].some((word) => query.includes(word))
+		) {
 			qualityType = "technical";
 		}
 
 		// Quality aspects
-		if (["composition", "framed", "cropped"].some(word => query.includes(word))) {
+		if (
+			["composition", "framed", "cropped"].some((word) => query.includes(word))
+		) {
 			aspects.push("composition");
 		}
-		if (["light", "bright", "dark", "exposure"].some(word => query.includes(word))) {
+		if (
+			["light", "bright", "dark", "exposure"].some((word) =>
+				query.includes(word),
+			)
+		) {
 			aspects.push("lighting");
 		}
-		if (["focus", "sharp", "blurry", "clear"].some(word => query.includes(word))) {
+		if (
+			["focus", "sharp", "blurry", "clear"].some((word) => query.includes(word))
+		) {
 			aspects.push("focus");
 		}
-		if (["color", "black and white", "monochrome"].some(word => query.includes(word))) {
+		if (
+			["color", "black and white", "monochrome"].some((word) =>
+				query.includes(word),
+			)
+		) {
 			aspects.push("color");
 		}
-		if (["quality", "noise", "grainy", "clear"].some(word => query.includes(word))) {
+		if (
+			["quality", "noise", "grainy", "clear"].some((word) =>
+				query.includes(word),
+			)
+		) {
 			aspects.push("clarity");
 		}
 
@@ -550,7 +682,9 @@ export class SearchIntentRecognizer {
 		return undefined;
 	}
 
-	private static extractTechnicalContext(query: string): TechnicalContext | undefined {
+	private static extractTechnicalContext(
+		query: string,
+	): TechnicalContext | undefined {
 		const context: TechnicalContext = {};
 
 		// Camera/lens mentions
@@ -571,7 +705,10 @@ export class SearchIntentRecognizer {
 		// Technical settings
 		const apertureMatch = query.match(/f\/?(\d+\.?\d*)/i);
 		if (apertureMatch) {
-			context.settings = { ...context.settings, aperture: `f/${apertureMatch[1]}` };
+			context.settings = {
+				...context.settings,
+				aperture: `f/${apertureMatch[1]}`,
+			};
 		}
 
 		const isoMatch = query.match(/iso\s*(\d+)/i);
@@ -581,7 +718,10 @@ export class SearchIntentRecognizer {
 
 		const focalMatch = query.match(/(\d+)mm/i);
 		if (focalMatch) {
-			context.settings = { ...context.settings, focalLength: `${focalMatch[1]}mm` };
+			context.settings = {
+				...context.settings,
+				focalLength: `${focalMatch[1]}mm`,
+			};
 		}
 
 		// File format
@@ -660,7 +800,7 @@ export class SearchIntentRecognizer {
 		query: string,
 		intent: SearchIntentType,
 		context: IntentContext,
-		externalContext?: any
+		externalContext?: any,
 	): string[] {
 		const suggestions: string[] = [];
 
@@ -671,21 +811,25 @@ export class SearchIntentRecognizer {
 					"interesting photos",
 					"favorite moments",
 					"best memories",
-					"hidden gems"
+					"hidden gems",
 				);
 
 				// Add context-aware suggestions for discovery intent
 				if (externalContext?.availableLocations?.length > 0) {
-					externalContext.availableLocations.slice(0, 2).forEach((loc: string) => {
-						suggestions.push(`photos in ${loc}`);
-						suggestions.push(`${loc} photos`);
-					});
+					externalContext.availableLocations
+						.slice(0, 2)
+						.forEach((loc: string) => {
+							suggestions.push(`photos in ${loc}`);
+							suggestions.push(`${loc} photos`);
+						});
 				}
 
 				if (externalContext?.availablePeople?.length > 0) {
-					externalContext.availablePeople.slice(0, 2).forEach((person: string) => {
-						suggestions.push(`photos with ${person}`);
-					});
+					externalContext.availablePeople
+						.slice(0, 2)
+						.forEach((person: string) => {
+							suggestions.push(`photos with ${person}`);
+						});
 				}
 				break;
 
@@ -708,14 +852,26 @@ export class SearchIntentRecognizer {
 				}
 				break;
 
-			case "location":
+			case "location": {
 				// Extract location words from the query to provide better suggestions
-				const locationWords = query.split(' ').filter(word =>
-					!["photos", "pictures", "pics", "images", "from", "at", "in", "near"].includes(word.toLowerCase())
-				);
+				const locationWords = query
+					.split(" ")
+					.filter(
+						(word) =>
+							![
+								"photos",
+								"pictures",
+								"pics",
+								"images",
+								"from",
+								"at",
+								"in",
+								"near",
+							].includes(word.toLowerCase()),
+					);
 
 				if (locationWords.length > 0) {
-					const location = locationWords.join(' ');
+					const location = locationWords.join(" ");
 					suggestions.push("recent photos"); // Include general recent photos suggestion
 					suggestions.push(`${location} photos`);
 					suggestions.push(`photos at ${location}`);
@@ -728,6 +884,7 @@ export class SearchIntentRecognizer {
 					suggestions.push("photos at home");
 				}
 				break;
+			}
 
 			case "person":
 				suggestions.push("family photos");
@@ -761,9 +918,10 @@ export class SearchIntentRecognizer {
 		// Add context-aware suggestions based on available data
 		if (externalContext?.availableLocations?.length > 0) {
 			const relevantLocations = externalContext.availableLocations
-				.filter((loc: string) =>
-					loc.toLowerCase().includes(query.split(' ')[0]) ||
-					query.toLowerCase().includes(loc.toLowerCase().split(' ')[0])
+				.filter(
+					(loc: string) =>
+						loc.toLowerCase().includes(query.split(" ")[0]) ||
+						query.toLowerCase().includes(loc.toLowerCase().split(" ")[0]),
 				)
 				.slice(0, 2);
 
@@ -774,9 +932,10 @@ export class SearchIntentRecognizer {
 
 		if (externalContext?.availableTags?.length > 0) {
 			const relevantTags = externalContext.availableTags
-				.filter((tag: string) =>
-					tag.toLowerCase().includes(query.split(' ')[0]) ||
-					query.toLowerCase().includes(tag.toLowerCase())
+				.filter(
+					(tag: string) =>
+						tag.toLowerCase().includes(query.split(" ")[0]) ||
+						query.toLowerCase().includes(tag.toLowerCase()),
 				)
 				.slice(0, 2);
 
@@ -794,7 +953,7 @@ export class SearchIntentRecognizer {
 	private static generateFilters(
 		query: string,
 		context: IntentContext,
-		modifiers: IntentModifier[]
+		modifiers: IntentModifier[],
 	): SearchFilters {
 		const filters: SearchFilters = {};
 
@@ -803,7 +962,8 @@ export class SearchIntentRecognizer {
 			switch (context.timeFrame.type) {
 				case "recent":
 					filters.dateFrom = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-						.toISOString().split('T')[0];
+						.toISOString()
+						.split("T")[0];
 					break;
 				case "specific":
 					// Try to parse specific date
@@ -845,22 +1005,37 @@ export class SearchIntentRecognizer {
 	/**
 	 * Categorize the query for better organization
 	 */
-	private static categorizeQuery(query: string, intent: SearchIntentType): string[] {
+	private static categorizeQuery(
+		query: string,
+		intent: SearchIntentType,
+	): string[] {
 		const categories: string[] = [];
 
 		// Add intent as primary category
 		categories.push(intent);
 
 		// Add descriptive categories based on content
-		if (query.includes("family") || query.includes("mom") || query.includes("dad")) {
+		if (
+			query.includes("family") ||
+			query.includes("mom") ||
+			query.includes("dad")
+		) {
 			categories.push("family");
 		}
 
-		if (query.includes("vacation") || query.includes("travel") || query.includes("trip")) {
+		if (
+			query.includes("vacation") ||
+			query.includes("travel") ||
+			query.includes("trip")
+		) {
 			categories.push("travel");
 		}
 
-		if (query.includes("birthday") || query.includes("party") || query.includes("celebration")) {
+		if (
+			query.includes("birthday") ||
+			query.includes("party") ||
+			query.includes("celebration")
+		) {
 			categories.push("events");
 		}
 
@@ -874,24 +1049,43 @@ export class SearchIntentRecognizer {
 	/**
 	 * Calculate query complexity based on length, keywords, and structure
 	 */
-	private static calculateComplexity(query: string, intent: SearchIntentType): "simple" | "moderate" | "complex" {
+	private static calculateComplexity(
+		query: string,
+		intent: SearchIntentType,
+	): "simple" | "moderate" | "complex" {
 		const wordCount = query.split(/\s+/).length;
-		const hasMultipleClauses = query.includes(',') || query.includes(' and ') || query.includes(' or ');
-		const hasSpecificTerms = /((find|show|get)\s+(the|my|a)\s+\w+|specific|particular|exact)/i.test(query);
-		const hasTemporalTerms = /(today|yesterday|tomorrow|last week|last month|last year|\d{4})/i.test(query);
+		const hasMultipleClauses =
+			query.includes(",") || query.includes(" and ") || query.includes(" or ");
+		const hasSpecificTerms =
+			/((find|show|get)\s+(the|my|a)\s+\w+|specific|particular|exact)/i.test(
+				query,
+			);
+		const hasTemporalTerms =
+			/(today|yesterday|tomorrow|last week|last month|last year|\d{4})/i.test(
+				query,
+			);
 		const hasLocationTerms = /(in|at|on|near)\s+\w+/i.test(query);
 		const hasPeopleTerms = /(with|together|family|friends)/i.test(query);
 
 		// Complex queries have multiple dimensions
-		if (wordCount > 8 || hasMultipleClauses ||
+		if (
+			wordCount > 8 ||
+			hasMultipleClauses ||
 			(hasSpecificTerms && hasTemporalTerms && hasLocationTerms) ||
 			(hasSpecificTerms && hasTemporalTerms && hasPeopleTerms) ||
-			(hasLocationTerms && hasPeopleTerms && hasTemporalTerms)) {
+			(hasLocationTerms && hasPeopleTerms && hasTemporalTerms)
+		) {
 			return "complex";
 		}
 
 		// Moderate queries have some specificity
-		if (wordCount > 4 || hasSpecificTerms || hasTemporalTerms || hasLocationTerms || hasPeopleTerms) {
+		if (
+			wordCount > 4 ||
+			hasSpecificTerms ||
+			hasTemporalTerms ||
+			hasLocationTerms ||
+			hasPeopleTerms
+		) {
 			return "moderate";
 		}
 
@@ -926,7 +1120,7 @@ export class SearchIntentRecognizer {
 	static getTypingSuggestions(
 		partialQuery: string,
 		intentHistory?: SearchIntent[],
-		externalContext?: any
+		externalContext?: any,
 	): string[] {
 		const normalized = partialQuery.toLowerCase().trim();
 
@@ -940,28 +1134,38 @@ export class SearchIntentRecognizer {
 		}
 
 		// Recognize intent from partial query
-		const intent = this.recognizeIntent(partialQuery, externalContext);
+		const intent = SearchIntentRecognizer.recognizeIntent(
+			partialQuery,
+			externalContext,
+		);
 
 		// If the intent already provides good suggestions (should with our new logic), use them
 		if (intent.suggestedQueries.length > 0) {
 			// Filter suggestions to include the partial query or related terms
-			const relevantSuggestions = intent.suggestedQueries.filter(suggestion => {
-				const suggestionLower = suggestion.toLowerCase();
-				const queryWords = normalized.split(' ');
-				const suggestionWords = suggestionLower.split(' ');
+			const relevantSuggestions = intent.suggestedQueries.filter(
+				(suggestion) => {
+					const suggestionLower = suggestion.toLowerCase();
+					const queryWords = normalized.split(" ");
+					const suggestionWords = suggestionLower.split(" ");
 
-				// Check if suggestion contains the query or vice versa
-				if (suggestionLower.includes(normalized) || normalized.includes(suggestionWords[0])) {
-					return true;
-				}
+					// Check if suggestion contains the query or vice versa
+					if (
+						suggestionLower.includes(normalized) ||
+						normalized.includes(suggestionWords[0])
+					) {
+						return true;
+					}
 
-				// Check for word overlap
-				return queryWords.some(qWord =>
-					suggestionWords.some(sWord =>
-						qWord.length > 2 && (sWord.includes(qWord) || qWord.includes(sWord))
-					)
-				);
-			});
+					// Check for word overlap
+					return queryWords.some((qWord) =>
+						suggestionWords.some(
+							(sWord) =>
+								qWord.length > 2 &&
+								(sWord.includes(qWord) || qWord.includes(sWord)),
+						),
+					);
+				},
+			);
 
 			// If we found relevant suggestions, return them
 			if (relevantSuggestions.length > 0) {
@@ -983,7 +1187,11 @@ export class SearchIntentRecognizer {
 		];
 
 		// Add context-specific suggestions based on the partial query
-		if (["beach", "park", "mountain", "city"].some(word => normalized.includes(word))) {
+		if (
+			["beach", "park", "mountain", "city"].some((word) =>
+				normalized.includes(word),
+			)
+		) {
 			fallbackSuggestions.push(`${normalized} photos`);
 		}
 

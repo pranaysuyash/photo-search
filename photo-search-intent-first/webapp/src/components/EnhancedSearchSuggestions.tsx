@@ -19,8 +19,15 @@ import {
 import type React from "react";
 import { useMemo } from "react";
 import { searchHistoryService } from "../services/SearchHistoryService";
-import { SearchIntentRecognizer, type SearchIntent } from "../services/SearchIntentRecognizer";
-import { didYouMean, expandSynonyms, synonymAlternates } from "../utils/searchSynonyms";
+import {
+	type SearchIntent,
+	SearchIntentRecognizer,
+} from "../services/SearchIntentRecognizer";
+import {
+	didYouMean,
+	expandSynonyms,
+	synonymAlternates,
+} from "../utils/searchSynonyms";
 
 interface EnhancedSearchSuggestionsProps {
 	query: string;
@@ -66,7 +73,10 @@ export function EnhancedSearchSuggestions({
 
 		// 1. Get intent-based suggestions
 		const intent = SearchIntentRecognizer.recognizeIntent(query, {
-			recentSearches: searchHistoryService.getHistory().slice(0, 5).map(h => h.query),
+			recentSearches: searchHistoryService
+				.getHistory()
+				.slice(0, 5)
+				.map((h) => h.query),
 			availableTags,
 			availablePeople,
 			availableLocations,
@@ -87,7 +97,8 @@ export function EnhancedSearchSuggestions({
 		});
 
 		// 2. Get history-based suggestions
-		const historySuggestions = searchHistoryService.getSuggestions(normalizedQuery);
+		const historySuggestions =
+			searchHistoryService.getSuggestions(normalizedQuery);
 		historySuggestions.slice(0, 4).forEach((suggestion, index) => {
 			allSuggestions.push({
 				id: `history-${index}`,
@@ -103,12 +114,16 @@ export function EnhancedSearchSuggestions({
 		});
 
 		// 3. Get spelling corrections
-		const corrections = didYouMean(query, [
-			...availableTags,
-			...availablePeople,
-			...availableLocations,
-			...availableCameras,
-		], 3);
+		const corrections = didYouMean(
+			query,
+			[
+				...availableTags,
+				...availablePeople,
+				...availableLocations,
+				...availableCameras,
+			],
+			3,
+		);
 
 		corrections.forEach((correction, index) => {
 			allSuggestions.push({
@@ -137,11 +152,13 @@ export function EnhancedSearchSuggestions({
 		});
 
 		// 5. Get smart contextual suggestions
-		const smartSuggestions = getSmartSuggestions(
-			query,
-			intent,
-			{ availableTags, availablePeople, availableLocations, availableCameras, photoCount }
-		);
+		const smartSuggestions = getSmartSuggestions(query, intent, {
+			availableTags,
+			availablePeople,
+			availableLocations,
+			availableCameras,
+			photoCount,
+		});
 		allSuggestions.push(...smartSuggestions);
 
 		// 6. Get popular searches
@@ -161,7 +178,7 @@ export function EnhancedSearchSuggestions({
 		// Sort by score and deduplicate
 		const seen = new Set<string>();
 		const sortedSuggestions = allSuggestions
-			.filter(suggestion => {
+			.filter((suggestion) => {
 				const normalized = suggestion.text.toLowerCase();
 				if (seen.has(normalized)) return false;
 				seen.add(normalized);
@@ -288,7 +305,9 @@ function getSuggestionBadge(type: SuggestionItem["type"]) {
 	}
 }
 
-function getIntentIcon(intent: SearchIntent["primary"]): React.ComponentType<LucideProps> {
+function getIntentIcon(
+	intent: SearchIntent["primary"],
+): React.ComponentType<LucideProps> {
 	switch (intent) {
 		case "discovery":
 			return Compass;
@@ -347,7 +366,7 @@ function getSmartSuggestions(
 		availableLocations: string[];
 		availableCameras: string[];
 		photoCount: number;
-	}
+	},
 ): SuggestionItem[] {
 	const suggestions: SuggestionItem[] = [];
 
@@ -381,10 +400,14 @@ function getSmartSuggestions(
 			});
 			break;
 
-		case "activity":
-			const activityTags = context.availableTags.filter(tag =>
-				["party", "vacation", "birthday", "wedding", "holiday"].includes(tag.toLowerCase())
-			).slice(0, 3);
+		case "activity": {
+			const activityTags = context.availableTags
+				.filter((tag) =>
+					["party", "vacation", "birthday", "wedding", "holiday"].includes(
+						tag.toLowerCase(),
+					),
+				)
+				.slice(0, 3);
 
 			activityTags.forEach((tag, index) => {
 				suggestions.push({
@@ -398,6 +421,7 @@ function getSmartSuggestions(
 				});
 			});
 			break;
+		}
 	}
 
 	// Time-based smart suggestions

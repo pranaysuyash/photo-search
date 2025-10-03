@@ -4,8 +4,11 @@
  */
 
 const DB_NAME = "PhotoVaultOffline";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = "offlineActions";
+const MANIFEST_STORE_NAME = "manifests";
+const METADATA_STORE_NAME = "metadata";
+const THUMBNAIL_STORE_NAME = "thumbnails";
 
 export class IndexedDBStorage {
 	private db: IDBDatabase | null = null;
@@ -41,6 +44,21 @@ export class IndexedDBStorage {
 					const store = db.createObjectStore(STORE_NAME, { keyPath: "id" });
 					store.createIndex("timestamp", "timestamp", { unique: false });
 					store.createIndex("type", "type", { unique: false });
+				}
+
+				// Create object store for manifests
+				if (!db.objectStoreNames.contains(MANIFEST_STORE_NAME)) {
+					db.createObjectStore(MANIFEST_STORE_NAME);
+				}
+
+				// Create object store for metadata
+				if (!db.objectStoreNames.contains(METADATA_STORE_NAME)) {
+					db.createObjectStore(METADATA_STORE_NAME);
+				}
+
+				// Create object store for thumbnails
+				if (!db.objectStoreNames.contains(THUMBNAIL_STORE_NAME)) {
+					db.createObjectStore(THUMBNAIL_STORE_NAME);
 				}
 			};
 		});
@@ -212,6 +230,165 @@ export class IndexedDBStorage {
 
 			request.onerror = () => {
 				console.error("[IndexedDB] Failed to count actions:", request.error);
+				reject(request.error);
+			};
+		});
+	}
+
+	/**
+	 * Store a manifest in the database
+	 */
+	async storeManifest(key: string, manifest: any[]): Promise<void> {
+		if (!this.db) {
+			await this.initialize();
+		}
+
+		return new Promise((resolve, reject) => {
+			const transaction = this.db?.transaction([MANIFEST_STORE_NAME], "readwrite");
+			if (!transaction) {
+				reject(new Error("Failed to create transaction"));
+				return;
+			}
+			const store = transaction.objectStore(MANIFEST_STORE_NAME);
+			const request = store.put(manifest, key);
+
+			request.onsuccess = () => resolve();
+			request.onerror = () => {
+				console.error("[IndexedDB] Failed to store manifest:", request.error);
+				reject(request.error);
+			};
+		});
+	}
+
+	/**
+	 * Get a manifest from the database
+	 */
+	async getManifest(key: string): Promise<any[] | null> {
+		if (!this.db) {
+			await this.initialize();
+		}
+
+		return new Promise((resolve, reject) => {
+			const transaction = this.db?.transaction([MANIFEST_STORE_NAME], "readonly");
+			if (!transaction) {
+				reject(new Error("Failed to create transaction"));
+				return;
+			}
+			const store = transaction.objectStore(MANIFEST_STORE_NAME);
+			const request = store.get(key);
+
+			request.onsuccess = () => {
+				resolve(request.result || null);
+			};
+
+			request.onerror = () => {
+				console.error("[IndexedDB] Failed to get manifest:", request.error);
+				reject(request.error);
+			};
+		});
+	}
+
+	/**
+	 * Store metadata
+	 */
+	async storeMetadata(key: string, value: any): Promise<void> {
+		if (!this.db) {
+			await this.initialize();
+		}
+
+		return new Promise((resolve, reject) => {
+			const transaction = this.db?.transaction([METADATA_STORE_NAME], "readwrite");
+			if (!transaction) {
+				reject(new Error("Failed to create transaction"));
+				return;
+			}
+			const store = transaction.objectStore(METADATA_STORE_NAME);
+			const request = store.put(value, key);
+
+			request.onsuccess = () => resolve();
+			request.onerror = () => {
+				console.error("[IndexedDB] Failed to store metadata:", request.error);
+				reject(request.error);
+			};
+		});
+	}
+
+	/**
+	 * Get metadata
+	 */
+	async getMetadata(key: string): Promise<any> {
+		if (!this.db) {
+			await this.initialize();
+		}
+
+		return new Promise((resolve, reject) => {
+			const transaction = this.db?.transaction([METADATA_STORE_NAME], "readonly");
+			if (!transaction) {
+				reject(new Error("Failed to create transaction"));
+				return;
+			}
+			const store = transaction.objectStore(METADATA_STORE_NAME);
+			const request = store.get(key);
+
+			request.onsuccess = () => {
+				resolve(request.result);
+			};
+
+			request.onerror = () => {
+				console.error("[IndexedDB] Failed to get metadata:", request.error);
+				reject(request.error);
+			};
+		});
+	}
+
+	/**
+	 * Store a thumbnail blob
+	 */
+	async storeThumbnail(path: string, blob: Blob): Promise<void> {
+		if (!this.db) {
+			await this.initialize();
+		}
+
+		return new Promise((resolve, reject) => {
+			const transaction = this.db?.transaction([THUMBNAIL_STORE_NAME], "readwrite");
+			if (!transaction) {
+				reject(new Error("Failed to create transaction"));
+				return;
+			}
+			const store = transaction.objectStore(THUMBNAIL_STORE_NAME);
+			const request = store.put(blob, path);
+
+			request.onsuccess = () => resolve();
+			request.onerror = () => {
+				console.error("[IndexedDB] Failed to store thumbnail:", request.error);
+				reject(request.error);
+			};
+		});
+	}
+
+	/**
+	 * Get a thumbnail blob
+	 */
+	async getThumbnail(path: string): Promise<Blob | null> {
+		if (!this.db) {
+			await this.initialize();
+		}
+
+		return new Promise((resolve, reject) => {
+			const transaction = this.db?.transaction([THUMBNAIL_STORE_NAME], "readonly");
+			if (!transaction) {
+				reject(new Error("Failed to create transaction"));
+				return;
+			}
+			const store = transaction.objectStore(THUMBNAIL_STORE_NAME);
+			const request = store.get(path);
+
+			request.onsuccess = () => {
+				resolve(request.result || null);
+			};
+
+			request.onerror = () => {
+				console.error("[IndexedDB] Failed to get thumbnail:", request.error);
 				reject(request.error);
 			};
 		});

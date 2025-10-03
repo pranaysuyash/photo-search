@@ -3,6 +3,7 @@ import {
 	createContext,
 	useCallback,
 	useContext,
+	useEffect,
 	useMemo,
 	useState,
 } from "react";
@@ -64,6 +65,20 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
 	const [filters, setFiltersState] = useState<SearchFilters>({
 		favOnly: false,
 	});
+
+	// Clear search state when directory changes to prevent query carryover
+	useEffect(() => {
+		// Clear search results and query when directory changes
+		setResults([]);
+		setQuery("");
+		setFiltersState({ favOnly: false });
+
+		// Also clear the photo store state
+		try {
+			(photo as unknown)?.setResults?.([]);
+			(photo as unknown)?.setQuery?.("");
+		} catch {}
+	}, [dir, photo]);
 
 	const setFilters = useCallback((f: Partial<SearchFilters>) => {
 		setFiltersState((prev) => ({ ...prev, ...f }));

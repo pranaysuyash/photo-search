@@ -40,6 +40,9 @@ interface AppShellProps {
 
 	// Content
 	children: React.ReactNode;
+
+	// Footer
+	footer?: React.ReactNode;
 }
 
 export const AppShell: React.FC<AppShellProps> = ({
@@ -59,6 +62,7 @@ export const AppShell: React.FC<AppShellProps> = ({
 	topBarProps,
 	quickActions,
 	children,
+	footer,
 }) => {
 	const { classes, getLayout, getComponentSpacing } = useResponsiveSpacing();
 
@@ -120,6 +124,12 @@ export const AppShell: React.FC<AppShellProps> = ({
 				>
 					{children}
 				</main>
+
+				{footer && (
+					<footer className="flex-shrink-0 border-t border-border bg-card">
+						{footer}
+					</footer>
+				)}
 			</div>
 		</div>
 	);

@@ -1,6 +1,14 @@
 import clsx from "clsx";
 import type { MutableRefObject, RefObject } from "react";
-import { lazy, memo, Suspense, useEffect, useState } from "react";
+import {
+	lazy,
+	memo,
+	Suspense,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import type { Location, NavigateFunction } from "react-router-dom";
 import type { LibraryActions } from "../contexts/LibraryContext";
 import { ResultsConfigProvider } from "../contexts/ResultsConfigContext";
@@ -12,7 +20,6 @@ import type {
 	UIActions,
 	WorkspaceActions,
 } from "../stores/types";
-import type { AccessibilitySettings } from "./AccessibilityPanel";
 
 // Toast type definition
 interface Toast {
@@ -31,15 +38,9 @@ interface JobsActions {
 	clearStopped: () => void;
 }
 
-const _MapView = lazy(() => import("./MapView"));
-const _SmartCollections = lazy(() => import("./SmartCollections"));
-const _TripsView = lazy(() => import("./TripsView"));
-const _VideoManager = lazy(() =>
-	import("./VideoManager").then((m) => ({
-		default: m.VideoManager,
-	})),
-);
+// Removed unused lazy preloads (_MapView, _SmartCollections, _TripsView, _VideoManager)
 
+import type { View } from "../App";
 import {
 	apiAuthCheck,
 	apiCancelJob,
@@ -47,9 +48,11 @@ import {
 	apiSearchLike,
 	apiSetFavorite,
 } from "../api";
+import { useHintTriggers } from "../components/HintSystem";
 // Context hooks
 import { useActionsContext } from "../contexts/ActionsContext";
 import { useDataContext } from "../contexts/DataContext";
+import { useJobsContext } from "../contexts/JobsContext";
 import { useLayoutContext } from "../contexts/LayoutContext";
 import { useOnboardingContext } from "../contexts/OnboardingContext";
 import { useViewStateContext } from "../contexts/ViewStateContext";
@@ -59,51 +62,97 @@ import {
 	useWelcomeState,
 } from "../hooks/useOnboardingProgress";
 import type { FilterPreset } from "../models/FilterPreset";
+import { useOsTrashEnabled } from "../stores/settingsStore";
 import {
 	isMobileTestPath,
 	isSharePath,
-	type View,
+	pathToView,
 	viewToPath,
 } from "../utils/router";
 import { AccessibilityPanel } from "./AccessibilityPanel";
+import {
+	AdaptiveResponsiveProvider,
+	ViewportIndicator,
+} from "./AdaptiveResponsiveLayout";
 import { AppShell } from "./AppShell";
 import { BottomNavigation } from "./BottomNavigation";
 import { ContextualHelp } from "./ContextualHelp";
-// Chrome islands
-import { AuthTokenBar, JobsFab, PanelsHost, RoutesHost } from "./chrome";
+import { ContextualModalProvider } from "./ContextualModalSystem";
+import { AuthTokenBar } from "./chrome/AuthTokenBar";
+import { JobsFab } from "./chrome/JobsFab";
+import { PanelsHost } from "./chrome/PanelsHost";
+import { RoutesHost } from "./chrome/RoutesHost";
+import { EmptyLibraryState } from "./EmptyLibraryState";
 import ErrorBoundary from "./ErrorBoundary";
-import { HintManager, useHintTriggers } from "./HintSystem";
-import { type Job, JobsCenter } from "./JobsCenter";
+import { HintManager } from "./HintSystem";
+import { IntentAwareWelcome } from "./IntentAwareWelcome";
+import type { Job } from "./JobsCenter";
+import { JobsCenter } from "./JobsCenter";
 import { MobileOptimizations } from "./MobileOptimizations";
-import MobilePWATest from "./MobilePWATest";
+import { MobilePWATest } from "./MobilePWATest";
 import { ModalSystemWrapper } from "./ModalSystemWrapper";
-import { ModelStatusIndicator } from "./ModelStatusIndicator";
 import FirstRunSetup from "./modals/FirstRunSetup";
 import { OfflineIndicator } from "./OfflineIndicator";
 import { OnboardingChecklist } from "./OnboardingChecklist";
 import { OnboardingTour } from "./OnboardingTour";
 import { OverlayLayer } from "./OverlayLayer";
-import { EnhancedFirstRunOnboarding } from "./onboarding";
+import { EnhancedFirstRunOnboarding } from "./onboarding/EnhancedFirstRunOnboarding";
 import PerformanceMonitor from "./PerformanceMonitor";
 import { PowerUserPanel } from "./PowerUserPanel";
 import { RecentActivityPanel } from "./RecentActivityPanel";
 import { SearchHistoryPanel } from "./SearchHistoryPanel";
+import { SearchTipsManager } from "./SearchTipsHint";
 import ShareViewer from "./ShareViewer";
 import { StatsBar } from "./StatsBar";
 import { StatusBar } from "./StatusBar";
 import { SuspenseFallback } from "./SuspenseFallback";
 import type { ViewType } from "./TopBar";
-import { Welcome } from "./Welcome";
+
+type HelpContextValue =
+	| "search"
+	| "library"
+	| "results"
+	| "settings"
+	| "collections";
+
+const deriveTopBarView = (view: View): ViewType => {
+	switch (view) {
+		case "library":
+		case "results":
+		case "map":
+		case "people":
+		case "trips":
+		case "tasks":
+			return view;
+		default:
+			return "results";
+	}
+};
+
+const deriveHelpContext = (view: View): HelpContextValue => {
+	switch (view) {
+		case "library":
+			return "library";
+		case "collections":
+		case "smart":
+			return "collections";
+		case "results":
+		case "saved":
+		case "map":
+		case "trips":
+		case "videos":
+		case "people":
+			return "results";
+		case "tasks":
+			return "settings";
+		default:
+			return "search";
+	}
+};
 
 interface AppWithHintsProps {
 	searchText: string;
 	selected: Set<string>;
-	showAccessibilityPanel: boolean;
-	setShowAccessibilityPanel: (show: boolean) => void;
-	handleAccessibilitySettingsChange: (settings: AccessibilitySettings) => void;
-	showOnboardingTour: boolean;
-	handleOnboardingComplete: () => void;
-	setShowOnboardingTour: (show: boolean) => void;
 }
 
 interface ContextProps {
@@ -136,15 +185,16 @@ export interface AppChromeProps {
 	refs: RefProps;
 }
 
+interface EnhancedOnboardingResult {
+	directory?: string;
+	includeVideos?: boolean;
+	enableDemo?: boolean;
+	completedSteps?: string[];
+}
+
 const AppWithHints = memo(function AppWithHints({
 	searchText,
 	selected,
-	showAccessibilityPanel: _showAccessibilityPanel,
-	setShowAccessibilityPanel: _setShowAccessibilityPanel,
-	handleAccessibilitySettingsChange: _handleAccessibilitySettingsChange,
-	showOnboardingTour: _showOnboardingTour,
-	handleOnboardingComplete: _handleOnboardingComplete,
-	setShowOnboardingTour: _setShowOnboardingTour,
 }: AppWithHintsProps) {
 	const { triggerHint } = useHintTriggers();
 
@@ -168,6 +218,26 @@ const AppWithHints = memo(function AppWithHints({
 	return null;
 });
 
+// Test window interface for optional hooks (kept narrow & tree-shakeable)
+interface TestWindow extends Window {
+	__TEST_COMPLETE_ONBOARDING__?: (
+		payload: Partial<EnhancedOnboardingResult>,
+	) => void;
+	__JOBS_FAB_STATS__?: {
+		activeJobsCount: number;
+		indexingActive: boolean;
+		indexingProgress?: number;
+	};
+	__JOBS_FAB_STATS_RECOMPUTES__?: number;
+	__HINT_LOG__?: Array<{ id: string; ts: number }>; // future use
+}
+
+const isTestMode =
+	typeof window !== "undefined" &&
+	Boolean(
+		(window as Partial<TestWindow> & { __TEST_MODE__?: boolean }).__TEST_MODE__,
+	);
+
 export function AppChrome({
 	location,
 	navigate,
@@ -179,8 +249,50 @@ export function AppChrome({
 	const viewState = useViewStateContext();
 	const data = useDataContext();
 	const actions = useActionsContext();
+	const jobsContext = useJobsContext();
 	const onboarding = useOnboardingContext();
+	const osTrashEnabled = useOsTrashEnabled();
 
+	const { pathname } = location;
+	const currentView = useMemo(() => pathToView(pathname), [pathname]);
+	const topBarView = useMemo(
+		() => deriveTopBarView(currentView),
+		[currentView],
+	);
+	const helpContext = useMemo(
+		() => deriveHelpContext(currentView),
+		[currentView],
+	);
+	const isShareRoute = isSharePath(pathname);
+	const isMobileTestRoute = isMobileTestPath(pathname);
+	const jobsForFab = jobsContext.state.jobs;
+	const jobsFabStatsRecomputeCounterRef = useRef(0);
+	const jobsFabStats = useMemo(() => {
+		jobsFabStatsRecomputeCounterRef.current += 1;
+		const activeJobs = jobsForFab.filter(
+			(job) => job.status === "running" || job.status === "paused",
+		);
+		const indexingJobs = jobsForFab.filter((job) => job.type === "index");
+		const indexingActive = indexingJobs.some(
+			(job) => job.status === "running" || job.status === "paused",
+		);
+		const avgProgress = indexingJobs.length
+			? indexingJobs.reduce((sum, job) => sum + (job.progress || 0), 0) /
+				indexingJobs.length
+			: undefined;
+		const snapshot = {
+			activeJobsCount: activeJobs.length,
+			indexingActive,
+			indexingProgress: avgProgress,
+		};
+		if (isTestMode) {
+			const tw = window as TestWindow;
+			tw.__JOBS_FAB_STATS__ = snapshot;
+			tw.__JOBS_FAB_STATS_RECOMPUTES__ =
+				jobsFabStatsRecomputeCounterRef.current;
+		}
+		return snapshot;
+	}, [jobsForFab]);
 	// Enhanced onboarding state
 	const {
 		shouldShowOnboarding: shouldShowEnhancedOnboarding,
@@ -287,8 +399,8 @@ export function AppChrome({
 	const {
 		dir,
 		engine,
-		hfToken: _hfToken,
-		openaiKey: _openaiKey,
+		hfToken, // Intent-First: keep for future API key handling
+		openaiKey, // Intent-First: keep for future API key handling
 		useCaps,
 		useOcr,
 		hasText,
@@ -300,14 +412,11 @@ export function AppChrome({
 		fMax,
 		tagFilter,
 		allTags,
-		needsHf: _needsHf,
-		needsOAI: _needsOAI,
 		results,
 		query,
 		fav,
 		favOnly,
 		topK,
-		saved: _saved,
 		collections,
 		smart,
 		library,
@@ -315,53 +424,49 @@ export function AppChrome({
 		tagsMap,
 		persons,
 		clusters,
-		points: _points,
 		diag,
 		meta,
 		busy,
 		note,
 		ocrReady,
-		ocrTextCount: _ocrTextCount,
-		presets: _presets,
-		altSearch,
-		ratingMap,
-		jobs,
-		libState,
+		ocrTextCount, // Intent-First: keep for future OCR features
+		presets, // Intent-First: keep for future preset management
+		hasAnyFilters, // Intent-First: keep for future filter state
+	} = data;
+
+	// Pull additional frequently used data fields from data context for clarity
+	const {
 		showInfoOverlay,
 		isConnected,
+		ratingMap,
+		altSearch,
+		jobs,
+		libState,
 		items,
-		hasAnyFilters: _hasAnyFilters,
 		indexCoverage,
 	} = data;
+
+	const runningJobsCount = useMemo(
+		() => jobs.filter((job) => job.status === "running").length,
+		[jobs],
+	);
 
 	const {
 		handleAccessibilitySettingsChange,
 		doSearchImmediate,
 		loadFav,
-		loadSaved: _loadSaved,
-		loadTags: _loadTags,
-		loadDiag: _loadDiag,
-		loadFaces: _loadFaces,
-		loadMap: _loadMap,
 		loadLibrary,
-		loadMetadata: _loadMetadata,
-		loadPresets: _loadPresets,
-		prepareFast: _prepareFast,
-		monitorOperation: _monitorOperation,
+		// Omitted unused actions for this chrome layer (loadSaved, loadTags, etc.)
 		openDetailByPath,
 		navDetail,
-		exportSelected: _exportSelected,
-		handlePhotoOpen: _handlePhotoOpen,
-		handlePhotoAction: _handlePhotoAction,
-		setRatingSelected: _setRatingSelected,
-		rowsEqual: _rowsEqual,
+		// exportSelected, handlePhotoOpen, handlePhotoAction, setRatingSelected, rowsEqual not used here
 	} = actions;
 
 	const {
 		settingsActions,
 		photoActions,
 		uiActions,
-		workspaceActions: _workspaceActions,
+		// workspaceActions unused here
 		modalControls,
 		lib,
 		jobsActions,
@@ -379,8 +484,13 @@ export function AppChrome({
 	useEffect(() => {
 		if (results.length > 0 && !busy) {
 			// Trigger hint when search completes with results
-			setTimeout(() => triggerHint("search-success"), 1000);
+			const timeoutId = window.setTimeout(
+				() => triggerHint("search-success"),
+				1000,
+			);
+			return () => window.clearTimeout(timeoutId);
 		}
+		return undefined;
 	}, [results.length, busy, triggerHint]);
 
 	useEffect(() => {
@@ -432,7 +542,9 @@ export function AppChrome({
 		}
 	}, [hasCompletedOnboarding, dir, shouldShowEnhancedOnboarding]);
 
-	const handleEnhancedOnboardingComplete = (data: unknown) => {
+	const handleEnhancedOnboardingComplete = (
+		payload: EnhancedOnboardingResult,
+	) => {
 		// Mark onboarding as completed
 		markStepComplete("welcome");
 		markStepComplete("directory-selection");
@@ -441,17 +553,17 @@ export function AppChrome({
 		markStepComplete("complete");
 
 		// Handle the setup data from enhanced onboarding
-		if (data.directory) {
+		if (payload?.directory && typeof payload.directory === "string") {
 			// Set the selected directory
-			settingsActions.setDir(data.directory);
+			settingsActions.setDir(payload.directory);
 		}
 
-		if (data.includeVideos !== undefined) {
-			// Update video preferences
-			settingsActions.setIncludeVideos(data.includeVideos);
+		if (typeof payload?.includeVideos === "boolean") {
+			// Update video preferences when setter is available
+			settingsActions.setIncludeVideos?.(payload.includeVideos);
 		}
 
-		if (data.enableDemo) {
+		if (payload?.enableDemo) {
 			// Enable demo library
 			handleWelcomeStartDemo();
 		}
@@ -472,6 +584,21 @@ export function AppChrome({
 		// Don't mark as completed - user can come back later
 	};
 
+	// Attach test onboarding completion hook once (guarded by isTestMode)
+	// Attach test onboarding completion hook (kept stable for tests)
+	// biome-ignore lint/correctness/useExhaustiveDependencies: intentional controlled exposure
+	useEffect(() => {
+		if (!isTestMode) return;
+		(window as TestWindow).__TEST_COMPLETE_ONBOARDING__ = (payload) => {
+			handleEnhancedOnboardingComplete({ ...(payload || {}) });
+		};
+		return () => {
+			if ((window as TestWindow).__TEST_COMPLETE_ONBOARDING__) {
+				delete (window as TestWindow).__TEST_COMPLETE_ONBOARDING__;
+			}
+		};
+	}, [isTestMode, handleEnhancedOnboardingComplete]);
+
 	const chrome = (
 		<MobileOptimizations
 			onSwipeLeft={handleSwipeLeft}
@@ -481,17 +608,15 @@ export function AppChrome({
 			enablePullToRefresh
 			onPullToRefresh={handlePullToRefresh}
 		>
-			{isSharePath(location.pathname) && <ShareViewer />}
-			{isMobileTestPath(location.pathname) && <MobilePWATest />}
+			{isShareRoute && <ShareViewer />}
+			{isMobileTestRoute && <MobilePWATest />}
 			<div
 				className={clsx(
 					"flex h-screen bg-white dark:bg-gray-950 dark:text-gray-100",
 					{
 						"high-contrast": accessibilitySettings?.highContrast,
 						"large-text": accessibilitySettings?.largeText,
-						hidden:
-							isSharePath(location.pathname) ||
-							isMobileTestPath(location.pathname),
+						hidden: isShareRoute || isMobileTestRoute,
 					},
 				)}
 			>
@@ -502,15 +627,23 @@ export function AppChrome({
 					Skip to main content
 				</a>
 				<OfflineIndicator />
-				<ModelStatusIndicator />
 				{showWelcome && (
-					<Welcome
+					<IntentAwareWelcome
 						onStartDemo={handleWelcomeStartDemo}
 						onSelectFolder={() => {
 							modalControls.openFolder();
 							uiActions.setShowWelcome(false);
 						}}
 						onClose={() => uiActions.setShowWelcome(false)}
+						onIntentDetected={(intent) => {
+							console.log("User intent detected:", intent);
+							// Could store intent for future personalization
+							try {
+								localStorage.setItem("userIntent", JSON.stringify(intent));
+							} catch (e) {
+								// ignore storage errors (quota / private mode)
+							}
+						}}
 					/>
 				)}
 
@@ -520,7 +653,9 @@ export function AppChrome({
 						setShowOnboarding(false);
 						try {
 							localStorage.setItem("hasSeenOnboarding", "true");
-						} catch {}
+						} catch (e) {
+							// ignore storage errors
+						}
 					}}
 					onQuickStart={handleFirstRunQuickStart}
 					onCustom={handleFirstRunCustom}
@@ -548,6 +683,8 @@ export function AppChrome({
 					}}
 				>
 					<AppShell
+						data-selected-view={currentView}
+						data-help-context={helpContext}
 						showModernSidebar={showModernSidebar}
 						isMobile={isMobile}
 						sidebarStats={{
@@ -562,7 +699,7 @@ export function AppChrome({
 						}
 						onSettingsClick={() => setShowAccessibilityPanel(true)}
 						onPowerUserClick={() => setShowPowerUserPanel(true)}
-						selectedView={viewToPath(location.pathname) as View}
+						selectedView={currentView}
 						onViewChange={(view) => navigate(viewToPath(view as View))}
 						onSelectLibrary={modalControls.openFolder}
 						collections={collections as Record<string, string[]>}
@@ -581,7 +718,7 @@ export function AppChrome({
 							busy: Boolean(busy),
 							gridSize,
 							setGridSize,
-							selectedView: viewToPath(location.pathname) as ViewType,
+							selectedView: topBarView,
 							setSelectedView: (view) =>
 								navigate(viewToPath(String(view) as View)),
 							currentFilter,
@@ -594,10 +731,10 @@ export function AppChrome({
 							dir: dir || "",
 							engine,
 							topK,
-							useOsTrash: Boolean(settingsActions.setUseOsTrash),
+							useOsTrash: osTrashEnabled,
 							showInfoOverlay,
 							onToggleInfoOverlay: settingsActions.setShowInfoOverlay
-								? () => settingsActions.setShowInfoOverlay(!showInfoOverlay)
+								? () => settingsActions.setShowInfoOverlay?.(!showInfoOverlay)
 								: () => {},
 							photoActions,
 							uiActions,
@@ -607,7 +744,7 @@ export function AppChrome({
 							indexStatus: libState.indexStatus,
 							isIndexing: libState.isIndexing,
 							onIndex: () => lib.index(),
-							activeJobs: jobs.filter((job) => job.status === "running").length,
+							activeJobs: runningJobsCount,
 							onOpenJobs: modalControls.openJobs,
 							progressPct: libState.progressPct,
 							etaSeconds: libState.etaSeconds,
@@ -618,19 +755,25 @@ export function AppChrome({
 							onPause: async () => {
 								try {
 									await lib.pause?.(dir ?? undefined);
-								} catch {}
+								} catch {
+									// Ignore pause errors - UI state will be updated regardless
+								}
 							},
 							onResume: async () => {
 								try {
 									await lib.resume?.(dir ?? undefined);
-								} catch {}
+								} catch {
+									// Ignore resume errors - UI state will be updated regardless
+								}
 							},
 							onOpenThemeModal: modalControls.openTheme,
 							onOpenDiagnostics: modalControls.openDiagnostics,
 							toastTimerRef,
 							setToast,
 							enableDemoLibrary,
-							onLibraryChange: settingsActions.setDir,
+							onLibraryChange: (val: string | null) => {
+								if (typeof val === "string") settingsActions.setDir(val);
+							},
 						}}
 						quickActions={{
 							prefersReducedMotion,
@@ -639,6 +782,17 @@ export function AppChrome({
 							showHelpHint,
 							onDismissHelpHint: dismissHelpHint,
 						}}
+						footer={
+							<StatusBar
+								photoCount={library?.length || 0}
+								indexedCount={library?.length || 0}
+								searchProvider={engine}
+								isIndexing={libState.isIndexing}
+								isConnected={isConnected}
+								currentDirectory={dir}
+								activeJobs={runningJobsCount}
+							/>
+						}
 					>
 						<main
 							id="main-content"
@@ -660,72 +814,88 @@ export function AppChrome({
 								}}
 							>
 								<Suspense fallback={<SuspenseFallback label="Loading…" />}>
-									<RoutesHost
-										dir={dir}
-										engine={engine}
-										library={library}
-										libState={{
-											isIndexing: libState.isIndexing,
-											progressPct: libState.progressPct || 0,
-											etaSeconds: libState.etaSeconds || 0,
-										}}
-										results={results.map((r) => ({
-											path: r.path,
-											score: r.score,
-										}))}
-										searchId={null} // TODO: Connect to actual search ID from search context
-										searchText={searchText}
-										altSearch={
-											altSearch || { active: false, applied: "", original: "" }
-										}
-										ratingMap={ratingMap}
-										showInfoOverlay={showInfoOverlay}
-										busy={Boolean(busy)}
-										selected={selected}
-										tagsMap={tagsMap}
-										smart={smart}
-										topK={topK}
-										query={query}
-										favOnly={favOnly}
-										tagFilter={tagFilter}
-										useCaps={useCaps}
-										useOcr={useOcr}
-										hasText={hasText}
-										camera={camera}
-										isoMin={String(isoMin || "")}
-										isoMax={String(isoMax || "")}
-										fMin={String(fMin || "")}
-										fMax={String(fMax || "")}
-										place={place}
-										persons={persons}
-										hasMore={libHasMore}
-										isLoading={Boolean(busy)}
-										onSelectLibrary={modalControls.openFolder}
-										onRunDemo={handleWelcomeStartDemo}
-										onOpenHelp={modalControls.openHelp}
-										onLoadLibrary={loadLibrary}
-										onCompleteOnboardingStep={completeOnboardingStep}
-										onToggleSelect={toggleSelect}
-										onOpen={(path) => {
-											const idx = (library || []).findIndex((p) => p === path);
-											if (idx >= 0) setDetailIdx(idx);
-										}}
-										openDetailByPath={openDetailByPath}
-										scrollContainerRef={scrollContainerRef}
-										setSearchText={setSearchText}
-										onSearchNow={doSearchImmediate}
-										onLayout={(rows: number[][]) => setLayoutRows(rows)}
-										onOpenFilters={() => setShowFilters(true)}
-										onOpenAdvanced={() => {
-											/* TODO: Open advanced search modal */
-										}}
-										setSmart={photoActions.setSmart}
-										setResults={photoActions.setResults}
-										setSearchId={photoActions.setSearchId}
-										setNote={uiActions.setNote}
-										setBusy={uiActions.setBusy}
-										setTopK={photoActions.setTopK}
-									/>
+									{library && library.length > 0 ? (
+										<RoutesHost
+											dir={dir}
+											engine={engine}
+											library={library}
+											libState={{
+												isIndexing: libState.isIndexing,
+												progressPct: libState.progressPct || 0,
+												etaSeconds: libState.etaSeconds || 0,
+											}}
+											results={results.map((r) => ({
+												path: r.path,
+												score: r.score,
+											}))}
+											searchId={null} // TODO: Connect to actual search ID from search context
+											searchText={searchText}
+											altSearch={
+												altSearch || {
+													active: false,
+													applied: "",
+													original: "",
+												}
+											}
+											ratingMap={ratingMap}
+											showInfoOverlay={showInfoOverlay}
+											busy={Boolean(busy)}
+											selected={selected}
+											tagsMap={tagsMap}
+											smart={smart}
+											topK={topK}
+											query={query}
+											favOnly={favOnly}
+											tagFilter={tagFilter}
+											useCaps={useCaps}
+											useOcr={useOcr}
+											hasText={hasText}
+											camera={camera}
+											isoMin={String(isoMin || "")}
+											isoMax={String(isoMax || "")}
+											fMin={String(fMin || "")}
+											fMax={String(fMax || "")}
+											place={place}
+											persons={persons}
+											hasMore={libHasMore}
+											isLoading={Boolean(busy)}
+											onSelectLibrary={modalControls.openFolder}
+											onRunDemo={handleWelcomeStartDemo}
+											onOpenHelp={modalControls.openHelp}
+											onLoadLibrary={loadLibrary}
+											onCompleteOnboardingStep={completeOnboardingStep}
+											onToggleSelect={toggleSelect}
+											onOpen={(path) => {
+												const idx = (library || []).findIndex(
+													(p) => p === path,
+												);
+												if (idx >= 0) setDetailIdx(idx);
+											}}
+											openDetailByPath={openDetailByPath}
+											scrollContainerRef={scrollContainerRef}
+											setSearchText={setSearchText}
+											onSearchNow={doSearchImmediate}
+											onLayout={(rows: number[][]) => setLayoutRows(rows)}
+											onOpenFilters={() => setShowFilters(true)}
+											onOpenAdvanced={() => {
+												/* TODO: Open advanced search modal */
+											}}
+											setSmart={photoActions.setSmart}
+											setResults={photoActions.setResults}
+											setSearchId={photoActions.setSearchId}
+											setNote={uiActions.setNote}
+											setBusy={(b: string | boolean) =>
+												uiActions.setBusy(
+													typeof b === "string" ? b : b ? "Busy" : "",
+												)
+											}
+											setTopK={photoActions.setTopK}
+										/>
+									) : (
+										<EmptyLibraryState
+											onSelectFolder={modalControls.openFolder}
+										/>
+									)}
 								</Suspense>
 								<StatsBar
 									items={items}
@@ -829,7 +999,12 @@ export function AppChrome({
 									}}
 								/>
 
-								<JobsFab onOpenJobs={modalControls.openJobs} />
+								<JobsFab
+									activeJobs={jobsFabStats.activeJobsCount}
+									isIndexing={jobsFabStats.indexingActive}
+									progressPct={jobsFabStats.indexingProgress}
+									onOpenJobs={modalControls.openJobs}
+								/>
 
 								<OverlayLayer busy={busy} note={note} />
 
@@ -842,7 +1017,9 @@ export function AppChrome({
 										if (!token) return;
 										try {
 											localStorage.setItem("api_token", token);
-										} catch {}
+										} catch {
+											// Ignore localStorage errors (private mode, quota exceeded)
+										}
 										const ok = await apiAuthCheck(token);
 										if (ok) {
 											setAuthRequired(false);
@@ -852,18 +1029,6 @@ export function AppChrome({
 											uiActions.setNote("Token rejected, check API_TOKEN.");
 										}
 									}}
-								/>
-
-								<StatusBar
-									photoCount={library?.length || 0}
-									indexedCount={library?.length || 0}
-									searchProvider={engine}
-									isIndexing={libState.isIndexing}
-									isConnected={isConnected}
-									currentDirectory={dir}
-									activeJobs={
-										jobs.filter((job) => job.status === "running").length
-									}
 								/>
 
 								<JobsCenter
@@ -912,16 +1077,10 @@ export function AppChrome({
 								/>
 
 								<ContextualHelp
+									data-help-context={helpContext}
 									isVisible={showContextualHelp}
 									onDismiss={() => setShowContextualHelp(false)}
-									context={
-										viewToPath(location.pathname) as unknown as
-											| "search"
-											| "library"
-											| "results"
-											| "settings"
-											| "collections"
-									}
+									context={helpContext}
 									userActions={userActions as string[]}
 								/>
 
@@ -931,7 +1090,9 @@ export function AppChrome({
 										setShowOnboardingChecklist(false);
 										try {
 											localStorage.setItem("onboardingComplete", "true");
-										} catch {}
+										} catch {
+											// Ignore localStorage errors (private mode, quota exceeded)
+										}
 									}}
 									completedSteps={onboardingSteps as string[]}
 									inProgressStepId={
@@ -990,6 +1151,12 @@ export function AppChrome({
 									)}
 								</ErrorBoundary>
 							</ResultsUIProvider>
+
+							{/* Contextual search tips (first-interaction) */}
+							<SearchTipsManager
+								libraryCount={library?.length || 0}
+								onboardingActive={showOnboardingTour}
+							/>
 						</main>
 
 						{/* ModalSystemWrapper provides enhanced modal system with fallback to legacy */}
@@ -1013,19 +1180,17 @@ export function AppChrome({
 					/>
 				)}
 
-				<AppWithHints
-					searchText={searchText}
-					selected={selected}
-					showAccessibilityPanel={showAccessibilityPanel}
-					setShowAccessibilityPanel={setShowAccessibilityPanel}
-					handleAccessibilitySettingsChange={handleAccessibilitySettingsChange}
-					showOnboardingTour={showOnboardingTour}
-					handleOnboardingComplete={handleOnboardingComplete}
-					setShowOnboardingTour={setShowOnboardingTour}
-				/>
+				<AppWithHints searchText={searchText} selected={selected} />
 			</div>
 		</MobileOptimizations>
 	);
 
-	return <HintManager>{chrome}</HintManager>;
+	return (
+		<AdaptiveResponsiveProvider>
+			<ContextualModalProvider>
+				<HintManager>{chrome}</HintManager>
+				<ViewportIndicator />
+			</ContextualModalProvider>
+		</AdaptiveResponsiveProvider>
+	);
 }

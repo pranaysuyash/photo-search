@@ -32,6 +32,9 @@ from .workspace import workspace_router
 from .smart_collections import smart_collections_router
 from .trips import trips_router
 from .enhanced_smart_collections import enhanced_smart_collections_router
+from .enhanced_faces import enhanced_faces_router
+from .enhanced_search import enhanced_search_router
+from .enhanced_indexing import enhanced_indexing_router
 
 __all__ = [
     "search_router",
@@ -65,4 +68,7 @@ __all__ = [
     "smart_collections_router",
     "trips_router",
     "enhanced_smart_collections_router",
+    "enhanced_faces_router",
+    "enhanced_search_router",
+    "enhanced_indexing_router",
 ]

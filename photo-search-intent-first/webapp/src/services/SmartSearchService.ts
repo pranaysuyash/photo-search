@@ -4,9 +4,13 @@
  */
 
 import { apiSearch } from "../api";
-import { SearchIntentRecognizer, type SearchIntent, type SearchFilters } from "./SearchIntentRecognizer";
-import { searchHistoryService } from "./SearchHistoryService";
 import { expandSynonyms } from "../utils/searchSynonyms";
+import { searchHistoryService } from "./SearchHistoryService";
+import {
+	type SearchFilters,
+	type SearchIntent,
+	SearchIntentRecognizer,
+} from "./SearchIntentRecognizer";
 
 export interface SmartSearchOptions {
 	dir: string;
@@ -30,7 +34,7 @@ export interface SmartSearchResult {
 	intent?: SearchIntent;
 	appliedFilters: SearchFilters;
 	expandedQuery?: string;
-	results: any[];
+	results: unknown[];
 	searchId: string;
 	processingTime: number;
 	suggestions: string[];
@@ -48,16 +52,21 @@ export class SmartSearchService {
 	/**
 	 * Perform smart search with intent recognition and enhancement
 	 */
-	static async smartSearch(options: SmartSearchOptions): Promise<SmartSearchResult> {
+	static async smartSearch(
+		options: SmartSearchOptions,
+	): Promise<SmartSearchResult> {
 		const startTime = Date.now();
 		const {
 			dir,
 			query,
 			engine,
-			topK = this.DEFAULT_OPTIONS.topK,
-			enableIntentRecognition = this.DEFAULT_OPTIONS.enableIntentRecognition,
-			enableQueryExpansion = this.DEFAULT_OPTIONS.enableQueryExpansion,
-			enableSmartFilters = this.DEFAULT_OPTIONS.enableSmartFilters,
+			topK = SmartSearchService.DEFAULT_OPTIONS.topK,
+			enableIntentRecognition = SmartSearchService.DEFAULT_OPTIONS
+				.enableIntentRecognition,
+			enableQueryExpansion = SmartSearchService.DEFAULT_OPTIONS
+				.enableQueryExpansion,
+			enableSmartFilters = SmartSearchService.DEFAULT_OPTIONS
+				.enableSmartFilters,
 			context = {},
 		} = options;
 
@@ -74,7 +83,10 @@ export class SmartSearchService {
 		// Step 1: Recognize search intent
 		if (enableIntentRecognition) {
 			intent = SearchIntentRecognizer.recognizeIntent(processedQuery, {
-				recentSearches: searchHistoryService.getHistory().slice(0, 5).map(h => h.query),
+				recentSearches: searchHistoryService
+					.getHistory()
+					.slice(0, 5)
+					.map((h) => h.query),
 				...context,
 			});
 
@@ -98,12 +110,21 @@ export class SmartSearchService {
 
 		// Step 3: Apply any additional smart filters
 		if (enableSmartFilters && intent) {
-			const smartFilters = this.generateSmartFilters(processedQuery, intent);
+			const smartFilters = SmartSearchService.generateSmartFilters(
+				processedQuery,
+				intent,
+			);
 			appliedFilters = { ...appliedFilters, ...smartFilters };
 		}
 
 		// Step 4: Execute search
-		const searchResult = await apiSearch(dir, processedQuery, engine, topK, appliedFilters);
+		const searchResult = await apiSearch(
+			dir,
+			processedQuery,
+			engine,
+			topK,
+			appliedFilters,
+		);
 
 		const processingTime = Date.now() - startTime;
 
@@ -116,12 +137,13 @@ export class SmartSearchService {
 		});
 
 		// Step 6: Generate post-search suggestions
-		const postSearchSuggestions = this.generatePostSearchSuggestions(
-			processedQuery,
-			searchResult.results,
-			intent,
-			context
-		);
+		const postSearchSuggestions =
+			SmartSearchService.generatePostSearchSuggestions(
+				processedQuery,
+				searchResult.results,
+				intent,
+				context,
+			);
 		suggestions.push(...postSearchSuggestions);
 
 		return {
@@ -148,7 +170,7 @@ export class SmartSearchService {
 			availableTags?: string[];
 			availablePeople?: string[];
 			availableLocations?: string[];
-		}
+		},
 	): string[] {
 		const suggestions: string[] = [];
 
@@ -158,22 +180,22 @@ export class SmartSearchService {
 
 		// Add context-aware suggestions
 		if (context?.availableTags?.length > 0) {
-			const matchingTags = context.availableTags.filter(tag =>
-				tag.toLowerCase().includes(query.toLowerCase())
+			const matchingTags = context.availableTags.filter((tag) =>
+				tag.toLowerCase().includes(query.toLowerCase()),
 			);
 			suggestions.push(...matchingTags.slice(0, 3));
 		}
 
 		if (context?.availablePeople?.length > 0) {
-			const matchingPeople = context.availablePeople.filter(person =>
-				person.toLowerCase().includes(query.toLowerCase())
+			const matchingPeople = context.availablePeople.filter((person) =>
+				person.toLowerCase().includes(query.toLowerCase()),
 			);
 			suggestions.push(...matchingPeople.slice(0, 2));
 		}
 
 		if (context?.availableLocations?.length > 0) {
-			const matchingLocations = context.availableLocations.filter(location =>
-				location.toLowerCase().includes(query.toLowerCase())
+			const matchingLocations = context.availableLocations.filter((location) =>
+				location.toLowerCase().includes(query.toLowerCase()),
 			);
 			suggestions.push(...matchingLocations.slice(0, 2));
 		}
@@ -188,7 +210,10 @@ export class SmartSearchService {
 	/**
 	 * Generate smart filters based on intent and query
 	 */
-	private static generateSmartFilters(query: string, intent: SearchIntent): SearchFilters {
+	private static generateSmartFilters(
+		query: string,
+		intent: SearchIntent,
+	): SearchFilters {
 		const filters: SearchFilters = {};
 
 		// Time-based filters
@@ -196,12 +221,13 @@ export class SmartSearchService {
 			switch (intent.context.timeFrame.type) {
 				case "recent":
 					filters.dateFrom = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-						.toISOString().split('T')[0];
+						.toISOString()
+						.split("T")[0];
 					break;
 				case "specific":
 					// Parse specific date logic would go here
 					break;
-				case "seasonal":
+				case "seasonal": {
 					// Add seasonal date ranges
 					const currentYear = new Date().getFullYear();
 					const season = intent.context.timeFrame.value;
@@ -213,6 +239,7 @@ export class SmartSearchService {
 						filters.dateTo = `${currentYear}-02-28`;
 					}
 					break;
+				}
 			}
 		}
 
@@ -251,26 +278,34 @@ export class SmartSearchService {
 	 */
 	private static generatePostSearchSuggestions(
 		query: string,
-		results: any[],
+		results: unknown[],
 		intent?: SearchIntent,
-		context?: any
+		context?: any,
 	): string[] {
 		const suggestions: string[] = [];
 
 		if (results.length === 0) {
 			// No results - provide alternative suggestions
-			suggestions.push(...this.getNoResultsSuggestions(query, intent, context));
+			suggestions.push(
+				...SmartSearchService.getNoResultsSuggestions(query, intent, context),
+			);
 		} else if (results.length < 5) {
 			// Few results - suggest broadening the search
-			suggestions.push(...this.getBroadeningSuggestions(query, intent));
+			suggestions.push(
+				...SmartSearchService.getBroadeningSuggestions(query, intent),
+			);
 		} else if (results.length > 20) {
 			// Many results - suggest refining the search
-			suggestions.push(...this.getRefiningSuggestions(query, intent, results));
+			suggestions.push(
+				...SmartSearchService.getRefiningSuggestions(query, intent, results),
+			);
 		}
 
 		// Add contextual suggestions based on results
 		if (results.length > 0) {
-			suggestions.push(...this.getResultBasedSuggestions(results, intent));
+			suggestions.push(
+				...SmartSearchService.getResultBasedSuggestions(results, intent),
+			);
 		}
 
 		return suggestions;
@@ -282,7 +317,7 @@ export class SmartSearchService {
 	private static getNoResultsSuggestions(
 		query: string,
 		intent?: SearchIntent,
-		context?: any
+		context?: any,
 	): string[] {
 		const suggestions: string[] = [];
 
@@ -317,13 +352,17 @@ export class SmartSearchService {
 		// This would use the didYouMean function from searchSynonyms
 		// For now, just add some common corrections
 		const commonMisspellings: Record<string, string[]> = {
-			"vacation": ["vacation", "holiday", "trip"],
-			"family": ["family", "fam", "relatives"],
-			"birthday": ["birthday", "bday", "b-day"],
+			vacation: ["vacation", "holiday", "trip"],
+			family: ["family", "fam", "relatives"],
+			birthday: ["birthday", "bday", "b-day"],
 		};
 
 		for (const [correct, misspellings] of Object.entries(commonMisspellings)) {
-			if (misspellings.some(misspelling => query.toLowerCase().includes(misspelling))) {
+			if (
+				misspellings.some((misspelling) =>
+					query.toLowerCase().includes(misspelling),
+				)
+			) {
 				suggestions.push(correct);
 				break;
 			}
@@ -335,15 +374,18 @@ export class SmartSearchService {
 	/**
 	 * Get suggestions to broaden search when few results
 	 */
-	private static getBroadeningSuggestions(query: string, intent?: SearchIntent): string[] {
+	private static getBroadeningSuggestions(
+		query: string,
+		intent?: SearchIntent,
+	): string[] {
 		const suggestions: string[] = [];
 
 		// Remove specific terms
-		const words = query.split(' ').filter(w => w.length > 2);
+		const words = query.split(" ").filter((w) => w.length > 2);
 		if (words.length > 1) {
 			// Suggest searches with fewer terms
 			for (let i = 0; i < words.length; i++) {
-				const broadened = words.filter((_, index) => index !== i).join(' ');
+				const broadened = words.filter((_, index) => index !== i).join(" ");
 				if (broadened) {
 					suggestions.push(broadened);
 				}
@@ -374,7 +416,7 @@ export class SmartSearchService {
 	private static getRefiningSuggestions(
 		query: string,
 		intent?: SearchIntent,
-		results?: any[]
+		results?: unknown[],
 	): string[] {
 		const suggestions: string[] = [];
 
@@ -405,7 +447,10 @@ export class SmartSearchService {
 	/**
 	 * Get suggestions based on actual search results
 	 */
-	private static getResultBasedSuggestions(results: any[], intent?: SearchIntent): string[] {
+	private static getResultBasedSuggestions(
+		results: unknown[],
+		intent?: SearchIntent,
+	): string[] {
 		const suggestions: string[] = [];
 
 		// Extract common themes from results
@@ -431,9 +476,11 @@ export class SmartSearchService {
 		const history = searchHistoryService.getHistory();
 
 		const popularQueries = searchHistoryService.getPopularSearches(5);
-		const averageResults = history.length > 0
-			? history.reduce((sum, entry) => sum + entry.resultCount, 0) / history.length
-			: 0;
+		const averageResults =
+			history.length > 0
+				? history.reduce((sum, entry) => sum + entry.resultCount, 0) /
+					history.length
+				: 0;
 
 		// Analyze intent patterns from recent searches
 		const intentCounts = new Map<string, number>();
@@ -441,7 +488,10 @@ export class SmartSearchService {
 
 		for (const entry of recentSearches) {
 			const intent = SearchIntentRecognizer.recognizeIntent(entry.query);
-			intentCounts.set(intent.primary, (intentCounts.get(intent.primary) || 0) + 1);
+			intentCounts.set(
+				intent.primary,
+				(intentCounts.get(intent.primary) || 0) + 1,
+			);
 		}
 
 		const recentIntents = Array.from(intentCounts.entries())

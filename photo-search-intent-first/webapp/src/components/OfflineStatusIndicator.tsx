@@ -20,7 +20,13 @@ export interface OfflineStatus {
 	isSyncing: boolean;
 }
 
+const OFFLINE_UI_ENABLED = import.meta.env?.VITE_ENABLE_OFFLINE_UI === "1";
+
 export function OfflineStatusIndicator() {
+	if (!OFFLINE_UI_ENABLED) {
+		return null;
+	}
+
 	const [status, setStatus] = useState<OfflineStatus>({
 		isOnline: navigator.onLine,
 		queueStats: {

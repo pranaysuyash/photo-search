@@ -6,6 +6,8 @@ export interface PhotoState {
 	searchId: string;
 	query: string;
 	topK: number;
+	// Soft synonym search banner state
+	altSearch: { active: boolean; original: string; applied: string };
 	fav: string[];
 	favOnly: boolean;
 	tags: {
@@ -18,12 +20,16 @@ export interface PhotoState {
 	smart: Record<string, unknown>;
 	library: string[];
 	libHasMore: boolean;
+	// Offline support
+	offlinePhotos: SearchResult[];
+	source: 'online' | 'offline' | 'mixed';
 }
 
 export interface PhotoActions {
 	setResults: (results: SearchResult[]) => void;
 	setSearchId: (id: string) => void;
 	setQuery: (query: string) => void;
+	setAltSearch: (alt: { active: boolean; original: string; applied: string }) => void;
 	setTopK: (topK: number) => void;
 	setFavorites: (fav: string[]) => void;
 	setFavOnly: (favOnly: boolean) => void;
@@ -39,6 +45,9 @@ export interface PhotoActions {
 	setLibHasMore: (hasMore: boolean) => void;
 	appendLibrary: (paths: string[]) => void;
 	resetSearch: () => void;
+	// Offline support
+	preloadPhotos: (photos: SearchResult[]) => void;
+	setSource: (source: 'online' | 'offline' | 'mixed') => void;
 }
 
 // UI state for modals, loading, view modes
@@ -115,6 +124,7 @@ export interface SettingsActions {
 	setResultView?: (view: "grid" | "film" | "timeline" | "map") => void;
 	setTimelineBucket?: (b: "day" | "week" | "month" | "year") => void;
 	setHighContrast?: (highContrast: boolean) => void;
+	setIncludeVideos?: (includeVideos: boolean) => void;
 }
 
 // Workspace, people, and system data

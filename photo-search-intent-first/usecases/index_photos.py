@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Tuple, Optional
 
 from adapters.fs_scanner import list_photos
-from infra.index_store import IndexStore
+from infra.storage_factory import create_index_store, initialize_storage_sync
 from adapters.provider_factory import get_provider
 from adapters.jobs_bridge import JobsBridge
 import json, time, uuid
@@ -22,7 +22,8 @@ def index_photos(
     Returns (new_count, updated_count, total_count)
     """
     embedder = embedder or get_provider(provider, hf_token=hf_token, openai_api_key=openai_api_key)
-    store = IndexStore(folder, index_key=getattr(embedder, 'index_id', None))
+    store = create_index_store(folder, index_key=getattr(embedder, 'index_id', None))
+    initialize_storage_sync(store)
 
     # Generate job_id if not provided
     if job_id is None:

@@ -5,6 +5,8 @@ from fastapi import APIRouter, Body, HTTPException
 from typing import Dict, Any, Optional
 
 from api.schemas.v1 import SearchRequest, SearchResponse, SearchResultItem, CachedSearchRequest
+from api.orchestrators.search_orchestrator import SearchOrchestrator
+from api.models.search import SearchRequest as NewSearchRequest, SearchProvider
 from adapters.provider_factory import get_provider
 from usecases.index_photos import index_photos
 from api.utils import _emb

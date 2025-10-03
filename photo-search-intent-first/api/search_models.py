@@ -14,7 +14,7 @@ Next migration steps (not yet implemented here):
 from __future__ import annotations
 
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 
 class SearchFilters(BaseModel):
@@ -39,7 +39,7 @@ class SearchFilters(BaseModel):
     person: Optional[str] = None
     persons: Optional[List[str]] = None
 
-    @validator('persons', pre=True)
+    @field_validator('persons', mode='before')
     def _norm_persons(cls, v):  # type: ignore
         if v is None:
             return v
@@ -75,9 +75,7 @@ class SearchRequest(BaseModel):
     # Structured EXIF / meta filters
     filters: SearchFilters = Field(default_factory=SearchFilters)
 
-    class Config:
-        allow_population_by_field_name = True
-        anystr_strip_whitespace = True
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
     def to_legacy_param_dict(self) -> Dict[str, Any]:
         """Return a flat dict approximating the original parameter namespace.

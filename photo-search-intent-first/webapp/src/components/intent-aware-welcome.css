@@ -1,0 +1,123 @@
+/* Intent-aware welcome animations and styles */
+
+@keyframes fade-in {
+	from {
+		opacity: 0;
+		transform: translateY(10px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes pulse-blue {
+	0%,
+	100% {
+		box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5);
+	}
+	50% {
+		box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
+	}
+}
+
+@keyframes analyze-pulse {
+	0% {
+		border-color: rgba(59, 130, 246, 0.5);
+		box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.3);
+	}
+	50% {
+		border-color: rgba(59, 130, 246, 1);
+		box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+	}
+	100% {
+		border-color: rgba(59, 130, 246, 0.5);
+		box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.3);
+	}
+}
+
+.animate-fade-in {
+	animation: fade-in 0.3s ease-out;
+}
+
+.animate-pulse-blue {
+	animation: pulse-blue 2s infinite;
+}
+
+.animate-analyze {
+	animation: analyze-pulse 1s ease-in-out;
+}
+
+/* Enhanced button hover states */
+.intent-button {
+	transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.intent-button:hover {
+	transform: translateY(-2px);
+}
+
+.intent-button:active {
+	transform: translateY(0);
+}
+
+/* Intent card selection state */
+.intent-card-selected {
+	border-color: rgb(59, 130, 246);
+	background-color: rgb(239, 246, 255);
+	box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Confidence indicator colors */
+.confidence-high {
+	color: rgb(22, 163, 74);
+	background-color: rgb(240, 253, 244);
+}
+
+.confidence-medium {
+	color: rgb(251, 146, 60);
+	background-color: rgb(254, 243, 232);
+}
+
+.confidence-low {
+	color: rgb(156, 163, 175);
+	background-color: rgb(249, 250, 251);
+}
+
+/* Smart suggestion pills */
+.suggestion-pill {
+	transition: all 0.15s ease;
+}
+
+.suggestion-pill:hover {
+	transform: scale(1.05);
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.suggestion-pill:active {
+	transform: scale(0.98);
+}
+
+/* Loading states */
+.loading-dots::after {
+	content: "";
+	animation: loading-dots 1.5s infinite;
+}
+
+@keyframes loading-dots {
+	0% {
+		content: "";
+	}
+	25% {
+		content: ".";
+	}
+	50% {
+		content: "..";
+	}
+	75% {
+		content: "...";
+	}
+	100% {
+		content: "";
+	}
+}

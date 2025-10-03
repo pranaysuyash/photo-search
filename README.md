@@ -36,6 +36,36 @@ CLI (Intent-First)
 
 - Index: `python3 photo-search-intent-first/cli.py index --dir /path/to/photos --provider local`
 - Search: `python3 photo-search-intent-first/cli.py search --dir /path/to/photos --query "friends having tea" --top-k 12`
+- Database: `python3 photo-search-intent-first/cli.py db --help` (SQLite storage management)
+
+Storage Backends (Intent-First)
+
+The Intent-First backend supports multiple storage backends for photo metadata, embeddings, and thumbnails:
+
+- **File-based (default)**: JSON/NumPy files in `.photo_index/` folder
+- **SQLite**: Structured database storage with SQL querying capabilities
+
+Configure backend via environment variable:
+
+```bash
+export STORAGE_BACKEND=sqlite  # or 'file' (default)
+```
+
+SQLite provides:
+
+- Structured queries for complex searches
+- Better performance for large collections
+- ACID transactions and data integrity
+- Easy backup/restore operations
+- Concurrent access support
+
+Database CLI commands:
+
+- Initialize: `python3 cli.py db init --dir /path/to/photos --backend sqlite`
+- Migrate: `python3 cli.py db migrate --dir /path/to/photos --from-backend file --to-backend sqlite`
+- Stats: `python3 cli.py db stats --dir /path/to/photos --backend sqlite`
+- Backup: `python3 cli.py db backup --dir /path/to/photos --output backup.db`
+- Restore: `python3 cli.py db restore --dir /path/to/photos --input backup.db`
 
 Package + Entry Point
 
@@ -76,9 +106,11 @@ Electron Packaging (Intent-First)
 1. Install Python deps (`pip install -r photo-search-intent-first/requirements.txt`) so the bundling script can talk to Hugging Face.
 2. Prepare the UI bundle: `npm --prefix photo-search-intent-first/electron run build:ui` (runs Vite build in the webapp).
 3. Stage bundled models (downloads, verifies hashes, and writes `manifest.json`):
+
    ```bash
    npm --prefix photo-search-intent-first/electron run prepare:models
    ```
+
 4. Create installers: `npm --prefix photo-search-intent-first/electron run dist` (`pack` builds unpacked directories).
 
 The `prepare:models` step downloads the CLIP weights specified in `electron/models/manifest.template.json`, records a deterministic hash per model, and ships them via Electron `extraResources`. On application launch the runtime verifies hashes, copies the models into `{appData}/photo-search/models`, and exports environment variables (`PHOTOVAULT_MODEL_DIR`, `TRANSFORMERS_OFFLINE=1`, `SENTENCE_TRANSFORMERS_HOME`, etc.) so the local provider never reaches out to the network. Use **Photo Search ▸ Refresh Bundled Models…** from the app menu to force a re-stage if assets become corrupted.
@@ -123,6 +155,17 @@ Production auth
 - Ensure the deployed UI sends `Authorization: Bearer <token>` for write calls. See `docs/AUTH.md` for options and security notes.
 
 If you still see HMR reload errors, hard refresh the browser to clear stale modules and ensure API is running on `http://localhost:8000` (per `VITE_API_BASE`).
+
+UX Improvements
+
+Recent enhancements to user experience and interface polish:
+
+- **Contextual Search Tips**: Search hints appear after first interaction (`search-first-interaction` event) and when photos are loaded. Dismissal is persisted in localStorage (`hint-search-tips-shown`).
+- **Hole-Punch Highlight Overlay**: Onboarding tour uses CSS mask/clip-path for transparent holes around highlighted elements, with adjustable `backdropOpacity` prop.
+- **Footer Anchoring**: Empty state uses `h-full` for proper centering and footer positioning at screen bottom.
+- **Electron SW Guard**: Service worker protection prevents conflicts between Electron and web service workers, ensuring proper offline functionality in desktop app.
+- **Visual Test Validation**: All UX improvements validated through Playwright visual regression tests (20/25 tests passing, browser-specific timeouts noted but non-critical).
+- **Electron Service Worker Guard**: SW registration skipped in Electron dev to prevent 404s.
 
 Documentation
 

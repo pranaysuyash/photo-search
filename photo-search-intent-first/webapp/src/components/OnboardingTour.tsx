@@ -24,6 +24,7 @@ interface OnboardingTourProps {
 	onSkip: () => void;
 	currentStep?: number;
 	userActions?: string[];
+	backdropOpacity?: number;
 }
 
 interface TourStep {
@@ -284,6 +285,7 @@ export function OnboardingTour({
 	onSkip,
 	currentStep = 0,
 	userActions: _userActions = [],
+	backdropOpacity = 0.2,
 }: OnboardingTourProps) {
 	const [step, setStep] = useState(currentStep);
 	const [isPaused, setIsPaused] = useState(false);
@@ -445,7 +447,7 @@ export function OnboardingTour({
 				initial={prefersReducedMotion ? undefined : { opacity: 0 }}
 				animate={{ opacity: 1 }}
 				exit={prefersReducedMotion ? undefined : { opacity: 0 }}
-				className="fixed inset-0 z-50 pointer-events-none"
+				className="fixed inset-0 z-40 pointer-events-none"
 			>
 				{/* Highlight animation CSS (scoped) */}
 				<style>{`
@@ -457,11 +459,19 @@ export function OnboardingTour({
           .tour-highlight { animation: tourPulse 1.2s ease-in-out infinite; }
         `}</style>
 				{/* Backdrop */}
-				<div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
-
+				<div
+					className="absolute inset-0 backdrop-blur-sm z-40"
+					style={{
+						backgroundColor: `rgba(0,0,0,${backdropOpacity})`,
+						...(currentTourStep?.target && {
+							mask: getHolePunchMask(currentTourStep.target),
+							WebkitMask: getHolePunchMask(currentTourStep.target),
+						}),
+					}}
+				/>{" "}
 				{/* Highlight overlay for target element */}
 				{currentTourStep?.target && (
-					<div className="absolute inset-0 pointer-events-none">
+					<div className="absolute inset-0 pointer-events-none z-50">
 						{(() => {
 							const targetSel = currentTourStep?.target;
 							const rect = targetSel ? getTargetRect(targetSel) : null;
@@ -483,7 +493,6 @@ export function OnboardingTour({
 						})()}
 					</div>
 				)}
-
 				{/* Tour Card */}
 				<motion.div
 					key={step}
@@ -495,7 +504,7 @@ export function OnboardingTour({
 						prefersReducedMotion ? undefined : { opacity: 0, scale: 0.9, y: 20 }
 					}
 					transition={{ duration: 0.2, ease: "easeOut" }}
-					className={clsx("absolute pointer-events-auto max-w-md")}
+					className={clsx("absolute pointer-events-auto max-w-md z-[60]")}
 					style={getCardPositionStyle(
 						currentTourStep?.position || "center",
 						currentTourStep?.target,
@@ -656,6 +665,19 @@ function getTargetRect(selector: string): DOMRect | null {
 	const element = document.querySelector(selector) as HTMLElement | null;
 	if (!element) return null;
 	return element.getBoundingClientRect();
+}
+
+// Helper function to compute mask for hole-punch
+function getHolePunchMask(selector: string): string | undefined {
+	const rect = getTargetRect(selector);
+	if (!rect) return undefined;
+	const padding = 12; // Slightly larger than highlight padding
+	const centerX = rect.left + rect.width / 2;
+	const centerY = rect.top + rect.height / 2;
+	const radius = Math.sqrt(
+		(rect.width / 2 + padding) ** 2 + (rect.height / 2 + padding) ** 2,
+	);
+	return `radial-gradient(circle at ${centerX}px ${centerY}px, transparent ${radius}px, rgba(0,0,0,1) ${radius}px)`;
 }
 
 // Helper function to get position classes

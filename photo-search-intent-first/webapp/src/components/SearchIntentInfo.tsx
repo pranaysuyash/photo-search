@@ -14,7 +14,10 @@ import {
 	X,
 } from "lucide-react";
 import type React from "react";
-import { SearchIntentRecognizer, type SearchIntent } from "../services/SearchIntentRecognizer";
+import {
+	type SearchIntent,
+	SearchIntentRecognizer,
+} from "../services/SearchIntentRecognizer";
 
 interface SearchIntentInfoProps {
 	intent: SearchIntent | undefined;
@@ -38,7 +41,9 @@ export function SearchIntentInfo({
 	const relevantFilters = getRelevantFilters(intent);
 
 	return (
-		<div className={`flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg ${className}`}>
+		<div
+			className={`flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg ${className}`}
+		>
 			<div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex-shrink-0">
 				{icon}
 			</div>
@@ -124,7 +129,9 @@ export function SearchIntentBadge({
 	const icon = getIntentIcon(intent.primary);
 
 	return (
-		<div className={`flex items-center gap-1.5 px-2 py-1 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-full text-xs ${className}`}>
+		<div
+			className={`flex items-center gap-1.5 px-2 py-1 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-full text-xs ${className}`}
+		>
 			{icon}
 			<span className="font-medium text-blue-700 dark:text-blue-300">
 				{getIntentLabel(intent.primary)}
@@ -165,7 +172,9 @@ export function SearchIntentTooltip({
 	);
 }
 
-function getIntentIcon(intent: SearchIntent["primary"]): React.ComponentType<LucideProps> {
+function getIntentIcon(
+	intent: SearchIntent["primary"],
+): React.ComponentType<LucideProps> {
 	switch (intent) {
 		case "discovery":
 			return Compass;
@@ -240,7 +249,9 @@ function getIntentDescription(intent: SearchIntent["primary"]): string {
 	}
 }
 
-function getRelevantFilters(intent: SearchIntent): Array<{ icon: React.ReactNode; label: string }> {
+function getRelevantFilters(
+	intent: SearchIntent,
+): Array<{ icon: React.ReactNode; label: string }> {
 	const filters: Array<{ icon: React.ReactNode; label: string }> = [];
 
 	if (intent.context.timeFrame) {
@@ -281,7 +292,9 @@ function getRelevantFilters(intent: SearchIntent): Array<{ icon: React.ReactNode
 	return filters;
 }
 
-function getTimeFrameLabel(timeFrame: NonNullable<SearchIntent["context"]["timeFrame"]>): string {
+function getTimeFrameLabel(
+	timeFrame: NonNullable<SearchIntent["context"]["timeFrame"]>,
+): string {
 	switch (timeFrame.type) {
 		case "recent":
 			return "Recent";

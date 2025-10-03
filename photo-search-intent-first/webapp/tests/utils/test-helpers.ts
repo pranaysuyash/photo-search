@@ -36,7 +36,30 @@ export async function waitForAppReady(
 				sessionStorage.setItem("onboardingComplete", "true");
 				sessionStorage.setItem("showWelcome", "false");
 			} catch (e) {
-				console.warn("Failed to set localStorage:", e);
+				console.warn("Failed to set onboarding flags:", e);
+			}
+			try {
+				const SETTINGS_KEY = "photo-search-settings";
+				const raw = localStorage.getItem(SETTINGS_KEY);
+				let data: { state: Record<string, unknown>; version?: number };
+				if (raw) {
+					data = JSON.parse(raw);
+					if (!data || typeof data !== "object") {
+						data = { state: {} };
+					}
+					data.state = { ...(data.state as Record<string, unknown>) };
+				} else {
+					data = { state: {} };
+				}
+				// Force inline search controls to be rendered for tests
+				data.state.searchCommandCenter = false;
+				// Reuse existing dir if present; otherwise flag demo library to ensure content
+				if (data.state.dir === undefined) {
+					data.state.enableDemoLibrary = true;
+				}
+				localStorage.setItem(SETTINGS_KEY, JSON.stringify(data));
+			} catch (e) {
+				console.warn("Failed to seed settings store:", e);
 			}
 		});
 	}

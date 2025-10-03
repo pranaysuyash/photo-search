@@ -483,8 +483,28 @@ export default function TimelineResults({
 			{monthKeys.length > 1 && (
 				<div className="hidden md:flex flex-col gap-2 fixed right-4 top-1/2 -translate-y-1/2 z-10">
 					<div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border border-gray-200 dark:border-gray-700 rounded-2xl shadow-lg p-3 max-h-[70vh] overflow-y-auto">
-						<div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 px-1">
-							Timeline Navigator
+						<div className="flex items-center justify-between mb-2 px-1">
+							<div className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+								Timeline Navigator
+							</div>
+							<div className="group relative">
+								<div className="w-3.5 h-3.5 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center cursor-help">
+									<span className="text-xs text-blue-600 dark:text-blue-400">
+										ℹ️
+									</span>
+								</div>
+								{/* Tooltip */}
+								<div className="absolute right-0 top-full mt-1 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+									<div className="font-medium mb-1">
+										Click to Filter by Date
+									</div>
+									<div className="text-gray-300">
+										Click any time period to jump directly to that section of
+										your timeline.
+									</div>
+									<div className="absolute -top-1 right-2 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+								</div>
+							</div>
 						</div>
 						{monthKeys.map((m) => {
 							const isActive = activeMonth === m;

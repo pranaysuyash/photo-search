@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from domain.models import SearchResult
-from infra.index_store import IndexStore
+from infra.storage_factory import create_index_store, initialize_storage_sync
 from adapters.provider_factory import get_provider
 
 
@@ -16,6 +16,7 @@ def search_photos(
     embedder=None,
 ) -> List[SearchResult]:
     embedder = embedder or get_provider(provider, hf_token=hf_token, openai_api_key=openai_api_key)
-    store = IndexStore(folder, index_key=getattr(embedder, 'index_id', None))
+    store = create_index_store(folder, index_key=getattr(embedder, 'index_id', None))
+    initialize_storage_sync(store)
     store.load()
     return store.search(embedder, query, top_k=top_k)

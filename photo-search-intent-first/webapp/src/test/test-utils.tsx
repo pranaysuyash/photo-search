@@ -13,6 +13,7 @@ import { ModalProvider } from "../contexts/ModalContext";
 import { ModalDataProvider } from "../contexts/ModalDataContext";
 import { ResultsConfigProvider } from "../contexts/ResultsConfigContext";
 import { SearchProvider } from "../contexts/SearchContext";
+import { SettingsProvider } from "../contexts/SettingsContext";
 import { UIProvider } from "../contexts/UIContext";
 import { AccessibilityProvider } from "../framework/AccessibilityFramework";
 import { initializeAPI } from "../services/PhotoVaultAPI";
@@ -49,6 +50,12 @@ vi.mock("../components/AccessibilityPanel", () => ({
 		},
 		updateSettings: vi.fn(),
 	}),
+}));
+
+// Mock API_BASE and apiAnalytics
+vi.mock("../api", () => ({
+	API_BASE: "http://localhost:8000",
+	apiAnalytics: vi.fn(() => Promise.resolve({ events: [], summary: {} })),
 }));
 
 // Mock the theme store (simulate Zustand selector behavior)
@@ -426,93 +433,95 @@ const AllTheProviders: React.FC<{ children: React.ReactNode }> = ({
 					future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
 				>
 					<ThemeProvider>
-						<UIProvider>
-							<SimpleStoreProvider>
-								<PhotoVaultAPIProvider>
-									<JobsProvider>
-										<LibraryProvider>
-											<SearchProvider>
-												<AccessibilityProvider>
-													<ModalProvider>
-														<ModalDataProvider
-															data={{
-																selected: new Set(),
-																dir: "",
-																engine: "local",
-																topK: 100,
-																highContrast: false,
-																useFast: false,
-																fastKind: "",
-																useCaps: false,
-																useOcr: false,
-																hasText: false,
-																useOsTrash: false,
-																searchText: "",
-																query: "",
-																collections: {},
-																clusters: [],
-																allTags: [],
-																meta: { cameras: [], places: [] },
-															}}
-															actions={{
-																settingsActions: {
-																	setDir: vi.fn(),
-																	setUseOsTrash: vi.fn(),
-																	setUseFast: vi.fn(),
-																	setFastKind: vi.fn(),
-																	setUseCaps: vi.fn(),
-																	setUseOcr: vi.fn(),
-																	setHasText: vi.fn(),
-																	setHighContrast: vi.fn(),
-																},
-																uiActions: {
-																	setBusy: vi.fn(),
-																	setNote: vi.fn(),
-																},
-																photoActions: {
-																	setResults: vi.fn(),
-																	setSaved: vi.fn(),
-																	setCollections: vi.fn(),
-																},
-																libIndex: vi.fn(),
-																prepareFast: vi.fn(),
-																buildOCR: vi.fn(),
-																buildMetadata: vi.fn(),
-																tagSelected: vi.fn(),
-															}}
-														>
-															<HintProvider>
-																<HintManager>
-																	<ResultsConfigProvider
-																		value={{
-																			resultView: "grid",
-																			setResultView: () => {},
-																			timelineBucket: "day",
-																			setTimelineBucket: () => {},
-																		}}
-																	>
-																		<MobileOptimizations
-																			onSwipeLeft={vi.fn()}
-																			onSwipeRight={vi.fn()}
-																			onSwipeUp={vi.fn()}
-																			enableSwipeGestures={false}
-																			enablePullToRefresh={false}
-																			onPullToRefresh={vi.fn()}
+						<SettingsProvider>
+							<UIProvider>
+								<SimpleStoreProvider>
+									<PhotoVaultAPIProvider>
+										<JobsProvider>
+											<LibraryProvider>
+												<SearchProvider>
+													<AccessibilityProvider>
+														<ModalProvider>
+															<ModalDataProvider
+																data={{
+																	selected: new Set(),
+																	dir: "",
+																	engine: "local",
+																	topK: 100,
+																	highContrast: false,
+																	useFast: false,
+																	fastKind: "",
+																	useCaps: false,
+																	useOcr: false,
+																	hasText: false,
+																	useOsTrash: false,
+																	searchText: "",
+																	query: "",
+																	collections: {},
+																	clusters: [],
+																	allTags: [],
+																	meta: { cameras: [], places: [] },
+																}}
+																actions={{
+																	settingsActions: {
+																		setDir: vi.fn(),
+																		setUseOsTrash: vi.fn(),
+																		setUseFast: vi.fn(),
+																		setFastKind: vi.fn(),
+																		setUseCaps: vi.fn(),
+																		setUseOcr: vi.fn(),
+																		setHasText: vi.fn(),
+																		setHighContrast: vi.fn(),
+																	},
+																	uiActions: {
+																		setBusy: vi.fn(),
+																		setNote: vi.fn(),
+																	},
+																	photoActions: {
+																		setResults: vi.fn(),
+																		setSaved: vi.fn(),
+																		setCollections: vi.fn(),
+																	},
+																	libIndex: vi.fn(),
+																	prepareFast: vi.fn(),
+																	buildOCR: vi.fn(),
+																	buildMetadata: vi.fn(),
+																	tagSelected: vi.fn(),
+																}}
+															>
+																<HintProvider>
+																	<HintManager>
+																		<ResultsConfigProvider
+																			value={{
+																				resultView: "grid",
+																				setResultView: () => {},
+																				timelineBucket: "day",
+																				setTimelineBucket: () => {},
+																			}}
 																		>
-																			{children}
-																		</MobileOptimizations>
-																	</ResultsConfigProvider>
-																</HintManager>
-															</HintProvider>
-														</ModalDataProvider>
-													</ModalProvider>
-												</AccessibilityProvider>
-											</SearchProvider>
-										</LibraryProvider>
-									</JobsProvider>
-								</PhotoVaultAPIProvider>
-							</SimpleStoreProvider>
-						</UIProvider>
+																			<MobileOptimizations
+																				onSwipeLeft={vi.fn()}
+																				onSwipeRight={vi.fn()}
+																				onSwipeUp={vi.fn()}
+																				enableSwipeGestures={false}
+																				enablePullToRefresh={false}
+																				onPullToRefresh={vi.fn()}
+																			>
+																				{children}
+																			</MobileOptimizations>
+																		</ResultsConfigProvider>
+																	</HintManager>
+																</HintProvider>
+															</ModalDataProvider>
+														</ModalProvider>
+													</AccessibilityProvider>
+												</SearchProvider>
+											</LibraryProvider>
+										</JobsProvider>
+									</PhotoVaultAPIProvider>
+								</SimpleStoreProvider>
+							</UIProvider>
+						</SettingsProvider>
 					</ThemeProvider>
 				</BrowserRouter>
 			</ErrorBoundary>

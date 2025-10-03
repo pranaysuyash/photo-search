@@ -81,8 +81,8 @@ export interface SceneAnalysis {
 	category: string;
 	confidence: number;
 	description: string;
-	lighting: 'dark' | 'normal' | 'bright';
-	timeOfDay?: 'dawn' | 'morning' | 'afternoon' | 'evening' | 'night';
+	lighting: "dark" | "normal" | "bright";
+	timeOfDay?: "dawn" | "morning" | "afternoon" | "evening" | "night";
 	weather?: string;
 	location?: string;
 }
@@ -110,14 +110,14 @@ export interface SimilarityResult {
 export interface CreativeFilter {
 	id: string;
 	name: string;
-	type: 'preset' | 'adjustment' | 'effect';
-	category: 'basic' | 'artistic' | 'vintage' | 'modern' | 'dramatic';
+	type: "preset" | "adjustment" | "effect";
+	category: "basic" | "artistic" | "vintage" | "modern" | "dramatic";
 	parameters: Record<string, number>;
 	thumbnail?: string;
 }
 
 export interface EditOperation {
-	type: 'filter' | 'adjustment' | 'crop' | 'rotate' | 'enhance';
+	type: "filter" | "adjustment" | "crop" | "rotate" | "enhance";
 	filter?: CreativeFilter;
 	adjustments?: {
 		brightness?: number;
@@ -151,7 +151,7 @@ export class VisualAnalysisService {
 
 	async analyzeImage(
 		imagePath: string,
-		options: Partial<VisualAnalysisOptions> = {}
+		options: Partial<VisualAnalysisOptions> = {},
 	): Promise<VisualAnalysisResult> {
 		const defaultOptions: VisualAnalysisOptions = {
 			enableObjectDetection: true,
@@ -162,7 +162,7 @@ export class VisualAnalysisService {
 			enableSceneAnalysis: true,
 			enableSimilaritySearch: false,
 			similarityThreshold: 0.8,
-			maxResults: 10
+			maxResults: 10,
 		};
 
 		const finalOptions = { ...defaultOptions, ...options };
@@ -179,14 +179,14 @@ export class VisualAnalysisService {
 			this.analysisCache.set(cacheKey, result);
 			return result;
 		} catch (error) {
-			console.error('Error analyzing image:', error);
+			console.error("Error analyzing image:", error);
 			throw new Error(`Failed to analyze image: ${error}`);
 		}
 	}
 
 	private async performImageAnalysis(
 		imagePath: string,
-		options: VisualAnalysisOptions
+		options: VisualAnalysisOptions,
 	): Promise<VisualAnalysisResult> {
 		// Simulate analysis - in production, this would use actual ML models
 		const startTime = Date.now();
@@ -195,23 +195,28 @@ export class VisualAnalysisService {
 		const embedding = await this.extractImageEmbedding(imagePath);
 
 		// Analyze different aspects of the image
-		const [
-			objects,
-			colors,
-			styles,
-			composition,
-			faces,
-			scene,
-			quality
-		] = await Promise.all([
-			options.enableObjectDetection ? this.detectObjects(imagePath) : Promise.resolve([]),
-			options.enableColorAnalysis ? this.analyzeColors(imagePath) : Promise.resolve([]),
-			options.enableStyleAnalysis ? this.analyzeStyle(imagePath) : Promise.resolve([]),
-			options.enableCompositionAnalysis ? this.analyzeComposition(imagePath) : Promise.resolve(this.getMockComposition()),
-			options.enableFaceDetection ? this.detectFaces(imagePath) : Promise.resolve([]),
-			options.enableSceneAnalysis ? this.analyzeScene(imagePath) : Promise.resolve(this.getMockScene()),
-			this.analyzeQuality(imagePath)
-		]);
+		const [objects, colors, styles, composition, faces, scene, quality] =
+			await Promise.all([
+				options.enableObjectDetection
+					? this.detectObjects(imagePath)
+					: Promise.resolve([]),
+				options.enableColorAnalysis
+					? this.analyzeColors(imagePath)
+					: Promise.resolve([]),
+				options.enableStyleAnalysis
+					? this.analyzeStyle(imagePath)
+					: Promise.resolve([]),
+				options.enableCompositionAnalysis
+					? this.analyzeComposition(imagePath)
+					: Promise.resolve(this.getMockComposition()),
+				options.enableFaceDetection
+					? this.detectFaces(imagePath)
+					: Promise.resolve([]),
+				options.enableSceneAnalysis
+					? this.analyzeScene(imagePath)
+					: Promise.resolve(this.getMockScene()),
+				this.analyzeQuality(imagePath),
+			]);
 
 		const result: VisualAnalysisResult = {
 			path: imagePath,
@@ -223,12 +228,16 @@ export class VisualAnalysisService {
 			scene,
 			quality,
 			embedding,
-			timestamp: Date.now()
+			timestamp: Date.now(),
 		};
 
 		// Add similarity search if requested
 		if (options.enableSimilaritySearch) {
-			result.similarity = await this.findSimilarImages(imagePath, embedding, options);
+			result.similarity = await this.findSimilarImages(
+				imagePath,
+				embedding,
+				options,
+			);
 		}
 
 		return result;
@@ -251,26 +260,31 @@ export class VisualAnalysisService {
 		// Simulate object detection
 		return [
 			{
-				label: 'person',
+				label: "person",
 				confidence: 0.95,
-				boundingBox: { x: 100, y: 50, width: 200, height: 300 }
+				boundingBox: { x: 100, y: 50, width: 200, height: 300 },
 			},
 			{
-				label: 'car',
+				label: "car",
 				confidence: 0.87,
-				boundingBox: { x: 300, y: 200, width: 150, height: 100 }
-			}
+				boundingBox: { x: 300, y: 200, width: 150, height: 100 },
+			},
 		];
 	}
 
 	private async analyzeColors(imagePath: string): Promise<ColorPalette[]> {
 		// Simulate color analysis
 		return [
-			{ color: '#FF6B6B', hex: '#FF6B6B', percentage: 35, name: 'Coral Red' },
-			{ color: '#4ECDC4', hex: '#4ECDC4', percentage: 25, name: 'Turquoise' },
-			{ color: '#45B7D1', hex: '#45B7D1', percentage: 20, name: 'Sky Blue' },
-			{ color: '#96CEB4', hex: '#96CEB4', percentage: 15, name: 'Mint Green' },
-			{ color: '#FECA57', hex: '#FECA57', percentage: 5, name: 'Golden Yellow' }
+			{ color: "#FF6B6B", hex: "#FF6B6B", percentage: 35, name: "Coral Red" },
+			{ color: "#4ECDC4", hex: "#4ECDC4", percentage: 25, name: "Turquoise" },
+			{ color: "#45B7D1", hex: "#45B7D1", percentage: 20, name: "Sky Blue" },
+			{ color: "#96CEB4", hex: "#96CEB4", percentage: 15, name: "Mint Green" },
+			{
+				color: "#FECA57",
+				hex: "#FECA57",
+				percentage: 5,
+				name: "Golden Yellow",
+			},
 		];
 	}
 
@@ -278,19 +292,21 @@ export class VisualAnalysisService {
 		// Simulate style analysis
 		return [
 			{
-				style: 'portrait',
+				style: "portrait",
 				confidence: 0.82,
-				attributes: ['shallow depth of field', 'bokeh', 'centered subject']
+				attributes: ["shallow depth of field", "bokeh", "centered subject"],
 			},
 			{
-				style: 'natural lighting',
+				style: "natural lighting",
 				confidence: 0.75,
-				attributes: ['soft light', 'warm tones', 'outdoor']
-			}
+				attributes: ["soft light", "warm tones", "outdoor"],
+			},
 		];
 	}
 
-	private async analyzeComposition(imagePath: string): Promise<CompositionAnalysis> {
+	private async analyzeComposition(
+		imagePath: string,
+	): Promise<CompositionAnalysis> {
 		// Simulate composition analysis
 		return this.getMockComposition();
 	}
@@ -301,8 +317,8 @@ export class VisualAnalysisService {
 			balance: 0.78,
 			leadingLines: 0.65,
 			framing: 0.72,
-			depth: 0.80,
-			overallScore: 0.76
+			depth: 0.8,
+			overallScore: 0.76,
 		};
 	}
 
@@ -310,19 +326,19 @@ export class VisualAnalysisService {
 		// Simulate face detection
 		return [
 			{
-				id: 'face_1',
+				id: "face_1",
 				boundingBox: { x: 150, y: 100, width: 120, height: 150 },
 				confidence: 0.92,
 				age: 28,
-				gender: 'female',
-				emotion: 'happy',
+				gender: "female",
+				emotion: "happy",
 				landmarks: [
-					{ x: 180, y: 130, type: 'left_eye' },
-					{ x: 240, y: 130, type: 'right_eye' },
-					{ x: 210, y: 160, type: 'nose' },
-					{ x: 210, y: 190, type: 'mouth' }
-				]
-			}
+					{ x: 180, y: 130, type: "left_eye" },
+					{ x: 240, y: 130, type: "right_eye" },
+					{ x: 210, y: 160, type: "nose" },
+					{ x: 210, y: 190, type: "mouth" },
+				],
+			},
 		];
 	}
 
@@ -333,17 +349,19 @@ export class VisualAnalysisService {
 
 	private getMockScene(): SceneAnalysis {
 		return {
-			category: 'outdoor',
+			category: "outdoor",
 			confidence: 0.88,
-			description: 'Outdoor scene with natural lighting',
-			lighting: 'bright',
-			timeOfDay: 'afternoon',
-			weather: 'clear',
-			location: 'park'
+			description: "Outdoor scene with natural lighting",
+			lighting: "bright",
+			timeOfDay: "afternoon",
+			weather: "clear",
+			location: "park",
 		};
 	}
 
-	private async analyzeQuality(imagePath: string): Promise<VisualQualityMetrics> {
+	private async analyzeQuality(
+		imagePath: string,
+	): Promise<VisualQualityMetrics> {
 		// Simulate quality analysis
 		return {
 			sharpness: 0.82,
@@ -352,41 +370,45 @@ export class VisualAnalysisService {
 			saturation: 0.79,
 			noise: 0.15,
 			compression: 0.08,
-			overall: 0.78
+			overall: 0.78,
 		};
 	}
 
 	async findSimilarImages(
 		queryImagePath: string,
 		queryEmbedding: number[],
-		options: VisualAnalysisOptions
+		options: VisualAnalysisOptions,
 	): Promise<SimilarityResult> {
 		const startTime = Date.now();
 
 		// Simulate similarity search across image library
 		// In production, this would query a vector database
-		const similarPhotos = Array.from({ length: options.maxResults }, (_, i) => ({
-			path: `/path/to/similar_photo_${i + 1}.jpg`,
-			score: Math.random() * 0.3 + 0.7, // Scores between 0.7-1.0
-			reason: this.getSimilarityReason()
-		})).filter(photo => photo.score >= options.similarityThreshold)
-		  .sort((a, b) => b.score - a.score);
+		const similarPhotos = Array.from(
+			{ length: options.maxResults },
+			(_, i) => ({
+				path: `/path/to/similar_photo_${i + 1}.jpg`,
+				score: Math.random() * 0.3 + 0.7, // Scores between 0.7-1.0
+				reason: this.getSimilarityReason(),
+			}),
+		)
+			.filter((photo) => photo.score >= options.similarityThreshold)
+			.sort((a, b) => b.score - a.score);
 
 		return {
 			similarPhotos,
 			searchTime: Date.now() - startTime,
-			totalCompared: 1000 // Simulated total images compared
+			totalCompared: 1000, // Simulated total images compared
 		};
 	}
 
 	private getSimilarityReason(): string {
 		const reasons = [
-			'similar composition',
-			'color palette match',
-			'subject similarity',
-			'visual style match',
-			'scene similarity',
-			'object detection match'
+			"similar composition",
+			"color palette match",
+			"subject similarity",
+			"visual style match",
+			"scene similarity",
+			"object detection match",
 		];
 		return reasons[Math.floor(Math.random() * reasons.length)];
 	}
@@ -395,81 +417,81 @@ export class VisualAnalysisService {
 	getCreativeFilters(): CreativeFilter[] {
 		return [
 			{
-				id: 'vintage',
-				name: 'Vintage Film',
-				type: 'preset',
-				category: 'vintage',
+				id: "vintage",
+				name: "Vintage Film",
+				type: "preset",
+				category: "vintage",
 				parameters: {
 					brightness: -0.1,
 					contrast: 0.2,
 					saturation: -0.3,
 					vignette: 0.5,
-					grain: 0.3
-				}
+					grain: 0.3,
+				},
 			},
 			{
-				id: 'black_white',
-				name: 'Black & White',
-				type: 'preset',
-				category: 'basic',
+				id: "black_white",
+				name: "Black & White",
+				type: "preset",
+				category: "basic",
 				parameters: {
 					saturation: -1.0,
 					contrast: 0.1,
-					brightness: 0.05
-				}
+					brightness: 0.05,
+				},
 			},
 			{
-				id: 'dramatic',
-				name: 'Dramatic',
-				type: 'preset',
-				category: 'dramatic',
+				id: "dramatic",
+				name: "Dramatic",
+				type: "preset",
+				category: "dramatic",
 				parameters: {
 					contrast: 0.4,
 					saturation: 0.2,
 					shadows: -0.3,
 					highlights: 0.2,
-					clarity: 0.3
-				}
+					clarity: 0.3,
+				},
 			},
 			{
-				id: 'warm_portrait',
-				name: 'Warm Portrait',
-				type: 'preset',
-				category: 'modern',
+				id: "warm_portrait",
+				name: "Warm Portrait",
+				type: "preset",
+				category: "modern",
 				parameters: {
 					brightness: 0.1,
 					contrast: 0.15,
 					saturation: 0.3,
 					warmth: 0.4,
-					softness: 0.2
-				}
+					softness: 0.2,
+				},
 			},
 			{
-				id: 'cool_landscape',
-				name: 'Cool Landscape',
-				type: 'preset',
-				category: 'modern',
+				id: "cool_landscape",
+				name: "Cool Landscape",
+				type: "preset",
+				category: "modern",
 				parameters: {
 					brightness: 0.05,
 					contrast: 0.2,
 					saturation: 0.1,
 					coolness: 0.3,
-					clarity: 0.25
-				}
-			}
+					clarity: 0.25,
+				},
+			},
 		];
 	}
 
 	async applyCreativeEdits(
 		imagePath: string,
-		edits: EditOperation[]
+		edits: EditOperation[],
 	): Promise<string> {
 		// Simulate applying creative edits
 		// In production, this would use image processing libraries
 		console.log(`Applying ${edits.length} edits to ${imagePath}`);
 
 		// Simulate processing time
-		await new Promise(resolve => setTimeout(resolve, 1000));
+		await new Promise((resolve) => setTimeout(resolve, 1000));
 
 		// Return path to edited image
 		return `${imagePath}.edited.jpg`;
@@ -479,7 +501,7 @@ export class VisualAnalysisService {
 	async batchAnalyzeImages(
 		imagePaths: string[],
 		options: Partial<VisualAnalysisOptions> = {},
-		onProgress?: (processed: number, total: number) => void
+		onProgress?: (processed: number, total: number) => void,
 	): Promise<VisualAnalysisResult[]> {
 		const results: VisualAnalysisResult[] = [];
 		const total = imagePaths.length;
@@ -512,7 +534,7 @@ export class VisualAnalysisService {
 	} {
 		return {
 			analysisCacheSize: this.analysisCache.size,
-			embeddingCacheSize: this.embeddingCache.size
+			embeddingCacheSize: this.embeddingCache.size,
 		};
 	}
 }

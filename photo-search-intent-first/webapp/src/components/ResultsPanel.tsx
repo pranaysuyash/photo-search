@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { apiLogEvent, apiOpen, apiSetFavorite } from "../api";
 import {
 	useFavorites,
+	usePhotoStore,
 	useSearchQuery,
 	useSearchResults,
 } from "../stores/photoStore";
@@ -34,6 +35,7 @@ export default function ResultsPanel() {
 	const place = usePlace();
 	const showExplain = useShowExplain();
 	const settingsActions = useSettingsActions();
+	const setFavorites = usePhotoStore((state) => state.setFavorites);
 
 	const [selected, setSelected] = useState<Record<string, boolean>>({});
 	const [detailIdx, setDetailIdx] = useState<number | null>(null);
@@ -69,6 +71,36 @@ export default function ResultsPanel() {
 		[results],
 	);
 
+	// Optimistic favorite toggle with immediate UI update
+	const toggleFavorite = useCallback(
+		async (path: string) => {
+			const isCurrentlyFavorite = favorites.includes(path);
+			const newFavorites = isCurrentlyFavorite
+				? favorites.filter((p) => p !== path)
+				: [...favorites, path];
+
+			// Optimistic UI update - update local state immediately
+			setFavorites(newFavorites);
+
+			try {
+				await apiSetFavorite(dir, path, !isCurrentlyFavorite);
+			} catch (error) {
+				// Revert on error
+				setFavorites(favorites);
+				handleError(error, {
+					logToServer: true,
+					context: {
+						action: "toggle_favorite",
+						component: "ResultsPanel",
+						dir,
+						path,
+					},
+				});
+			}
+		},
+		[dir, favorites, setFavorites],
+	);
+
 	// Keyboard shortcuts (grid context)
 	useEffect(() => {
 		function onKey(e: KeyboardEvent) {
@@ -99,16 +131,7 @@ export default function ResultsPanel() {
 				if (e.key.toLowerCase() === "f") {
 					e.preventDefault();
 					const p = results[detailIdx].path;
-					apiSetFavorite(dir, p, !favorites.includes(p)).catch((err) =>
-						handleError(err, {
-							logToServer: true,
-							context: {
-								action: "toggle_favorite",
-								component: "ResultsPanel",
-								dir,
-							},
-						}),
-					);
+					toggleFavorite(p);
 				}
 				return;
 			}
@@ -144,6 +167,7 @@ export default function ResultsPanel() {
 		selectAll,
 		clearSelection,
 		toggleSelect,
+		toggleFavorite,
 	]);
 
 	return (
@@ -219,21 +243,39 @@ export default function ResultsPanel() {
 								alert("Select photos first");
 								return;
 							}
-							let _added = 0;
-							for (const p of sel) {
-								try {
-									await apiSetFavorite(dir, p, !favorites.includes(p));
-									_added++;
-								} catch (err) {
-									handleError(err, {
-										logToServer: true,
-										context: {
-											action: "batch_favorite",
-											component: "ResultsPanel",
-											dir,
-										},
-									});
+
+							// Optimistic updates for batch operations
+							const currentFavorites = new Set(favorites);
+							const toToggle = sel.filter((p) =>
+								currentFavorites.has(p) ? false : true,
+							);
+							const newFavorites = [...favorites];
+
+							// Add new favorites optimistically
+							toToggle.forEach((p) => {
+								if (!currentFavorites.has(p)) {
+									newFavorites.push(p);
 								}
+							});
+
+							setFavorites(newFavorites);
+
+							try {
+								// Apply changes to backend
+								await Promise.all(
+									toToggle.map((p) => apiSetFavorite(dir, p, true)),
+								);
+							} catch (err) {
+								// Revert on error
+								setFavorites(favorites);
+								handleError(err, {
+									logToServer: true,
+									context: {
+										action: "batch_favorite",
+										component: "ResultsPanel",
+										dir,
+									},
+								});
 							}
 						}}
 						className="bg-pink-600 text-white rounded px-2 py-1"
@@ -297,7 +339,7 @@ export default function ResultsPanel() {
 					onFavorite={() => {
 						const p = results[detailIdx]?.path;
 						if (!p) return;
-						apiSetFavorite(dir, p, !favorites.includes(p)).catch(() => {});
+						toggleFavorite(p);
 					}}
 				/>
 			)}

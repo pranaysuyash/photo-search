@@ -4,7 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { offlineService } from "../services/OfflineService";
 import { OfflineQueueManager } from "./OfflineQueueManager";
 
+const OFFLINE_UI_ENABLED = import.meta.env?.VITE_ENABLE_OFFLINE_UI === "1";
+
 export function OfflineIndicator() {
+	if (!OFFLINE_UI_ENABLED) {
+		return null;
+	}
+
 	const [isOnline, setIsOnline] = useState(true);
 	const [showToast, setShowToast] = useState(false);
 	const [syncPending, setSyncPending] = useState(false);

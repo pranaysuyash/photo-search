@@ -6,14 +6,24 @@
   "scripts": {
     "dev": "node run-electron.js",
     "dev:full": "npm run build:ui && npm run prepare:models && node run-electron.js",
-    "build:ui": "cd ../webapp && npm install && npm run build && mkdir -p ../api/web && cp -R dist/* ../api/web/",
+    "build:ui": "cd ../webapp && npm install && npm run build",
     "prepare:models": "python ../scripts/prepare_models.py",
     "pack": "npm run build:ui && npm run prepare:models && electron-builder --dir",
-    "dist": "npm run build:ui && npm run prepare:models && electron-builder -mwl"
+    "dist": "npm run build:ui && npm run prepare:models && electron-builder -mwl",
+    "dist:mac": "npm run build:ui && npm run prepare:models && electron-builder --mac",
+    "dist:win": "npm run build:ui && npm run prepare:models && electron-builder --win",
+    "dist:linux": "npm run build:ui && npm run prepare:models && electron-builder --linux",
+    "sign:mac": "codesign --deep --force --verify --sign \"$APPLE_SIGNING_IDENTITY\" dist/mac/Photo\\ Search.app",
+    "notarize:mac": "electron-notarize --bundle-id com.photos.search.intentfirst --app-path dist/mac/Photo\\ Search.app --apple-id $APPLE_ID --password $APPLE_PASSWORD --team-id $APPLE_TEAM_ID",
+    "release": "npm run dist && npm run sign:mac && npm run notarize:mac",
+    "release:mac": "npm run dist:mac && npm run sign:mac && npm run notarize:mac",
+    "release:win": "npm run dist:win",
+    "release:linux": "npm run dist:linux"
   },
   "devDependencies": {
     "electron": "29.0.0",
-    "electron-builder": "24.13.3"
+    "electron-builder": "24.13.3",
+    "electron-notarize": "^1.2.1"
   },
   "dependencies": {
     "electron-updater": "6.1.8",
@@ -51,18 +61,64 @@
       }
     ],
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "build"
     },
     "mac": {
       "target": [
-        "dmg"
+        "dmg",
+        "zip"
       ],
-      "category": "public.app-category.photography"
+      "category": "public.app-category.photography",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSCameraUsageDescription": "This app needs access to the camera to capture photos.",
+        "NSMicrophoneUsageDescription": "This app needs access to the microphone to record videos with sound."
+      }
     },
     "win": {
       "target": [
-        "nsis"
-      ]
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "msi",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "certificateSubjectName": "Your Company Name",
+      "certificateSha1": "YOUR_CERTIFICATE_SHA1_HERE",
+      "sign": "./build/sign-windows.js"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm"
+      ],
+      "category": "Graphics"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Photo Search"
+    },
+    "appx": {
+      "applicationId": "com.photos.search.intentfirst",
+      "backgroundColor": "#464646",
+      "language": "en-US",
+      "publisher": "CN=YourCompany",
+      "publisherDisplayName": "Your Company Name"
     },
     "publish": [
       {
@@ -70,6 +126,7 @@
         "owner": "yourorg",
         "repo": "photo-search"
       }
-    ]
+    ],
+    "afterSign": "build/notarize.js"
   }
 }

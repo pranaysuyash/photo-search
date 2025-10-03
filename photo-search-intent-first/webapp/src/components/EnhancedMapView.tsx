@@ -636,21 +636,34 @@ export function EnhancedMapView({
 export function SimpleMapFallback({
 	points,
 	onLoadMap,
+	onEnableEnhancedClustering,
 }: {
 	points: { lat: number; lon: number }[];
 	onLoadMap: () => void;
+	onEnableEnhancedClustering?: () => void;
 }) {
 	return (
 		<div className="bg-white border rounded p-3">
 			<div className="flex items-center justify-between">
 				<h2 className="font-semibold">Map (GPS)</h2>
-				<button
-					type="button"
-					onClick={onLoadMap}
-					className="bg-gray-200 rounded px-3 py-1 text-sm"
-				>
-					Load
-				</button>
+				<div className="flex gap-2">
+					{onEnableEnhancedClustering && (
+						<button
+							type="button"
+							onClick={onEnableEnhancedClustering}
+							className="bg-blue-100 text-blue-700 rounded px-3 py-1 text-sm hover:bg-blue-200 transition-colors"
+						>
+							Enhanced Clustering
+						</button>
+					)}
+					<button
+						type="button"
+						onClick={onLoadMap}
+						className="bg-gray-200 rounded px-3 py-1 text-sm hover:bg-gray-300 transition-colors"
+					>
+						Load Map
+					</button>
+				</div>
 			</div>
 			{points.length === 0 ? (
 				<div className="text-sm text-gray-600 mt-2">No GPS points found.</div>

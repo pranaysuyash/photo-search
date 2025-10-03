@@ -38,7 +38,7 @@ export interface ConnectivityStats {
 const MAX_EVENTS = 1000; // Keep last 1000 events
 const MAX_STATS_HISTORY = 100; // Keep stats for last 100 sessions
 
-class ConnectivityHistoryService {
+export class ConnectivityHistoryService {
 	private readonly STORAGE_KEY = "connectivity_history";
 	private readonly STATS_KEY = "connectivity_stats";
 	private events: ConnectivityEvent[] = [];
@@ -82,7 +82,7 @@ class ConnectivityHistoryService {
 	private async checkNetworkQuality() {
 		try {
 			const start = Date.now();
-			const _response = await fetch("/api/monitoring", {
+			await fetch("/api/monitoring", {
 				method: "GET",
 				cache: "no-store",
 				headers: { Accept: "application/json" },

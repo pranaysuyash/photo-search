@@ -13,7 +13,8 @@ from .endpoints import (
     presets_router, config_router, library_router, editing_router, models_router,
     data_management_router, utilities_router, file_management_router, fast_index_router,
     captions_router, admin_router, watch_router, workspace_router,
-    smart_collections_router, trips_router, enhanced_smart_collections_router
+    smart_collections_router, trips_router, enhanced_smart_collections_router,
+    enhanced_faces_router, enhanced_search_router, enhanced_indexing_router
 )
 
 # Main API v1 router
@@ -51,3 +52,6 @@ api_v1.include_router(workspace_router)
 api_v1.include_router(smart_collections_router)
 api_v1.include_router(trips_router)
 api_v1.include_router(enhanced_smart_collections_router)
+api_v1.include_router(enhanced_faces_router)
+api_v1.include_router(enhanced_search_router)
+api_v1.include_router(enhanced_indexing_router)

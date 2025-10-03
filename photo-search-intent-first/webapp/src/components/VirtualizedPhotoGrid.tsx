@@ -1,342 +1,254 @@
-import type React from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import AutoSizer from "react-virtualized-auto-sizer";
+/**
+ * Virtualized photo grid component for fast rendering of large photo collections
+ * Uses react-window for efficient rendering of thumbnails
+ */
+
+import { memo, useCallback, useMemo } from "react";
+import type { CellComponentProps } from "react-window";
 import { Grid } from "react-window";
-import {
-	useInfiniteLibraryScroll,
-	usePredictivePreloading,
-} from "../hooks/useInfiniteLibraryScroll";
-import { usePerformanceMonitor } from "../services/PerformanceMonitor";
-import { LazyImage } from "./LazyImage";
-import { Badge } from "./ui/badge";
-import { Card } from "./ui/card";
-import { Button } from "./ui/shadcn/Button";
+import { useOfflineFirstMetadata } from "../hooks/useOfflineFirst";
+import type { PhotoMeta } from "../models/PhotoMeta";
+import { Badge, Card, CardContent, NoPhotosEmpty, Skeleton } from "./ui";
+
+// Types
+interface PhotoItem {
+  path: string;
+  id: string;
+  metadata?: PhotoMeta;
+  thumbnail?: string;
+}
 
 interface VirtualizedPhotoGridProps {
-	dir: string;
-	engine: string;
-	onItemClick?: (path: string) => void;
-	className?: string;
-	imageQuality?: "low" | "medium" | "high";
-	showMetrics?: boolean;
+  photos: PhotoItem[];
+  thumbnailSize?: number;
+  columns?: number;
+  gap?: number;
+  selectedPhotos?: Set<string>;
+  onPhotoClick?: (photo: PhotoItem) => void;
+  onPhotoSelect?: (photo: PhotoItem) => void;
+  showSelection?: boolean;
+  className?: string;
 }
 
-interface GridItemData {
-	items: string[];
-	onItemClick?: (path: string) => void;
-	imageQuality: string;
-	isPreloaded: (item: string) => boolean;
-}
-
-const GridItem: React.FC<{
-	columnIndex: number;
-	rowIndex: number;
-	style: React.CSSProperties;
-	data: GridItemData;
-}> = ({ columnIndex, rowIndex, style, data }) => {
-	const { items, onItemClick, imageQuality, isPreloaded } = data;
-	const index = rowIndex * Math.floor(window.innerWidth / 200) + columnIndex; // Approximate columns
-	const item = items[index];
-
-	if (!item) {
-		return (
-			<div
-				style={style}
-				className="flex items-center justify-center bg-gray-100 rounded"
-			>
-				<div className="text-gray-400 text-sm">Empty</div>
-			</div>
-		);
-	}
-
-	const fileName = item.split("/").pop() || "Unknown";
-	const preloaded = isPreloaded(item);
-
-	return (
-		<div style={style} className="p-1">
-			<Card
-				className={`relative group cursor-pointer overflow-hidden transition-all duration-200 hover:shadow-lg ${
-					preloaded ? "ring-2 ring-blue-200" : ""
-				}`}
-				onClick={() => onItemClick?.(item)}
-			>
-				<div className="aspect-square relative">
-					<LazyImage
-						src={item}
-						alt={fileName}
-						className="w-full h-full object-cover"
-						placeholder={
-							<div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse flex items-center justify-center">
-								<div className="text-gray-400 text-xs text-center px-2">
-									{fileName.length > 20
-										? fileName.substring(0, 20) + "..."
-										: fileName}
-								</div>
-							</div>
-						}
-						quality={imageQuality}
-						loading="lazy"
-					/>
-
-					{/* Overlay with file info */}
-					<div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 flex items-end">
-						<div className="p-2 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-							<div className="text-xs truncate">{fileName}</div>
-							{preloaded && (
-								<Badge variant="secondary" className="text-xs mt-1">
-									Preloaded
-								</Badge>
-							)}
-						</div>
-					</div>
-				</div>
-			</Card>
-		</div>
-	);
+type GridCellContext = {
+  photos: PhotoItem[];
+  columns: number;
+  onPhotoClick?: (photo: PhotoItem) => void;
+  onPhotoSelect?: (photo: PhotoItem) => void;
+  selectedPhotos?: Set<string>;
+  thumbnailSize: number;
+  gap: number;
 };
 
+// Photo grid cell component
+const PhotoGridCell = memo(function PhotoGridCell({
+  columnIndex,
+  rowIndex,
+  style,
+  photos,
+  columns,
+  onPhotoClick,
+  onPhotoSelect,
+  selectedPhotos,
+  thumbnailSize,
+}: CellComponentProps<GridCellContext>) {
+  const index = rowIndex * columns + columnIndex;
+  const photo = photos[index];
+
+  // Get metadata for this photo (offline-first) - must be called unconditionally
+  const { metadata } = useOfflineFirstMetadata(photo?.path || "");
+
+  // Handle photo click - must be called unconditionally
+  const handleClick = useCallback(() => {
+    if (photo) {
+      onPhotoClick?.(photo);
+    }
+  }, [onPhotoClick, photo]);
+
+  // Handle photo double click - must be called unconditionally
+  const handleDoubleClick = useCallback(() => {
+    if (photo) {
+      onPhotoSelect?.(photo);
+    }
+  }, [onPhotoSelect, photo]);
+
+  // Format file size for display - must be called unconditionally
+  const formatFileSize = useCallback((size: number | undefined) => {
+    if (!size) return "";
+    if (size < 1024) return `${size} B`;
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+    if (size < 1024 * 1024 * 1024)
+      return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(size / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+  }, []);
+
+  // Get photo dimensions from metadata - must be called unconditionally
+  const dimensions = useMemo(() => {
+    if (metadata?.width && metadata?.height) {
+      return `${metadata.width}×${metadata.height}`;
+    }
+    return "";
+  }, [metadata?.width, metadata?.height]);
+
+  // Get file size from metadata - must be called unconditionally
+  const fileSize = useMemo(() => {
+    return formatFileSize(metadata?.size_bytes);
+  }, [metadata?.size_bytes, formatFileSize]);
+
+  // Early return if no photo at this index
+  if (!photo) {
+    return <div className="p-1 box-border" style={{ ...style }} />;
+  }
+
+  // Determine if photo is selected
+  const isSelected = selectedPhotos?.has(photo.path) || false;
+
+  return (
+    <div className="p-1 box-border" style={{ ...style }}>
+      <Card
+        className={`relative overflow-hidden transition-all duration-200 hover:shadow-lg hover:-translate-y-1 cursor-pointer ${
+          isSelected ? "ring-2 ring-primary" : ""
+        }`}
+        onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            handleClick();
+          }
+        }}
+        tabIndex={0}
+      >
+        {/* Thumbnail image */}
+        <div
+          className="relative bg-muted"
+          style={{ height: thumbnailSize - 40 }}
+        >
+          <img
+            src={photo.thumbnail || `file://${photo.path}`}
+            alt={photo.path.split("/").pop() || photo.path.split("\\").pop()}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              // Fallback to file URL if thumbnail fails, or show placeholder
+              const img = e.target as HTMLImageElement;
+              if (img.src !== `file://${photo.path}` && !photo.thumbnail) {
+                img.src = `file://${photo.path}`;
+              } else {
+                // Show a placeholder if no thumbnail available
+                img.style.display = "none";
+                const parent = img.parentElement;
+                if (parent) {
+                  parent.innerHTML = `
+										<div class="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
+											<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+											</svg>
+										</div>
+									`;
+                }
+              }
+            }}
+          />
+
+          {/* Loading skeleton */}
+          {!metadata && (
+            <div className="absolute inset-0 flex items-center justify-center bg-background/70">
+              <Skeleton className="w-5 h-5 rounded-full animate-spin" />
+            </div>
+          )}
+        </div>
+
+        {/* Photo info */}
+        <CardContent className="p-2 h-10 overflow-hidden">
+          <div className="space-y-1">
+            <div
+              className="font-semibold text-xs truncate"
+              title={
+                photo.path.split("/").pop() || photo.path.split("\\").pop()
+              }
+            >
+              {photo.path.split("/").pop() || photo.path.split("\\").pop()}
+            </div>
+
+            <div className="flex justify-between text-xs text-muted-foreground truncate">
+              <span title={dimensions}>{dimensions}</span>
+              <span title={fileSize}>{fileSize}</span>
+            </div>
+          </div>
+        </CardContent>
+
+        {/* Selection indicator */}
+        {isSelected && (
+          <Badge className="absolute top-2 right-2 w-5 h-5 p-0 flex items-center justify-center text-xs">
+            ✓
+          </Badge>
+        )}
+      </Card>
+    </div>
+  );
+});
+
+// Virtualized photo grid component
 export function VirtualizedPhotoGrid({
-	dir,
-	engine,
-	onItemClick,
-	className = "",
-	imageQuality = "medium",
-	showMetrics = false,
+  photos,
+  thumbnailSize = 200,
+  columns = 4,
+  gap = 8,
+  selectedPhotos,
+  onPhotoClick,
+  onPhotoSelect,
+  showSelection,
+  className,
 }: VirtualizedPhotoGridProps) {
-	const [currentScrollIndex, setCurrentScrollIndex] = useState(0);
-	const gridRef = useRef<any>(null);
-	const performanceMonitor = usePerformanceMonitor();
+  const rows = useMemo(() => {
+    return Math.ceil(photos.length / columns);
+  }, [photos.length, columns]);
 
-	// Use infinite scroll hook
-	const {
-		items,
-		loading,
-		hasMore,
-		error,
-		loadMore,
-		reset,
-		totalItems,
-		loadedItems,
-		memoryUsage,
-	} = useInfiniteLibraryScroll(dir, engine, {
-		initialBatchSize: 500,
-		batchSize: 1000,
-		threshold: 500,
-		maxMemoryMB: 300,
-		enablePreload: true,
-	});
+  // Memoize grid data
+  const cellProps = useMemo<GridCellContext>(
+    () => ({
+      photos,
+      columns,
+      onPhotoClick,
+      onPhotoSelect,
+      selectedPhotos,
+      thumbnailSize,
+      gap,
+    }),
+    [
+      photos,
+      columns,
+      onPhotoClick,
+      onPhotoSelect,
+      selectedPhotos,
+      thumbnailSize,
+      gap,
+    ]
+  );
 
-	// Use predictive preloading
-	const { isPreloaded } = usePredictivePreloading(
-		items,
-		currentScrollIndex,
-		10,
-	);
+  // Render empty state
+  if (photos.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <NoPhotosEmpty />
+      </div>
+    );
+  }
 
-	// Calculate grid dimensions
-	const getGridDimensions = useCallback((width: number) => {
-		const minItemWidth = 180;
-		const gap = 8;
-		const columns = Math.max(
-			1,
-			Math.floor((width - gap) / (minItemWidth + gap)),
-		);
-		const itemWidth = (width - gap * (columns + 1)) / columns;
-		const itemHeight = itemWidth; // Square items
-
-		return {
-			columns,
-			itemWidth: itemWidth + gap,
-			itemHeight: itemHeight + gap,
-			rowHeight: itemHeight + gap,
-		};
-	}, []);
-
-	// Handle scroll events for predictive preloading
-	const handleScroll = useCallback(
-		({ scrollTop }: { scrollTop: number }) => {
-			if (gridRef.current) {
-				const { itemHeight } = getGridDimensions(window.innerWidth);
-				const newIndex = Math.floor(scrollTop / itemHeight);
-				setCurrentScrollIndex(newIndex);
-			}
-		},
-		[getGridDimensions],
-	);
-
-	// Track performance metrics
-	useEffect(() => {
-		const renderStart = performance.now();
-
-		// Update performance metrics
-		performanceMonitor.updateLibraryMetrics({
-			totalItems,
-			loadedItems,
-			virtualizationEnabled: true,
-			visibleItems: Math.min(items.length, 100), // Approximate visible items
-			totalRenderedItems: items.length,
-		});
-
-		// Record grid render time
-		const renderEnd = performance.now();
-		performanceMonitor.recordGridRenderTime(renderEnd - renderStart);
-	}, [items.length, totalItems, loadedItems, performanceMonitor]);
-
-	// Memoize grid item data
-	const gridItemData = useMemo<GridItemData>(
-		() => ({
-			items,
-			onItemClick,
-			imageQuality,
-			isPreloaded,
-		}),
-		[items, onItemClick, imageQuality, isPreloaded],
-	);
-
-	// Calculate total rows needed
-	const getTotalRows = useCallback(
-		(width: number) => {
-			const { columns } = getGridDimensions(width);
-			return Math.ceil(items.length / columns);
-		},
-		[items.length, getGridDimensions],
-	);
-
-	// Performance metrics
-	const performanceMetrics = useMemo(() => {
-		if (!showMetrics) return null;
-
-		return (
-			<div className="fixed bottom-4 right-4 bg-white rounded-lg shadow-lg p-4 border z-50">
-				<div className="space-y-2 text-sm">
-					<div className="flex justify-between">
-						<span>Total Items:</span>
-						<span className="font-mono">{totalItems.toLocaleString()}</span>
-					</div>
-					<div className="flex justify-between">
-						<span>Loaded:</span>
-						<span className="font-mono">{loadedItems.toLocaleString()}</span>
-					</div>
-					<div className="flex justify-between">
-						<span>Memory:</span>
-						<span
-							className={`font-mono ${memoryUsage > 250 ? "text-red-600" : "text-green-600"}`}
-						>
-							{memoryUsage}MB
-						</span>
-					</div>
-					<div className="flex justify-between">
-						<span>Loading:</span>
-						<span className="font-mono">{loading ? "Yes" : "No"}</span>
-					</div>
-				</div>
-			</div>
-		);
-	}, [showMetrics, totalItems, loadedItems, memoryUsage, loading]);
-
-	// Sentinel element for infinite scroll
-	const Sentinel = () => (
-		<div
-			ref={(el) => {
-				if (el && hasMore && !loading) {
-					// This element will be observed by the intersection observer
-					el.setAttribute("data-sentinel", "true");
-				}
-			}}
-			className="flex justify-center items-center py-8"
-		>
-			{loading && (
-				<div className="text-center">
-					<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-					<p className="mt-2 text-sm text-gray-600">Loading more photos...</p>
-				</div>
-			)}
-			{error && (
-				<div className="text-center">
-					<p className="text-red-600 mb-2">Error loading photos</p>
-					<Button onClick={loadMore} variant="outline" size="sm">
-						Retry
-					</Button>
-				</div>
-			)}
-			{!hasMore && items.length > 0 && (
-				<div className="text-center text-gray-500">
-					<p>All photos loaded</p>
-					<p className="text-sm">
-						Showing {items.length} of {totalItems} photos
-					</p>
-				</div>
-			)}
-		</div>
-	);
-
-	if (error && items.length === 0) {
-		return (
-			<div
-				className={`flex flex-col items-center justify-center p-8 ${className}`}
-			>
-				<div className="text-center">
-					<h3 className="text-lg font-medium text-gray-900 mb-2">
-						Error Loading Library
-					</h3>
-					<p className="text-gray-600 mb-4">{error}</p>
-					<Button onClick={reset} variant="outline">
-						Try Again
-					</Button>
-				</div>
-			</div>
-		);
-	}
-
-	return (
-		<div className={`relative ${className}`}>
-			{showMetrics && performanceMetrics}
-
-			{items.length === 0 && !loading ? (
-				<div className="flex flex-col items-center justify-center p-8">
-					<div className="text-center">
-						<h3 className="text-lg font-medium text-gray-900 mb-2">
-							No Photos Found
-						</h3>
-						<p className="text-gray-600">Check your directory and try again.</p>
-					</div>
-				</div>
-			) : (
-				<div className="h-full">
-					<AutoSizer>
-						{({ width, height }) => {
-							const { columns, itemWidth, rowHeight } =
-								getGridDimensions(width);
-							const totalRows = getTotalRows(width);
-
-							return (
-								<div className="relative" style={{ height }}>
-									<Grid
-										ref={gridRef}
-										columnCount={columns}
-										columnWidth={itemWidth}
-										height={height - 100} // Leave space for sentinel
-										rowCount={totalRows}
-										rowHeight={rowHeight}
-										itemData={gridItemData}
-										onScroll={handleScroll}
-									>
-										{GridItem}
-									</Grid>
-
-									{/* Sentinel for infinite scroll */}
-									<div
-										className="absolute bottom-0 left-0 right-0"
-										style={{ height: 100 }}
-									>
-										<Sentinel />
-									</div>
-								</div>
-							);
-						}}
-					</AutoSizer>
-				</div>
-			)}
-		</div>
-	);
+  return (
+    <div className="w-full h-full relative">
+      <Grid
+        columnCount={columns}
+        columnWidth={thumbnailSize + gap}
+        rowCount={rows}
+        rowHeight={thumbnailSize + gap}
+        overscanCount={2}
+        cellComponent={PhotoGridCell}
+        cellProps={cellProps}
+        className="w-full h-full"
+      />
+    </div>
+  );
 }
+
+// Export memoized version for performance
+export const MemoizedVirtualizedPhotoGrid = memo(VirtualizedPhotoGrid);

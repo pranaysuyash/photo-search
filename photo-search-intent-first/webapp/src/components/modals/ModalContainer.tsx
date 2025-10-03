@@ -114,10 +114,12 @@ export function ModalContainer({
 
 	const modalContent = (
 		<div className="fixed inset-0 z-50">
-			{/* Backdrop */}
+			{/* Backdrop with enhanced blur */}
 			<div
 				className={cn(
-					"fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity",
+					"fixed inset-0 bg-black/30 backdrop-blur-md transition-all duration-300 ease-out",
+					"supports-[backdrop-filter]:bg-black/25 supports-[backdrop-filter]:backdrop-blur-xl",
+					"before:absolute before:inset-0 before:bg-gradient-to-b before:from-transparent before:to-black/10 before:pointer-events-none",
 					backdropClassName,
 				)}
 				onClick={handleBackdropClick}
@@ -131,8 +133,9 @@ export function ModalContainer({
 				ref={modalRef}
 				className={cn(
 					"fixed inset-0 flex items-center justify-center p-4",
-					"transform transition-all duration-200 ease-out",
+					"transform transition-all duration-300 ease-out",
 					"scale-95 opacity-0 data-[state=open]:scale-100 data-[state=open]:opacity-100",
+					"backdrop-brightness-110 backdrop-contrast-105",
 					className,
 				)}
 				data-state={isOpen ? "open" : "closed"}

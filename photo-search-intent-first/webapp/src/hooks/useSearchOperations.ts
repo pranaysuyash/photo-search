@@ -166,11 +166,14 @@ export function useSearchOperations() {
 
 	// Enhanced smart search with intent recognition
 	const doSmartSearch = useCallback(
-		async (query: string, options?: {
-			enableIntentRecognition?: boolean;
-			enableQueryExpansion?: boolean;
-			enableSmartFilters?: boolean;
-		}) => {
+		async (
+			query: string,
+			options?: {
+				enableIntentRecognition?: boolean;
+				enableQueryExpansion?: boolean;
+				enableSmartFilters?: boolean;
+			},
+		) => {
 			if (!dir) {
 				uiActions.setNote("Please select a photo directory first");
 				return;
@@ -202,7 +205,12 @@ export function useSearchOperations() {
 					enableQueryExpansion: options?.enableQueryExpansion ?? true,
 					enableSmartFilters: options?.enableSmartFilters ?? true,
 					context: {
-						availableTags: tagFilter ? tagFilter.split(",").map(t => t.trim()).filter(Boolean) : [],
+						availableTags: tagFilter
+							? tagFilter
+									.split(",")
+									.map((t) => t.trim())
+									.filter(Boolean)
+							: [],
 						availablePeople: [], // Would be populated from API
 						availableLocations: meta.places.map(String),
 						availableCameras: meta.cameras,
@@ -239,10 +247,10 @@ export function useSearchOperations() {
 					// Could store these in a context for later use
 					console.log("Smart suggestions available:", result.suggestions);
 				}
-
 			} catch (error) {
 				console.error("Smart search failed:", error);
-				const message = error instanceof Error ? error.message : "Smart search failed";
+				const message =
+					error instanceof Error ? error.message : "Smart search failed";
 				uiActions.setNote(message);
 				photoActions.setResults([]);
 				photoActions.setSearchId("");
@@ -250,14 +258,7 @@ export function useSearchOperations() {
 				uiActions.clearBusy();
 			}
 		},
-		[
-			dir,
-			engine,
-			topK,
-			tagFilter,
-			photoActions,
-			uiActions,
-		],
+		[dir, engine, topK, tagFilter, photoActions, uiActions],
 	);
 
 	return {

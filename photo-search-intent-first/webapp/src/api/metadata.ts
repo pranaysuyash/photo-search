@@ -1,4 +1,10 @@
 import { API_BASE, post } from "./base";
+import {
+	offlineCapableGetLibrary,
+	offlineCapableGetMetadata,
+	offlineCapableSetFavorite,
+	offlineCapableSetTags,
+} from "./offline";
 import type {
 	BuildParams,
 	DiagnosticsResponse,
@@ -13,6 +19,23 @@ import type {
 } from "./types";
 
 export async function getFavorites(dir: string): Promise<FavoritesResponse> {
+	// Check if we're online
+	const isOnline =
+		(window as unknown).offlineService?.getStatus?.() || navigator.onLine;
+
+	if (!isOnline) {
+		// Fetch from offline storage
+		const library = await offlineCapableGetLibrary(dir);
+		const favorites = library.filter((photo) => photo.metadata?.favorite);
+
+		return {
+			favorites: favorites.map((photo) => ({
+				path: photo.path,
+				metadata: photo.metadata,
+			})),
+		} as FavoritesResponse;
+	}
+
 	const r = await fetch(`${API_BASE}/favorites?dir=${encodeURIComponent(dir)}`);
 	if (!r.ok) throw new Error(await r.text());
 	return r.json() as Promise<FavoritesResponse>;
@@ -23,6 +46,16 @@ export async function setFavorite(
 	path: string,
 	favorite: boolean,
 ): Promise<{ ok: boolean }> {
+	// Check if we're online
+	const isOnline =
+		(window as unknown).offlineService?.getStatus?.() || navigator.onLine;
+
+	if (!isOnline) {
+		// Queue the action for offline processing
+		await offlineCapableSetFavorite(dir, path, favorite);
+		return { ok: true };
+	}
+
 	return post<{ ok: boolean }>("/favorite", {
 		dir,
 		path,
@@ -41,6 +74,19 @@ export async function setTags(
 	paths: string[],
 	tags: string[],
 ): Promise<{ ok: boolean }> {
+	// Check if we're online
+	const isOnline =
+		(window as unknown).offlineService?.getStatus?.() || navigator.onLine;
+
+	if (!isOnline) {
+		// Queue the action for offline processing
+		// Process each path individually
+		for (const path of paths) {
+			await offlineCapableSetTags(dir, path, tags);
+		}
+		return { ok: true };
+	}
+
 	return post<{ ok: boolean }>("/tags", {
 		dir,
 		paths,
@@ -52,6 +98,32 @@ export async function getLibrary(
 	dir: string,
 	options?: { offset?: number; limit?: number },
 ): Promise<LibraryResponse> {
+	// Check if we're online
+	const isOnline =
+		(window as unknown).offlineService?.getStatus?.() || navigator.onLine;
+
+	if (!isOnline) {
+		// Fetch from offline storage
+		const library = await offlineCapableGetLibrary(dir);
+
+		// Apply offset and limit if specified
+		let result = library;
+		if (options?.offset !== undefined) {
+			result = result.slice(options.offset);
+		}
+		if (options?.limit !== undefined) {
+			result = result.slice(0, options.limit);
+		}
+
+		return {
+			photos: result.map((photo) => ({
+				path: photo.path,
+				metadata: photo.metadata,
+			})),
+			total: library.length,
+		} as LibraryResponse;
+	}
+
 	const params = new URLSearchParams();
 	if (options?.offset !== undefined)
 		params.append("offset", options.offset.toString());
@@ -75,6 +147,26 @@ export async function getMetadata(
 	dir: string,
 	path: string,
 ): Promise<PhotoMetadata> {
+	// Check if we're online
+	const isOnline =
+		(window as unknown).offlineService?.getStatus?.() || navigator.onLine;
+
+	if (!isOnline) {
+		// Fetch from offline storage
+		const metadata = await offlineCapableGetMetadata(dir, path);
+		if (metadata) {
+			return metadata as PhotoMetadata;
+		}
+		// If not in offline cache, return empty metadata
+		return {
+			path,
+			exif: {},
+			faces: [],
+			tags: [],
+			favorite: false,
+		} as PhotoMetadata;
+	}
+
 	const r = await fetch(
 		`${API_BASE}/metadata?dir=${encodeURIComponent(
 			dir,

@@ -39,6 +39,7 @@ class Config(BaseModel):
 
     # Storage and paths
     ps_appdata_dir: Optional[Path] = Field(default=None, description="App data directory")
+    storage_backend: str = Field(default="file", description="Storage backend: 'file' or 'sqlite'")
 
     # Other
     env: str = Field(default="dev", description="Environment (dev/prod)")
@@ -101,6 +102,7 @@ def load_config() -> Config:
         transformers_offline=os.environ.get("TRANSFORMERS_OFFLINE", "").strip() == "1",
         offline_mode=os.environ.get("OFFLINE_MODE", "").strip() == "1",
         ps_appdata_dir=Path(os.environ["PS_APPDATA_DIR"]) if os.environ.get("PS_APPDATA_DIR") else None,
+        storage_backend=os.environ.get("STORAGE_BACKEND", "file").strip().lower(),
         env=os.environ.get("ENV", "dev").strip(),
     )
 

@@ -313,6 +313,73 @@ def thumb_batch(
     }
 
 
+@router.get("/thumb")
+def get_thumbnail(
+    directory: str = Query(..., alias="dir"), 
+    path: str = Query(...), 
+    size: int = 256
+):
+    """Get thumbnail of a photo."""
+    from infra.index_store import IndexStore
+    folder = Path(directory)
+    if not folder.exists():
+        raise HTTPException(400, "Folder not found")
+    
+    store = IndexStore(folder)
+    store.load()
+    
+    # Fallback to any existing index if the default one is empty
+    if not store.state.paths:
+        try:
+            bases = []
+            try:
+                bases.append(store.index_dir.parent)
+            except Exception:
+                pass
+            bases.append(folder / '.photo_index')
+            pfile = None
+            for base in bases:
+                try:
+                    if not base.exists():
+                        continue
+                    # Try preferred index first
+                    preferred = base / 'st-clip-ViT-B-32' / 'paths.json'
+                    if preferred.exists():
+                        pfile = preferred
+                        break
+                    # Try any subdirectory with paths.json
+                    for sub in base.iterdir():
+                        if sub.is_dir():
+                            cand = sub / 'paths.json'
+                            if cand.exists():
+                                pfile = cand
+                                break
+                    if pfile is not None:
+                        break
+                except Exception:
+                    continue
+            if pfile is not None:
+                data = json.loads(pfile.read_text(encoding='utf-8'))
+                store.state.paths = data.get('paths', []) or []
+                store.state.mtimes = data.get('mtimes', [0.0] * len(store.state.paths))
+        except Exception:
+            pass
+    
+    try:
+        # Find the mtime for this path
+        idx_map = {sp: float(mt) for sp, mt in zip(store.state.paths or [], store.state.mtimes or [])}
+        mtime = idx_map.get(path, 0.0)
+        
+        # Generate or get existing thumbnail
+        tp = get_or_create_thumb(store.index_dir, Path(path), float(mtime), size=size)
+        if tp is None or not tp.exists():
+            raise HTTPException(404, "Thumb not found")
+        
+        return FileResponse(str(tp))
+    except Exception:
+        raise HTTPException(500, "Failed to generate thumbnail")
+
+
 @router.get("/thumb_face")
 def get_face_thumbnail(
     directory: str = Query(..., alias="dir"), 

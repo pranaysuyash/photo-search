@@ -79,8 +79,7 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
 
 	return (
 		<div
-			className="fixed inset-0 z-50 flex items-start md:items-center justify-center p-3 md:p-6"
-			style={{ background: "var(--color-surface-overlay)" }}
+			className="fixed inset-0 z-50 flex items-start md:items-center justify-center p-3 md:p-6 bg-black/30 backdrop-blur-md supports-[backdrop-filter]:bg-black/25 supports-[backdrop-filter]:backdrop-blur-xl transition-all duration-300 ease-out"
 			role="dialog"
 			aria-modal="true"
 			aria-label="Search Photos"
@@ -93,7 +92,7 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
 						apply.
 					</div>
 				)}
-				<div className="w-full max-w-3xl rounded-2xl shadow-lg border border-border bg-card text-foreground">
+				<div className="w-full max-w-3xl rounded-2xl shadow-lg border border-border bg-card text-foreground backdrop-brightness-110 backdrop-contrast-105 transform transition-all duration-300 ease-out scale-95 opacity-0 animate-in fade-in-0 zoom-in-95">
 					<div className="flex items-center justify-between px-4 py-3 md:px-6 md:py-4 border-b border-border">
 						<div className="text-base md:text-lg font-semibold">
 							Search Photos

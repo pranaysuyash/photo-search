@@ -11,6 +11,8 @@ const MapView = lazy(() => import("../MapView"));
 const SmartDiscovery = lazy(() => import("../SmartDiscovery"));
 const AutoCurationPanel = lazy(() => import("../AutoCurationPanel"));
 const VisualTools = lazy(() => import("../VisualTools"));
+const CollaborativeWorkspace = lazy(() => import("../CollaborativeWorkspace"));
+const SocialSharingModal = lazy(() => import("../SocialSharingModal"));
 const TripsView = lazy(() => import("../TripsView"));
 const VideoManager = lazy(() =>
 	import("../VideoManager").then((m) => ({
@@ -209,7 +211,7 @@ export function RoutesHost({
 								onPhotoSelect={(photo) => openDetailByPath(photo.path)}
 								onPhotoView={(photo) => {
 									// Optional: Handle photo view actions
-									console.log('Viewing photo:', photo.path);
+									console.log("Viewing photo:", photo.path);
 								}}
 							/>
 						</div>
@@ -223,7 +225,7 @@ export function RoutesHost({
 								onPhotoSelect={(photo) => openDetailByPath(photo)}
 								onPhotoView={(photo) => {
 									// Optional: Handle photo view actions
-									console.log('Viewing photo:', photo.path);
+									console.log("Viewing photo:", photo.path);
 								}}
 							/>
 						</div>
@@ -238,9 +240,22 @@ export function RoutesHost({
 								onImageSelect={(path) => openDetailByPath(path)}
 								onPhotoView={(photo) => {
 									// Optional: Handle photo view actions
-									console.log('Viewing photo:', photo.path);
+									console.log("Viewing photo:", photo.path);
 								}}
 								availableImages={library || []}
+							/>
+						</div>
+					}
+				/>
+				<Route
+					path="/collaborate/:albumId?"
+					element={
+						<div className="p-4">
+							<CollaborativeWorkspace
+								albumId="default-album"
+								userId="current-user"
+								userName="Current User"
+								onPhotoSelect={(path) => openDetailByPath(path)}
 							/>
 						</div>
 					}

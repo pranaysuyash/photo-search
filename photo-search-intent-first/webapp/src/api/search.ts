@@ -1,4 +1,5 @@
 import { post } from "./base";
+import { offlineCapableSearch } from "./offline";
 import type {
 	SearchCachedParams,
 	SearchCachedResponse,
@@ -12,6 +13,33 @@ import type {
 
 export async function search(params: SearchParams): Promise<SearchResponse> {
 	const { dir, query, provider, topK = 24, options = {} } = params;
+
+	// Check if we're online and if the API is available
+	const isOnline =
+		(window as unknown).offlineService?.getStatus?.() || navigator.onLine;
+
+	if (!isOnline) {
+		// Perform offline search using cached data
+		const offlineResults = await offlineCapableSearch(
+			dir,
+			query,
+			provider,
+			topK,
+		);
+
+		// Return results in the same format as the API response
+		return {
+			results: offlineResults.map((result) => ({
+				path: result.path,
+				similarity: result.similarity,
+				metadata: result.metadata,
+			})),
+			query,
+			provider,
+			top_k: topK,
+			is_offline: true,
+		} as SearchResponse;
+	}
 
 	return post<SearchResponse>("/search", {
 		dir,

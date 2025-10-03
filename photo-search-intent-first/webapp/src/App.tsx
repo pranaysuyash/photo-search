@@ -22,6 +22,7 @@ import {
 	apiOperationStatus,
 	apiSetTags,
 } from "./api";
+import { initializeOfflineServices } from "./offline-setup";
 import { telemetryService } from "./services/TelemetryService";
 // Store helpers
 import { useAltSearch } from "./stores";
@@ -65,6 +66,7 @@ import {
 	usePlace,
 	usePoints,
 	useSavedSearches,
+	useSearchId,
 	useSearchQuery,
 	// Individual photo hooks
 	useSearchResults,
@@ -102,6 +104,7 @@ import {
 	useMobileDetection,
 } from "./components/MobileOptimizations";
 import { useOnboarding } from "./components/OnboardingTour";
+import SessionRestoreIndicator from "./components/SessionRestoreIndicator";
 import { ToastAction } from "./components/ui/toast";
 import { ActionsProvider } from "./contexts/ActionsContext";
 import { DataProvider } from "./contexts/DataContext";
@@ -138,6 +141,7 @@ import { useResultsShortcuts } from "./hooks/useResultsShortcuts";
 import { useSearchOperations } from "./hooks/useSearchOperations";
 import type { FilterPreset } from "./models/FilterPreset";
 import { ModalDataBridgeProvider } from "./providers/ModalDataBridgeProvider";
+import { sessionRestoreService } from "./services/SessionRestoreService";
 import { handleError } from "./utils/errors";
 import { pathToView } from "./utils/router";
 import {
@@ -239,19 +243,35 @@ function AppWithModalControls() {
 	const location = useLocation();
 	const navigate = useNavigate();
 	const currentView = pathToView(location.pathname);
+
+	// Initialize session restore service
+	const sessionPreferences = useMemo(
+		() => sessionRestoreService.getViewPreferences(),
+		[],
+	);
 	const viewPreferences = useMemo(() => loadViewPreferences(), []);
+
+	// Merge session preferences with local preferences, giving priority to session
+	const mergedPreferences = useMemo(
+		() => ({
+			...viewPreferences,
+			...sessionPreferences,
+		}),
+		[viewPreferences, sessionPreferences],
+	);
+
 	const [searchText, setSearchText] = useState("");
 
 	const [selected, setSelected] = useState<Set<string>>(new Set());
 	const [gridSize, setGridSize] = useState<GridSize>(
-		() => viewPreferences.gridSize ?? "medium",
+		() => mergedPreferences.gridSize ?? "medium",
 	);
 	const [resultView, _setResultView] = useState<ResultView>(
-		() => viewPreferences.resultView ?? "grid",
+		() => mergedPreferences.resultView ?? "grid",
 	);
 	const [timelineBucket, _setTimelineBucket] = useState<
 		"day" | "week" | "month"
-	>(() => viewPreferences.timelineBucket ?? "day");
+	>(() => mergedPreferences.timelineBucket ?? "day");
 	const handleSetResultView = useCallback(
 		(view: ResultView) => {
 			_setResultView(view);
@@ -270,12 +290,31 @@ function AppWithModalControls() {
 	);
 
 	useEffect(() => {
+		// Save to both existing preferences and new session restore service
 		saveViewPreferences({ resultView, timelineBucket, gridSize });
+		sessionRestoreService.updateViewPreferences({
+			resultView,
+			timelineBucket,
+			gridSize,
+		});
 	}, [resultView, timelineBucket, gridSize]);
 	const [currentFilter, setCurrentFilter] = useState<string>("all");
 	const [showFilters, setShowFilters] = useState(false);
 	const [dateFrom, setDateFrom] = useState("");
 	const [dateTo, setDateTo] = useState("");
+	const [showRecentActivity, setShowRecentActivity] = useState(false);
+	const [showSearchHistory, setShowSearchHistory] = useState(false);
+
+	// Track sidebar state changes
+	useEffect(() => {
+		sessionRestoreService.updateUI({
+			sidebarState: {
+				showFilters,
+				showRecentActivity,
+				showSearchHistory,
+			},
+		});
+	}, [showFilters, showRecentActivity, showSearchHistory]);
 	const { anyOpen: anyModalOpen } = useModalStatus();
 	const enableDemoLibrary = useEnableDemoLibrary();
 	const [showOnboarding, setShowOnboarding] = useState(false);
@@ -299,8 +338,6 @@ function AppWithModalControls() {
 	const [focusIdx, setFocusIdx] = useState<number | null>(null);
 	const [layoutRows, setLayoutRows] = useState<number[][]>([]);
 	// Panels toggles
-	const [showRecentActivity, setShowRecentActivity] = useState(false);
-	const [showSearchHistory, setShowSearchHistory] = useState(false);
 	const layoutRowsRef = useRef(layoutRows);
 	const lastSelectionCountRef = useRef<number>(selected.size);
 	const [bottomNavTab, setBottomNavTab] = useState<
@@ -328,6 +365,11 @@ function AppWithModalControls() {
 				},
 			}),
 		);
+
+		// Update selected photos in session restore service
+		sessionRestoreService.updateUI({
+			selectedPhotos: Array.from(selected),
+		});
 	}, [selected]);
 
 	const {
@@ -524,6 +566,29 @@ function AppWithModalControls() {
 		}
 	}, []);
 
+	// Restore session state on mount
+	useEffect(() => {
+		// Restore last search query if available
+		const lastSearch = sessionRestoreService.getLastSearchQuery();
+		if (lastSearch && !searchText) {
+			setSearchText(lastSearch);
+		}
+
+		// Restore last accessed directory
+		const lastDirectory = sessionRestoreService.getLastAccessedDirectory();
+		if (lastDirectory && !dir) {
+			// This would need to be integrated with the directory selection mechanism
+			console.log("Last accessed directory:", lastDirectory);
+		}
+
+		// Initialize navigation tracking
+		if (currentView) {
+			sessionRestoreService.updateNavigation({
+				currentView,
+			});
+		}
+	}, []); // Only run once on mount
+
 	// MonitoringService is automatically initialized via singleton instance
 	usePageViewTracking();
 
@@ -666,6 +731,16 @@ function AppWithModalControls() {
 		}
 	}, [dir]);
 
+	// Update library state when directory changes
+	useEffect(() => {
+		if (dir) {
+			sessionRestoreService.updateLibrary({
+				lastAccessedDirectory: dir,
+				preferredEngine: engine,
+			});
+		}
+	}, [dir, engine]);
+
 	// Index status polling moved to LibraryProvider
 
 	// Compute index coverage from diagnostics + library
@@ -759,7 +834,13 @@ function AppWithModalControls() {
 						// Log performance metrics for large collections
 						if (library && library.length > 1000) {
 							console.log(
-								`Loaded ${r.paths.length} items, total: ${library.length + r.paths.length}, memory: ${Math.round(performance.memory ? performance.memory.usedJSHeapSize / 1024 / 1024 : 0)}MB`,
+								`Loaded ${r.paths.length} items, total: ${
+									library.length + r.paths.length
+								}, memory: ${Math.round(
+									performance.memory
+										? performance.memory.usedJSHeapSize / 1024 / 1024
+										: 0,
+								)}MB`,
 							);
 						}
 					}
@@ -911,6 +992,12 @@ function AppWithModalControls() {
 				uiActions.setNote("Invalid directory path");
 				return;
 			}
+
+			// Record search in session restore service
+			sessionRestoreService.recordSearch(text.trim());
+			sessionRestoreService.updateNavigation({
+				currentView: "results",
+			});
 
 			return await _doSearchImmediate(text);
 		},
@@ -2089,6 +2176,9 @@ function AppWithModalControls() {
 					<ActionsProvider value={actionProps}>
 						<ModalDataBridgeProvider>
 							<OnboardingProvider value={onboardingProps}>
+								{/* Session Restore Indicator */}
+								<SessionRestoreIndicator />
+
 								{/* Temporary cast: contextProps type mismatch (workspaceActions.setWorkspace signature). */}
 								<AppChrome
 									location={location}

@@ -155,6 +155,7 @@ class SearchResult(BaseModel):
     embedding_similarity: Optional[float] = Field(None, description="Embedding similarity score")
     ocr_score: Optional[float] = Field(None, description="OCR match score")
     caption_score: Optional[float] = Field(None, description="Caption match score")
+    folder: Optional[str] = Field(None, description="Source folder when searching multiple roots")
 
 
 class SearchResponse(BaseModel):
@@ -165,13 +166,8 @@ class SearchResponse(BaseModel):
     filters_applied: List[str] = Field(default_factory=list, description="List of applied filters")
     search_time_ms: Optional[float] = Field(None, description="Search execution time in milliseconds")
     provider_used: SearchProvider = Field(..., description="Provider used for search")
-
-    @validator('results')
-    def validate_results(cls, v, values):
-        limit = values.get('limit', 1000)
-        if len(v) > limit:
-            raise ValueError(f"Number of results ({len(v)}) exceeds limit ({limit})")
-        return v
+    is_cached: bool = Field(False, description="Whether the result was from cache")
+    cache_hit: bool = Field(False, description="Whether this was a cache hit")
 
 
 class SearchStatus(BaseModel):

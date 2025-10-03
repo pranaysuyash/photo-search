@@ -393,6 +393,39 @@ def thumb_batch_v1(
     )
 
 
+@utilities_router.get("/thumb")
+def get_thumbnail_v1(
+    directory: str = Query(..., alias="dir"), 
+    path: str = Query(...), 
+    size: int = 256,
+    _auth = Depends(require_auth)
+):
+    """
+    Get thumbnail of a photo.
+    """
+    from infra.index_store import IndexStore
+    folder = Path(directory)
+    if not folder.exists():
+        raise HTTPException(400, "Folder not found")
+    
+    store = IndexStore(folder)
+    store.load()
+    
+    try:
+        # Find the mtime for this path
+        idx_map = {sp: float(mt) for sp, mt in zip(store.state.paths or [], store.state.mtimes or [])}
+        mtime = idx_map.get(path, 0.0)
+        
+        # Generate or get existing thumbnail
+        tp = get_or_create_thumb(store.index_dir, Path(path), float(mtime), size=size)
+        if tp is None or not tp.exists():
+            raise HTTPException(404, "Thumb not found")
+        
+        return FileResponse(str(tp))
+    except Exception:
+        raise HTTPException(500, "Failed to generate thumbnail")
+
+
 @utilities_router.get("/thumb_face")
 def get_face_thumbnail_v1(
     directory: str = Query(..., alias="dir"), 

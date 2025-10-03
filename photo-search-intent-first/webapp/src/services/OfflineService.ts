@@ -496,6 +496,13 @@ class OfflineService {
 	}
 
 	private async checkConnection() {
+		const navigatorOnline =
+			typeof navigator !== "undefined" ? navigator.onLine : true;
+		if (!navigatorOnline) {
+			this.setOnlineStatus(false);
+			return;
+		}
+
 		const ts = Date.now();
 		const url = `${API_BASE}/api/monitoring?ts=${ts}`;
 		try {
@@ -504,9 +511,28 @@ class OfflineService {
 				cache: "no-store",
 				headers: { Accept: "application/json" },
 			});
-			this.setOnlineStatus(response.ok);
-		} catch {
-			this.setOnlineStatus(false);
+
+			if (!response.ok) {
+				offlineDebug(
+					"[Offline Service] Monitoring endpoint responded",
+					response.status,
+				);
+			}
+
+			this.setOnlineStatus(true);
+		} catch (error) {
+			const stillOnline =
+				typeof navigator !== "undefined" ? navigator.onLine : true;
+			if (!stillOnline) {
+				this.setOnlineStatus(false);
+				return;
+			}
+
+			offlineDebug(
+				"[Offline Service] Connectivity check failed, assuming offline-first mode",
+				error,
+			);
+			this.setOnlineStatus(true);
 		}
 	}
 

@@ -4,13 +4,14 @@ import {
 	Grid3x3 as IconGrid,
 	Heart as IconHeart,
 	MapPin as IconMapPin,
+	Palette as IconPalette,
 	Plane as IconPlane,
 	Search as IconSearch,
+	Share2 as IconShare2,
 	Sparkles as IconSparkles,
 	Tag as IconTag,
 	Users as IconUsers,
 	Wand2 as IconWand2,
-	Palette as IconPalette,
 	X,
 } from "lucide-react";
 
@@ -115,6 +116,11 @@ export function Sidebar({
 			id: "visual-tools",
 			label: "Visual Tools",
 			icon: IconPalette,
+		},
+		{
+			id: "collaborate",
+			label: "Collaborate",
+			icon: IconShare2,
 		},
 		{
 			id: "saved",

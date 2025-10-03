@@ -8,13 +8,16 @@ import { SearchIntentRecognizer } from "../../services/SearchIntentRecognizer";
 describe("SearchIntentRecognizer", () => {
 	describe("recognizeIntent", () => {
 		test("should recognize discovery intent", () => {
-			const intent = SearchIntentRecognizer.recognizeIntent("show me some photos");
+			const intent = SearchIntentRecognizer.recognizeIntent(
+				"show me some photos",
+			);
 			expect(intent.primary).toBe("discovery");
 			expect(intent.confidence).toBeGreaterThan(0.5);
 		});
 
 		test("should recognize temporal intent", () => {
-			const intent = SearchIntentRecognizer.recognizeIntent("photos from today");
+			const intent =
+				SearchIntentRecognizer.recognizeIntent("photos from today");
 			expect(intent.primary).toBe("temporal");
 			expect(intent.context.timeFrame?.type).toBe("recent");
 		});
@@ -39,7 +42,9 @@ describe("SearchIntentRecognizer", () => {
 		});
 
 		test("should recognize technical intent", () => {
-			const intent = SearchIntentRecognizer.recognizeIntent("photos shot at f/2.8");
+			const intent = SearchIntentRecognizer.recognizeIntent(
+				"photos shot at f/2.8",
+			);
 			expect(intent.primary).toBe("technical");
 			expect(intent.context.technical?.settings?.aperture).toBe("f/2.8");
 		});
@@ -57,13 +62,17 @@ describe("SearchIntentRecognizer", () => {
 		});
 
 		test("should extract context correctly", () => {
-			const intent = SearchIntentRecognizer.recognizeIntent("family photos from last summer");
+			const intent = SearchIntentRecognizer.recognizeIntent(
+				"family photos from last summer",
+			);
 			expect(intent.context.people?.relationship).toBe("family");
 			expect(intent.context.timeFrame?.type).toBe("seasonal");
 		});
 
 		test("should handle modifiers", () => {
-			const intent = SearchIntentRecognizer.recognizeIntent("beach photos not sunset");
+			const intent = SearchIntentRecognizer.recognizeIntent(
+				"beach photos not sunset",
+			);
 			expect(intent.modifiers).toHaveLength(1);
 			expect(intent.modifiers[0].type).toBe("exclusion");
 			expect(intent.modifiers[0].value).toBe("sunset");
@@ -80,7 +89,9 @@ describe("SearchIntentRecognizer", () => {
 		test("should provide contextual suggestions for partial query", () => {
 			const suggestions = SearchIntentRecognizer.getTypingSuggestions("beach");
 			expect(suggestions.length).toBeGreaterThan(0);
-			expect(suggestions.some(s => s.toLowerCase().includes("beach"))).toBe(true);
+			expect(suggestions.some((s) => s.toLowerCase().includes("beach"))).toBe(
+				true,
+			);
 		});
 
 		test("should use intent history for better suggestions", () => {
@@ -91,7 +102,7 @@ describe("SearchIntentRecognizer", () => {
 
 			const suggestions = SearchIntentRecognizer.getTypingSuggestions(
 				"beach",
-				intentHistory
+				intentHistory,
 			);
 
 			expect(suggestions.length).toBeGreaterThan(0);
@@ -105,7 +116,8 @@ describe("SearchIntentRecognizer", () => {
 		});
 
 		test("should handle very long queries", () => {
-			const longQuery = "photos of happy people at the beach during sunset with family and friends on vacation last summer";
+			const longQuery =
+				"photos of happy people at the beach during sunset with family and friends on vacation last summer";
 			const intent = SearchIntentRecognizer.recognizeIntent(longQuery);
 			expect(intent.complexity).toBe("complex");
 		});
@@ -121,7 +133,9 @@ describe("SearchIntentRecognizer", () => {
 		});
 
 		test("should handle queries with punctuation", () => {
-			const intent = SearchIntentRecognizer.recognizeIntent("beach photos, sunset");
+			const intent = SearchIntentRecognizer.recognizeIntent(
+				"beach photos, sunset",
+			);
 			expect(intent.primary).toBe("location");
 		});
 	});
@@ -134,7 +148,10 @@ describe("SearchIntentRecognizer", () => {
 				availableLocations: ["Home", "Beach House"],
 			};
 
-			const intent = SearchIntentRecognizer.recognizeIntent("beach photos", context);
+			const intent = SearchIntentRecognizer.recognizeIntent(
+				"beach photos",
+				context,
+			);
 			expect(intent.suggestedQueries.length).toBeGreaterThan(0);
 		});
 
@@ -144,8 +161,10 @@ describe("SearchIntentRecognizer", () => {
 			};
 
 			const intent = SearchIntentRecognizer.recognizeIntent("photos", context);
-			const hasContextSuggestions = intent.suggestedQueries.some(s =>
-				context.availableLocations.some(loc => s.toLowerCase().includes(loc.toLowerCase()))
+			const hasContextSuggestions = intent.suggestedQueries.some((s) =>
+				context.availableLocations.some((loc) =>
+					s.toLowerCase().includes(loc.toLowerCase()),
+				),
 			);
 			expect(hasContextSuggestions).toBe(true);
 		});
