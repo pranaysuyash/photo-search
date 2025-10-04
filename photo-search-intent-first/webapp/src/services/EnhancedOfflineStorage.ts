@@ -582,32 +582,6 @@ export class EnhancedOfflineStorage {
 		return 0;
 	}
 
-	/**
-	 * Clear all offline storage
-	 */
-	async clearAll(): Promise<void> {
-		if (!this.db) {
-			await this.initialize();
-		}
-
-		const stores = [
-			this.PHOTO_STORE,
-			this.EMBEDDING_STORE,
-			this.INDEX_STORE,
-			this.METADATA_STORE,
-		];
-
-		for (const storeName of stores) {
-			await new Promise((resolve, reject) => {
-				const tx = this.db!.transaction([storeName], "readwrite");
-				const store = tx.objectStore(storeName);
-				const request = store.clear();
-
-				request.onsuccess = () => resolve();
-				request.onerror = () => reject(request.error);
-			});
-		}
-	}
 
 	/**
 	 * Check if offline storage is supported

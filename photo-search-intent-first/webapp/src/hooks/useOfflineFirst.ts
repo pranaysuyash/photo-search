@@ -3,7 +3,15 @@
  * Provides immediate UI response with cached data, followed by fresh results when available
  */
 
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { PhotoMeta } from "../models/PhotoMeta";
+import { offlineCapableGetLibrary, offlineCapableGetMetadata, offlineCapableSearch } from "../api/offline";
+import { search } from "../api/search";
+import { expandSynonyms } from "../utils/searchSynonyms";
+import { offlineService } from "../services/OfflineService";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCamera, useCaptionsEnabled, useDir, useEngine, useFMax, useFastIndexEnabled, useFastKind, useFMin, useHasText, useHfToken, useIsoMax, useIsoMin, useOcrEnabled, useOpenaiKey, usePlace } from "../stores/settingsStore";
+import { useFavOnly, useTopK, useTags } from "../stores/photoStore";
 
 // Types for offline-first search results
 interface OfflineFirstSearchResult {
@@ -58,7 +66,8 @@ export function useOfflineFirstSearch() {
 	const openaiKey = useOpenaiKey();
 	const topK = useTopK();
 	const favOnly = useFavOnly();
-	const tagFilter = useTagFilter();
+	const tags = useTags();
+	const tagFilter = tags?.tagFilter;
 	const place = usePlace();
 	const camera = useCamera();
 	const isoMin = useIsoMin();
