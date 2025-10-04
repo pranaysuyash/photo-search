@@ -67,11 +67,14 @@ const searchBarPath = path.join(__dirname, 'src/components/SearchBar.tsx');
 if (fs.existsSync(searchBarPath)) {
     const content = fs.readFileSync(searchBarPath, 'utf8');
     const hasForwardRef = content.includes('forwardRef<');
-    const hasProperClosing = content.includes(');') && !content.includes('forwardRef<HTMLDivElement, SearchBarProps>(');
+    const hasForwardRefCall = content.includes('forwardRef<HTMLDivElement, SearchBarProps>(');
+    const hasExportForwardRef = content.includes('export const SearchBar = forwardRef<');
+    const hasDisplayName = content.includes('SearchBar.displayName = "SearchBar"');
+    const hasProperSyntax = hasForwardRefCall && hasExportForwardRef && hasDisplayName;
 
     console.log('✅ SearchBar component:');
     console.log(`   - Uses forwardRef: ${hasForwardRef ? '✅' : '❌'}`);
-    console.log(`   - Proper syntax: ${hasProperClosing ? '✅' : '❌'}`);
+    console.log(`   - Proper syntax: ${hasProperSyntax ? '✅' : '❌'} (${hasForwardRefCall ? 'call' : 'no-call'} & ${hasExportForwardRef ? 'export' : 'no-export'} & ${hasDisplayName ? 'displayName' : 'no-displayName'})`);
 } else {
     console.log('❌ SearchBar.tsx not found');
 }
