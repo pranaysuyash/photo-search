@@ -628,6 +628,205 @@ export default function Collections({
 		clearSelection();
 	};
 
+	// Collection management handlers
+	const handleRename = async (collectionName: string) => {
+		const newName = prompt(`Rename collection "${collectionName}" to:`, collectionName);
+		if (newName && newName.trim() && newName !== collectionName) {
+			const trimmedName = newName.trim();
+
+			// Check if name already exists
+			if (collections[trimmedName]) {
+				alert(`A collection named "${trimmedName}" already exists.`);
+				return;
+			}
+
+			try {
+				// Record action for undo/redo
+				recordAction({
+					type: "rename",
+					collectionName,
+					timestamp: Date.now(),
+					previousState: {
+						name: collectionName,
+						newName: trimmedName,
+						photos: collections[collectionName] || []
+					}
+				});
+
+				// Create new collection and delete old one
+				const collectionPaths = collections[collectionName] || [];
+				await apiSetCollection(dir, engine, trimmedName, collectionPaths);
+				await apiDeleteCollection(dir, engine, collectionName);
+
+				// Update local state
+				const updatedCollections = { ...collections };
+				updatedCollections[trimmedName] = collectionPaths;
+				delete updatedCollections[collectionName];
+
+				// Transfer theme and cover settings
+				const currentTheme = collectionThemes[collectionName];
+				const currentCover = collectionCovers[collectionName];
+				if (currentTheme) {
+					setCollectionThemes(prev => {
+						const updated = { ...prev };
+						delete updated[collectionName];
+						updated[trimmedName] = currentTheme;
+						return updated;
+					});
+				}
+				if (currentCover !== undefined) {
+					setCollectionCovers(prev => {
+						const updated = { ...prev };
+						delete updated[collectionName];
+						updated[trimmedName] = currentCover;
+						return updated;
+					});
+				}
+
+				if (onCollectionUpdate) {
+					onCollectionUpdate(updatedCollections);
+				}
+
+				announce(`Collection renamed from "${collectionName}" to "${trimmedName}"`);
+			} catch (error) {
+				console.error(`Failed to rename collection ${collectionName}:`, error);
+				alert(`Failed to rename collection. Please try again.`);
+			}
+		}
+	};
+
+	const handleDuplicate = async (collectionName: string) => {
+		const baseName = `${collectionName} Copy`;
+		let duplicateName = baseName;
+		let counter = 1;
+
+		// Find unique name
+		while (collections[duplicateName]) {
+			duplicateName = `${baseName} ${counter}`;
+			counter++;
+		}
+
+		try {
+			// Record action for undo/redo
+			recordAction({
+				type: "duplicate",
+				collectionName: duplicateName,
+				timestamp: Date.now(),
+				previousState: {
+					photos: collections[collectionName] || []
+				}
+			});
+
+			const collectionPaths = collections[collectionName] || [];
+			await apiSetCollection(dir, engine, duplicateName, collectionPaths);
+
+			// Update local state
+			const updatedCollections = {
+				...collections,
+				[duplicateName]: [...collectionPaths]
+			};
+
+			// Copy theme and cover settings
+			const currentTheme = collectionThemes[collectionName];
+			const currentCover = collectionCovers[collectionName];
+			if (currentTheme) {
+				setCollectionThemes(prev => ({
+					...prev,
+					[duplicateName]: currentTheme
+				}));
+			}
+			if (currentCover !== undefined) {
+				setCollectionCovers(prev => ({
+					...prev,
+					[duplicateName]: currentCover
+				}));
+			}
+
+			if (onCollectionUpdate) {
+				onCollectionUpdate(updatedCollections);
+			}
+
+			announce(`Collection "${collectionName}" duplicated as "${duplicateName}"`);
+		} catch (error) {
+			console.error(`Failed to duplicate collection ${collectionName}:`, error);
+			alert(`Failed to duplicate collection. Please try again.`);
+		}
+	};
+
+	const handleArchive = async (collectionName: string) => {
+		const confirmArchive = confirm(
+			`Archive collection "${collectionName}"?\n\nThis will move the collection to an archived state. You can restore it later if needed.`
+		);
+
+		if (confirmArchive) {
+			try {
+				// Record action for undo/redo
+				recordAction({
+					type: "archive",
+					collectionName,
+					timestamp: Date.now(),
+					previousState: {
+						photos: collections[collectionName] || [],
+						themes: collectionThemes
+					}
+				});
+
+				// For now, we'll simulate archiving by adding a prefix
+				// In a real implementation, this might move to a separate archived collections store
+				const archivedName = `[Archived] ${collectionName}`;
+				const collectionPaths = collections[collectionName] || [];
+
+				// Check if archived name already exists
+				if (collections[archivedName]) {
+					let counter = 1;
+					let uniqueArchivedName = `${archivedName} (${counter})`;
+					while (collections[uniqueArchivedName]) {
+						counter++;
+						uniqueArchivedName = `${archivedName} (${counter})`;
+					}
+					archivedName = uniqueArchivedName;
+				}
+
+				await apiSetCollection(dir, engine, archivedName, collectionPaths);
+				await apiDeleteCollection(dir, engine, collectionName);
+
+				// Update local state
+				const updatedCollections = { ...collections };
+				updatedCollections[archivedName] = collectionPaths;
+				delete updatedCollections[collectionName];
+
+				// Transfer theme settings
+				const currentTheme = collectionThemes[collectionName];
+				const currentCover = collectionCovers[collectionName];
+				if (currentTheme) {
+					setCollectionThemes(prev => {
+						const updated = { ...prev };
+						delete updated[collectionName];
+						updated[archivedName] = currentTheme;
+						return updated;
+					});
+				}
+				if (currentCover !== undefined) {
+					setCollectionCovers(prev => {
+						const updated = { ...prev };
+						delete updated[collectionName];
+						updated[archivedName] = currentCover;
+						return updated;
+					});
+				}
+
+				if (onCollectionUpdate) {
+					onCollectionUpdate(updatedCollections);
+				}
+
+				announce(`Collection "${collectionName}" archived as "${archivedName}"`);
+			} catch (error) {
+				console.error(`Failed to archive collection ${collectionName}:`, error);
+				alert(`Failed to archive collection. Please try again.`);
+			}
+		}
+	};
+
 	// Context menu handlers
 	const handleContextMenu = (event: React.MouseEvent, collectionName: string) => {
 		event.preventDefault();
@@ -658,16 +857,13 @@ export default function Collections({
 				setShowCoverSelector(collectionName);
 				break;
 			case "rename":
-				// TODO: Implement rename functionality
-				alert("Rename functionality coming soon!");
+				handleRename(collectionName);
 				break;
 			case "duplicate":
-				// TODO: Implement duplicate functionality
-				alert("Duplicate functionality coming soon!");
+				handleDuplicate(collectionName);
 				break;
 			case "archive":
-				// TODO: Implement archive functionality
-				alert("Archive functionality coming soon!");
+				handleArchive(collectionName);
 				break;
 			case "delete":
 				if (onDelete) {

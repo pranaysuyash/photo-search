@@ -9,6 +9,14 @@ const STORE_NAME = "offlineActions";
 const MANIFEST_STORE_NAME = "manifests";
 const METADATA_STORE_NAME = "metadata";
 const THUMBNAIL_STORE_NAME = "thumbnails";
+const DIAGNOSTICS_STORE_NAME = "diagnostics";
+
+export interface DiagnosticEventRecord {
+	id?: number;
+	type: string;
+	timestamp: number;
+	payload: unknown;
+}
 
 export class IndexedDBStorage {
 	private db: IDBDatabase | null = null;

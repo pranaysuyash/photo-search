@@ -44,12 +44,12 @@ The following roadmap captures the long-term, intent-first initiatives required 
 - **Scope:** Prepare modernization work by securing offline resilience, shared design primitives, and baseline regression artifacts.
 - **Deliverables:**
   1. Draft implementation spec for `OfflineService` exponential backoff + status emitters. — ✅ Implemented Oct 2025 (backoff + scheduling live; status emitters still TBD).
-  2. Define diagnostics telemetry schema (connection history, model health) and surface plan for upcoming ActivityTray. — **TODO**
-  3. Outline CI offline smoke strategy (CLI script + Playwright runner) with tooling requirements. — **TODO**
+  2. Define diagnostics telemetry schema (connection history, model health) and surface plan for upcoming ActivityTray. — ▶️ Plan drafted (`docs/APPCHROME_PHASE0_IMPLEMENTATION_PLAN.md#1`).
+  3. Outline CI offline smoke strategy (CLI script + Playwright runner) with tooling requirements. — ▶️ Plan drafted (`docs/APPCHROME_PHASE0_IMPLEMENTATION_PLAN.md#2`).
   4. Catalog legacy components requiring shadcn migration (StatusBar, StatsBar, LibrarySwitcher, Collections, BottomNavigation, SearchBar). — ✅ Completed Oct 2025.
-  5. Produce baseline UX capture plan (screenshots or Playwright visuals) for library/search/collections/onboarding journeys. — **TODO**
+  5. Produce baseline UX capture plan (screenshots or Playwright visuals) for library/search/collections/onboarding journeys. — ▶️ Plan drafted (`docs/APPCHROME_PHASE0_IMPLEMENTATION_PLAN.md#3`).
   6. Schedule design/dev workshop to lock shared visual spec; circulate agenda + attendees. — ✅ Calendar invite requested Oct 2025.
-  7. Draft RFC outline for `LayoutShell` extraction covering routing/context impacts. — **TODO**
+  7. Draft RFC outline for `LayoutShell` extraction covering routing/context impacts. — ▶️ Outline captured (`docs/APPCHROME_PHASE0_IMPLEMENTATION_PLAN.md#4`).
 - **Success Criteria:** All TODO items have owners/dates before Phase 1 kicks off; migration candidates documented for design system roll-out.
 
 ---

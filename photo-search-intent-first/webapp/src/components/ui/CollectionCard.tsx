@@ -504,24 +504,21 @@ export function CollectionCard({
 							<DropdownMenuContent align="end" className="min-w-48">
 								<DropdownMenuItem onClick={() => {
 									setIsDropdownOpen(false);
-									// TODO: Implement rename functionality
-									alert("Rename functionality coming soon!");
+									if (onAction) onAction('rename', name);
 								}}>
 									<Edit3 className="w-4 h-4 mr-2" />
 									Rename
 								</DropdownMenuItem>
 								<DropdownMenuItem onClick={() => {
 									setIsDropdownOpen(false);
-									// TODO: Implement duplicate functionality
-									alert("Duplicate functionality coming soon!");
+									if (onAction) onAction('duplicate', name);
 								}}>
 									<Copy className="w-4 h-4 mr-2" />
 									Duplicate
 								</DropdownMenuItem>
 								<DropdownMenuItem onClick={() => {
 									setIsDropdownOpen(false);
-									// TODO: Implement archive functionality
-									alert("Archive functionality coming soon!");
+									if (onAction) onAction('archive', name);
 								}}>
 									<Archive className="w-4 h-4 mr-2" />
 									Archive

@@ -13,7 +13,7 @@ import {
   SearchIntentRecognizer,
 } from "../services/SearchIntentRecognizer";
 import { SearchIntentInfo } from "./SearchIntentInfo";
-// import { EnhancedSearchSuggestions } from "./EnhancedSearchSuggestions";
+import { EnhancedSearchSuggestions } from "./EnhancedSearchSuggestions";
 import { SearchHistoryPanel } from "./SearchHistoryPanel";
 import {
   buildSuggestions,
@@ -143,18 +143,18 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
     }, [debouncedSearch, searchText, suggestOpen]);
 
     // Handle enhanced suggestion selection
-    // const handleEnhancedSuggestionSelect = useCallback(
-    //   (suggestion: string, intent?: SearchIntent) => {
-    //     setSearchText(suggestion);
-    //     setCurrentIntent(intent);
-    //     setSuggestOpen(false);
-    //     setActiveIdx(-1);
-    //     setTimeout(() => {
-    //       onSearch(suggestion);
-    //     }, 0);
-    //   },
-    //   [setSearchText, onSearch]
-    // );
+    const handleEnhancedSuggestionSelect = useCallback(
+      (suggestion: string, intent?: SearchIntent) => {
+        setSearchText(suggestion);
+        setCurrentIntent(intent);
+        setSuggestOpen(false);
+        setActiveIdx(-1);
+        setTimeout(() => {
+          onSearch(suggestion);
+        }, 0);
+      },
+      [setSearchText, onSearch]
+    );
 
     const handleSearch = useCallback(
       (text: string) => {
@@ -366,18 +366,17 @@ export const SearchBar = forwardRef<HTMLDivElement, SearchBarProps>(
         {suggestOpen && (
           <div className="suggestions-dropdown" id="suggestions-listbox">
             {useEnhancedSuggestions ? (
-              // <EnhancedSearchSuggestions
-              //   query={searchText}
-              //   onSuggestionSelect={handleEnhancedSuggestionSelect}
-              //   availableTags={allTags}
-              //   availablePeople={clusters
-              //     .map((c) => c.name || "")
-              //     .filter(Boolean)}
-              //   availableLocations={meta.places?.map((p) => String(p)) || []}
-              //   availableCameras={meta.cameras || []}
-              //   className="max-h-96 overflow-y-auto"
-              // />
-              <div>Enhanced suggestions disabled for testing</div>
+              <EnhancedSearchSuggestions
+                query={searchText}
+                onSuggestionSelect={handleEnhancedSuggestionSelect}
+                availableTags={allTags}
+                availablePeople={clusters
+                  .map((c) => c.name || "")
+                  .filter(Boolean)}
+                availableLocations={meta.places?.map((p) => String(p)) || []}
+                availableCameras={meta.cameras || []}
+                className="max-h-96 overflow-y-auto"
+              />
             ) : (
               <>
                 {suggestions.length === 0 ? (

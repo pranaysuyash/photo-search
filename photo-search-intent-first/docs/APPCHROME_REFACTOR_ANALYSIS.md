@@ -70,11 +70,11 @@ Each layer maps to a focused component, letting us ship incremental improvements
 | Document current gaps and success criteria | ✅ Done | Captured in `WEBAPP_STATUS_AND_V3_DIRECTION.md` and this analysis. |
 | Inventory components needing shadcn migration | ✅ Done | `StatusBar`, `StatsBar`, `LibrarySwitcher`, `Collections`, `BottomNavigation`, `SearchBar` called out for Phase 1. |
 | OfflineService retry/backoff design | ✅ Done | Exponential backoff + retry scheduling implemented Oct 2025 (follow-up: expose status hooks/telemetry). |
-| Diagnostics surfacing plan (connection history, model status) | ⚠️ TODO | Need doc + UX wire (tie into future ActivityTray). Track as TODO in `TODO_PLAN.md`. |
-| Offline CI smoke coverage plan | ⚠️ TODO | Define CLI + Playwright jobs; add action items to backlog. |
-| Baseline screenshots/journey capture | ⚠️ TODO | Require Playwright visual harness or manual captures once shell stabilizes; add to checklist. |
+| Diagnostics surfacing plan (connection history, model status) | ▶️ Plan drafted | See `APPCHROME_PHASE0_IMPLEMENTATION_PLAN.md#1`. Needs design sign-off + implementation ticket. |
+| Offline CI smoke coverage plan | ▶️ Plan drafted | See `APPCHROME_PHASE0_IMPLEMENTATION_PLAN.md#2`. Next step: wire into CI. |
+| Baseline screenshots/journey capture | ▶️ Plan drafted | See `APPCHROME_PHASE0_IMPLEMENTATION_PLAN.md#3`. Await Playwright visual harness. |
 | Design/dev workshop scheduling | ✅ Done | Added to Immediate Next Steps; calendar invite pending PM confirmation. |
-| RFC outline for shell extraction | ⚠️ TODO | Outline to be drafted after offline tasks have owners. |
+| RFC outline for shell extraction | ▶️ Outline ready | See `APPCHROME_PHASE0_IMPLEMENTATION_PLAN.md#4`; full RFC to follow. |
 
 ### Phase 1 – Shell Extraction
 - Introduce `LayoutShell`, `NavigationRail`, and `UtilityDock` components driven by existing contexts but rendering side-by-side rather than stacked.

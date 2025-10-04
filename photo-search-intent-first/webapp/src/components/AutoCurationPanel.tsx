@@ -86,6 +86,7 @@ export function AutoCurationPanel({
     maxPhotosPerCollection: 100,
   });
   const [progress, setProgress] = useState<CurationProgress | null>(null);
+  const [showSettings, setShowSettings] = useState<boolean>(false);
   const { toast } = useToast();
 
   const curationEngine = AutoCurationEngine.getInstance(options);
@@ -382,7 +383,7 @@ export function AutoCurationPanel({
             Auto-Curation Engine
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => {}}>
+            <Button variant="outline" size="sm" onClick={() => setShowSettings(!showSettings)}>
               <Settings className="w-4 h-4 mr-2" />
               Options
             </Button>
@@ -393,6 +394,117 @@ export function AutoCurationPanel({
           </div>
         </CardTitle>
       </CardHeader>
+
+      {/* Settings Panel */}
+      {showSettings && (
+        <div className="border-b bg-gray-50 px-6 py-4">
+          <h4 className="text-sm font-medium text-gray-900 mb-3">Auto-Curation Options</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Feature Toggles */}
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="quality-assessment"
+                  checked={options.enableQualityAssessment}
+                  onCheckedChange={(checked) =>
+                    setOptions(prev => ({ ...prev, enableQualityAssessment: checked as boolean }))
+                  }
+                />
+                <label htmlFor="quality-assessment" className="text-sm text-gray-700">
+                  Quality Assessment
+                </label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="duplicate-detection"
+                  checked={options.enableDuplicateDetection}
+                  onCheckedChange={(checked) =>
+                    setOptions(prev => ({ ...prev, enableDuplicateDetection: checked as boolean }))
+                  }
+                />
+                <label htmlFor="duplicate-detection" className="text-sm text-gray-700">
+                  Duplicate Detection
+                </label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="event-detection"
+                  checked={options.enableEventDetection}
+                  onCheckedChange={(checked) =>
+                    setOptions(prev => ({ ...prev, enableEventDetection: checked as boolean }))
+                  }
+                />
+                <label htmlFor="event-detection" className="text-sm text-gray-700">
+                  Event Detection
+                </label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="smart-grouping"
+                  checked={options.enableSmartGrouping}
+                  onCheckedChange={(checked) =>
+                    setOptions(prev => ({ ...prev, enableSmartGrouping: checked as boolean }))
+                  }
+                />
+                <label htmlFor="smart-grouping" className="text-sm text-gray-700">
+                  Smart Grouping
+                </label>
+              </div>
+            </div>
+
+            {/* Threshold Settings */}
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm text-gray-700 block mb-1">
+                  Quality Threshold: {options.qualityThreshold}%
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={options.qualityThreshold}
+                  onChange={(e) =>
+                    setOptions(prev => ({ ...prev, qualityThreshold: Number(e.target.value) }))
+                  }
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-700 block mb-1">
+                  Duplicate Threshold: {options.duplicateThreshold}%
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={options.duplicateThreshold}
+                  onChange={(e) =>
+                    setOptions(prev => ({ ...prev, duplicateThreshold: Number(e.target.value) }))
+                  }
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-700 block mb-1">
+                  Max Photos per Collection: {options.maxPhotosPerCollection}
+                </label>
+                <input
+                  type="range"
+                  min="10"
+                  max="500"
+                  step="10"
+                  value={options.maxPhotosPerCollection}
+                  onChange={(e) =>
+                    setOptions(prev => ({ ...prev, maxPhotosPerCollection: Number(e.target.value) }))
+                  }
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <CardContent>
         {!result ? (
           <div className="text-center py-8">

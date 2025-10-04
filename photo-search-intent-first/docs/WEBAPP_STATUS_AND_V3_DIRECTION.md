@@ -60,11 +60,11 @@ This document captures the current state of the production webapp, identifies ga
 | Deliverable | Status | Owner | Notes |
 | --- | --- | --- | --- |
 | OfflineService backoff + status spec | Done | AI assistant + engineering follow-up | Exponential backoff landed Oct 2025; next step is exposing status telemetry. |
-| Diagnostics telemetry schema & ActivityTray UX | TODO | AI assistant + design | Tie into ActivityTray concept from `APPCHROME_REFACTOR_ANALYSIS.md`. |
-| Offline CI smoke plan (CLI + Playwright) | TODO | AI assistant | Outline to be added to backlog and CI pipeline design. |
+| Diagnostics telemetry schema & ActivityTray UX | Plan drafted | AI assistant + design | See `APPCHROME_PHASE0_IMPLEMENTATION_PLAN.md#1`; implementation tickets pending. |
+| Offline CI smoke plan (CLI + Playwright) | Plan drafted | AI assistant | Steps in `APPCHROME_PHASE0_IMPLEMENTATION_PLAN.md#2`; wire into CI. |
 | Component migration inventory | Done | AI assistant | Targets documented in `APPCHROME_REFACTOR_ANALYSIS.md`. |
-| Baseline journey capture plan | TODO | AI assistant | Decide on Playwright visuals vs. manual captures. |
+| Baseline journey capture plan | Plan drafted | AI assistant | Approach in `APPCHROME_PHASE0_IMPLEMENTATION_PLAN.md#3`. |
 | Design/dev workshop scheduling | In progress | AI assistant | Calendar invite requested; waiting on PM confirmation. |
-| RFC outline for LayoutShell extraction | TODO | AI assistant | Draft after offline tasks have named owners. |
+| RFC outline for LayoutShell extraction | Outline ready | AI assistant | Structure in `APPCHROME_PHASE0_IMPLEMENTATION_PLAN.md#4`; full RFC next. |
 
 Keeping this document updated whenever we land offline fixes or migrate screens into `webapp-v3/` will ensure the team stays aligned on progress toward the modern, offline-first experience.

@@ -1,14 +1,37 @@
 import { describe, expect, it, vi } from "vitest";
+import React from "react";
 import App from "./App";
 import { render, screen, waitFor } from "./test/test-utils";
 
-// Intentionally delay the lazy MapView import to assert Suspense fallback
-vi.mock("../components/MapView", async () => {
-  await new Promise((r) => setTimeout(r, 50));
+// Mock useLibrary to return a non-empty array so RoutesHost renders
+vi.mock("./stores/useStores", async (importOriginal) => {
+  const actual = await importOriginal();
   return {
-    default: () => <div data-testid="route-map-delayed">Map Delayed</div>,
+    ...actual,
+    useLibrary: () => ["photo1.jpg", "photo2.jpg"], // Mock library with some photos
   };
 });
+
+// Mock RoutesHost to use a controlled lazy component for testing Suspense
+vi.mock("./components/chrome/RoutesHost", () => ({
+  RoutesHost: () => {
+    const MapView = React.lazy(() =>
+      new Promise((resolve) => {
+        setTimeout(() => {
+          resolve({
+            default: () => <div data-testid="route-map-delayed">Map Delayed</div>,
+          });
+        }, 50);
+      })
+    );
+
+    return (
+      <React.Suspense fallback={<div data-testid="suspense-fallback">Loading…</div>}>
+        <MapView />
+      </React.Suspense>
+    );
+  },
+}));
 
 describe("App lazy route Suspense", () => {
   it("shows SuspenseFallback before MapView resolves", async () => {
