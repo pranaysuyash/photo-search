@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type RenderOptions, render } from "@testing-library/react";
-import type React from "react";
+import React from "react";
 import { BrowserRouter } from "react-router-dom";
 import { vi } from "vitest";
 import ErrorBoundary from "../components/ErrorBoundary";
@@ -374,35 +374,35 @@ vi.mock("../contexts/domains/SearchOperationsContext", () => ({
 
 // Mock lazy components used in RoutesHost
 vi.mock("../components/MapView", () => ({
-	default: vi.fn(() => null),
+	default: () => <div>MapView</div>,
 }));
 
 vi.mock("../components/SmartDiscovery", () => ({
-	default: vi.fn(() => null),
+	default: () => <div>SmartDiscovery</div>,
 }));
 
 vi.mock("../components/AutoCurationPanel", () => ({
-	default: vi.fn(() => null),
+	default: () => <div>AutoCurationPanel</div>,
 }));
 
 vi.mock("../components/VisualTools", () => ({
-	default: vi.fn(() => null),
+	default: () => <div>VisualTools</div>,
 }));
 
 vi.mock("../components/CollaborativeWorkspace", () => ({
-	default: vi.fn(() => null),
+	default: () => <div>CollaborativeWorkspace</div>,
 }));
 
 vi.mock("../components/SocialSharingModal", () => ({
-	default: vi.fn(() => null),
+	default: () => <div>SocialSharingModal</div>,
 }));
 
 vi.mock("../components/TripsView", () => ({
-	default: vi.fn(() => null),
+	default: () => <div>TripsView</div>,
 }));
 
 vi.mock("../components/VideoManager", () => ({
-	VideoManager: vi.fn(() => null),
+	VideoManager: () => <div>VideoManager</div>,
 }));
 
 // Test wrapper that provides all necessary contexts

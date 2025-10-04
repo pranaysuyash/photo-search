@@ -39,6 +39,8 @@ import {
 	HardDrive,
 } from "lucide-react";
 import { CollectionCard } from "./ui/CollectionCard";
+import { AnalyticsModal } from "./ui/AnalyticsModal";
+import { CollectionContextMenu } from "./ui/CollectionContextMenu";
 import { useCallback, useRef, useState, useEffect, useMemo } from "react";
 import { apiCreateShare, apiExport, apiSetCollection, apiDeleteCollection, thumbUrl } from "../api";
 import { announce } from "../utils/accessibility";
@@ -1629,264 +1631,19 @@ export default function Collections({
 				</div>
 			)}
 
-			{/* Collection Insights Modal */}
-			{showInsights && (
-				<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-					<div className="bg-white rounded-xl shadow-xl max-w-4xl w-full p-6 max-h-[90vh] overflow-y-auto">
-						<div className="flex items-center justify-between mb-6">
-							<div className="flex items-center gap-2">
-								<BarChart3 className="w-6 h-6 text-blue-600" />
-								<h3 className="text-xl font-semibold text-gray-900">Collection Insights & Analytics</h3>
-							</div>
-							<button
-								type="button"
-								onClick={() => setShowInsights(false)}
-								className="text-gray-400 hover:text-gray-600 transition-colors p-1"
-							>
-								<X className="w-5 h-5" />
-							</button>
-						</div>
+			<AnalyticsModal
+				isOpen={showInsights}
+				onClose={() => setShowInsights(false)}
+				insights={getCollectionInsights}
+				collections={collections}
+			/>
 
-						{getCollectionInsights.overview.totalCollections > 0 ? (
-							<div className="space-y-6">
-								{/* Overview Stats */}
-								<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-									<div className="bg-blue-50 p-4 rounded-lg">
-										<div className="flex items-center gap-2 mb-2">
-											<FolderPlus className="w-5 h-5 text-blue-600" />
-											<span className="text-sm font-medium text-blue-600">Collections</span>
-										</div>
-										<div className="text-2xl font-bold text-gray-900">{getCollectionInsights.overview.totalCollections}</div>
-									</div>
-									<div className="bg-green-50 p-4 rounded-lg">
-										<div className="flex items-center gap-2 mb-2">
-											<FileImage className="w-5 h-5 text-green-600" />
-											<span className="text-sm font-medium text-green-600">Total Photos</span>
-										</div>
-										<div className="text-2xl font-bold text-gray-900">{getCollectionInsights.overview.totalPhotos}</div>
-									</div>
-									<div className="bg-purple-50 p-4 rounded-lg">
-										<div className="flex items-center gap-2 mb-2">
-											<TrendingUp className="w-5 h-5 text-purple-600" />
-											<span className="text-sm font-medium text-purple-600">Avg per Collection</span>
-										</div>
-										<div className="text-2xl font-bold text-gray-900">{getCollectionInsights.overview.avgPhotosPerCollection}</div>
-									</div>
-									<div className="bg-orange-50 p-4 rounded-lg">
-										<div className="flex items-center gap-2 mb-2">
-											<HardDrive className="w-5 h-5 text-orange-600" />
-											<span className="text-sm font-medium text-orange-600">Est. Storage</span>
-										</div>
-										<div className="text-2xl font-bold text-gray-900">{getCollectionInsights.overview.totalEstimatedStorage} MB</div>
-									</div>
-								</div>
-
-								{/* Collection Size Analysis */}
-								<div className="bg-gray-50 p-6 rounded-lg">
-									<h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-										<PieChart className="w-5 h-5 text-indigo-600" />
-										Collection Size Analysis
-									</h4>
-									<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-										{getCollectionInsights.collections.largest && (
-											<div>
-												<h5 className="font-medium text-gray-700 mb-2">Largest Collection</h5>
-												<div className="bg-white p-4 rounded border">
-													<div className="font-medium text-gray-900">{getCollectionInsights.collections.largest.name}</div>
-													<div className="text-sm text-gray-600">{getCollectionInsights.collections.largest.count} photos</div>
-													<div className="text-xs text-gray-500">{getCollectionInsights.collections.largest.estimatedSize.toFixed(1)} MB</div>
-												</div>
-											</div>
-										)}
-										{getCollectionInsights.collections.smallest && (
-											<div>
-												<h5 className="font-medium text-gray-700 mb-2">Smallest Collection</h5>
-												<div className="bg-white p-4 rounded border">
-													<div className="font-medium text-gray-900">{getCollectionInsights.collections.smallest.name}</div>
-													<div className="text-sm text-gray-600">{getCollectionInsights.collections.smallest.count} photos</div>
-													<div className="text-xs text-gray-500">{getCollectionInsights.collections.smallest.estimatedSize.toFixed(1)} MB</div>
-												</div>
-											</div>
-										)}
-									</div>
-								</div>
-
-								{/* Top Collections by Size */}
-								<div className="bg-gray-50 p-6 rounded-lg">
-									<h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-										<Activity className="w-5 h-5 text-green-600" />
-										Top Collections by Size
-									</h4>
-									<div className="space-y-2">
-										{getCollectionInsights.collections.sortedBySize.slice(0, 5).map((collection, index) => (
-											<div key={collection.name} className="flex items-center justify-between bg-white p-3 rounded border">
-												<div className="flex items-center gap-3">
-													<span className="text-sm font-medium text-gray-500">#{index + 1}</span>
-													<span className="font-medium text-gray-900">{collection.name}</span>
-												</div>
-												<div className="text-right">
-													<div className="text-sm font-medium text-gray-900">{collection.count} photos</div>
-													<div className="text-xs text-gray-500">{collection.estimatedSize.toFixed(1)} MB</div>
-												</div>
-											</div>
-										))}
-									</div>
-								</div>
-
-								{/* Theme Distribution */}
-								{Object.keys(getCollectionInsights.themes).length > 0 && (
-									<div className="bg-gray-50 p-6 rounded-lg">
-										<h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-											<Palette className="w-5 h-5 text-pink-600" />
-											Theme Distribution
-										</h4>
-										<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-											{Object.entries(getCollectionInsights.themes).map(([theme, count]) => (
-												<div key={theme} className="bg-white p-3 rounded border text-center">
-													<div className="font-medium text-gray-900 capitalize">{theme}</div>
-													<div className="text-sm text-gray-600">{count} collection{count !== 1 ? 's' : ''}</div>
-												</div>
-											))}
-										</div>
-									</div>
-								)}
-
-								{/* Recent Activity */}
-								{getCollectionInsights.recentActivity.length > 0 && (
-									<div className="bg-gray-50 p-6 rounded-lg">
-										<h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-											<Calendar className="w-5 h-5 text-blue-600" />
-											Recent Activity
-										</h4>
-										<div className="space-y-2">
-											{getCollectionInsights.recentActivity.map((collectionName, index) => (
-												<div key={collectionName} className="flex items-center gap-3 bg-white p-3 rounded border">
-													<span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full">Recent</span>
-													<span className="font-medium text-gray-900">{collectionName}</span>
-													<span className="text-sm text-gray-500">({collections[collectionName]?.length || 0} photos)</span>
-												</div>
-											))}
-										</div>
-									</div>
-								)}
-							</div>
-						) : (
-							<div className="text-center py-12">
-								<BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-								<h4 className="text-lg font-medium text-gray-900 mb-2">No Collections Yet</h4>
-								<p className="text-gray-600">Create your first collection to see insights and analytics.</p>
-							</div>
-						)}
-					</div>
-				</div>
-			)}
-
-			{/* Context Menu */}
-			{contextMenu && (
-				<div
-					className="fixed bg-white border border-gray-200 rounded-lg shadow-xl z-50 py-2 min-w-48"
-					style={{
-						left: Math.min(contextMenu.x, window.innerWidth - 200),
-						top: Math.min(contextMenu.y, window.innerHeight - 400),
-					}}
-				>
-					<div className="px-3 py-2 text-xs font-medium text-gray-500 border-b border-gray-100">
-						{contextMenu.collectionName}
-					</div>
-
-					<button
-						type="button"
-						onClick={() => handleContextMenuAction("open", contextMenu.collectionName)}
-						className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-					>
-						<FolderPlus className="w-4 h-4" />
-						Open Collection
-					</button>
-
-					<div className="border-t border-gray-100 my-1" />
-
-					<button
-						type="button"
-						onClick={() => handleContextMenuAction("share", contextMenu.collectionName)}
-						className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-						disabled={!collections[contextMenu.collectionName]?.length}
-					>
-						<Share2 className="w-4 h-4" />
-						Share
-					</button>
-
-					<button
-						type="button"
-						onClick={() => handleContextMenuAction("export", contextMenu.collectionName)}
-						className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-						disabled={!collections[contextMenu.collectionName]?.length}
-					>
-						<Download className="w-4 h-4" />
-						Export
-					</button>
-
-					<div className="border-t border-gray-100 my-1" />
-
-					<button
-						type="button"
-						onClick={() => handleContextMenuAction("theme", contextMenu.collectionName)}
-						className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-					>
-						<Palette className="w-4 h-4" />
-						Change Theme
-					</button>
-
-					<button
-						type="button"
-						onClick={() => handleContextMenuAction("cover", contextMenu.collectionName)}
-						className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-						disabled={!collections[contextMenu.collectionName]?.length}
-					>
-						<Edit2 className="w-4 h-4" />
-						Change Cover
-					</button>
-
-					<button
-						type="button"
-						onClick={() => handleContextMenuAction("rename", contextMenu.collectionName)}
-						className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-					>
-						<Edit3 className="w-4 h-4" />
-						Rename
-					</button>
-
-					<button
-						type="button"
-						onClick={() => handleContextMenuAction("duplicate", contextMenu.collectionName)}
-						className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-					>
-						<Copy className="w-4 h-4" />
-						Duplicate
-					</button>
-
-					<button
-						type="button"
-						onClick={() => handleContextMenuAction("archive", contextMenu.collectionName)}
-						className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-					>
-						<Archive className="w-4 h-4" />
-						Archive
-					</button>
-
-					<div className="border-t border-gray-100 my-1" />
-
-					{onDelete && (
-						<button
-							type="button"
-							onClick={() => handleContextMenuAction("delete", contextMenu.collectionName)}
-							className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-						>
-							<Trash2 className="w-4 h-4" />
-							Delete
-						</button>
-					)}
-				</div>
-			)}
+			<CollectionContextMenu
+				contextMenu={contextMenu}
+				collections={collections}
+				onAction={handleContextMenuAction}
+				showDelete={!!onDelete}
+			/>
 
 			{/* Enhanced drop zone hint */}
 			{selectedPhotos.length > 0 &&
