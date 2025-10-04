@@ -133,6 +133,9 @@ Thumbs.db
 .photo_index/
 .thumbs/
 demo_photos/
+!photo-search-intent-first/webapp/public/demo_photos/
+photo-search-intent-first/webapp/public/demo_photos/*
+!photo-search-intent-first/webapp/public/demo_photos/manifest.json
 testdata_openai/
 e2e_data/
 archive/

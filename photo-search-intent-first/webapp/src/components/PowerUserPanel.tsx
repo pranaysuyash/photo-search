@@ -9,6 +9,10 @@ import {
   CardHeader,
   CardTitle,
 } from "./ui";
+import { useDir } from "../stores";
+import { offlineCapableGetLibrary } from "../api/offline";
+import { enhancedOfflineStorage } from "../services/EnhancedOfflineStorage";
+import { thumbnailGenerator } from "../services/ThumbnailGenerator";
 
 interface PowerUserFeature {
   id: string;
@@ -104,6 +108,9 @@ export function PowerUserPanel({ isOpen, onClose }: PowerUserPanelProps) {
   const [enabledFeatures, setEnabledFeatures] = useState<Set<string>>(
     new Set()
   );
+  const [devMessage, setDevMessage] = useState<string | null>(null);
+  const [devBusy, setDevBusy] = useState(false);
+  const dir = useDir();
 
   const filteredFeatures =
     selectedCategory === "all"
@@ -121,6 +128,50 @@ export function PowerUserPanel({ isOpen, onClose }: PowerUserPanelProps) {
     }
     setEnabledFeatures(newEnabled);
   };
+
+  const runDevAction = async (action: () => Promise<void>) => {
+    if (!import.meta.env.DEV) {
+      return;
+    }
+    setDevBusy(true);
+    try {
+      await action();
+    } finally {
+      setDevBusy(false);
+    }
+  };
+
+  const handleSeedDemoPhotos = () =>
+    runDevAction(async () => {
+      if (!dir) {
+        setDevMessage("Select a library directory before seeding demo photos.");
+        return;
+      }
+      await offlineCapableGetLibrary(dir);
+      setDevMessage("Seeded demo photos into offline cache.");
+    });
+
+  const handleGenerateThumbnails = () =>
+    runDevAction(async () => {
+      if (!dir) {
+        setDevMessage("Select a library directory before generating thumbnails.");
+        return;
+      }
+      const photos = await enhancedOfflineStorage.getAllPhotos();
+      const before = photos.filter((photo) => !photo.thumbnail).length;
+      thumbnailGenerator.enqueueMissing(dir, photos);
+      setDevMessage(
+        before > 0
+          ? `Queued thumbnail generation for ${before} photos.`
+          : "No missing thumbnails detected."
+      );
+    });
+
+  const handleClearOfflineCache = () =>
+    runDevAction(async () => {
+      await enhancedOfflineStorage.clearAll();
+      setDevMessage("Cleared offline cache. Seed again to repopulate.");
+    });
 
   if (!isOpen) return null;
 
@@ -218,6 +269,52 @@ export function PowerUserPanel({ isOpen, onClose }: PowerUserPanelProps) {
               ))}
             </div>
           </div>
+
+          {import.meta.env.DEV && (
+            <div className="border-t bg-muted/40 p-4">
+              <Card className="bg-background/80">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">
+                    Offline Debug Utilities
+                  </CardTitle>
+                  <CardDescription>
+                    Tools to seed demo data, regenerate thumbnails, and clear caches.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3">
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={devBusy}
+                      onClick={handleSeedDemoPhotos}
+                    >
+                      Seed demo photos
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={devBusy}
+                      onClick={handleGenerateThumbnails}
+                    >
+                      Generate missing thumbnails
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      disabled={devBusy}
+                      onClick={handleClearOfflineCache}
+                    >
+                      Clear offline cache
+                    </Button>
+                  </div>
+                  {devMessage && (
+                    <p className="text-sm text-muted-foreground">{devMessage}</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
           {/* Footer */}
           <div className="flex items-center justify-between p-4 border-t bg-muted/50">

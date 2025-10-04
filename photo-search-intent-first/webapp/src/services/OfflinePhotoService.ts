@@ -1,3 +1,9 @@
+import {
+  enhancedOfflineStorage,
+  type OfflinePhotoStorage,
+} from "./EnhancedOfflineStorage";
+import { indexedDBStorage } from "./IndexedDBStorage";
+
 /**
  * Enhanced Offline Photo Service for Mobile PWA
  * Manages photo caching, offline viewing, and sync operations
@@ -9,533 +15,602 @@ import { serviceEnabled } from "../config/logging";
 import { handleError } from "../utils/errors";
 
 export interface PhotoCacheEntry {
-	path: string;
-	thumbnailUrl: string;
-	fullUrl: string;
-	metadata: unknown;
-	cachedAt: number;
-	size: number;
-	priority: "high" | "medium" | "low";
+  path: string;
+  thumbnailUrl: string;
+  fullUrl: string;
+  metadata: unknown;
+  cachedAt: number;
+  size: number;
+  priority: "high" | "medium" | "low";
 }
 
 export interface OfflinePhotoConfig {
-	maxCacheSizeMB?: number;
-	maxCacheEntries?: number;
-	cacheExpirationDays?: number;
-	enableSmartCaching?: boolean;
-	enablePrecaching?: boolean;
+  maxCacheSizeMB?: number;
+  maxCacheEntries?: number;
+  cacheExpirationDays?: number;
+  enableSmartCaching?: boolean;
+  enablePrecaching?: boolean;
 }
 
 const DEFAULT_CONFIG: OfflinePhotoConfig = {
-	maxCacheSizeMB: 500,
-	maxCacheEntries: 1000,
-	cacheExpirationDays: 30,
-	enableSmartCaching: true,
-	enablePrecaching: true,
+  maxCacheSizeMB: 500,
+  maxCacheEntries: 1000,
+  cacheExpirationDays: 30,
+  enableSmartCaching: true,
+  enablePrecaching: true,
 };
 
 export class OfflinePhotoService {
-	private config: OfflinePhotoConfig;
-	private cacheName = "photovault-photos-v1";
-	private metadataCacheName = "photovault-metadata-v1";
-	private dbName = "PhotoVaultOfflineDB";
-	private dbVersion = 1;
-	private db: IDBDatabase | null = null;
-	private syncQueue: Array<() => Promise<void>> = [];
+  private config: OfflinePhotoConfig;
+  private cacheName = "photovault-photos-v1";
+  private metadataCacheName = "photovault-metadata-v1";
+  private dbName = "PhotoVaultOfflineDB";
+  private dbVersion = 1;
+  private db: IDBDatabase | null = null;
+  private syncQueue: Array<() => Promise<void>> = [];
 
-	constructor(config: OfflinePhotoConfig = {}) {
-		this.config = { ...DEFAULT_CONFIG, ...config };
-		this.initializeDatabase();
-	}
+  constructor(config: OfflinePhotoConfig = {}) {
+    this.config = { ...DEFAULT_CONFIG, ...config };
+    this.initializeDatabase();
+  }
 
-	// Initialize IndexedDB for metadata and cache management
-	private async initializeDatabase() {
-		return new Promise<void>((resolve, reject) => {
-			const request = indexedDB.open(this.dbName, this.dbVersion);
+  // Initialize IndexedDB for metadata and cache management
+  private async initializeDatabase() {
+    return new Promise<void>((resolve, reject) => {
+      const request = indexedDB.open(this.dbName, this.dbVersion);
 
-			request.onerror = () => reject(request.error);
-			request.onsuccess = () => {
-				this.db = request.result;
-				resolve();
-			};
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        this.db = request.result;
+        resolve();
+      };
 
-			request.onupgradeneeded = (event) => {
-				const db = (event.target as IDBOpenDBRequest).result;
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
 
-				// Photo cache store
-				if (!db.objectStoreNames.contains("photoCache")) {
-					const photoStore = db.createObjectStore("photoCache", {
-						keyPath: "path",
-					});
-					photoStore.createIndex("cachedAt", "cachedAt", { unique: false });
-					photoStore.createIndex("priority", "priority", { unique: false });
-					photoStore.createIndex("size", "size", { unique: false });
-				}
+        // Photo cache store
+        if (!db.objectStoreNames.contains("photoCache")) {
+          const photoStore = db.createObjectStore("photoCache", {
+            keyPath: "path",
+          });
+          photoStore.createIndex("cachedAt", "cachedAt", { unique: false });
+          photoStore.createIndex("priority", "priority", { unique: false });
+          photoStore.createIndex("size", "size", { unique: false });
+        }
 
-				// Sync queue store
-				if (!db.objectStoreNames.contains("syncQueue")) {
-					db.createObjectStore("syncQueue", {
-						keyPath: "id",
-						autoIncrement: true,
-					});
-				}
+        // Sync queue store
+        if (!db.objectStoreNames.contains("syncQueue")) {
+          db.createObjectStore("syncQueue", {
+            keyPath: "id",
+            autoIncrement: true,
+          });
+        }
 
-				// Offline actions store
-				if (!db.objectStoreNames.contains("offlineActions")) {
-					db.createObjectStore("offlineActions", {
-						keyPath: "id",
-						autoIncrement: true,
-					});
-				}
-			};
-		});
-	}
+        // Offline actions store
+        if (!db.objectStoreNames.contains("offlineActions")) {
+          db.createObjectStore("offlineActions", {
+            keyPath: "id",
+            autoIncrement: true,
+          });
+        }
+      };
+    });
+  }
 
-	// Cache photo with different sizes
-	async cachePhoto(
-		path: string,
-		priority: "high" | "medium" | "low" = "medium",
-	) {
-		try {
-			// Check if already cached
-			if (await this.isPhotoCached(path)) {
-				return;
-			}
+  // Cache photo with different sizes
+  async cachePhoto(
+    path: string,
+    priority: "high" | "medium" | "low" = "medium"
+  ) {
+    try {
+      // Check if already cached
+      if (await this.isPhotoCached(path)) {
+        return;
+      }
 
-			// Get photo URLs
-			const thumbnailUrl = `${API_BASE}/api/thumb/${encodeURIComponent(
-				path,
-			)}?size=400`;
-			const fullUrl = `${API_BASE}/api/media/${encodeURIComponent(path)}`;
+      // Get photo URLs
+      const thumbnailUrl = `${API_BASE}/api/thumb/${encodeURIComponent(
+        path
+      )}?size=400`;
+      const fullUrl = `${API_BASE}/api/media/${encodeURIComponent(path)}`;
 
-			// Cache thumbnail
-			const thumbnailCache = await caches.open(this.cacheName);
-			await thumbnailCache.add(thumbnailUrl);
+      // Cache thumbnail
+      const thumbnailCache = await caches.open(this.cacheName);
+      await thumbnailCache.add(thumbnailUrl);
 
-			// Cache full image if high priority or space allows
-			if (priority === "high" || (await this.hasCacheSpace())) {
-				await thumbnailCache.add(fullUrl);
-			}
+      // Cache full image if high priority or space allows
+      if (priority === "high" || (await this.hasCacheSpace())) {
+        await thumbnailCache.add(fullUrl);
+      }
 
-			// Store metadata in IndexedDB
-			const entry: PhotoCacheEntry = {
-				path,
-				thumbnailUrl,
-				fullUrl,
-				metadata: {}, // Will be populated separately
-				cachedAt: Date.now(),
-				size: 0, // Will be calculated from cache storage
-				priority,
-			};
+      // Store metadata in IndexedDB
+      const entry: PhotoCacheEntry = {
+        path,
+        thumbnailUrl,
+        fullUrl,
+        metadata: {}, // Will be populated separately
+        cachedAt: Date.now(),
+        size: 0, // Will be calculated from cache storage
+        priority,
+      };
 
-			await this.storeCacheEntry(entry);
+      await this.storeCacheEntry(entry);
 
-			console.log(`[OfflinePhotoService] Cached photo: ${path}`);
-		} catch (error) {
-			console.error(
-				`[OfflinePhotoService] Failed to cache photo: ${path}`,
-				error,
-			);
-			if (serviceEnabled("offlinePhoto")) {
-				handleError(error, {
-					logToServer: true,
-					logToConsole: false,
-					context: {
-						action: "offline_cache_photo",
-						component: "OfflinePhotoService.cachePhoto",
-						metadata: { path },
-					},
-				});
-			}
-		}
-	}
+      // Also store in EnhancedOfflineStorage for unified access
+      const offlinePhoto: OfflinePhotoStorage = {
+        id: path,
+        path,
+        thumbnail: thumbnailUrl,
+        cachedAt: Date.now(),
+        lastAccessed: Date.now(),
+      };
+      await enhancedOfflineStorage.storePhoto(offlinePhoto);
 
-	// Cache multiple photos efficiently
-	async cachePhotos(
-		photos: Array<{ path: string; priority?: "high" | "medium" | "low" }>,
-	) {
-		const cachePromises = photos.map((photo) =>
-			this.cachePhoto(photo.path, photo.priority || "medium"),
-		);
+      console.log(`[OfflinePhotoService] Cached photo: ${path}`);
+    } catch (error) {
+      console.error(
+        `[OfflinePhotoService] Failed to cache photo: ${path}`,
+        error
+      );
+      if (serviceEnabled("offlinePhoto")) {
+        handleError(error, {
+          logToServer: true,
+          logToConsole: false,
+          context: {
+            action: "offline_cache_photo",
+            component: "OfflinePhotoService.cachePhoto",
+            metadata: { path },
+          },
+        });
+      }
+    }
+  }
 
-		// Batch process to avoid overwhelming the cache
-		const batchSize = 5;
-		for (let i = 0; i < cachePromises.length; i += batchSize) {
-			const batch = cachePromises.slice(i, i + batchSize);
-			await Promise.all(batch);
+  // Cache multiple photos efficiently
+  async cachePhotos(
+    photos: Array<{ path: string; priority?: "high" | "medium" | "low" }>
+  ) {
+    const cachePromises = photos.map((photo) =>
+      this.cachePhoto(photo.path, photo.priority || "medium")
+    );
 
-			// Small delay between batches
-			await new Promise((resolve) => setTimeout(resolve, 100));
-		}
-	}
+    // Batch process to avoid overwhelming the cache
+    const batchSize = 5;
+    for (let i = 0; i < cachePromises.length; i += batchSize) {
+      const batch = cachePromises.slice(i, i + batchSize);
+      await Promise.all(batch);
 
-	// Get cached photo URL (returns blob URL for offline access)
-	async getCachedPhotoUrl(
-		path: string,
-		size: "thumbnail" | "full" = "thumbnail",
-	): Promise<string | null> {
-		try {
-			const cache = await caches.open(this.cacheName);
-			const url =
-				size === "thumbnail"
-					? `${API_BASE}/api/thumb/${encodeURIComponent(path)}?size=400`
-					: `${API_BASE}/api/media/${encodeURIComponent(path)}`;
+      // Small delay between batches
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
 
-			const response = await cache.match(url);
-			if (response) {
-				const blob = await response.blob();
-				return URL.createObjectURL(blob);
-			}
-		} catch (error) {
-			console.error(
-				`[OfflinePhotoService] Failed to get cached photo: ${path}`,
-				error,
-			);
-			if (serviceEnabled("offlinePhoto")) {
-				handleError(error, {
-					logToServer: true,
-					logToConsole: false,
-					context: {
-						action: "offline_get_cached_photo",
-						component: "OfflinePhotoService.getCachedPhotoUrl",
-						metadata: { path, size },
-					},
-				});
-			}
-		}
-		return null;
-	}
+  // Get cached photo URL (returns blob URL for offline access)
+  async getCachedPhotoUrl(
+    path: string,
+    size: "thumbnail" | "full" = "thumbnail"
+  ): Promise<string | null> {
+    try {
+      const cache = await caches.open(this.cacheName);
+      const url =
+        size === "thumbnail"
+          ? `${API_BASE}/api/thumb/${encodeURIComponent(path)}?size=400`
+          : `${API_BASE}/api/media/${encodeURIComponent(path)}`;
 
-	// Check if photo is cached
-	async isPhotoCached(path: string): Promise<boolean> {
-		try {
-			const db = this.db;
-			if (!db) return false;
+      const response = await cache.match(url);
+      if (response) {
+        const blob = await response.blob();
+        return URL.createObjectURL(blob);
+      }
+    } catch (error) {
+      console.error(
+        `[OfflinePhotoService] Failed to get cached photo: ${path}`,
+        error
+      );
+      if (serviceEnabled("offlinePhoto")) {
+        handleError(error, {
+          logToServer: true,
+          logToConsole: false,
+          context: {
+            action: "offline_get_cached_photo",
+            component: "OfflinePhotoService.getCachedPhotoUrl",
+            metadata: { path, size },
+          },
+        });
+      }
+    }
+    return null;
+  }
 
-			const transaction = db.transaction(["photoCache"], "readonly");
-			const store = transaction.objectStore("photoCache");
-			const request = store.get(path);
+  // Check if photo is cached
+  async isPhotoCached(path: string): Promise<boolean> {
+    try {
+      const db = this.db;
+      if (!db) return false;
 
-			return new Promise((resolve) => {
-				request.onsuccess = () => resolve(!!request.result);
-				request.onerror = () => resolve(false);
-			});
-		} catch {
-			return false;
-		}
-	}
+      const transaction = db.transaction(["photoCache"], "readonly");
+      const store = transaction.objectStore("photoCache");
+      const request = store.get(path);
 
-	// Store cache entry in IndexedDB
-	private async storeCacheEntry(entry: PhotoCacheEntry) {
-		const db = this.db;
-		if (!db) return;
+      return new Promise((resolve) => {
+        request.onsuccess = () => resolve(!!request.result);
+        request.onerror = () => resolve(false);
+      });
+    } catch {
+      return false;
+    }
+  }
 
-		const transaction = db.transaction(["photoCache"], "readwrite");
-		const store = transaction.objectStore("photoCache");
-		store.put(entry);
-	}
+  // Store cache entry in IndexedDB
+  private async storeCacheEntry(entry: PhotoCacheEntry) {
+    const db = this.db;
+    if (!db) return;
 
-	// Check if there's space in cache
-	private async hasCacheSpace(): Promise<boolean> {
-		try {
-			const db = this.db;
-			if (!db) return false;
+    const transaction = db.transaction(["photoCache"], "readwrite");
+    const store = transaction.objectStore("photoCache");
+    store.put(entry);
+  }
 
-			const transaction = db.transaction(["photoCache"], "readonly");
-			const store = transaction.objectStore("photoCache");
-			const request = store.getAll();
+  // Check if there's space in cache
+  private async hasCacheSpace(): Promise<boolean> {
+    try {
+      const db = this.db;
+      if (!db) return false;
 
-			return new Promise((resolve) => {
-				request.onsuccess = () => {
-					const entries = request.result as PhotoCacheEntry[];
-					const totalSize = entries.reduce(
-						(sum, entry) => sum + (entry.size || 0),
-						0,
-					);
-					const maxSizeBytes = this.config.maxCacheSizeMB! * 1024 * 1024;
-					resolve(
-						totalSize < maxSizeBytes &&
-							entries.length < this.config.maxCacheEntries!,
-					);
-				};
-				request.onerror = () => resolve(false);
-			});
-		} catch {
-			return false;
-		}
-	}
+      const transaction = db.transaction(["photoCache"], "readonly");
+      const store = transaction.objectStore("photoCache");
+      const request = store.getAll();
 
-	// Clean up old cache entries
-	async cleanupCache() {
-		try {
-			const db = this.db;
-			if (!db) return;
+      return new Promise((resolve) => {
+        request.onsuccess = () => {
+          const entries = request.result as PhotoCacheEntry[];
+          const totalSize = entries.reduce(
+            (sum, entry) => sum + (entry.size || 0),
+            0
+          );
+          const maxSizeBytes = this.config.maxCacheSizeMB! * 1024 * 1024;
+          resolve(
+            totalSize < maxSizeBytes &&
+              entries.length < this.config.maxCacheEntries!
+          );
+        };
+        request.onerror = () => resolve(false);
+      });
+    } catch {
+      return false;
+    }
+  }
 
-			const transaction = db.transaction(["photoCache"], "readwrite");
-			const store = transaction.objectStore("photoCache");
-			const request = store.getAll();
+  // Clean up old cache entries
+  async cleanupCache() {
+    try {
+      const db = this.db;
+      if (!db) return;
 
-			return new Promise<void>((resolve) => {
-				request.onsuccess = async () => {
-					const entries = request.result as PhotoCacheEntry[];
-					const now = Date.now();
-					const expirationTime =
-						this.config.cacheExpirationDays! * 24 * 60 * 60 * 1000;
+      const transaction = db.transaction(["photoCache"], "readwrite");
+      const store = transaction.objectStore("photoCache");
+      const request = store.getAll();
 
-					const cache = await caches.open(this.cacheName);
+      return new Promise<void>((resolve) => {
+        request.onsuccess = async () => {
+          const entries = request.result as PhotoCacheEntry[];
+          const now = Date.now();
+          const expirationTime =
+            this.config.cacheExpirationDays! * 24 * 60 * 60 * 1000;
 
-					for (const entry of entries) {
-						if (now - entry.cachedAt > expirationTime) {
-							// Remove from cache storage
-							await cache.delete(entry.thumbnailUrl);
-							await cache.delete(entry.fullUrl);
+          const cache = await caches.open(this.cacheName);
 
-							// Remove from IndexedDB
-							store.delete(entry.path);
-						}
-					}
+          for (const entry of entries) {
+            if (now - entry.cachedAt > expirationTime) {
+              // Remove from cache storage
+              await cache.delete(entry.thumbnailUrl);
+              await cache.delete(entry.fullUrl);
 
-					resolve();
-				};
-				request.onerror = () => resolve();
-			});
-		} catch (error) {
-			console.error("[OfflinePhotoService] Cache cleanup failed:", error);
-			if (serviceEnabled("offlinePhoto")) {
-				handleError(error, {
-					logToServer: true,
-					logToConsole: false,
-					context: {
-						action: "offline_cache_cleanup",
-						component: "OfflinePhotoService.cleanupCache",
-					},
-				});
-			}
-		}
-	}
+              // Remove from IndexedDB
+              store.delete(entry.path);
+            }
+          }
 
-	// Get offline photo metadata
-	async getOfflineMetadata(path: string): Promise<unknown | null> {
-		try {
-			const db = this.db;
-			if (!db) return null;
+          resolve();
+        };
+        request.onerror = () => resolve();
+      });
+    } catch (error) {
+      console.error("[OfflinePhotoService] Cache cleanup failed:", error);
+      if (serviceEnabled("offlinePhoto")) {
+        handleError(error, {
+          logToServer: true,
+          logToConsole: false,
+          context: {
+            action: "offline_cache_cleanup",
+            component: "OfflinePhotoService.cleanupCache",
+          },
+        });
+      }
+    }
+  }
 
-			const transaction = db.transaction(["photoCache"], "readonly");
-			const store = transaction.objectStore("photoCache");
-			const request = store.get(path);
+  // Get offline photo metadata
+  async getOfflineMetadata(path: string): Promise<unknown | null> {
+    try {
+      const db = this.db;
+      if (!db) return null;
 
-			return new Promise((resolve) => {
-				request.onsuccess = () => {
-					const entry = request.result as PhotoCacheEntry;
-					resolve(entry?.metadata || null);
-				};
-				request.onerror = () => resolve(null);
-			});
-		} catch {
-			return null;
-		}
-	}
+      const transaction = db.transaction(["photoCache"], "readonly");
+      const store = transaction.objectStore("photoCache");
+      const request = store.get(path);
 
-	// Store offline action for sync when online
-	async queueOfflineAction(action: Record<string, unknown>) {
-		try {
-			const db = this.db;
-			if (!db) return;
+      return new Promise((resolve) => {
+        request.onsuccess = () => {
+          const entry = request.result as PhotoCacheEntry;
+          resolve(entry?.metadata || null);
+        };
+        request.onerror = () => resolve(null);
+      });
+    } catch {
+      return null;
+    }
+  }
 
-			const transaction = db.transaction(["offlineActions"], "readwrite");
-			const store = transaction.objectStore("offlineActions");
-			store.put(Object.assign({}, action, { timestamp: Date.now() }));
-		} catch (error) {
-			console.error(
-				"[OfflinePhotoService] Failed to queue offline action:",
-				error,
-			);
-		}
-	}
+  // Store offline action for sync when online
+  async queueOfflineAction(action: Record<string, unknown>) {
+    try {
+      const db = this.db;
+      if (!db) return;
 
-	// Sync offline actions when back online
-	async syncOfflineActions(): Promise<number> {
-		try {
-			const db = this.db;
-			if (!db) return 0;
+      const transaction = db.transaction(["offlineActions"], "readwrite");
+      const store = transaction.objectStore("offlineActions");
+      store.put(Object.assign({}, action, { timestamp: Date.now() }));
+    } catch (error) {
+      console.error(
+        "[OfflinePhotoService] Failed to queue offline action:",
+        error
+      );
+    }
+  }
 
-			const transaction = db.transaction(["offlineActions"], "readonly");
-			const store = transaction.objectStore("offlineActions");
-			const request = store.getAll();
+  // Sync offline actions when back online
+  async syncOfflineActions(): Promise<number> {
+    try {
+      const db = this.db;
+      if (!db) return 0;
 
-			return new Promise(async (resolve) => {
-				request.onsuccess = async () => {
-					const actions = request.result;
-					let syncedCount = 0;
+      const transaction = db.transaction(["offlineActions"], "readonly");
+      const store = transaction.objectStore("offlineActions");
+      const request = store.getAll();
 
-					for (const action of actions) {
-						try {
-							// Process each action
-							await this.processOfflineAction(action);
-							syncedCount++;
+      return new Promise(async (resolve) => {
+        request.onsuccess = async () => {
+          const actions = request.result;
+          let syncedCount = 0;
 
-							// Remove from queue
-							const deleteTransaction = db.transaction(
-								["offlineActions"],
-								"readwrite",
-							);
-							const deleteStore =
-								deleteTransaction.objectStore("offlineActions");
-							deleteStore.delete(action.id);
-						} catch (error) {
-							console.error(
-								"[OfflinePhotoService] Failed to sync action:",
-								error,
-							);
-							if (serviceEnabled("offlinePhoto")) {
-								handleError(error, {
-									logToServer: true,
-									logToConsole: false,
-									context: {
-										action: "offline_sync_action",
-										component: "OfflinePhotoService.syncOfflineActions",
-									},
-								});
-							}
-						}
-					}
+          for (const action of actions) {
+            try {
+              // Process each action
+              await this.processOfflineAction(action);
+              syncedCount++;
 
-					resolve(syncedCount);
-				};
-				request.onerror = () => resolve(0);
-			});
-		} catch {
-			return 0;
-		}
-	}
+              // Remove from queue
+              const deleteTransaction = db.transaction(
+                ["offlineActions"],
+                "readwrite"
+              );
+              const deleteStore =
+                deleteTransaction.objectStore("offlineActions");
+              deleteStore.delete(action.id);
+            } catch (error) {
+              console.error(
+                "[OfflinePhotoService] Failed to sync action:",
+                error
+              );
+              if (serviceEnabled("offlinePhoto")) {
+                handleError(error, {
+                  logToServer: true,
+                  logToConsole: false,
+                  context: {
+                    action: "offline_sync_action",
+                    component: "OfflinePhotoService.syncOfflineActions",
+                  },
+                });
+              }
+            }
+          }
 
-	private async processOfflineAction(action: any) {
-		// Process different types of offline actions
-		switch (action.type) {
-			case "favorite":
-				// Handle offline favorite action
-				break;
-			case "tag":
-				// Handle offline tag action
-				break;
-			case "rating":
-				// Handle offline rating action
-				break;
-			default:
-				console.warn(
-					"[OfflinePhotoService] Unknown offline action type:",
-					action?.type,
-				);
-		}
-	}
+          resolve(syncedCount);
+        };
+        request.onerror = () => resolve(0);
+      });
+    } catch {
+      return 0;
+    }
+  }
 
-	// Get cache statistics
-	async getCacheStats(): Promise<{
-		totalPhotos: number;
-		totalSizeMB: number;
-		cacheHitRate: number;
-		oldestEntry: number;
-		newestEntry: number;
-	}> {
-		try {
-			const db = this.db;
-			if (!db) {
-				return {
-					totalPhotos: 0,
-					totalSizeMB: 0,
-					cacheHitRate: 0,
-					oldestEntry: 0,
-					newestEntry: 0,
-				};
-			}
+  private async processOfflineAction(action: any) {
+    // Process different types of offline actions
+    switch (action.type) {
+      case "favorite":
+        // Handle offline favorite action
+        break;
+      case "tag":
+        // Handle offline tag action
+        break;
+      case "rating":
+        // Handle offline rating action
+        break;
+      default:
+        console.warn(
+          "[OfflinePhotoService] Unknown offline action type:",
+          action?.type
+        );
+    }
+  }
 
-			const transaction = db.transaction(["photoCache"], "readonly");
-			const store = transaction.objectStore("photoCache");
-			const request = store.getAll();
+  // Get cache statistics
+  async getCacheStats(): Promise<{
+    totalPhotos: number;
+    totalSizeMB: number;
+    cacheHitRate: number;
+    oldestEntry: number;
+    newestEntry: number;
+  }> {
+    try {
+      const db = this.db;
+      if (!db) {
+        return {
+          totalPhotos: 0,
+          totalSizeMB: 0,
+          cacheHitRate: 0,
+          oldestEntry: 0,
+          newestEntry: 0,
+        };
+      }
 
-			return new Promise((resolve) => {
-				request.onsuccess = () => {
-					const entries = request.result as PhotoCacheEntry[];
+      const transaction = db.transaction(["photoCache"], "readonly");
+      const store = transaction.objectStore("photoCache");
+      const request = store.getAll();
 
-					if (entries.length === 0) {
-						resolve({
-							totalPhotos: 0,
-							totalSizeMB: 0,
-							cacheHitRate: 0,
-							oldestEntry: 0,
-							newestEntry: 0,
-						});
-						return;
-					}
+      return new Promise((resolve) => {
+        request.onsuccess = () => {
+          const entries = request.result as PhotoCacheEntry[];
 
-					const totalSize = entries.reduce(
-						(sum, entry) => sum + (entry.size || 0),
-						0,
-					);
-					const cachedAts = entries.map((e) => e.cachedAt);
+          if (entries.length === 0) {
+            resolve({
+              totalPhotos: 0,
+              totalSizeMB: 0,
+              cacheHitRate: 0,
+              oldestEntry: 0,
+              newestEntry: 0,
+            });
+            return;
+          }
 
-					resolve({
-						totalPhotos: entries.length,
-						totalSizeMB: totalSize / (1024 * 1024),
-						cacheHitRate: 0, // Would need to track hits
-						oldestEntry: Math.min(...cachedAts),
-						newestEntry: Math.max(...cachedAts),
-					});
-				};
-				request.onerror = () => {
-					resolve({
-						totalPhotos: 0,
-						totalSizeMB: 0,
-						cacheHitRate: 0,
-						oldestEntry: 0,
-						newestEntry: 0,
-					});
-				};
-			});
-		} catch {
-			return {
-				totalPhotos: 0,
-				totalSizeMB: 0,
-				cacheHitRate: 0,
-				oldestEntry: 0,
-				newestEntry: 0,
-			};
-		}
-	}
+          const totalSize = entries.reduce(
+            (sum, entry) => sum + (entry.size || 0),
+            0
+          );
+          const cachedAts = entries.map((e) => e.cachedAt);
+
+          resolve({
+            totalPhotos: entries.length,
+            totalSizeMB: totalSize / (1024 * 1024),
+            cacheHitRate: 0, // Would need to track hits
+            oldestEntry: Math.min(...cachedAts),
+            newestEntry: Math.max(...cachedAts),
+          });
+        };
+        request.onerror = () => {
+          resolve({
+            totalPhotos: 0,
+            totalSizeMB: 0,
+            cacheHitRate: 0,
+            oldestEntry: 0,
+            newestEntry: 0,
+          });
+        };
+      });
+    } catch {
+      return {
+        totalPhotos: 0,
+        totalSizeMB: 0,
+        cacheHitRate: 0,
+        oldestEntry: 0,
+        newestEntry: 0,
+      };
+    }
+  }
+
+  // Get all photos from EnhancedOfflineStorage
+  async getAllOfflinePhotos(): Promise<OfflinePhotoStorage[]> {
+    try {
+      return await enhancedOfflineStorage.getAllPhotos();
+    } catch (error) {
+      console.error(
+        "[OfflinePhotoService] Failed to get all offline photos:",
+        error
+      );
+      return [];
+    }
+  }
+
+  // Store a photo in EnhancedOfflineStorage
+  async storeOfflinePhoto(photo: OfflinePhotoStorage): Promise<void> {
+    try {
+      await enhancedOfflineStorage.storePhoto(photo);
+    } catch (error) {
+      console.error(
+        "[OfflinePhotoService] Failed to store offline photo:",
+        error
+      );
+      throw error;
+    }
+  }
+
+  // Get a specific photo from EnhancedOfflineStorage
+  async getOfflinePhoto(id: string): Promise<OfflinePhotoStorage | undefined> {
+    try {
+      return await enhancedOfflineStorage.getPhoto(id);
+    } catch (error) {
+      console.error(
+        "[OfflinePhotoService] Failed to get offline photo:",
+        error
+      );
+      return undefined;
+    }
+  }
+
+  // Store a thumbnail in IndexedDB
+  async storeThumbnail(path: string, blob: Blob): Promise<void> {
+    try {
+      await indexedDBStorage.storeThumbnail(path, blob);
+    } catch (error) {
+      console.error("[OfflinePhotoService] Failed to store thumbnail:", error);
+      throw error;
+    }
+  }
+
+  // Get a thumbnail from IndexedDB
+  async getThumbnail(path: string): Promise<Blob | null> {
+    try {
+      return await indexedDBStorage.getThumbnail(path);
+    } catch (error) {
+      console.error("[OfflinePhotoService] Failed to get thumbnail:", error);
+      return null;
+    }
+  }
 }
 
 // React hook for easy integration
 export function useOfflinePhotos() {
-	const [offlineService] = React.useState(() => new OfflinePhotoService());
-	const [isOnline, setIsOnline] = React.useState(navigator.onLine);
-	const [cacheStats, setCacheStats] = React.useState<unknown>(null);
+  const [offlineService] = React.useState(() => new OfflinePhotoService());
+  const [isOnline, setIsOnline] = React.useState(navigator.onLine);
+  const [cacheStats, setCacheStats] = React.useState<unknown>(null);
 
-	React.useEffect(() => {
-		const handleOnline = () => {
-			setIsOnline(true);
-			// Sync offline actions when back online
-			offlineService.syncOfflineActions();
-		};
+  React.useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      // Sync offline actions when back online
+      offlineService.syncOfflineActions();
+    };
 
-		const handleOffline = () => setIsOnline(false);
+    const handleOffline = () => setIsOnline(false);
 
-		window.addEventListener("online", handleOnline);
-		window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
 
-		// Get initial cache stats
-		offlineService.getCacheStats().then(setCacheStats);
+    // Get initial cache stats
+    offlineService.getCacheStats().then(setCacheStats);
 
-		return () => {
-			window.removeEventListener("online", handleOnline);
-			window.removeEventListener("offline", handleOffline);
-		};
-	}, [offlineService]);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [offlineService]);
 
-	return {
-		offlineService,
-		isOnline,
-		cacheStats,
-	};
+  return {
+    offlineService,
+    isOnline,
+    cacheStats,
+  };
 }
 
 export const offlinePhotoService = new OfflinePhotoService();

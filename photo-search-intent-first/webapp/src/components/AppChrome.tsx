@@ -6,7 +6,6 @@ import {
 	Suspense,
 	useEffect,
 	useMemo,
-	useRef,
 	useState,
 } from "react";
 import type { Location, NavigateFunction } from "react-router-dom";
@@ -77,6 +76,7 @@ import {
 import { AppShell } from "./AppShell";
 import { BottomNavigation } from "./BottomNavigation";
 import { ContextualHelp } from "./ContextualHelp";
+import { useJobMetrics } from "../hooks/useJobMetrics";
 import { ContextualModalProvider } from "./ContextualModalSystem";
 import { AuthTokenBar } from "./chrome/AuthTokenBar";
 import { JobsFab } from "./chrome/JobsFab";
@@ -266,33 +266,7 @@ export function AppChrome({
 	const isShareRoute = isSharePath(pathname);
 	const isMobileTestRoute = isMobileTestPath(pathname);
 	const jobsForFab = jobsContext.state.jobs;
-	const jobsFabStatsRecomputeCounterRef = useRef(0);
-	const jobsFabStats = useMemo(() => {
-		jobsFabStatsRecomputeCounterRef.current += 1;
-		const activeJobs = jobsForFab.filter(
-			(job) => job.status === "running" || job.status === "paused",
-		);
-		const indexingJobs = jobsForFab.filter((job) => job.type === "index");
-		const indexingActive = indexingJobs.some(
-			(job) => job.status === "running" || job.status === "paused",
-		);
-		const avgProgress = indexingJobs.length
-			? indexingJobs.reduce((sum, job) => sum + (job.progress || 0), 0) /
-				indexingJobs.length
-			: undefined;
-		const snapshot = {
-			activeJobsCount: activeJobs.length,
-			indexingActive,
-			indexingProgress: avgProgress,
-		};
-		if (isTestMode) {
-			const tw = window as TestWindow;
-			tw.__JOBS_FAB_STATS__ = snapshot;
-			tw.__JOBS_FAB_STATS_RECOMPUTES__ =
-				jobsFabStatsRecomputeCounterRef.current;
-		}
-		return snapshot;
-	}, [jobsForFab]);
+	const jobMetrics = useJobMetrics(jobsForFab);
 	// Enhanced onboarding state
 	const {
 		shouldShowOnboarding: shouldShowEnhancedOnboarding,
@@ -1000,9 +974,9 @@ export function AppChrome({
 								/>
 
 								<JobsFab
-									activeJobs={jobsFabStats.activeJobsCount}
-									isIndexing={jobsFabStats.indexingActive}
-									progressPct={jobsFabStats.indexingProgress}
+									activeJobs={jobMetrics.activeJobsCount}
+									isIndexing={jobMetrics.indexingActive}
+									progressPct={jobMetrics.indexingProgress}
 									onOpenJobs={modalControls.openJobs}
 								/>
 

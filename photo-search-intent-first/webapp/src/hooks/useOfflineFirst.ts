@@ -3,38 +3,7 @@
  * Provides immediate UI response with cached data, followed by fresh results when available
  */
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-	offlineCapableGetLibrary,
-	offlineCapableGetMetadata,
-	offlineCapableSearch,
-} from "../api/offline";
-import { search } from "../api/search";
-import { type SearchParams, SearchResponse } from "../api/types";
-import {
-	useCamera,
-	useCaptionsEnabled,
-	useDir,
-	useEngine,
-	useFastIndexEnabled,
-	useFastKind,
-	useFavOnly,
-	useFMax,
-	useFMin,
-	useHasText,
-	useHfToken,
-	useIsoMax,
-	useIsoMin,
-	useOcrEnabled,
-	useOpenaiKey,
-	usePhotoActions,
-	usePlace,
-	useTagFilter,
-	useTopK,
-	useUIActions,
-} from "../stores";
-import { expandSynonyms } from "../utils/searchSynonyms";
+import type { PhotoMeta } from "../models/PhotoMeta";
 
 // Types for offline-first search results
 interface OfflineFirstSearchResult {
@@ -185,6 +154,8 @@ export function useOfflineFirstSearch() {
 				uiActions.setBusy("Searching...");
 				setIsRefreshing(true);
 
+				const isOnline = offlineService.getStatus();
+
 				// Try to get cached results first
 				const cachedResults = await offlineCapableSearch(
 					dir,
@@ -213,6 +184,11 @@ export function useOfflineFirstSearch() {
 				} else {
 					setIsCachedResult(false);
 					setCacheHit(false);
+				}
+
+				if (!isOnline) {
+					setIsRefreshing(false);
+					return;
 				}
 
 				// Now perform online search for fresh results
@@ -556,7 +532,7 @@ export function useOfflineFirstLibrary() {
 // Hook for getting photo metadata with offline-first approach
 export function useOfflineFirstMetadata(photoPath: string) {
 	const dir = useDir();
-	const [metadata, setMetadata] = useState<unknown>(null);
+	const [metadata, setMetadata] = useState<PhotoMeta | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
 	const [isCached, setIsCached] = useState(false);
 	const [error, setError] = useState<string | null>(null);

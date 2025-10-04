@@ -218,6 +218,7 @@ export function TopBar({
 		<div
 			className="top-bar bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-700/50"
 			aria-busy={busy || undefined}
+			data-view={selectedView}
 		>
 			{/* Busy progress bar */}
 			{busy && (

@@ -73,7 +73,7 @@ export function ContextualHelp({
 		: helpContent.content.slice(0, 2);
 
 	return (
-		<div className="fixed bottom-4 right-4 z-50 max-w-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4">
+		<div className="fixed bottom-4 right-4 z-50 max-w-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4" data-help-context={context}>
 			<div className="flex items-start justify-between mb-3">
 				<h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
 					{helpContent.title}

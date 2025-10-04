@@ -3,12 +3,14 @@
  * Uses react-window for efficient rendering of thumbnails
  */
 
-import { memo, useCallback, useMemo } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CellComponentProps } from "react-window";
 import { Grid } from "react-window";
 import { useOfflineFirstMetadata } from "../hooks/useOfflineFirst";
 import type { PhotoMeta } from "../models/PhotoMeta";
-import { Badge, Card, CardContent, NoPhotosEmpty, Skeleton } from "./ui";
+import { Badge, NoPhotosEmpty, Skeleton } from "./ui";
+import { resolveThumbUrl } from "../services/ThumbnailResolver";
+import { ImageOff } from "lucide-react";
 
 // Types
 interface PhotoItem {
@@ -26,8 +28,6 @@ interface VirtualizedPhotoGridProps {
   selectedPhotos?: Set<string>;
   onPhotoClick?: (photo: PhotoItem) => void;
   onPhotoSelect?: (photo: PhotoItem) => void;
-  showSelection?: boolean;
-  className?: string;
 }
 
 type GridCellContext = {
@@ -36,7 +36,6 @@ type GridCellContext = {
   onPhotoClick?: (photo: PhotoItem) => void;
   onPhotoSelect?: (photo: PhotoItem) => void;
   selectedPhotos?: Set<string>;
-  thumbnailSize: number;
   gap: number;
 };
 
@@ -50,13 +49,14 @@ const PhotoGridCell = memo(function PhotoGridCell({
   onPhotoClick,
   onPhotoSelect,
   selectedPhotos,
-  thumbnailSize,
 }: CellComponentProps<GridCellContext>) {
   const index = rowIndex * columns + columnIndex;
   const photo = photos[index];
 
   // Get metadata for this photo (offline-first) - must be called unconditionally
   const { metadata } = useOfflineFirstMetadata(photo?.path || "");
+  const [thumbSrc, setThumbSrc] = useState<string | undefined>(photo?.thumbnail);
+  const objectUrlRef = useRef<string | null>(null);
 
   // Handle photo click - must be called unconditionally
   const handleClick = useCallback(() => {
@@ -97,16 +97,75 @@ const PhotoGridCell = memo(function PhotoGridCell({
 
   // Early return if no photo at this index
   if (!photo) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     return <div className="p-1 box-border" style={{ ...style }} />;
   }
 
   // Determine if photo is selected
   const isSelected = selectedPhotos?.has(photo.path) || false;
 
+  useEffect(() => {
+    if (!photo) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const inlineThumb = photo.thumbnail;
+    if (inlineThumb) {
+      setThumbSrc(inlineThumb);
+      return () => {
+        if (objectUrlRef.current) {
+          URL.revokeObjectURL(objectUrlRef.current);
+          objectUrlRef.current = null;
+        }
+      };
+    }
+
+    async function loadThumb() {
+      try {
+        const url = await resolveThumbUrl({ path: photo.path, thumbnail: photo.thumbnail });
+        if (cancelled) {
+          if (url?.startsWith("blob:")) {
+            URL.revokeObjectURL(url);
+          }
+          return;
+        }
+
+        if (objectUrlRef.current && objectUrlRef.current !== url) {
+          URL.revokeObjectURL(objectUrlRef.current);
+          objectUrlRef.current = null;
+        }
+
+        if (url?.startsWith("blob:")) {
+          objectUrlRef.current = url;
+        }
+
+        setThumbSrc(url);
+      } catch (error) {
+        console.warn("[VirtualizedPhotoGrid] Failed to resolve thumbnail", error);
+        if (!cancelled) {
+          setThumbSrc(undefined);
+        }
+      }
+    }
+
+    setThumbSrc(undefined);
+    loadThumb();
+
+    return () => {
+      cancelled = true;
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
+    };
+  }, [photo]);
+
   return (
     <div className="p-1 box-border" style={{ ...style }}>
-      <Card
-        className={`relative overflow-hidden transition-all duration-200 hover:shadow-lg hover:-translate-y-1 cursor-pointer ${
+      <figure
+        className={`relative overflow-hidden transition-all duration-200 hover:shadow-lg hover:-translate-y-1 cursor-pointer border rounded-lg bg-card ${
           isSelected ? "ring-2 ring-primary" : ""
         }`}
         onClick={handleClick}
@@ -116,38 +175,24 @@ const PhotoGridCell = memo(function PhotoGridCell({
             handleClick();
           }
         }}
-        tabIndex={0}
       >
         {/* Thumbnail image */}
         <div
-          className="relative bg-muted"
-          style={{ height: thumbnailSize - 40 }}
+          className="relative bg-muted h-36"
         >
-          <img
-            src={photo.thumbnail || `file://${photo.path}`}
-            alt={photo.path.split("/").pop() || photo.path.split("\\").pop()}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              // Fallback to file URL if thumbnail fails, or show placeholder
-              const img = e.target as HTMLImageElement;
-              if (img.src !== `file://${photo.path}` && !photo.thumbnail) {
-                img.src = `file://${photo.path}`;
-              } else {
-                // Show a placeholder if no thumbnail available
-                img.style.display = "none";
-                const parent = img.parentElement;
-                if (parent) {
-                  parent.innerHTML = `
-										<div class="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
-											<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-											</svg>
-										</div>
-									`;
-                }
-              }
-            }}
-          />
+          {thumbSrc ? (
+            <img
+              src={thumbSrc}
+              alt={photo.path.split("/").pop() || photo.path.split("\\").pop()}
+              className="w-full h-full object-cover"
+              onError={() => setThumbSrc(undefined)}
+            />
+          ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-muted text-muted-foreground">
+              <ImageOff className="h-6 w-6" aria-hidden="true" />
+              <span className="text-xs font-medium">No preview</span>
+            </div>
+          )}
 
           {/* Loading skeleton */}
           {!metadata && (
@@ -158,7 +203,7 @@ const PhotoGridCell = memo(function PhotoGridCell({
         </div>
 
         {/* Photo info */}
-        <CardContent className="p-2 h-10 overflow-hidden">
+        <figcaption className="p-2 h-10 overflow-hidden">
           <div className="space-y-1">
             <div
               className="font-semibold text-xs truncate"
@@ -174,7 +219,7 @@ const PhotoGridCell = memo(function PhotoGridCell({
               <span title={fileSize}>{fileSize}</span>
             </div>
           </div>
-        </CardContent>
+        </figcaption>
 
         {/* Selection indicator */}
         {isSelected && (
@@ -182,7 +227,7 @@ const PhotoGridCell = memo(function PhotoGridCell({
             ✓
           </Badge>
         )}
-      </Card>
+      </figure>
     </div>
   );
 });
@@ -196,8 +241,6 @@ export function VirtualizedPhotoGrid({
   selectedPhotos,
   onPhotoClick,
   onPhotoSelect,
-  showSelection,
-  className,
 }: VirtualizedPhotoGridProps) {
   const rows = useMemo(() => {
     return Math.ceil(photos.length / columns);

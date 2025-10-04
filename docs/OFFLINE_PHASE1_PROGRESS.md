@@ -38,9 +38,9 @@ Non‑Goals (Phase 1): Deep EXIF search, offline embedding generation, OCR searc
 
 | Component                    | Strengths                     | Gaps (Phase 1 relevance)                              |
 | ---------------------------- | ----------------------------- | ----------------------------------------------------- |
-| EnhancedOfflineStorage       | Robust schema & CRUD          | No hash/version, no dedicated thumb helpers           |
+| EnhancedOfflineStorage       | Robust schema & CRUD          | ✅ Cache schema versioning + clearAll helper added     |
 | EnhancedOfflineSearchService | Keyword + embedding scaffolds | OCR/embedding generation stubs                        |
-| offline/api/offline.ts       | Caches opportunistically      | No manifest ingestion, sequential slow metadata pulls |
+| offline/api/offline.ts       | Caches opportunistically      | ✅ Manifest seeding + background thumb refresh wired   |
 | OfflineService               | Connectivity + queue          | Not tied to gallery preload/manifest lifecycle        |
 | offline-setup.ts             | Central init                  | Does not attempt manifest load/precache               |
 

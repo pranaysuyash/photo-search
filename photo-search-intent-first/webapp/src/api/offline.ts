@@ -7,6 +7,7 @@ import {
   enhancedOfflineStorage,
   type OfflinePhotoStorage,
 } from "../services/EnhancedOfflineStorage";
+import { thumbnailGenerator } from "../services/ThumbnailGenerator";
 import { offlineService } from "../services/OfflineService";
 import { API_BASE } from "./base";
 import { search as apiSearch } from "./search";
@@ -203,6 +204,40 @@ export async function offlineCapableGetLibrary(
   console.log(`[OfflineAPI] Retrieving library from offline cache for: ${dir}`);
 
   const allPhotos = (await enhancedOfflineStorage.getAllPhotos?.()) || [];
+
+  // Dev-time seeding: if empty and in dev, attempt to seed demo photos
+  if (import.meta.env.DEV && allPhotos.length === 0) {
+    try {
+      console.log("[OfflineAPI] Seeding demo photos into offline cache (dev only)");
+      // Try to read a manifest if present – keeps this guarded and no-op in prod
+      const res = await fetch("/demo_photos/manifest.json");
+      if (res.ok) {
+        const manifest: { items: { path: string; thumbnail?: string; meta?: Partial<PhotoMeta> }[] } = await res.json();
+        for (const item of manifest.items) {
+          await enhancedOfflineStorage.storePhoto({
+            id: item.path,
+            path: item.path,
+            thumbnail: item.thumbnail,
+            metadata: item.meta as PhotoMeta | undefined,
+            cachedAt: Date.now(),
+            lastAccessed: Date.now(),
+          });
+        }
+        const seeded = (await enhancedOfflineStorage.getAllPhotos()) || [];
+        thumbnailGenerator.enqueueMissing(dir, seeded);
+        return seeded;
+      }
+    } catch (e) {
+      console.warn("[OfflineAPI] Demo seeding skipped:", e);
+    }
+  }
+  if (allPhotos.length > 0) {
+    thumbnailGenerator.enqueueMissing(dir, allPhotos);
+    if (offlineService.getStatus()) {
+      void refreshMissingMetadata(dir, allPhotos);
+    }
+  }
+
   return allPhotos;
 }
 
@@ -386,5 +421,26 @@ export async function precacheEmbeddingsForOffline(dir: string): Promise<void> {
   } catch (error) {
     console.error("[OfflineAPI] Failed to precache embeddings:", error);
     throw error;
+  }
+}
+
+async function refreshMissingMetadata(
+  dir: string,
+  photos: OfflinePhotoStorage[],
+): Promise<void> {
+  const candidates = photos.filter((photo) => !photo.metadata);
+  if (candidates.length === 0) {
+    return;
+  }
+
+  for (const photo of candidates) {
+    try {
+      await offlineCapableGetMetadata(dir, photo.path);
+    } catch (error) {
+      console.warn(
+        `[OfflineAPI] Failed refreshing metadata for ${photo.path}:`,
+        error,
+      );
+    }
   }
 }

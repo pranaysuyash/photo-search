@@ -20,8 +20,9 @@ export {
 	useSearchState,
 } from "./useSearchState";
 
-// Utility hooks
-// export { useLocalStorage } from './useLocalStorage'; // Not implemented yet
+// Job management hooks
+export { useJobMetrics } from "./useJobMetrics";
+export type { JobMetrics } from "./useJobMetrics";
 
 export type { DataLoadingOptions } from "./useDataLoading";
 // Data management hooks

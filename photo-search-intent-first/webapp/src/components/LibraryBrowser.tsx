@@ -7,6 +7,8 @@ import { useMemoryManager } from "../hooks/useMemoryManager";
 import { VideoService } from "../services/VideoService";
 import { ScrollLoader } from "../utils/loading";
 import { VirtualizedPhotoGrid } from "./VirtualizedPhotoGrid";
+import { offlineCapableGetLibrary } from "../api/offline";
+import { enhancedOfflineStorage } from "../services/EnhancedOfflineStorage";
 
 type SortOption = "name" | "date" | "size" | "rating" | "camera";
 type SortDirection = "asc" | "desc";
@@ -36,6 +38,62 @@ const LibraryBrowser = memo(function LibraryBrowser({
 	hasMore = false,
 	isLoading = false,
 }: LibraryBrowserProps) {
+    // Phase 2: hydrate grid from offline cache if available
+    const [offlinePhotos, setOfflinePhotos] = useState<
+      { id: string; path: string; thumbnail?: string }[]
+    >([]);
+    const mapOfflinePhoto = useCallback(
+      (photo: { id: string; path: string; thumbnail?: string }) => ({
+        id: photo.id,
+        path: photo.path,
+        thumbnail: photo.thumbnail,
+      }),
+      []
+    );
+
+    useEffect(() => {
+      let cancelled = false;
+      (async () => {
+        try {
+          if (dir) {
+            const items = await offlineCapableGetLibrary(dir);
+            if (!cancelled) {
+              setOfflinePhotos(items.map(mapOfflinePhoto));
+            }
+          }
+        } catch (e) {
+          console.warn("Offline hydrate failed", e);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [dir, mapOfflinePhoto]);
+
+    useEffect(() => {
+      if (!dir) {
+        return;
+      }
+      let cancelled = false;
+      const refresh = async () => {
+        try {
+          const items = await enhancedOfflineStorage.getAllPhotos();
+          if (!cancelled) {
+            setOfflinePhotos(items.map(mapOfflinePhoto));
+          }
+        } catch (error) {
+          console.warn("Offline cache refresh failed", error);
+        }
+      };
+      const listener = () => {
+        void refresh();
+      };
+      window.addEventListener("offline-thumbnail-updated", listener);
+      return () => {
+        cancelled = true;
+        window.removeEventListener("offline-thumbnail-updated", listener);
+      };
+    }, [dir, mapOfflinePhoto]);
 	const [sortBy, setSortBy] = useState<SortOption>("name");
 	const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 	const [showStats, setShowStats] = useState(false);
@@ -419,14 +477,15 @@ const LibraryBrowser = memo(function LibraryBrowser({
 					No items yet. Build the index, then click Reload.
 				</div>
 			) : useVirtualizedGrid ? (
-				/* Virtualized grid for large collections */
+            	/* Virtualized grid for large collections (prefer offline cache if available) */
 				<VirtualizedPhotoGrid
-					dir={dir}
-					engine={engine}
-					onItemClick={onOpen}
+					photos={(offlinePhotos.length ? offlinePhotos : sortedLibrary.map((p) => ({ id: p, path: p })))}
+					thumbnailSize={200}
+					columns={5}
+					onPhotoClick={(photo) => onOpen?.(photo.path)}
+					onPhotoSelect={(photo) => onToggleSelect?.(photo.path)}
 					className="mt-2"
-					imageQuality="medium"
-					showMetrics={showStats}
+					showSelection
 				/>
 			) : (
 				/* Traditional grid for small collections with animations */

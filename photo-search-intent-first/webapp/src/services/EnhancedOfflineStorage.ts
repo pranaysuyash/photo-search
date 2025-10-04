@@ -32,12 +32,14 @@ export interface OfflineStorageConfig {
 
 export class EnhancedOfflineStorage {
 	private readonly config: OfflineStorageConfig;
+	public static readonly CACHE_SCHEMA_VERSION = "2024-10-offline-cache-v1";
 	private readonly DB_NAME = "PhotoVaultOfflineEnhanced";
 	private readonly DB_VERSION = 2;
 	private readonly PHOTO_STORE = "photos";
 	private readonly EMBEDDING_STORE = "embeddings";
 	private readonly INDEX_STORE = "search_indices";
 	private readonly METADATA_STORE = "metadata";
+	private readonly VERSION_KEY = "photo-vault-offline-cache-version";
 
 	private db: IDBDatabase | null = null;
 	private isInitialized = false;
@@ -75,7 +77,15 @@ export class EnhancedOfflineStorage {
 			request.onsuccess = () => {
 				this.db = request.result;
 				this.isInitialized = true;
-				resolve();
+				this.ensureSchemaVersion()
+					.then(resolve)
+					.catch((error) => {
+						console.error(
+							"[EnhancedOfflineStorage] Failed to ensure schema version:",
+							error,
+						);
+						reject(error);
+					});
 			};
 
 			request.onupgradeneeded = (event) => {
@@ -123,6 +133,29 @@ export class EnhancedOfflineStorage {
 		});
 	}
 
+	private async ensureSchemaVersion(): Promise<void> {
+		if (typeof window === "undefined") {
+			return;
+		}
+		try {
+			const storedVersion = window.localStorage.getItem(this.VERSION_KEY);
+			if (storedVersion === EnhancedOfflineStorage.CACHE_SCHEMA_VERSION) {
+				return;
+			}
+			await this.clearAllStores();
+			window.localStorage.setItem(
+				this.VERSION_KEY,
+				EnhancedOfflineStorage.CACHE_SCHEMA_VERSION,
+			);
+		} catch (error) {
+			console.error(
+				"[EnhancedOfflineStorage] Failed to ensure schema version:",
+				error,
+			);
+			throw error;
+		}
+	}
+
 	/**
 	 * Store a photo's data offline
 	 */
@@ -149,6 +182,42 @@ export class EnhancedOfflineStorage {
 				reject(request.error);
 			};
 		});
+	}
+
+	private async clearAllStores(): Promise<void> {
+		if (!this.db) {
+			return;
+		}
+		await Promise.all(
+			[
+				this.PHOTO_STORE,
+				this.EMBEDDING_STORE,
+				this.INDEX_STORE,
+				this.METADATA_STORE,
+			].map(
+				(storeName) =>
+					new Promise<void>((resolve, reject) => {
+						const tx = this.db!.transaction([storeName], "readwrite");
+						const store = tx.objectStore(storeName);
+						const request = store.clear();
+						request.onsuccess = () => resolve();
+						request.onerror = () => reject(request.error);
+					}),
+				),
+			);
+	}
+
+	/**
+	 * Public helper to wipe all cached data
+	 */
+	async clearAll(): Promise<void> {
+		if (!this.db) {
+			await this.initialize();
+		}
+		await this.clearAllStores();
+		if (typeof window !== "undefined") {
+			window.localStorage.removeItem(this.VERSION_KEY);
+		}
 	}
 
 	/**

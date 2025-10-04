@@ -1,4 +1,5 @@
 import { indexedDBStorage } from "./IndexedDBStorage";
+import { enhancedOfflineStorage } from "./EnhancedOfflineStorage";
 
 export interface ThumbnailResolveOptions {
   size?: number;
@@ -9,14 +10,15 @@ export interface ThumbnailResolveOptions {
  * Resolve thumbnail URL for a photo with fallback strategies
  */
 export async function resolveThumbUrl(
-  photo: { path: string; thumb?: string },
+  photo: { path: string; thumb?: string; thumbnail?: string },
   opts: ThumbnailResolveOptions = {}
 ): Promise<string | undefined> {
   const { size = 256, preferEmbedded = false } = opts;
 
   // 1. If already has a data/blob URL, use it
-  if (photo.thumb?.startsWith('data:') || photo.thumb?.startsWith('blob:')) {
-    return photo.thumb;
+  const inlineThumb = photo.thumb ?? photo.thumbnail;
+  if (inlineThumb?.startsWith("data:") || inlineThumb?.startsWith("blob:")) {
+    return inlineThumb;
   }
 
   // 2. Check IndexedDB cache
@@ -29,6 +31,21 @@ export async function resolveThumbUrl(
     }
   } catch (error) {
     console.warn('[ThumbnailResolver] Cache check failed:', error);
+  }
+
+  // 2b. Check enhanced offline storage (data URL)
+  try {
+    const stored = await enhancedOfflineStorage.getPhoto(photo.path);
+    if (stored?.thumbnail) {
+      return stored.thumbnail;
+    }
+  } catch (error) {
+    console.warn('[ThumbnailResolver] Offline storage lookup failed:', error);
+  }
+
+  // If we're offline and have no cached thumbnail, bail early
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    return inlineThumb;
   }
 
   // 3. Electron file:// if available (placeholder - implement when electronAPI supports it)

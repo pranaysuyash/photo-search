@@ -1,0 +1,24 @@
+{
+  "items": [
+    {
+      "path": "/demo_photos/sample1.jpg",
+      "thumbnail": "/demo_photos/sample1_thumb.jpg",
+      "meta": {
+        "title": "Sample 1",
+        "width": 800,
+        "height": 600,
+        "tags": ["demo", "sample"]
+      }
+    },
+    {
+      "path": "/demo_photos/sample2.jpg",
+      "thumbnail": "/demo_photos/sample2_thumb.jpg",
+      "meta": {
+        "title": "Sample 2",
+        "width": 1024,
+        "height": 768,
+        "tags": ["demo", "sample"]
+      }
+    }
+  ]
+}

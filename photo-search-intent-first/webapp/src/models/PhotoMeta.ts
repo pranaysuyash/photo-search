@@ -9,6 +9,7 @@ export interface PhotoMeta {
 	mtime?: number; // unix seconds (file mtime)
 	width?: number;
 	height?: number;
+	size_bytes?: number; // file size in bytes
 	place?: string;
 	tags?: string[];
 	// Optional conveniences sometimes present in responses/UIs

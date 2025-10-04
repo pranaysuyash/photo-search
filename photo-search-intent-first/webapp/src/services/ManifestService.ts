@@ -15,7 +15,7 @@ export interface PhotoManifestItem {
 export async function loadOfflineManifest(): Promise<PhotoManifestItem[] | null> {
 	try {
 		// First, fetch the manifest from the network
-		const response = await fetch('/demo_manifest.json');
+			const response = await fetch("/demo_photos/manifest.json");
 		if (!response.ok) {
 			throw new Error(`Failed to fetch manifest: ${response.status}`);
 		}
@@ -62,3 +62,4 @@ export async function loadOfflineManifest(): Promise<PhotoManifestItem[] | null>
 
 		return null;
 	}
+}
