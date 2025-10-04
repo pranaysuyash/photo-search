@@ -273,4 +273,30 @@ export const handlers = [
 			total: 100,
 		});
 	}),
+
+	// Library endpoint
+	http.get(`${API_BASE}/library`, ({ request }) => {
+		const url = new URL(request.url);
+		const dir = url.searchParams.get("dir");
+		if (!dir) {
+			return HttpResponse.json(
+				{ detail: "dir parameter required" },
+				{ status: 400 },
+			);
+		}
+		return HttpResponse.json({
+			photos: [
+				{
+					path: "/test/photo1.jpg",
+					mtime: 1640995200,
+					size: 1024000,
+				},
+				{
+					path: "/test/photo2.jpg",
+					mtime: 1641081600,
+					size: 2048000,
+				},
+			],
+		});
+	}),
 ];
