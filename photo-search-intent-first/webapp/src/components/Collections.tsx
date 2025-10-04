@@ -41,6 +41,8 @@ import {
 import { CollectionCard } from "./ui/CollectionCard";
 import { AnalyticsModal } from "./ui/AnalyticsModal";
 import { CollectionContextMenu } from "./ui/CollectionContextMenu";
+import { ThemeSelector } from "./ui/ThemeSelector";
+import { CoverSelector } from "./ui/CoverSelector";
 import { useCallback, useRef, useState, useEffect, useMemo } from "react";
 import { apiCreateShare, apiExport, apiSetCollection, apiDeleteCollection, thumbUrl } from "../api";
 import { announce } from "../utils/accessibility";
@@ -1443,45 +1445,14 @@ export default function Collections({
 				</ul>
 			)}
 
-			{/* Theme Selector Modal */}
-			{showThemeSelector && (
-				<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-					<div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-						<div className="flex items-center justify-between mb-4">
-							<h3 className="text-lg font-semibold text-gray-900">Choose Theme</h3>
-							<button
-								type="button"
-								onClick={() => setShowThemeSelector(null)}
-								className="text-gray-400 hover:text-gray-600 transition-colors"
-							>
-								×
-							</button>
-						</div>
-						<div className="grid grid-cols-2 gap-3">
-							{Object.entries(themes).map(([key, theme]) => (
-								<button
-									key={key}
-									type="button"
-									onClick={() => {
-										setCollectionTheme(showThemeSelector, key);
-										setShowThemeSelector(null);
-									}}
-									className={`p-4 rounded-lg border-2 transition-all hover:scale-105 ${
-										collectionThemes[showThemeSelector] === key
-											? "border-blue-500 ring-2 ring-blue-200"
-											: "border-gray-200 hover:border-gray-300"
-									}`}
-								>
-									<div className={`w-full h-12 rounded-lg bg-gradient-to-br ${theme.colors} mb-2`} />
-									<div className={`text-sm font-medium ${theme.accent}`}>
-										{theme.name}
-									</div>
-								</button>
-							))}
-						</div>
-					</div>
-				</div>
-			)}
+			<ThemeSelector
+				isOpen={!!showThemeSelector}
+				collectionName={showThemeSelector}
+				currentTheme={showThemeSelector ? collectionThemes[showThemeSelector] || 'blue' : ''}
+				themes={themes}
+				onClose={() => setShowThemeSelector(null)}
+				onSelectTheme={setCollectionTheme}
+			/>
 
 			{/* Keyboard Shortcuts Help Modal */}
 			{showKeyboardHelp && (
@@ -1662,101 +1633,17 @@ export default function Collections({
 					</div>
 				)}
 
-			{/* Cover Selector Modal */}
-			{showCoverSelector && (
-				<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-					<div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[80vh] overflow-hidden">
-						<div className="flex items-center justify-between p-6 border-b border-gray-200">
-							<div className="flex items-center gap-3">
-								<button
-									type="button"
-									onClick={() => setShowCoverSelector(null)}
-									className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-									title="Close"
-								>
-									<ArrowLeft className="w-5 h-5 text-gray-600" />
-								</button>
-								<div>
-									<h3 className="text-xl font-semibold text-gray-900">Choose Cover Photo</h3>
-									<p className="text-sm text-gray-600 mt-1">
-										Select a photo to represent the "{showCoverSelector}" collection
-									</p>
-								</div>
-							</div>
-							<div className="flex items-center gap-2">
-								<span className="text-sm text-gray-500">
-									Current: Photo {(collectionCovers[showCoverSelector] || 0) + 1}
-								</span>
-							</div>
-						</div>
-
-						<div className="p-6 overflow-y-auto max-h-[60vh]">
-							<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-								{collections[showCoverSelector]?.map((photoPath, index) => {
-									const isCurrentCover = (collectionCovers[showCoverSelector] || 0) === index;
-									return (
-										<button
-											key={photoPath}
-											type="button"
-											onClick={() => setCollectionCover(showCoverSelector, index)}
-											className={`relative group rounded-lg overflow-hidden transition-all duration-200 ${
-												isCurrentCover
-													? "ring-4 ring-blue-500 ring-offset-2"
-													: "hover:ring-2 hover:ring-blue-300 hover:ring-offset-1"
-											}`}
-										>
-											<div className="aspect-square">
-												<img
-													src={thumbUrl(dir, engine, photoPath, 150)}
-													alt={`Photo ${index + 1}`}
-													className="w-full h-full object-cover"
-													loading="lazy"
-												/>
-											</div>
-
-											{/* Current cover indicator */}
-											{isCurrentCover && (
-												<div className="absolute top-2 right-2 bg-blue-600 text-white p-1.5 rounded-full">
-													<Check className="w-3 h-3" />
-												</div>
-											)}
-
-											{/* Photo number */}
-											<div className="absolute bottom-2 left-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded-full">
-												{index + 1}
-											</div>
-
-											{/* Hover overlay */}
-											<div className="absolute inset-0 bg-blue-600 bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
-												<div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-													<div className="bg-white text-blue-600 px-3 py-1.5 rounded-lg font-medium text-sm shadow-lg">
-														{isCurrentCover ? "Current Cover" : "Set as Cover"}
-													</div>
-												</div>
-											</div>
-										</button>
-									);
-								})}
-							</div>
-						</div>
-
-						<div className="p-6 border-t border-gray-200 bg-gray-50">
-							<div className="flex items-center justify-between">
-								<p className="text-sm text-gray-600">
-									{collections[showCoverSelector]?.length || 0} photos in this collection
-								</p>
-								<button
-									type="button"
-									onClick={() => setShowCoverSelector(null)}
-									className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
-								>
-									Done
-								</button>
-							</div>
-						</div>
-					</div>
-				</div>
-			)}
+			<CoverSelector
+				isOpen={!!showCoverSelector}
+				collectionName={showCoverSelector}
+				photos={showCoverSelector ? collections[showCoverSelector] || [] : []}
+				currentCoverIndex={showCoverSelector ? collectionCovers[showCoverSelector] || 0 : 0}
+				onClose={() => setShowCoverSelector(null)}
+				onSelectCover={setCollectionCover}
+				thumbUrl={thumbUrl}
+				dir={dir}
+				engine={engine}
+			/>
 
 			{/* Global drag overlay for better feedback */}
 			{draggedItem?.type === "photo" && (
