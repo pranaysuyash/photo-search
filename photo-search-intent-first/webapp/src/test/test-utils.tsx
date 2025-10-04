@@ -372,6 +372,39 @@ vi.mock("../contexts/domains/SearchOperationsContext", () => ({
 	}),
 }));
 
+// Mock lazy components used in RoutesHost
+vi.mock("../components/MapView", () => ({
+	default: vi.fn(() => null),
+}));
+
+vi.mock("../components/SmartDiscovery", () => ({
+	default: vi.fn(() => null),
+}));
+
+vi.mock("../components/AutoCurationPanel", () => ({
+	default: vi.fn(() => null),
+}));
+
+vi.mock("../components/VisualTools", () => ({
+	default: vi.fn(() => null),
+}));
+
+vi.mock("../components/CollaborativeWorkspace", () => ({
+	default: vi.fn(() => null),
+}));
+
+vi.mock("../components/SocialSharingModal", () => ({
+	default: vi.fn(() => null),
+}));
+
+vi.mock("../components/TripsView", () => ({
+	default: vi.fn(() => null),
+}));
+
+vi.mock("../components/VideoManager", () => ({
+	VideoManager: vi.fn(() => null),
+}));
+
 // Test wrapper that provides all necessary contexts
 const AllTheProviders: React.FC<{ children: React.ReactNode }> = ({
 	children,

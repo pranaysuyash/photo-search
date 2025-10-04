@@ -354,34 +354,35 @@ export function CollectionCard({
 	};
 
 	return (
-		<Card
-			draggable
-			onDragStart={(e) => onDragStart(e, name)}
-			onDragOver={(e) => onDragOver(e, name)}
-			onDragEnter={(e) => onDragEnter(e, name)}
-			onDragLeave={onDragLeave}
-			onDrop={(e) => onDrop(e, name)}
-			onKeyDown={(e) => {
-				if (e.key === "Enter" || e.key === " ") {
-					e.preventDefault();
-					if (bulkMode && onToggleSelection) {
-						onToggleSelection(name);
-					} else {
-						onOpen(name);
+		<li>
+			<Card
+				draggable
+				onDragStart={(e) => onDragStart(e, name)}
+				onDragOver={(e) => onDragOver(e, name)}
+				onDragEnter={(e) => onDragEnter(e, name)}
+				onDragLeave={onDragLeave}
+				onDrop={(e) => onDrop(e, name)}
+				onKeyDown={(e) => {
+					if (e.key === "Enter" || e.key === " ") {
+						e.preventDefault();
+						if (bulkMode && onToggleSelection) {
+							onToggleSelection(name);
+						} else {
+							onOpen(name);
+						}
 					}
-				}
-			}}
-			onContextMenu={(e) => onContextMenu(e, name)}
-			tabIndex={0}
-			aria-label={`Collection ${name} with ${photos.length} photos${isFocused ? " (focused)" : ""}`}
-			className={`bg-gradient-to-br ${theme.colors} border rounded-xl transition-all duration-300 cursor-move shadow-sm hover:shadow-lg transform group ${
-				isDropTarget
-					? "border-blue-500 bg-blue-50 shadow-lg ring-2 ring-blue-200 ring-opacity-50 scale-105 animate-pulse"
-					: `${theme.border} hover:border-gray-300 hover:scale-[1.02]`
-			} ${isDragging ? "opacity-50 scale-95" : ""} ${
-				isFocused ? "ring-4 ring-blue-400 ring-opacity-60 border-blue-400" : ""
-			}`}
-		>
+				}}
+				onContextMenu={(e) => onContextMenu(e, name)}
+				tabIndex={0}
+				aria-label={`Collection ${name} with ${photos.length} photos${isFocused ? " (focused)" : ""}`}
+				className={`bg-gradient-to-br ${theme.colors} border rounded-xl transition-all duration-300 cursor-move shadow-sm hover:shadow-lg transform group ${
+					isDropTarget
+						? "border-blue-500 bg-blue-50 shadow-lg ring-2 ring-blue-200 ring-opacity-50 scale-105 animate-pulse"
+						: `${theme.border} hover:border-gray-300 hover:scale-[1.02]`
+				} ${isDragging ? "opacity-50 scale-95" : ""} ${
+					isFocused ? "ring-4 ring-blue-400 ring-opacity-60 border-blue-400" : ""
+				}`}
+			>
 			<CardContent className="p-4">
 				{/* Collection header with drag handle */}
 				<div className="flex items-center justify-between mb-3">
@@ -546,6 +547,7 @@ export function CollectionCard({
 					</div>
 				</div>
 			</CardContent>
-		</Card>
+			</Card>
+		</li>
 	);
 }
