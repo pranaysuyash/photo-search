@@ -68,6 +68,14 @@ export class IndexedDBStorage {
 				if (!db.objectStoreNames.contains(THUMBNAIL_STORE_NAME)) {
 					db.createObjectStore(THUMBNAIL_STORE_NAME);
 				}
+
+				if (!db.objectStoreNames.contains(DIAGNOSTICS_STORE_NAME)) {
+					const diagnosticsStore = db.createObjectStore(
+						DIAGNOSTICS_STORE_NAME,
+						{ keyPath: "id", autoIncrement: true },
+					);
+					diagnosticsStore.createIndex("timestamp", "timestamp", { unique: false });
+				}
 			};
 		});
 	}
@@ -397,6 +405,73 @@ export class IndexedDBStorage {
 
 			request.onerror = () => {
 				console.error("[IndexedDB] Failed to get thumbnail:", request.error);
+				reject(request.error);
+			};
+		});
+	}
+
+	async addDiagnosticEvent(event: DiagnosticEventRecord): Promise<void> {
+		if (!this.db) {
+			await this.initialize();
+		}
+
+		return new Promise((resolve, reject) => {
+			const transaction = this.db?.transaction(
+				[DIAGNOSTICS_STORE_NAME],
+				"readwrite",
+			);
+			if (!transaction) {
+				reject(new Error("Failed to create diagnostics transaction"));
+				return;
+			}
+			const store = transaction.objectStore(DIAGNOSTICS_STORE_NAME);
+			const request = store.add(event);
+
+			request.onsuccess = () => resolve();
+			request.onerror = () => {
+				console.error(
+					"[IndexedDB] Failed to add diagnostic event:",
+					request.error,
+				);
+				reject(request.error);
+			};
+		});
+	}
+
+	async getDiagnosticEvents(limit = 50): Promise<DiagnosticEventRecord[]> {
+		if (!this.db) {
+			await this.initialize();
+		}
+
+		return new Promise((resolve, reject) => {
+			const transaction = this.db?.transaction(
+				[DIAGNOSTICS_STORE_NAME],
+				"readonly",
+			);
+			if (!transaction) {
+				reject(new Error("Failed to create diagnostics transaction"));
+				return;
+			}
+			const store = transaction.objectStore(DIAGNOSTICS_STORE_NAME);
+			const index = store.index("timestamp");
+			const request = index.openCursor(null, "prev");
+			const results: DiagnosticEventRecord[] = [];
+
+			request.onsuccess = () => {
+				const cursor = request.result;
+				if (cursor && results.length < limit) {
+					results.push(cursor.value as DiagnosticEventRecord);
+					cursor.continue();
+				} else {
+					resolve(results);
+				}
+			};
+
+			request.onerror = () => {
+				console.error(
+					"[IndexedDB] Failed to read diagnostics:",
+					request.error,
+				);
 				reject(request.error);
 			};
 		});

@@ -60,8 +60,8 @@ This document captures the current state of the production webapp, identifies ga
 | Deliverable | Status | Owner | Notes |
 | --- | --- | --- | --- |
 | OfflineService backoff + status spec | Done | AI assistant + engineering follow-up | Exponential backoff landed Oct 2025; next step is exposing status telemetry. |
-| Diagnostics telemetry schema & ActivityTray UX | Plan drafted | AI assistant + design | See `APPCHROME_PHASE0_IMPLEMENTATION_PLAN.md#1`; implementation tickets pending. |
-| Offline CI smoke plan (CLI + Playwright) | Plan drafted | AI assistant | Steps in `APPCHROME_PHASE0_IMPLEMENTATION_PLAN.md#2`; wire into CI. |
+| Diagnostics telemetry schema & ActivityTray UX | In progress | AI assistant + design | Telemetry hooks now emit in `OfflineService`; ActivityTray visualization pending (see `APPCHROME_PHASE0_IMPLEMENTATION_PLAN.md#1`). |
+| Offline CI smoke plan (CLI + Playwright) | In progress | AI assistant | CLI smoke script `scripts/offline_smoke.sh` added; Playwright automation pending (`APPCHROME_PHASE0_IMPLEMENTATION_PLAN.md#2`). |
 | Component migration inventory | Done | AI assistant | Targets documented in `APPCHROME_REFACTOR_ANALYSIS.md`. |
 | Baseline journey capture plan | Plan drafted | AI assistant | Approach in `APPCHROME_PHASE0_IMPLEMENTATION_PLAN.md#3`. |
 | Design/dev workshop scheduling | In progress | AI assistant | Calendar invite requested; waiting on PM confirmation. |

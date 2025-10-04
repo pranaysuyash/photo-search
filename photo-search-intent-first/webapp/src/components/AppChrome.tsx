@@ -91,6 +91,7 @@ import { JobsCenter } from "./JobsCenter";
 import { MobileOptimizations } from "./MobileOptimizations";
 import { MobilePWATest } from "./MobilePWATest";
 import { ModalSystemWrapper } from "./ModalSystemWrapper";
+import AdvancedSearchModal from "./modals/AdvancedSearchModal";
 import FirstRunSetup from "./modals/FirstRunSetup";
 import { OnboardingChecklist } from "./OnboardingChecklist";
 import { OnboardingTour } from "./OnboardingTour";
@@ -276,6 +277,7 @@ export function AppChrome({
 
 	const [showEnhancedOnboarding, setShowEnhancedOnboarding] = useState(false);
 	const [showPowerUserPanel, setShowPowerUserPanel] = useState(false);
+	const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
 
 	const { triggerHint } = useHintTriggers();
 
@@ -635,6 +637,24 @@ export function AppChrome({
 					onTour={modalControls.openHelp}
 				/>
 
+				<AdvancedSearchModal
+					open={showAdvancedSearch}
+					onClose={() => setShowAdvancedSearch(false)}
+					onApply={(query: string) => {
+						setSearchText(query);
+						doSearchImmediate(query);
+						setShowAdvancedSearch(false);
+					}}
+					onSave={(name: string, query: string) => {
+						// TODO: Implement saved search functionality
+						console.log('Save search:', name, query);
+						setShowAdvancedSearch(false);
+					}}
+					allTags={allTags || []}
+					cameras={meta?.cameras || []}
+					people={(clusters || []).map(c => c.name || "Unknown").filter(Boolean)}
+				/>
+
 				<EnhancedFirstRunOnboarding
 					isOpen={showEnhancedOnboarding}
 					onClose={handleEnhancedOnboardingClose}
@@ -850,7 +870,7 @@ export function AppChrome({
 											onLayout={(rows: number[][]) => setLayoutRows(rows)}
 											onOpenFilters={() => setShowFilters(true)}
 											onOpenAdvanced={() => {
-												/* TODO: Open advanced search modal */
+												setShowAdvancedSearch(true);
 											}}
 											setSmart={photoActions.setSmart}
 											setResults={photoActions.setResults}

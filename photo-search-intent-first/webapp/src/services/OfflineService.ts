@@ -463,7 +463,11 @@ import {
 import { serviceEnabled } from "../config/logging";
 import { handleError } from "../utils/errors";
 import { connectivityHistoryService } from "./ConnectivityHistory";
-import { indexedDBStorage } from "./IndexedDBStorage";
+import {
+  indexedDBStorage,
+  IndexedDBStorage,
+  type DiagnosticEventRecord,
+} from "./IndexedDBStorage";
 
 const OFFLINE_DEBUG =
 	import.meta.env.VITE_OFFLINE_DEBUG === "1" ||
@@ -475,6 +479,48 @@ const offlineDebug = (...args: Array<unknown>) => {
 	}
 };
 
+type ConnectivitySource =
+	| "navigator"
+	| "monitoring-endpoint"
+	| "manual"
+	| "unknown";
+
+type ConnectivityStatusEvent = {
+	type: "connectivity-status";
+	status: "online" | "offline";
+	source: ConnectivitySource;
+	latencyMs?: number;
+	retryCount?: number;
+	timestamp?: number;
+};
+
+type QueueSnapshotEvent = {
+	type: "queue-snapshot";
+	reason: string;
+	queueLength: number;
+	readyLength: number;
+	deferredLength: number;
+	nextRetryInMs: number | null;
+	lastActionType?: OfflineAction["type"];
+	timestamp?: number;
+};
+
+type SyncCycleEvent = {
+	type: "sync-cycle";
+	durationMs: number;
+	syncedCount: number;
+	failedCount: number;
+	nextRetryInMs: number | null;
+	timestamp?: number;
+};
+
+type DiagnosticEvent =
+	| ConnectivityStatusEvent
+	| QueueSnapshotEvent
+	| SyncCycleEvent;
+
+type DiagnosticsListener = (event: DiagnosticEvent & { timestamp: number }) => void;
+
 class OfflineService {
 	private readonly QUEUE_KEY = "offline_action_queue";
 	private readonly MAX_RETRIES = 3;
@@ -483,6 +529,7 @@ class OfflineService {
 	private isOnline: boolean;
 	private syncInProgress: boolean = false;
 	private listeners: Set<(online: boolean) => void> = new Set();
+	private diagnosticsListeners: Set<DiagnosticsListener> = new Set();
 	private syncRetryTimeout: number | null = null;
 
 	constructor() {
@@ -503,7 +550,7 @@ class OfflineService {
 		const navigatorOnline =
 			typeof navigator !== "undefined" ? navigator.onLine : true;
 		if (!navigatorOnline) {
-			this.setOnlineStatus(false);
+			this.setOnlineStatus(false, "navigator");
 			return;
 		}
 
@@ -523,12 +570,12 @@ class OfflineService {
 				);
 			}
 
-			this.setOnlineStatus(true);
+			this.setOnlineStatus(true, "monitoring-endpoint");
 		} catch (error) {
 			const stillOnline =
 				typeof navigator !== "undefined" ? navigator.onLine : true;
 			if (!stillOnline) {
-				this.setOnlineStatus(false);
+				this.setOnlineStatus(false, "navigator");
 				return;
 			}
 
@@ -536,14 +583,23 @@ class OfflineService {
 				"[Offline Service] Connectivity check failed, assuming offline-first mode",
 				error,
 			);
-			this.setOnlineStatus(true);
+			this.setOnlineStatus(true, "monitoring-endpoint");
 		}
 	}
 
-	private setOnlineStatus(online: boolean) {
+	private setOnlineStatus(
+		online: boolean,
+		source: ConnectivitySource = "unknown",
+	) {
 		if (this.isOnline !== online) {
 			this.isOnline = online;
 			this.notifyListeners(online);
+			this.emitDiagnostic({
+				type: "connectivity-status",
+				status: online ? "online" : "offline",
+				source,
+			});
+			void this.captureQueueSnapshot("status-change");
 
 			if (online) {
 				this.syncQueue();
@@ -553,16 +609,105 @@ class OfflineService {
 
 	private handleOnline() {
 		offlineDebug("[Offline Service] Connection restored");
-		this.setOnlineStatus(true);
+		this.setOnlineStatus(true, "navigator");
 	}
 
 	private handleOffline() {
 		offlineDebug("[Offline Service] Connection lost");
-		this.setOnlineStatus(false);
+		this.setOnlineStatus(false, "navigator");
 	}
 
 	private notifyListeners(online: boolean) {
 		this.listeners.forEach((listener) => listener(online));
+	}
+
+	private emitDiagnostic(event: DiagnosticEvent) {
+		const timestamp = event.timestamp ?? Date.now();
+		const record = { ...event, timestamp } as DiagnosticEvent & {
+			timestamp: number;
+		};
+
+		this.diagnosticsListeners.forEach((listener) => {
+			try {
+				listener(record);
+			} catch (error) {
+				offlineDebug(
+					"[Offline Service] Diagnostics listener error",
+					error,
+				);
+			}
+		});
+
+		if (IndexedDBStorage.isSupported()) {
+			const payload: DiagnosticEventRecord = {
+				type: record.type,
+				timestamp,
+				payload: { ...record },
+			};
+			void indexedDBStorage
+				.addDiagnosticEvent(payload)
+				.catch((error) =>
+					offlineDebug(
+						"[Offline Service] Failed to persist diagnostic event",
+						error,
+					),
+				);
+		}
+	}
+
+	private getNextRetryDelayMs(queue: OfflineAction[]): number | null {
+		const now = Date.now();
+		let earliest = Number.POSITIVE_INFINITY;
+		for (const action of queue) {
+			const nextAt = action.nextAttemptAt ?? now;
+			if (nextAt < earliest) {
+				earliest = nextAt;
+			}
+		}
+		if (!Number.isFinite(earliest)) {
+			return null;
+		}
+		return Math.max(0, earliest - now);
+	}
+
+	private logQueueSnapshotFromQueue(queue: OfflineAction[], reason: string) {
+		const now = Date.now();
+		let readyLength = 0;
+		let deferredLength = 0;
+		for (const action of queue) {
+			const nextAt = action.nextAttemptAt ?? now;
+			if (nextAt <= now) {
+				readyLength += 1;
+			} else {
+				deferredLength += 1;
+			}
+		}
+		const nextRetryInMs = this.getNextRetryDelayMs(queue);
+		const lastActionType = queue.length
+			? queue[queue.length - 1]?.type
+			: undefined;
+
+		this.emitDiagnostic({
+			type: "queue-snapshot",
+			reason,
+			queueLength: queue.length,
+			readyLength,
+			deferredLength,
+			nextRetryInMs,
+			lastActionType,
+		});
+	}
+
+	private async captureQueueSnapshot(reason: string) {
+		try {
+			const queue = await this.getQueue();
+			this.logQueueSnapshotFromQueue(queue, reason);
+		} catch (error) {
+			offlineDebug(
+				"[Offline Service] Failed to capture queue snapshot",
+				error,
+			);
+		}
 	}
 
 	private clearScheduledSync() {
@@ -592,6 +737,28 @@ class OfflineService {
 		return () => {
 			this.listeners.delete(callback);
 		};
+	}
+
+	public onDiagnostics(callback: DiagnosticsListener) {
+		this.diagnosticsListeners.add(callback);
+		return () => {
+			this.diagnosticsListeners.delete(callback);
+		};
+	}
+
+	public async getDiagnostics(limit = 50): Promise<DiagnosticEventRecord[]> {
+		if (!IndexedDBStorage.isSupported()) {
+			return [];
+		}
+		try {
+			return await indexedDBStorage.getDiagnosticEvents(limit);
+		} catch (error) {
+			offlineDebug(
+				"[Offline Service] Failed to read diagnostics",
+				error,
+			);
+			return [];
+		}
 	}
 
 	public getStatus(): boolean {
@@ -631,6 +798,8 @@ class OfflineService {
 		if (this.isOnline) {
 			this.syncQueue();
 		}
+
+		void this.captureQueueSnapshot("queue-action");
 
 		return queuedAction.id;
 	}
@@ -683,6 +852,8 @@ class OfflineService {
 		if (this.isOnline) {
 			this.syncQueue();
 		}
+
+		void this.captureQueueSnapshot("queue-actions");
 
 		return actionIds;
 	}
@@ -758,6 +929,8 @@ class OfflineService {
 				error,
 			);
 		}
+
+		void this.captureQueueSnapshot("remove-actions");
 	}
 
 	public async clearQueue(): Promise<void> {
@@ -773,6 +946,8 @@ class OfflineService {
 		} catch (error) {
 			console.error("[Offline Service] Failed to clear queue:", error);
 		}
+
+		this.logQueueSnapshotFromQueue([], "clear-queue");
 	}
 
 	public async getQueue(): Promise<OfflineAction[]> {
@@ -799,6 +974,7 @@ class OfflineService {
 		this.syncInProgress = true;
 
 		const queue = await this.getQueue();
+		this.logQueueSnapshotFromQueue(queue, "sync-start");
 		const now = Date.now();
 		const readyActions = queue.filter((action) => {
 			const nextAttempt = action.nextAttemptAt ?? 0;
@@ -818,6 +994,7 @@ class OfflineService {
 				const delay = Math.max(earliest - now, this.RETRY_BASE_DELAY_MS);
 				this.scheduleNextSync(delay);
 			}
+			this.logQueueSnapshotFromQueue(queue, "sync-no-ready");
 			return;
 		}
 
@@ -905,13 +1082,11 @@ class OfflineService {
 		}
 
 		const pendingActions = [...deferredActions, ...remaining];
-		if (pendingActions.length > 0) {
-			const nextAttempt = Math.min(
-				...pendingActions.map((action) => action.nextAttemptAt ?? Date.now()),
-			);
-			const delay = Math.max(nextAttempt - Date.now(), this.RETRY_BASE_DELAY_MS);
-			this.scheduleNextSync(delay);
+		const nextRetryInMs = this.getNextRetryDelayMs(pendingActions);
+		if (nextRetryInMs !== null) {
+			this.scheduleNextSync(nextRetryInMs);
 		}
+		this.logQueueSnapshotFromQueue(pendingActions, "sync-post");
 
 		// Log sync completion
 		const syncDuration = Date.now() - syncStartTime;
@@ -921,6 +1096,14 @@ class OfflineService {
 			failedCount,
 			syncDuration,
 		);
+
+		this.emitDiagnostic({
+			type: "sync-cycle",
+			durationMs: syncDuration,
+			syncedCount: successfullySynced.length,
+			failedCount,
+			nextRetryInMs,
+		});
 
 		this.syncInProgress = false;
 	}

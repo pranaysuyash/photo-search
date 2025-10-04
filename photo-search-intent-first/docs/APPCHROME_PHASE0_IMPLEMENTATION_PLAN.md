@@ -56,6 +56,8 @@ This document captures the concrete follow-up work needed before the shell refac
 3. Run `OFFLINE_MODE=1 python cli.py search --dir demo_photos --query beach`.
 4. Store logs + exit status in CI artifact.
 
+> Implementation note: `scripts/offline_smoke.sh` encapsulates steps 1–3 for CI consumption.
+
 ### Electron Smoke (follow-up)
 - Use existing Spectron/Playwright-lite plan: package electron app, run with `app://` assets, simulate offline env var, run minimal interaction test.
 

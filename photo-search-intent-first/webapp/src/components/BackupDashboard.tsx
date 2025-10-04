@@ -446,9 +446,95 @@ function BackupSettings({
 							</div>
 						</div>
 					</label>
+
+					{/* Cloud Backup Options */}
+					<label className="flex items-center gap-3 p-3 rounded-lg border border-gray-300 dark:border-gray-600 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
+						<input
+							type="checkbox"
+							checked={config.providers.includes("google-drive")}
+							onChange={(e) => {
+								const providers = e.target.checked
+									? [...config.providers, "google-drive" as BackupProvider]
+									: config.providers.filter((p) => p !== "google-drive");
+								onChange({ ...config, providers });
+							}}
+							className="w-4 h-4"
+						/>
+						<Cloud className="w-5 h-5 text-blue-500" />
+						<div className="flex-1">
+							<div className="font-medium">Google Drive</div>
+							<div className="text-xs text-gray-500">
+								Store backups in your Google Drive account
+							</div>
+						</div>
+					</label>
+
+					<label className="flex items-center gap-3 p-3 rounded-lg border border-gray-300 dark:border-gray-600 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
+						<input
+							type="checkbox"
+							checked={config.providers.includes("dropbox")}
+							onChange={(e) => {
+								const providers = e.target.checked
+									? [...config.providers, "dropbox" as BackupProvider]
+									: config.providers.filter((p) => p !== "dropbox");
+								onChange({ ...config, providers });
+							}}
+							className="w-4 h-4"
+						/>
+						<Cloud className="w-5 h-5 text-green-500" />
+						<div className="flex-1">
+							<div className="font-medium">Dropbox</div>
+							<div className="text-xs text-gray-500">
+								Store backups in your Dropbox account
+							</div>
+						</div>
+					</label>
+
+					<label className="flex items-center gap-3 p-3 rounded-lg border border-gray-300 dark:border-gray-600 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
+						<input
+							type="checkbox"
+							checked={config.providers.includes("s3")}
+							onChange={(e) => {
+								const providers = e.target.checked
+									? [...config.providers, "s3" as BackupProvider]
+									: config.providers.filter((p) => p !== "s3");
+								onChange({ ...config, providers });
+							}}
+							className="w-4 h-4"
+						/>
+						<Cloud className="w-5 h-5 text-orange-500" />
+						<div className="flex-1">
+							<div className="font-medium">Amazon S3</div>
+							<div className="text-xs text-gray-500">
+								Store backups in AWS S3 compatible storage
+							</div>
+						</div>
+					</label>
+
+					<label className="flex items-center gap-3 p-3 rounded-lg border border-gray-300 dark:border-gray-600 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
+						<input
+							type="checkbox"
+							checked={config.providers.includes("icloud")}
+							onChange={(e) => {
+								const providers = e.target.checked
+									? [...config.providers, "icloud" as BackupProvider]
+									: config.providers.filter((p) => p !== "icloud");
+								onChange({ ...config, providers });
+							}}
+							className="w-4 h-4"
+						/>
+						<Cloud className="w-5 h-5 text-gray-500" />
+						<div className="flex-1">
+							<div className="font-medium">iCloud Drive</div>
+							<div className="text-xs text-gray-500">
+								Store backups in your iCloud Drive account
+							</div>
+						</div>
+					</label>
 				</div>
 				<p className="text-xs text-gray-500 mt-2">
-					Cloud backup options coming soon
+					<Info className="w-3 h-3 inline mr-1" />
+					Cloud providers require authentication setup in settings
 				</p>
 			</div>
 

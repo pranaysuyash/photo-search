@@ -15,18 +15,23 @@ vi.mock("./stores/useStores", async (importOriginal) => {
 // Mock RoutesHost to use a controlled lazy component for testing Suspense
 vi.mock("./components/chrome/RoutesHost", () => ({
   RoutesHost: () => {
-    const MapView = React.lazy(() =>
-      new Promise((resolve) => {
-        setTimeout(() => {
-          resolve({
-            default: () => <div data-testid="route-map-delayed">Map Delayed</div>,
-          });
-        }, 50);
-      })
+    const MapView = React.lazy(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(() => {
+            resolve({
+              default: () => (
+                <div data-testid="route-map-delayed">Map Delayed</div>
+              ),
+            });
+          }, 50);
+        })
     );
 
     return (
-      <React.Suspense fallback={<div data-testid="suspense-fallback">Loading…</div>}>
+      <React.Suspense
+        fallback={<div data-testid="suspense-fallback">Loading…</div>}
+      >
         <MapView />
       </React.Suspense>
     );
