@@ -38,6 +38,7 @@ import {
 	FileImage,
 	HardDrive,
 } from "lucide-react";
+import { CollectionCard } from "./ui/CollectionCard";
 import { useCallback, useRef, useState, useEffect, useMemo } from "react";
 import { apiCreateShare, apiExport, apiSetCollection, apiDeleteCollection, thumbUrl } from "../api";
 import { announce } from "../utils/accessibility";
@@ -723,62 +724,6 @@ export default function Collections({
 		}
 	}, [filteredAndSortedCollections, focusedCollectionIndex]);
 
-	// Lazy loading image component
-	const LazyImage = ({ src, alt, className, collectionName, photoPath }: {
-		src: string;
-		alt: string;
-		className: string;
-		collectionName: string;
-		photoPath: string;
-	}) => {
-		const imgRef = useRef<HTMLImageElement>(null);
-		const [isVisible, setIsVisible] = useState(false);
-		const [hasLoaded, setHasLoaded] = useState(false);
-		const imageKey = `${collectionName}-${photoPath}`;
-
-		useEffect(() => {
-			const observer = new IntersectionObserver(
-				([entry]) => {
-					if (entry.isIntersecting && !loadedImages.has(imageKey)) {
-						setIsVisible(true);
-						setLoadedImages(prev => new Set(prev).add(imageKey));
-					}
-				},
-				{ threshold: 0.1, rootMargin: "50px" }
-			);
-
-			if (imgRef.current) {
-				observer.observe(imgRef.current);
-			}
-
-			return () => observer.disconnect();
-		}, [imageKey]);
-
-		return (
-			<div ref={imgRef} className={`${className} relative overflow-hidden`}>
-				{isVisible ? (
-					<img
-						src={src}
-						alt={alt}
-						className={`w-full h-full object-cover transition-opacity duration-300 ${
-							hasLoaded ? "opacity-100" : "opacity-0"
-						}`}
-						onLoad={() => setHasLoaded(true)}
-						loading="lazy"
-					/>
-				) : (
-					<div className="w-full h-full bg-gray-200 animate-pulse flex items-center justify-center">
-						<Camera className="w-6 h-6 text-gray-400" />
-					</div>
-				)}
-				{isVisible && !hasLoaded && (
-					<div className="absolute inset-0 bg-gray-200 animate-pulse flex items-center justify-center">
-						<div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-					</div>
-				)}
-			</div>
-		);
-	};
 
 	// Handle creating new collection
 	const handleCreateCollection = useCallback(async () => {
@@ -1447,368 +1392,50 @@ export default function Collections({
 			) : (
 				<ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 text-sm">
 					{filteredAndSortedCollections.map((name, index) => {
-						const isDropTarget = dragOverCollection === name;
 						const collectionPaths = collections[name] || [];
 						const theme = getCollectionTheme(name);
 						const isFocused = focusedCollectionIndex === index;
+						const isDropTarget = dragOverCollection === name;
+						const isDragging = draggedItem?.type === "collection" && draggedItem.name === name;
+						const isSelected = selectedCollections.has(name);
 
 						return (
-							<li
+							<CollectionCard
 								key={name}
-								draggable
-								onDragStart={(e) => handleCollectionDragStart(e, name)}
-								onDragOver={(e) => handleDragOver(e, name)}
-								onDragEnter={(e) => handleDragEnter(e, name)}
+								name={name}
+								photos={collectionPaths}
+								theme={theme}
+								isFocused={isFocused}
+								isDropTarget={isDropTarget}
+								isDragging={isDragging}
+								isSelected={isSelected}
+								bulkMode={bulkMode}
+								dir={dir}
+								engine={engine}
+								onOpen={onOpen}
+								onShare={handleShare}
+								onExport={handleExport}
+								onDelete={onDelete}
+								onSetCover={(name) => setShowCoverSelector(name)}
+								onChangeTheme={(name) => setShowThemeSelector(name)}
+								onToggleSelection={toggleCollectionSelection}
+								onDragStart={handleCollectionDragStart}
+								onDragOver={handleDragOver}
+								onDragEnter={handleDragEnter}
 								onDragLeave={handleDragLeave}
-								onDrop={(e) => handleDrop(e, name)}
-								onKeyDown={(e) => {
-									if (e.key === "Enter" || e.key === " ") {
-										e.preventDefault();
-										if (bulkMode) {
-											toggleCollectionSelection(name);
-										} else {
-											onOpen(name);
-										}
-									}
-								}}
+								onDrop={handleDrop}
+								onContextMenu={handleContextMenu}
 								onClick={() => {
 									setFocusedCollectionIndex(index);
 									setKeyboardNavigationActive(true);
 								}}
-								onContextMenu={(e) => handleContextMenu(e, name)}
-								tabIndex={0}
-								aria-label={`Collection ${name} with ${collectionPaths.length} photos${isFocused ? " (focused)" : ""}`}
-								className={`bg-gradient-to-br ${theme.colors} border rounded-xl p-4 transition-all duration-300 cursor-move shadow-sm hover:shadow-lg transform ${
-									isDropTarget
-										? "border-blue-500 bg-blue-50 shadow-lg ring-2 ring-blue-200 ring-opacity-50 scale-105 animate-pulse"
-										: `${theme.border} hover:border-gray-300 hover:scale-[1.02]`
-								} ${expandedActions === name ? "ring-2 ring-blue-200 shadow-md" : ""} ${
-									draggedItem?.type === "collection" && draggedItem.name === name
-										? "opacity-50 scale-95"
-										: ""
-								} ${
-									isFocused && keyboardNavigationActive
-										? "ring-4 ring-blue-400 ring-opacity-60 border-blue-400"
-										: ""
-								}`}
-							>
-								{/* Collection header with drag handle */}
-								<div className="flex items-center justify-between mb-3">
-									<div className="flex items-center gap-2 min-w-0 flex-1">
-										{bulkMode && (
-											<button
-												type="button"
-												onClick={(e) => {
-													e.stopPropagation();
-													toggleCollectionSelection(name);
-												}}
-												className="p-1 rounded hover:bg-white hover:bg-opacity-50 transition-colors"
-											>
-												{selectedCollections.has(name) ? (
-													<CheckSquare className="w-5 h-5 text-blue-600" />
-												) : (
-													<Square className="w-5 h-5 text-gray-400" />
-												)}
-											</button>
-										)}
-										<GripVertical className="w-4 h-4 text-gray-400 flex-shrink-0" />
-										<div className="min-w-0">
-											<div
-												className="font-semibold text-gray-900 truncate"
-												title={name}
-											>
-												{name}
-											</div>
-											<div className="text-xs text-gray-600 space-y-1">
-												<div className="flex items-center gap-1">
-													<span>
-														{collectionPaths.length} photo
-														{collectionPaths.length !== 1 ? "s" : ""}
-													</span>
-													{isDropTarget && (
-														<span className="text-blue-600 font-medium">
-															• Drop here to add
-														</span>
-													)}
-												</div>
-												{collectionPaths.length > 0 && (
-													<div className="flex items-center gap-2 text-xs text-gray-500">
-														<span>
-															Est. {Math.round(collectionPaths.length * 2.5)}MB
-														</span>
-														<span>•</span>
-														<span>
-															{new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}
-														</span>
-													</div>
-												)}
-											</div>
-										</div>
-									</div>
-								</div>
-
-								{/* Photo grid preview */}
-								<div className="relative mb-3 group">
-									{collectionPaths.length > 0 ? (
-										<>
-											{collectionPaths.length === 1 ? (
-												// Single photo - full cover
-												<div className="relative">
-													<LazyImage
-														src={thumbUrl(dir, engine, getCollectionCover(name, collectionPaths), 200)}
-														alt={`${name} collection cover`}
-														className="w-full h-32 rounded-lg shadow-sm transition-transform duration-200 group-hover:scale-[1.02]"
-														collectionName={name}
-														photoPath={getCollectionCover(name, collectionPaths)}
-													/>
-													<button
-														type="button"
-														onClick={(e) => {
-															e.stopPropagation();
-															setShowCoverSelector(name);
-														}}
-														className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm text-gray-700 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-white shadow-sm"
-														title="Change cover photo"
-													>
-														<Edit2 className="w-3 h-3" />
-													</button>
-												</div>
-											) : collectionPaths.length === 2 ? (
-												// Two photos - side by side
-												<div className="grid grid-cols-2 gap-1 h-32">
-													{collectionPaths.slice(0, 2).map((path, i) => (
-														<LazyImage
-															key={path}
-															src={thumbUrl(dir, engine, path, 100)}
-															alt={`${name} photo ${i + 1}`}
-															className="w-full h-full rounded-lg shadow-sm transition-transform duration-200 group-hover:scale-[1.02]"
-															collectionName={name}
-															photoPath={path}
-														/>
-													))}
-												</div>
-											) : collectionPaths.length === 3 ? (
-												// Three photos - main + 2 stack
-												<div className="grid grid-cols-2 gap-1 h-32 relative">
-													<div className="relative">
-														<LazyImage
-															src={thumbUrl(dir, engine, getCollectionCover(name, collectionPaths), 100)}
-															alt={`${name} main photo`}
-															className="w-full h-full rounded-lg shadow-sm transition-transform duration-200 group-hover:scale-[1.02]"
-															collectionName={name}
-															photoPath={getCollectionCover(name, collectionPaths)}
-														/>
-														<button
-															type="button"
-															onClick={(e) => {
-																e.stopPropagation();
-																setShowCoverSelector(name);
-															}}
-															className="absolute top-1 left-1 bg-white/90 backdrop-blur-sm text-gray-700 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-white shadow-sm"
-															title="Change cover photo"
-														>
-															<Edit2 className="w-2.5 h-2.5" />
-														</button>
-													</div>
-													<div className="grid grid-rows-2 gap-1">
-														{collectionPaths.slice(1, 3).map((path, i) => (
-															<LazyImage
-																key={path}
-																src={thumbUrl(dir, engine, path, 50)}
-																alt={`${name} photo ${i + 2}`}
-																className="w-full h-full rounded-lg shadow-sm transition-transform duration-200 group-hover:scale-[1.02]"
-																collectionName={name}
-																photoPath={path}
-															/>
-														))}
-													</div>
-												</div>
-											) : (
-												// Four or more photos - 2x2 grid with main cover
-												<div className="grid grid-cols-2 grid-rows-2 gap-1 h-32 relative">
-													{/* First photo is the cover photo */}
-													<div className="relative">
-														<LazyImage
-															key={getCollectionCover(name, collectionPaths)}
-															src={thumbUrl(dir, engine, getCollectionCover(name, collectionPaths), 75)}
-															alt={`${name} cover photo`}
-															className="w-full h-full rounded-lg shadow-sm transition-transform duration-200 group-hover:scale-[1.02]"
-															collectionName={name}
-															photoPath={getCollectionCover(name, collectionPaths)}
-														/>
-														<button
-															type="button"
-															onClick={(e) => {
-																e.stopPropagation();
-																setShowCoverSelector(name);
-															}}
-															className="absolute top-1 left-1 bg-white/90 backdrop-blur-sm text-gray-700 p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-white shadow-sm"
-															title="Change cover photo"
-														>
-															<Edit2 className="w-2 h-2" />
-														</button>
-													</div>
-													{/* Other photos */}
-													{collectionPaths.slice(0, 3).filter(path => path !== getCollectionCover(name, collectionPaths)).slice(0, 3).map((path, i) => (
-														<LazyImage
-															key={path}
-															src={thumbUrl(dir, engine, path, 75)}
-															alt={`${name} photo ${i + 2}`}
-															className="w-full h-full rounded-lg shadow-sm transition-transform duration-200 group-hover:scale-[1.02]"
-															collectionName={name}
-															photoPath={path}
-														/>
-													))}
-												</div>
-											)}
-
-											{/* Multiple photos indicator */}
-											{collectionPaths.length > 4 && (
-												<div className="absolute top-2 right-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
-													<Plus className="w-3 h-3" />
-													{collectionPaths.length - 4}
-												</div>
-											)}
-
-											{/* Gradient overlay for better text readability */}
-											<div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-lg" />
-										</>
-									) : (
-										<div className="w-full h-32 bg-gray-100 rounded-lg flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-200">
-											<FolderPlus className="w-8 h-8 mb-2" />
-											<span className="text-sm">Empty collection</span>
-										</div>
-									)}
-								</div>
-
-								{/* Action buttons */}
-								<div className="flex items-center justify-between pt-2 border-t border-gray-100">
-									<button
-										type="button"
-										onClick={() => onOpen(name)}
-										className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-xs font-medium transition-colors duration-200 flex items-center gap-1"
-									>
-										View Collection
-									</button>
-
-									<div className="flex items-center gap-1">
-										{/* Quick access buttons */}
-										<button
-											type="button"
-											onClick={() => handleShare(name)}
-											className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-blue-600 transition-colors duration-200"
-											title="Share collection"
-											disabled={collectionPaths.length === 0}
-										>
-											<Share2 className="w-4 h-4" />
-										</button>
-										<button
-											type="button"
-											onClick={() => handleExport(name)}
-											className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-green-600 transition-colors duration-200"
-											title="Export collection"
-											disabled={collectionPaths.length === 0}
-										>
-											<Download className="w-4 h-4" />
-										</button>
-
-										{/* Quick actions dropdown */}
-										<div className="relative">
-											<button
-												type="button"
-												onClick={(e) => {
-													e.stopPropagation();
-													setActiveDropdown(activeDropdown === name ? null : name);
-												}}
-												className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors duration-200"
-												title="More actions"
-											>
-												<MoreVertical className="w-4 h-4" />
-											</button>
-
-											{activeDropdown === name && (
-												<div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-48">
-													<div className="py-1">
-														<button
-															type="button"
-															className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-															onClick={() => {
-																setActiveDropdown(null);
-																// TODO: Implement rename functionality
-																alert("Rename functionality coming soon!");
-															}}
-														>
-															<Edit3 className="w-4 h-4" />
-															Rename
-														</button>
-														<button
-															type="button"
-															className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-															onClick={() => {
-																setActiveDropdown(null);
-																// TODO: Implement duplicate functionality
-																alert("Duplicate functionality coming soon!");
-															}}
-														>
-															<Copy className="w-4 h-4" />
-															Duplicate
-														</button>
-														<button
-															type="button"
-															className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-															onClick={() => {
-																setActiveDropdown(null);
-																// TODO: Implement archive functionality
-																alert("Archive functionality coming soon!");
-															}}
-														>
-															<Archive className="w-4 h-4" />
-															Archive
-														</button>
-														<button
-															type="button"
-															className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-															onClick={(e) => {
-																e.stopPropagation();
-																setActiveDropdown(null);
-																setShowThemeSelector(name);
-															}}
-														>
-															<Palette className="w-4 h-4" />
-															Change Theme
-														</button>
-														<div className="border-t border-gray-100 my-1" />
-														{onDelete && (
-															<button
-																type="button"
-																onClick={() => {
-																	setActiveDropdown(null);
-																	// Record action for undo/redo before deleting
-																	const collectionPaths = collections[name] || [];
-																	recordAction({
-																		type: "delete",
-																		collectionName: name,
-																		timestamp: Date.now(),
-																		previousState: {
-																			photos: collectionPaths,
-																			themes: collectionThemes
-																		}
-																	});
-																	onDelete(name);
-																}}
-																className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-															>
-																<Trash2 className="w-4 h-4" />
-																Delete
-															</button>
-														)}
-													</div>
-												</div>
-											)}
-										</div>
-									</div>
-								</div>
-							</li>
+								onRecordAction={recordAction}
+								getCollectionCover={getCollectionCover}
+								thumbUrl={thumbUrl}
+								collectionThemes={collectionThemes}
+								loadedImages={loadedImages}
+								setLoadedImages={setLoadedImages}
+							/>
 						);
 					})}
 				</ul>

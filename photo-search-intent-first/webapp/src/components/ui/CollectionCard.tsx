@@ -48,6 +48,7 @@ interface CollectionCardProps {
 	onDragLeave: (e: React.DragEvent) => void;
 	onDrop: (e: React.DragEvent, name: string) => void;
 	onContextMenu: (e: React.MouseEvent, name: string) => void;
+	onClick?: () => void;
 	onRecordAction: (action: any) => void;
 	getCollectionCover: (name: string, photos: string[]) => string;
 	thumbUrl: (dir: string, engine: string, path: string, size: number) => string;
@@ -147,6 +148,7 @@ export function CollectionCard({
 	onDragLeave,
 	onDrop,
 	onContextMenu,
+	onClick,
 	onRecordAction,
 	getCollectionCover,
 	thumbUrl,
@@ -373,6 +375,7 @@ export function CollectionCard({
 					}
 				}}
 				onContextMenu={(e) => onContextMenu(e, name)}
+				onClick={onClick}
 				tabIndex={0}
 				aria-label={`Collection ${name} with ${photos.length} photos${isFocused ? " (focused)" : ""}`}
 				className={`bg-gradient-to-br ${theme.colors} border rounded-xl transition-all duration-300 cursor-move shadow-sm hover:shadow-lg transform group ${
