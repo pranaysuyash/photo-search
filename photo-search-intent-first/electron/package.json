@@ -26,6 +26,7 @@
     "electron-notarize": "^1.2.1"
   },
   "dependencies": {
+    "chokidar": "^4.0.3",
     "electron-updater": "6.1.8",
     "tweetnacl": "1.0.3"
   },

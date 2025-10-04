@@ -19,13 +19,15 @@ class PythonServiceSupervisor {
       restartDelay: options.restartDelay || 5000, // 5 seconds
       healthCheckInterval: options.healthCheckInterval || 10000, // 10 seconds
       healthCheckTimeout: options.healthCheckTimeout || 5000, // 5 seconds
-      cwd: options.cwd || path.resolve(__dirname, '..'),
-      pythonPath: options.pythonPath || this.getDefaultPythonPath(),
+      cwd: options.cwd || path.resolve(__dirname, '..', '..'),
       logLevel: options.logLevel || 'info',
       enableProdLogging: options.enableProdLogging || false,
       ...options
     };
-    
+
+    // Set pythonPath after other options are initialized
+    this.options.pythonPath = options.pythonPath || this.getDefaultPythonPath();
+
     this.serviceProcess = null;
     this.restartCount = 0;
     this.healthCheckTimer = null;
@@ -35,7 +37,7 @@ class PythonServiceSupervisor {
     this.lastHealthCheck = null;
     this.healthCheckFailures = 0;
     this.maxHealthCheckFailures = 3;
-    
+
     // Event emitters for status changes
     this.listeners = {
       statusChange: [],
@@ -44,26 +46,32 @@ class PythonServiceSupervisor {
       error: []
     };
   }
-  
+
   getDefaultPythonPath() {
     const cwd = this.options.cwd;
     const pythonPath = path.join(cwd, '.venv', 'bin', 'python');
-    
+
+    console.log('[ServiceSupervisor] CWD:', cwd);
+    console.log('[ServiceSupervisor] Checking Python path:', pythonPath);
+
     // Check if virtual environment exists
     if (fs.existsSync(pythonPath)) {
+      console.log('[ServiceSupervisor] Virtual environment found, using:', pythonPath);
       return pythonPath;
     }
-    
+
+    console.warn('[ServiceSupervisor] Virtual environment not found at:', pythonPath);
+    console.warn('[ServiceSupervisor] Falling back to system python');
     // Fallback to system python
     return 'python';
   }
-  
+
   on(event, callback) {
     if (this.listeners[event]) {
       this.listeners[event].push(callback);
     }
   }
-  
+
   off(event, callback) {
     if (this.listeners[event]) {
       const index = this.listeners[event].indexOf(callback);
@@ -72,7 +80,7 @@ class PythonServiceSupervisor {
       }
     }
   }
-  
+
   emit(event, data) {
     if (this.listeners[event]) {
       this.listeners[event].forEach(callback => {
@@ -84,29 +92,29 @@ class PythonServiceSupervisor {
       });
     }
   }
-  
+
   setStatus(newStatus) {
     const oldStatus = this.status;
     this.status = newStatus;
     console.log(`[ServiceSupervisor] Status changed: ${oldStatus} → ${newStatus}`);
     this.emit('statusChange', { from: oldStatus, to: newStatus });
   }
-  
+
   async start() {
     if (this.isShuttingDown) {
       console.warn('[ServiceSupervisor] Cannot start while shutting down');
       return false;
     }
-    
+
     if (this.status === 'starting' || this.status === 'running') {
       console.warn('[ServiceSupervisor] Service already starting or running');
       return true;
     }
-    
+
     this.setStatus('starting');
     this.restartCount = 0;
     this.healthCheckFailures = 0;
-    
+
     try {
       const success = await this.spawnService();
       if (success) {
@@ -124,33 +132,33 @@ class PythonServiceSupervisor {
       return false;
     }
   }
-  
+
   async stop() {
     this.isShuttingDown = true;
     this.stopHealthMonitoring();
-    
+
     if (this.status === 'stopped' || this.status === 'stopping') {
       return true;
     }
-    
+
     this.setStatus('stopping');
-    
+
     try {
       if (this.serviceProcess) {
         // Try graceful shutdown first
         this.serviceProcess.kill('SIGTERM');
-        
+
         // Wait a bit for graceful shutdown
         await new Promise(resolve => setTimeout(resolve, 2000));
-        
+
         // Force kill if still running
         if (this.serviceProcess.killed === false) {
           this.serviceProcess.kill('SIGKILL');
         }
-        
+
         this.serviceProcess = null;
       }
-      
+
       this.setStatus('stopped');
       return true;
     } catch (error) {
@@ -161,41 +169,48 @@ class PythonServiceSupervisor {
       this.isShuttingDown = false;
     }
   }
-  
+
   async restart() {
     console.log('[ServiceSupervisor] Restarting service...');
     await this.stop();
-    
+
     // Brief pause before restart
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
+
     return await this.start();
   }
-  
+
   spawnService() {
     return new Promise((resolve, reject) => {
       try {
         const cwd = this.options.cwd;
         const pythonPath = this.options.pythonPath;
-        
+
+        console.log('[ServiceSupervisor] Spawning service with:');
+        console.log('[ServiceSupervisor] CWD:', cwd);
+        console.log('[ServiceSupervisor] Python path:', pythonPath);
+        console.log('[ServiceSupervisor] Python exists:', fs.existsSync(pythonPath));
+
         // Standardize dev API port for consistency
         const args = [
-          '-m', 'uvicorn', 
-          'api.server:app', 
-          '--host', this.options.host, 
+          '-m', 'uvicorn',
+          'api.server:app',
+          '--host', this.options.host,
           '--port', String(this.options.port)
         ];
-        
+
+        console.log('[ServiceSupervisor] Args:', args);
+
         // Generate an ephemeral API token for this run
         this.apiToken = crypto.randomBytes(24).toString('hex');
-        const env = { 
-          ...process.env, 
-          API_TOKEN: this.apiToken, 
-          API_PORT: String(this.options.port) 
+        const env = {
+          ...process.env,
+          API_TOKEN: this.apiToken,
+          API_PORT: String(this.options.port)
         };
-        
+
         console.log(`[ServiceSupervisor] Starting Python service on ${this.options.host}:${this.options.port}`);
-        
+
         // In production, capture logs to a file for diagnostics
         let stdioConfig = 'inherit';
         if (this.options.enableProdLogging && !this.isDev()) {
@@ -211,13 +226,13 @@ class PythonServiceSupervisor {
             stdioConfig = 'inherit';
           }
         }
-        
-        this.serviceProcess = spawn(pythonPath, args, { 
-          cwd, 
-          stdio: stdioConfig, 
-          env 
+
+        this.serviceProcess = spawn(pythonPath, args, {
+          cwd,
+          stdio: stdioConfig,
+          env
         });
-        
+
         // Handle stdout/stderr if we're capturing logs
         if (Array.isArray(stdioConfig) && stdioConfig[1] === 'pipe') {
           this.serviceProcess.stdout.on('data', (d) => {
@@ -227,24 +242,24 @@ class PythonServiceSupervisor {
             console.error(`[Python Service] ${d}`);
           });
         }
-        
+
         this.serviceProcess.on('exit', (code, signal) => {
           console.warn(`[ServiceSupervisor] Python service exited with code ${code} and signal ${signal}`);
-          
+
           if (!this.isShuttingDown) {
             this.handleUnexpectedExit(code, signal);
           }
         });
-        
+
         this.serviceProcess.on('error', (error) => {
           console.error('[ServiceSupervisor] Failed to spawn Python service:', error);
           this.emit('error', { type: 'spawn-failed', error });
-          
+
           if (!this.isShuttingDown) {
             this.handleSpawnError(error);
           }
         });
-        
+
         // Give it a moment to start
         setTimeout(() => {
           if (this.serviceProcess && !this.serviceProcess.killed) {
@@ -253,34 +268,34 @@ class PythonServiceSupervisor {
             reject(new Error('Service process failed to start'));
           }
         }, 1000);
-        
+
       } catch (error) {
         console.error('[ServiceSupervisor] Error spawning service:', error);
         reject(error);
       }
     });
   }
-  
+
   handleUnexpectedExit(code, signal) {
     this.setStatus('crashed');
-    
+
     if (this.restartCount < this.options.maxRestarts) {
       this.restartCount++;
       console.log(`[ServiceSupervisor] Service crashed, restart attempt ${this.restartCount}/${this.options.maxRestarts}`);
-      
-      this.emit('restart', { 
-        attempt: this.restartCount, 
+
+      this.emit('restart', {
+        attempt: this.restartCount,
         maxAttempts: this.options.maxRestarts,
         exitCode: code,
         signal: signal
       });
-      
+
       // Schedule restart with exponential backoff
       const delay = Math.min(
         this.options.restartDelay * Math.pow(1.5, this.restartCount - 1),
         30000 // Max 30 seconds
       );
-      
+
       setTimeout(() => {
         if (!this.isShuttingDown) {
           this.restart();
@@ -288,22 +303,22 @@ class PythonServiceSupervisor {
       }, delay);
     } else {
       console.error('[ServiceSupervisor] Maximum restart attempts reached, giving up');
-      this.emit('error', { 
-        type: 'max-restarts-reached', 
+      this.emit('error', {
+        type: 'max-restarts-reached',
         restartCount: this.restartCount,
         maxRestarts: this.options.maxRestarts
       });
     }
   }
-  
+
   handleSpawnError(error) {
     this.setStatus('crashed');
     this.emit('error', { type: 'spawn-error', error });
-    
+
     if (this.restartCount < this.options.maxRestarts) {
       this.restartCount++;
       console.log(`[ServiceSupervisor] Spawn error, restart attempt ${this.restartCount}/${this.options.maxRestarts}`);
-      
+
       setTimeout(() => {
         if (!this.isShuttingDown) {
           this.restart();
@@ -311,36 +326,36 @@ class PythonServiceSupervisor {
       }, this.options.restartDelay);
     }
   }
-  
+
   startHealthMonitoring() {
     this.stopHealthMonitoring(); // Clear any existing timer
-    
+
     this.healthCheckTimer = setInterval(async () => {
       try {
         const isHealthy = await this.performHealthCheck();
         this.lastHealthCheck = new Date();
-        
+
         if (isHealthy) {
           this.healthCheckFailures = 0;
           this.emit('healthChange', { healthy: true, failures: 0 });
         } else {
           this.healthCheckFailures++;
           console.warn(`[ServiceSupervisor] Health check failed (${this.healthCheckFailures}/${this.maxHealthCheckFailures})`);
-          this.emit('healthChange', { 
-            healthy: false, 
+          this.emit('healthChange', {
+            healthy: false,
             failures: this.healthCheckFailures,
             maxFailures: this.maxHealthCheckFailures
           });
-          
+
           // If we've exceeded max failures, mark as unhealthy and consider restart
           if (this.healthCheckFailures >= this.maxHealthCheckFailures) {
             this.setStatus('unhealthy');
-            this.emit('error', { 
-              type: 'health-failed', 
+            this.emit('error', {
+              type: 'health-failed',
               failures: this.healthCheckFailures,
               maxFailures: this.maxHealthCheckFailures
             });
-            
+
             // Attempt restart
             if (this.restartCount < this.options.maxRestarts) {
               console.log('[ServiceSupervisor] Health check failures exceeded threshold, restarting service');
@@ -354,21 +369,21 @@ class PythonServiceSupervisor {
       }
     }, this.options.healthCheckInterval);
   }
-  
+
   stopHealthMonitoring() {
     if (this.healthCheckTimer) {
       clearInterval(this.healthCheckTimer);
       this.healthCheckTimer = null;
     }
   }
-  
+
   async performHealthCheck() {
     const healthUrls = [
       `http://${this.options.host}:${this.options.port}/api/health`,
       `http://${this.options.host}:${this.options.port}/health`,
       `http://${this.options.host}:${this.options.port}/docs`
     ];
-    
+
     for (const url of healthUrls) {
       try {
         const isReachable = await this.httpPing(url, this.options.healthCheckTimeout);
@@ -380,10 +395,10 @@ class PythonServiceSupervisor {
         console.debug(`[ServiceSupervisor] Health check URL failed: ${url}`, error?.message);
       }
     }
-    
+
     return false;
   }
-  
+
   httpPing(url, timeout = 5000) {
     return new Promise((resolve) => {
       const controller = new AbortController();
@@ -391,7 +406,7 @@ class PythonServiceSupervisor {
         controller.abort();
         resolve(false);
       }, timeout);
-      
+
       http.get(url, { signal: controller.signal }, (res) => {
         clearTimeout(timeoutId);
         resolve(res.statusCode >= 200 && res.statusCode < 300);
@@ -405,13 +420,13 @@ class PythonServiceSupervisor {
       });
     });
   }
-  
+
   isDev() {
     return process.env.NODE_ENV === 'development';
   }
-  
+
   // Public API methods
-  
+
   getStatus() {
     return {
       status: this.status,
@@ -425,7 +440,7 @@ class PythonServiceSupervisor {
       host: this.options.host
     };
   }
-  
+
   getConfig() {
     return {
       host: this.options.host,
@@ -436,32 +451,32 @@ class PythonServiceSupervisor {
       healthCheckTimeout: this.options.healthCheckTimeout
     };
   }
-  
+
   getApiToken() {
     return this.apiToken;
   }
-  
+
   getApiBaseUrl() {
     return `http://${this.options.host}:${this.options.port}`;
   }
-  
+
   getApiConfig() {
     return {
       base: this.getApiBaseUrl(),
       token: this.apiToken || ''
     };
   }
-  
+
   async waitForHealthy(timeoutMs = 30000) {
     const startTime = Date.now();
-    
+
     while (Date.now() - startTime < timeoutMs) {
       if (this.status === 'running' && this.healthCheckFailures === 0) {
         return true;
       }
       await new Promise(resolve => setTimeout(resolve, 500));
     }
-    
+
     return false;
   }
 }

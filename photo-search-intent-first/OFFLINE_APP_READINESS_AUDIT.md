@@ -36,12 +36,12 @@ The photo-search app currently has extensive online dependencies that conflict w
 
 ### ⚠️ **ONLINE DEPENDENCIES TO ADDRESS**
 
-#### 1. UI Status Indicators
-**Files**: `OfflineIndicator.tsx`, `OfflineStatusIndicator.tsx`, `StatusBar.tsx`, `AppChrome.tsx`
-- Online/offline status notifications
-- Network quality monitoring displays
-- Connection status indicators
-- Queue management UI for offline actions
+#### 1. UI Status Indicators (Deferred)
+**Files**: `StatusBar.tsx`, `AppChrome.tsx` (legacy indicator components removed)
+- Offline indicator UI removed for strict offline-first experience
+- Network quality displays reserved for future online enhancements
+- Queue management messaging gated behind service hooks only
+- Reintroduce visual cues alongside forthcoming online features
 
 #### 2. Network Services
 **File**: `OfflineService.ts` (1,300+ lines)

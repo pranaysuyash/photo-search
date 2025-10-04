@@ -92,7 +92,6 @@ import { MobileOptimizations } from "./MobileOptimizations";
 import { MobilePWATest } from "./MobilePWATest";
 import { ModalSystemWrapper } from "./ModalSystemWrapper";
 import FirstRunSetup from "./modals/FirstRunSetup";
-import { OfflineIndicator } from "./OfflineIndicator";
 import { OnboardingChecklist } from "./OnboardingChecklist";
 import { OnboardingTour } from "./OnboardingTour";
 import { OverlayLayer } from "./OverlayLayer";
@@ -600,7 +599,6 @@ export function AppChrome({
 				>
 					Skip to main content
 				</a>
-				<OfflineIndicator />
 				{showWelcome && (
 					<IntentAwareWelcome
 						onStartDemo={handleWelcomeStartDemo}

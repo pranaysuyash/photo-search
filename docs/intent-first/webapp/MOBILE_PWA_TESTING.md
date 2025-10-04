@@ -95,7 +95,7 @@ This guide provides comprehensive testing procedures for the newly implemented m
 1. Perform actions while offline (favorite, tag, etc.)
 2. Go back online
 3. **Expected**: Actions sync automatically
-4. **Expected**: Offline indicator shows sync status
+4. **Expected**: Sync completes silently; dedicated offline indicator deferred
 
 ### PWA Installation Testing
 

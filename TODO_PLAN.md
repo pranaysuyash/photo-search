@@ -23,7 +23,7 @@ The following roadmap captures the long-term, intent-first initiatives required 
 ### 2) Electron Offline Hardening & Health Surface
 - **Scope:** Make the Electron app resilient and transparent in air-gapped environments.
 - **Deliverables:**
-  1. Upgrade `OfflineService` to exponential backoff + status LED component (green/amber/red) in OfflineIndicator.
+  1. Upgrade `OfflineService` to exponential backoff; defer status LED UI until online cues return.
   2. Extend Diagnostics drawer with connection history, last successful `/api/health` timestamp, and bundled model status check.
   3. Ensure backend CORS includes `app://local`; add automated Spectron/Playwright-lite test that packages assets, forces offline, and verifies UI boot + zero console noise.
   4. Document Electron-specific offline behaviours in `ELECTRON_INTEGRATION_TEST_PLAN.md` and troubleshooting flow.
@@ -39,6 +39,18 @@ The following roadmap captures the long-term, intent-first initiatives required 
   2. Create CLI script covering indexing/search with `OFFLINE_MODE=1` and bundled models (report to `agents.md`).
   3. Bundle results into a nightly “offline smoke” pipeline storing artifacts/logs.
 - **Success Criteria:** Offline smoke runs automatically; failures block release.
+
+### Phase 0 – AppChrome Foundations (Owner: AI assistant)
+- **Scope:** Prepare modernization work by securing offline resilience, shared design primitives, and baseline regression artifacts.
+- **Deliverables:**
+  1. Draft implementation spec for `OfflineService` exponential backoff + status emitters. — ✅ Implemented Oct 2025 (backoff + scheduling live; status emitters still TBD).
+  2. Define diagnostics telemetry schema (connection history, model health) and surface plan for upcoming ActivityTray. — **TODO**
+  3. Outline CI offline smoke strategy (CLI script + Playwright runner) with tooling requirements. — **TODO**
+  4. Catalog legacy components requiring shadcn migration (StatusBar, StatsBar, LibrarySwitcher, Collections, BottomNavigation, SearchBar). — ✅ Completed Oct 2025.
+  5. Produce baseline UX capture plan (screenshots or Playwright visuals) for library/search/collections/onboarding journeys. — **TODO**
+  6. Schedule design/dev workshop to lock shared visual spec; circulate agenda + attendees. — ✅ Calendar invite requested Oct 2025.
+  7. Draft RFC outline for `LayoutShell` extraction covering routing/context impacts. — **TODO**
+- **Success Criteria:** All TODO items have owners/dates before Phase 1 kicks off; migration candidates documented for design system roll-out.
 
 ---
 

@@ -11,7 +11,6 @@ import {
 	Zap,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { OfflineStatusIndicator } from "./OfflineStatusIndicator";
 
 interface StatusBarProps {
 	photoCount?: number;
@@ -145,10 +144,6 @@ export function StatusBar({
 						<span>{memoryUsage.toFixed(0)}%</span>
 					</div>
 
-					{/* Connection status */}
-					<div className="status-item">
-						<OfflineStatusIndicator />
-					</div>
 				</div>
 			</div>
 		</div>

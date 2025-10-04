@@ -1,12 +1,15 @@
 import { indexedDBStorage } from "./IndexedDBStorage";
 
 export interface PhotoManifestItem {
+	id: string;
 	path: string;
 	size: number;
 	mtime: number;
 	width?: number;
 	height?: number;
 	hash: string;
+	mime?: string;
+	dataUri?: string;
 }
 
 /**
@@ -15,7 +18,7 @@ export interface PhotoManifestItem {
 export async function loadOfflineManifest(): Promise<PhotoManifestItem[] | null> {
 	try {
 		// First, fetch the manifest from the network
-			const response = await fetch("/demo_photos/manifest.json");
+		const response = await fetch("/demo_manifest.json");
 		if (!response.ok) {
 			throw new Error(`Failed to fetch manifest: ${response.status}`);
 		}

@@ -57,17 +57,43 @@ function generateManifest() {
     const fileContent = fs.readFileSync(filePath);
     const hash = crypto.createHash('sha256').update(fileContent).digest('hex');
 
+    const baseName = path.basename(relativePath);
+    const mime = (() => {
+      const ext = path.extname(baseName).toLowerCase();
+      switch (ext) {
+        case '.jpg':
+        case '.jpeg':
+          return 'image/jpeg';
+        case '.png':
+          return 'image/png';
+        case '.gif':
+          return 'image/gif';
+        case '.bmp':
+          return 'image/bmp';
+        case '.webp':
+          return 'image/webp';
+        default:
+          return 'application/octet-stream';
+      }
+    })();
+
+    const dataUri = `data:${mime};base64,${fileContent.toString('base64')}`;
+
     manifest.push({
+      id: relativePath,
       path: relativePath,
+      name: baseName,
       size: stat.size,
       mtime: Math.floor(stat.mtime.getTime() / 1000), // Unix timestamp
-      ...dimensions,
-      hash
+      hash,
+      mime,
+      dataUri,
+      ...dimensions
     });
   }
 
   // Sort by path for consistency
-  manifest.sort((a, b) => a.path.localeCompare(b.path));
+  manifest.sort((a, b) => a.id.localeCompare(b.id));
 
   // Write manifest
   fs.writeFileSync(outputFile, JSON.stringify(manifest, null, 2));

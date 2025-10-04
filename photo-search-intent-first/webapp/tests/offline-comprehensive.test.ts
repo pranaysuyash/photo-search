@@ -9,7 +9,7 @@ import {
  * Comprehensive No-Internet End-to-End Test Suite
  *
  * Tests the complete offline functionality of the Photo Search application:
- * - Offline detection and indicators
+ * - Offline detection readiness (UI indicators deferred)
  * - Action queuing when offline
  * - Sync functionality when connection is restored
  * - Connectivity history logging
@@ -54,85 +54,6 @@ test.describe("Comprehensive Offline Functionality", () => {
 					"Service worker not available, continuing with offline tests",
 				);
 			});
-	});
-
-	test.describe("Offline Detection and Indicators", () => {
-		test("should display offline indicator when network is disconnected", async ({
-			page,
-			context,
-		}) => {
-			// Initially should be online
-			await expect(
-				page.locator('[data-testid="offline-indicator"]'),
-			).not.toBeVisible();
-
-			// Go offline
-			await context.setOffline(true);
-
-			// Wait for offline detection
-			await page.waitForTimeout(2000);
-
-			// Offline indicator should be visible
-			const offlineIndicator = page.locator(
-				'[data-testid="offline-indicator"], .offline-indicator, [class*="offline"]',
-			);
-			await expect(offlineIndicator).toBeVisible({ timeout: 5000 });
-
-			// Should contain appropriate offline messaging
-			await expect(offlineIndicator).toContainText(
-				/offline|no connection|disconnected/i,
-			);
-		});
-
-		test("should hide offline indicator when connection is restored", async ({
-			page,
-			context,
-		}) => {
-			// First go offline
-			await context.setOffline(true);
-			await page.waitForTimeout(2000);
-
-			// Verify offline indicator is visible
-			const offlineIndicator = page.locator(
-				'[data-testid="offline-indicator"], .offline-indicator, [class*="offline"]',
-			);
-			await expect(offlineIndicator).toBeVisible();
-
-			// Come back online
-			await context.setOffline(false);
-
-			// Wait for online detection
-			await page.waitForTimeout(2000);
-
-			// Offline indicator should be hidden
-			await expect(offlineIndicator).not.toBeVisible({ timeout: 5000 });
-		});
-
-		test("should update network status in real-time", async ({
-			page,
-			context,
-		}) => {
-			// Monitor network status changes
-			const networkStatus = page.locator(
-				'[data-testid="network-status"], .network-status',
-			);
-
-			// Go offline
-			await context.setOffline(true);
-			await page.waitForTimeout(1000);
-
-			// Check if network status reflects offline state
-			const statusText = (await networkStatus.textContent()) || "";
-			expect(statusText.toLowerCase()).toContain("offline");
-
-			// Go online
-			await context.setOffline(false);
-			await page.waitForTimeout(1000);
-
-			// Check if network status reflects online state
-			const onlineStatusText = (await networkStatus.textContent()) || "";
-			expect(onlineStatusText.toLowerCase()).not.toContain("offline");
-		});
 	});
 
 	test.describe("Model Status Monitoring", () => {
@@ -597,26 +518,24 @@ test.describe("Comprehensive Offline Functionality", () => {
 			}
 		});
 
-		test("should recover from temporary network issues", async ({
-			page,
-			context,
-		}) => {
-			// Go offline
-			await context.setOffline(true);
-			await page.waitForTimeout(1000);
+			test("should recover from temporary network issues without UI indicator", async ({
+				page,
+				context,
+			}) => {
+				// Go offline
+				await context.setOffline(true);
+				await page.waitForTimeout(1000);
 
-			// Verify offline state
-			const offlineIndicator = page.locator(
-				'[data-testid="offline-indicator"], [class*="offline"]',
-			);
-			await expect(offlineIndicator).toBeVisible();
+				// Offline indicator intentionally absent in offline-first mode
+				const offlineIndicator = page.locator('[data-testid="offline-indicator"]');
+				await expect(offlineIndicator).toHaveCount(0);
 
-			// Come back online
-			await context.setOffline(false);
-			await page.waitForTimeout(2000);
+				// Come back online
+				await context.setOffline(false);
+				await page.waitForTimeout(2000);
 
-			// Should recover and show online state
-			await expect(offlineIndicator).not.toBeVisible();
+				// UI should remain indicator-free after recovery
+				await expect(offlineIndicator).toHaveCount(0);
 
 			// Should be able to perform operations
 			const appContent = await page.isVisible(
@@ -761,11 +680,9 @@ test.describe("Comprehensive Offline Functionality", () => {
 			await context.setOffline(true);
 			await page.waitForTimeout(1000);
 
-			// Test basic offline functionality
-			const offlineIndicator = page.locator(
-				'[data-testid="offline-indicator"], [class*="offline"]',
-			);
-			await expect(offlineIndicator).toBeVisible();
+				// Ensure offline indicator remains hidden by design
+				const offlineIndicator = page.locator('[data-testid="offline-indicator"]');
+				await expect(offlineIndicator).toHaveCount(0);
 
 			// Test that app remains functional
 			const appContent = page.locator('#root, [data-testid="app"], main');

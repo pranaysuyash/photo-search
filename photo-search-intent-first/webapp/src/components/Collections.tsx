@@ -26,12 +26,20 @@ import {
 	Plane,
 	HelpCircle,
 	Keyboard,
+	Undo,
+	Redo,
 	Edit2,
 	Check,
 	ArrowLeft,
+	BarChart3,
+	PieChart,
+	TrendingUp,
+	Activity,
+	FileImage,
+	HardDrive,
 } from "lucide-react";
 import { useCallback, useRef, useState, useEffect, useMemo } from "react";
-import { apiCreateShare, apiExport, apiSetCollection, thumbUrl } from "../api";
+import { apiCreateShare, apiExport, apiSetCollection, apiDeleteCollection, thumbUrl } from "../api";
 import { announce } from "../utils/accessibility";
 import { handleError } from "../utils/errors";
 import { EnhancedEmptyState } from "./EnhancedEmptyState";
@@ -80,6 +88,8 @@ export default function Collections({
 	const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 	const [collectionThemes, setCollectionThemes] = useState<Record<string, string>>({});
 	const [showThemeSelector, setShowThemeSelector] = useState<string | null>(null);
+	const [showCoverSelector, setShowCoverSelector] = useState<string | null>(null);
+	const [collectionCovers, setCollectionCovers] = useState<Record<string, number>>({});
 	const [selectedCollections, setSelectedCollections] = useState<Set<string>>(new Set());
 	const [bulkMode, setBulkMode] = useState(false);
 	const [searchQuery, setSearchQuery] = useState("");
@@ -97,8 +107,25 @@ export default function Collections({
 		y: number;
 		collectionName: string;
 	} | null>(null);
-	const [showCoverSelector, setShowCoverSelector] = useState<string | null>(null);
-	const [collectionCovers, setCollectionCovers] = useState<Record<string, number>>({});
+	const [showInsights, setShowInsights] = useState(false);
+
+	// Undo/Redo functionality
+	type CollectionAction = {
+		type: "create" | "delete" | "update" | "theme_change";
+		timestamp: number;
+		collectionName: string;
+		previousState?: {
+			collections?: Record<string, string[]>;
+			themes?: Record<string, string>;
+		};
+		newState?: {
+			collections?: Record<string, string[]>;
+			themes?: Record<string, string>;
+		};
+	};
+
+	const [actionHistory, setActionHistory] = useState<CollectionAction[]>([]);
+	const [historyIndex, setHistoryIndex] = useState(-1);
 
 	const dragCounter = useRef(0);
 
@@ -114,16 +141,13 @@ export default function Collections({
 			if (contextMenu) {
 				setContextMenu(null);
 			}
-			if (showCoverSelector) {
-				setShowCoverSelector(null);
-			}
 		};
 
 		document.addEventListener("mousedown", handleClickOutside);
 		return () => {
 			document.removeEventListener("mousedown", handleClickOutside);
 		};
-	}, [activeDropdown, showThemeSelector, contextMenu, showCoverSelector]);
+	}, [activeDropdown, showThemeSelector, contextMenu]);
 
 	// Enhanced keyboard navigation
 	useEffect(() => {
@@ -165,7 +189,15 @@ export default function Collections({
 					if (focusedCollectionIndex >= 0 && focusedCollectionIndex < collectionsList.length) {
 						const collectionName = collectionsList[focusedCollectionIndex];
 						if (bulkMode) {
-							toggleCollectionSelection(collectionName);
+							setSelectedCollections(prev => {
+								const newSet = new Set(prev);
+								if (newSet.has(collectionName)) {
+									newSet.delete(collectionName);
+								} else {
+									newSet.add(collectionName);
+								}
+								return newSet;
+							});
 						} else {
 							onOpen(collectionName);
 						}
@@ -181,31 +213,11 @@ export default function Collections({
 					}
 					break;
 
-				case "s":
-					if (event.ctrlKey || event.metaKey) {
-						event.preventDefault();
-						if (focusedCollectionIndex >= 0 && focusedCollectionIndex < collectionsList.length) {
-							const collectionName = collectionsList[focusedCollectionIndex];
-							handleShare(collectionName);
-						}
-					}
-					break;
-
-				case "e":
-					if (event.ctrlKey || event.metaKey) {
-						event.preventDefault();
-						if (focusedCollectionIndex >= 0 && focusedCollectionIndex < collectionsList.length) {
-							const collectionName = collectionsList[focusedCollectionIndex];
-							handleExport(collectionName);
-						}
-					}
-					break;
-
 				case "a":
 					if (event.ctrlKey || event.metaKey) {
 						event.preventDefault();
 						if (bulkMode) {
-							selectAllCollections();
+							setSelectedCollections(new Set(Object.keys(collections)));
 						}
 					}
 					break;
@@ -215,7 +227,26 @@ export default function Collections({
 					setFocusedCollectionIndex(-1);
 					setKeyboardNavigationActive(false);
 					if (bulkMode) {
-						clearSelection();
+						setSelectedCollections(new Set());
+						setBulkMode(false);
+					}
+					break;
+
+				case "z":
+					if (event.ctrlKey || event.metaKey) {
+						event.preventDefault();
+						if (event.shiftKey) {
+							handleRedo();
+						} else {
+							handleUndo();
+						}
+					}
+					break;
+
+				case "y":
+					if (event.ctrlKey || event.metaKey) {
+						event.preventDefault();
+						handleRedo();
 					}
 					break;
 
@@ -240,7 +271,7 @@ export default function Collections({
 
 		document.addEventListener("keydown", handleKeyDown);
 		return () => document.removeEventListener("keydown", handleKeyDown);
-	}, [collections, searchQuery, focusedCollectionIndex, keyboardNavigationActive, bulkMode, onOpen, onDelete, handleShare, handleExport, toggleCollectionSelection, selectAllCollections, clearSelection]);
+	}, [collections, searchQuery, focusedCollectionIndex, keyboardNavigationActive, bulkMode]);
 
 	// Theme system
 	const themes = {
@@ -302,11 +333,127 @@ export default function Collections({
 	};
 
 	const setCollectionTheme = (collectionName: string, themeKey: string) => {
+		// Record theme change action
+		const previousTheme = collectionThemes[collectionName] || "default";
+		if (previousTheme !== themeKey) {
+			recordAction({
+				type: "theme_change",
+				timestamp: Date.now(),
+				collectionName,
+				previousState: { themes: { ...collectionThemes } },
+				newState: { themes: { ...collectionThemes, [collectionName]: themeKey } },
+			});
+		}
+
 		setCollectionThemes(prev => ({
 			...prev,
 			[collectionName]: themeKey,
 		}));
 		// TODO: Save theme to API/localStorage
+	};
+
+	// Undo/Redo functionality
+	const recordAction = (action: CollectionAction) => {
+		setActionHistory(prev => {
+			// Remove any future actions if we're not at the end
+			const newHistory = prev.slice(0, historyIndex + 1);
+			newHistory.push(action);
+
+			// Limit history to 50 actions
+			if (newHistory.length > 50) {
+				newHistory.shift();
+			}
+
+			return newHistory;
+		});
+		setHistoryIndex(prev => prev + 1);
+	};
+
+	const canUndo = historyIndex >= 0 && actionHistory.length > 0;
+	const canRedo = historyIndex < actionHistory.length - 1;
+
+	const handleUndo = async () => {
+		if (!canUndo) return;
+
+		const action = actionHistory[historyIndex];
+
+		try {
+			// Revert the action
+			switch (action.type) {
+				case "theme_change":
+					if (action.previousState?.themes) {
+						setCollectionThemes(action.previousState.themes);
+					}
+					break;
+				case "create":
+					// Remove collection from API
+					await apiDeleteCollection(dir, action.collectionName);
+					onLoadCollections();
+					break;
+				case "delete":
+					// Restore collection to API
+					if (action.previousState?.photos) {
+						await apiSetCollection(dir, action.collectionName, action.previousState.photos);
+						onLoadCollections();
+					}
+					break;
+				case "update":
+					// Revert collection updates to API
+					if (action.previousState?.photos) {
+						await apiSetCollection(dir, action.collectionName, action.previousState.photos);
+						onLoadCollections();
+					}
+					break;
+			}
+
+			setHistoryIndex(prev => prev - 1);
+			announce(`Undid ${action.type} action on ${action.collectionName}`, "polite");
+		} catch (error) {
+			console.error("Undo operation failed:", error);
+			announce("Failed to undo action", "assertive");
+		}
+	};
+
+	const handleRedo = async () => {
+		if (!canRedo) return;
+
+		const action = actionHistory[historyIndex + 1];
+
+		try {
+			// Reapply the action
+			switch (action.type) {
+				case "theme_change":
+					if (action.newState?.themes) {
+						setCollectionThemes(action.newState.themes);
+					}
+					break;
+				case "create":
+					// Recreate collection in API
+					if (action.newState?.photos) {
+						await apiSetCollection(dir, action.collectionName, action.newState.photos);
+						onLoadCollections();
+					}
+					break;
+				case "delete":
+					// Delete collection from API
+					await apiDeleteCollection(dir, action.collectionName);
+					onLoadCollections();
+					break;
+				case "update":
+					// Reapply collection updates to API
+					if (action.newState?.photos) {
+						await apiSetCollection(dir, action.collectionName, action.newState.photos);
+						onLoadCollections();
+					}
+					break;
+			}
+
+			setHistoryIndex(prev => prev + 1);
+			announce(`Redid ${action.type} action on ${action.collectionName}`, "polite");
+		} catch (error) {
+			console.error("Redo operation failed:", error);
+			announce("Failed to redo action", "assertive");
+		}
 	};
 
 	// Collection templates
@@ -364,6 +511,54 @@ export default function Collections({
 		}
 	};
 
+	// Collection Insights and Analytics
+	const getCollectionInsights = useMemo(() => {
+		const totalCollections = Object.keys(collections).length;
+		const totalPhotos = Object.values(collections).reduce((sum, photos) => sum + photos.length, 0);
+		const avgPhotosPerCollection = totalCollections > 0 ? Math.round(totalPhotos / totalCollections) : 0;
+
+		// Calculate collection sizes
+		const collectionSizes = Object.entries(collections).map(([name, photos]) => ({
+			name,
+			count: photos.length,
+			estimatedSize: photos.length * 2.5, // 2.5MB average per photo
+		}));
+
+		// Sort by size for insights
+		const sortedBySizeDesc = [...collectionSizes].sort((a, b) => b.count - a.count);
+		const largestCollection = sortedBySizeDesc[0];
+		const smallestCollection = sortedBySizeDesc[sortedBySizeDesc.length - 1];
+
+		// Calculate storage usage
+		const totalEstimatedStorage = collectionSizes.reduce((sum, col) => sum + col.estimatedSize, 0);
+
+		// Collection themes distribution
+		const themeDistribution = Object.entries(collectionThemes).reduce((acc, [name, theme]) => {
+			acc[theme] = (acc[theme] || 0) + 1;
+			return acc;
+		}, {} as Record<string, number>);
+
+		// Recent activity (simulated based on collection creation order)
+		const recentActivity = Object.keys(collections).slice(-5).reverse();
+
+		return {
+			overview: {
+				totalCollections,
+				totalPhotos,
+				avgPhotosPerCollection,
+				totalEstimatedStorage: Math.round(totalEstimatedStorage),
+			},
+			collections: {
+				all: collectionSizes,
+				largest: largestCollection,
+				smallest: smallestCollection,
+				sortedBySize: sortedBySizeDesc,
+			},
+			themes: themeDistribution,
+			recentActivity,
+		};
+	}, [collections, collectionThemes]);
+
 	// Bulk operations
 	const toggleCollectionSelection = (collectionName: string) => {
 		setSelectedCollections(prev => {
@@ -393,6 +588,17 @@ export default function Collections({
 		if (!confirmed) return;
 
 		for (const collectionName of selectedCollections) {
+			// Record action for undo/redo before deleting
+			const collectionPaths = collections[collectionName] || [];
+			recordAction({
+				type: "delete",
+				collectionName,
+				timestamp: Date.now(),
+				previousState: {
+					photos: collectionPaths,
+					themes: collectionThemes
+				}
+			});
 			await onDelete(collectionName);
 		}
 		clearSelection();
@@ -460,6 +666,17 @@ export default function Collections({
 				break;
 			case "delete":
 				if (onDelete) {
+					// Record action for undo/redo before deleting
+					const collectionPaths = collections[collectionName] || [];
+					recordAction({
+						type: "delete",
+						collectionName,
+						timestamp: Date.now(),
+						previousState: {
+							photos: collectionPaths,
+							themes: collectionThemes
+						}
+					});
 					onDelete(collectionName);
 				}
 				break;
@@ -578,6 +795,17 @@ export default function Collections({
 					setCollectionTheme(newCollectionName.trim(), template.theme);
 				}
 			}
+
+			// Record action for undo/redo
+			recordAction({
+				type: "create",
+				collectionName: newCollectionName.trim(),
+				timestamp: Date.now(),
+				newState: {
+					photos: selectedPhotos,
+					themes: collectionThemes
+				}
+			});
 
 			setNewCollectionName("");
 			setShowCreateForm(false);
@@ -891,6 +1119,39 @@ export default function Collections({
 							title="Toggle filters"
 						>
 							<Filter className="w-4 h-4" />
+						</button>
+
+						{/* Undo/Redo buttons */}
+						<div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+							<button
+								type="button"
+								onClick={handleUndo}
+								disabled={!canUndo}
+								className="p-2 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+								title="Undo (Ctrl+Z)"
+							>
+								<Undo className="w-4 h-4" />
+							</button>
+							<div className="w-px bg-gray-300 h-4" />
+							<button
+								type="button"
+								onClick={handleRedo}
+								disabled={!canRedo}
+								className="p-2 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+								title="Redo (Ctrl+Y or Ctrl+Shift+Z)"
+							>
+								<Redo className="w-4 h-4" />
+							</button>
+						</div>
+
+						{/* Collection Insights */}
+						<button
+							type="button"
+							onClick={() => setShowInsights(true)}
+							className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+							title="Collection insights and analytics"
+						>
+							<BarChart3 className="w-4 h-4" />
 						</button>
 
 						{/* Keyboard shortcuts help */}
@@ -1522,6 +1783,17 @@ export default function Collections({
 																type="button"
 																onClick={() => {
 																	setActiveDropdown(null);
+																	// Record action for undo/redo before deleting
+																	const collectionPaths = collections[name] || [];
+																	recordAction({
+																		type: "delete",
+																		collectionName: name,
+																		timestamp: Date.now(),
+																		previousState: {
+																			photos: collectionPaths,
+																			themes: collectionThemes
+																		}
+																	});
 																	onDelete(name);
 																}}
 																className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
@@ -1675,6 +1947,24 @@ export default function Collections({
 								</div>
 							</div>
 
+							{/* Undo/Redo */}
+							<div>
+								<h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+									<span className="w-2 h-2 bg-yellow-600 rounded-full"></span>
+									Undo/Redo
+								</h4>
+								<div className="space-y-2 text-sm">
+									<div className="flex justify-between">
+										<span className="text-gray-600">Undo last action</span>
+										<kbd className="px-2 py-1 bg-gray-100 rounded text-xs">Ctrl + Z</kbd>
+									</div>
+									<div className="flex justify-between">
+										<span className="text-gray-600">Redo action</span>
+										<kbd className="px-2 py-1 bg-gray-100 rounded text-xs">Ctrl + Y</kbd>
+									</div>
+								</div>
+							</div>
+
 							{/* Help */}
 							<div>
 								<h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
@@ -1708,6 +1998,158 @@ export default function Collections({
 								</div>
 							</div>
 						</div>
+					</div>
+				</div>
+			)}
+
+			{/* Collection Insights Modal */}
+			{showInsights && (
+				<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+					<div className="bg-white rounded-xl shadow-xl max-w-4xl w-full p-6 max-h-[90vh] overflow-y-auto">
+						<div className="flex items-center justify-between mb-6">
+							<div className="flex items-center gap-2">
+								<BarChart3 className="w-6 h-6 text-blue-600" />
+								<h3 className="text-xl font-semibold text-gray-900">Collection Insights & Analytics</h3>
+							</div>
+							<button
+								type="button"
+								onClick={() => setShowInsights(false)}
+								className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+							>
+								<X className="w-5 h-5" />
+							</button>
+						</div>
+
+						{getCollectionInsights.overview.totalCollections > 0 ? (
+							<div className="space-y-6">
+								{/* Overview Stats */}
+								<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+									<div className="bg-blue-50 p-4 rounded-lg">
+										<div className="flex items-center gap-2 mb-2">
+											<FolderPlus className="w-5 h-5 text-blue-600" />
+											<span className="text-sm font-medium text-blue-600">Collections</span>
+										</div>
+										<div className="text-2xl font-bold text-gray-900">{getCollectionInsights.overview.totalCollections}</div>
+									</div>
+									<div className="bg-green-50 p-4 rounded-lg">
+										<div className="flex items-center gap-2 mb-2">
+											<FileImage className="w-5 h-5 text-green-600" />
+											<span className="text-sm font-medium text-green-600">Total Photos</span>
+										</div>
+										<div className="text-2xl font-bold text-gray-900">{getCollectionInsights.overview.totalPhotos}</div>
+									</div>
+									<div className="bg-purple-50 p-4 rounded-lg">
+										<div className="flex items-center gap-2 mb-2">
+											<TrendingUp className="w-5 h-5 text-purple-600" />
+											<span className="text-sm font-medium text-purple-600">Avg per Collection</span>
+										</div>
+										<div className="text-2xl font-bold text-gray-900">{getCollectionInsights.overview.avgPhotosPerCollection}</div>
+									</div>
+									<div className="bg-orange-50 p-4 rounded-lg">
+										<div className="flex items-center gap-2 mb-2">
+											<HardDrive className="w-5 h-5 text-orange-600" />
+											<span className="text-sm font-medium text-orange-600">Est. Storage</span>
+										</div>
+										<div className="text-2xl font-bold text-gray-900">{getCollectionInsights.overview.totalEstimatedStorage} MB</div>
+									</div>
+								</div>
+
+								{/* Collection Size Analysis */}
+								<div className="bg-gray-50 p-6 rounded-lg">
+									<h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+										<PieChart className="w-5 h-5 text-indigo-600" />
+										Collection Size Analysis
+									</h4>
+									<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+										{getCollectionInsights.collections.largest && (
+											<div>
+												<h5 className="font-medium text-gray-700 mb-2">Largest Collection</h5>
+												<div className="bg-white p-4 rounded border">
+													<div className="font-medium text-gray-900">{getCollectionInsights.collections.largest.name}</div>
+													<div className="text-sm text-gray-600">{getCollectionInsights.collections.largest.count} photos</div>
+													<div className="text-xs text-gray-500">{getCollectionInsights.collections.largest.estimatedSize.toFixed(1)} MB</div>
+												</div>
+											</div>
+										)}
+										{getCollectionInsights.collections.smallest && (
+											<div>
+												<h5 className="font-medium text-gray-700 mb-2">Smallest Collection</h5>
+												<div className="bg-white p-4 rounded border">
+													<div className="font-medium text-gray-900">{getCollectionInsights.collections.smallest.name}</div>
+													<div className="text-sm text-gray-600">{getCollectionInsights.collections.smallest.count} photos</div>
+													<div className="text-xs text-gray-500">{getCollectionInsights.collections.smallest.estimatedSize.toFixed(1)} MB</div>
+												</div>
+											</div>
+										)}
+									</div>
+								</div>
+
+								{/* Top Collections by Size */}
+								<div className="bg-gray-50 p-6 rounded-lg">
+									<h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+										<Activity className="w-5 h-5 text-green-600" />
+										Top Collections by Size
+									</h4>
+									<div className="space-y-2">
+										{getCollectionInsights.collections.sortedBySize.slice(0, 5).map((collection, index) => (
+											<div key={collection.name} className="flex items-center justify-between bg-white p-3 rounded border">
+												<div className="flex items-center gap-3">
+													<span className="text-sm font-medium text-gray-500">#{index + 1}</span>
+													<span className="font-medium text-gray-900">{collection.name}</span>
+												</div>
+												<div className="text-right">
+													<div className="text-sm font-medium text-gray-900">{collection.count} photos</div>
+													<div className="text-xs text-gray-500">{collection.estimatedSize.toFixed(1)} MB</div>
+												</div>
+											</div>
+										))}
+									</div>
+								</div>
+
+								{/* Theme Distribution */}
+								{Object.keys(getCollectionInsights.themes).length > 0 && (
+									<div className="bg-gray-50 p-6 rounded-lg">
+										<h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+											<Palette className="w-5 h-5 text-pink-600" />
+											Theme Distribution
+										</h4>
+										<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+											{Object.entries(getCollectionInsights.themes).map(([theme, count]) => (
+												<div key={theme} className="bg-white p-3 rounded border text-center">
+													<div className="font-medium text-gray-900 capitalize">{theme}</div>
+													<div className="text-sm text-gray-600">{count} collection{count !== 1 ? 's' : ''}</div>
+												</div>
+											))}
+										</div>
+									</div>
+								)}
+
+								{/* Recent Activity */}
+								{getCollectionInsights.recentActivity.length > 0 && (
+									<div className="bg-gray-50 p-6 rounded-lg">
+										<h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+											<Calendar className="w-5 h-5 text-blue-600" />
+											Recent Activity
+										</h4>
+										<div className="space-y-2">
+											{getCollectionInsights.recentActivity.map((collectionName, index) => (
+												<div key={collectionName} className="flex items-center gap-3 bg-white p-3 rounded border">
+													<span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full">Recent</span>
+													<span className="font-medium text-gray-900">{collectionName}</span>
+													<span className="text-sm text-gray-500">({collections[collectionName]?.length || 0} photos)</span>
+												</div>
+											))}
+										</div>
+									</div>
+								)}
+							</div>
+						) : (
+							<div className="text-center py-12">
+								<BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+								<h4 className="text-lg font-medium text-gray-900 mb-2">No Collections Yet</h4>
+								<p className="text-gray-600">Create your first collection to see insights and analytics.</p>
+							</div>
+						)}
 					</div>
 				</div>
 			)}

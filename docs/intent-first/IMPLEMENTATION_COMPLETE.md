@@ -49,7 +49,7 @@ Successfully implemented all foundational Intent-First features for PhotoVault, 
 ### 6. PWA Offline Functionality ✅
 - **Service Worker**: Intelligent caching strategies
 - **Offline Queue**: Actions sync when reconnected
-- **Offline Indicator**: Clear status communication
+- **Offline Indicator**: Deferred until online enhancements ship
 - **Background Sync**: Automatic retry for failed requests
 - **Cache Management**: 
   - Static assets cached on install
@@ -99,7 +99,7 @@ src/components/
 ├── Sidebar.tsx (189 lines)
 ├── TopBar.tsx (446 lines)
 ├── StatsBar.tsx (54 lines)
-├── OfflineIndicator.tsx (183 lines)
+├── OfflineIndicator.tsx (removed during offline-first refocus)
 ├── BatchOperations.tsx (412 lines)
 └── modals/
     ├── SaveModal.tsx (100 lines)

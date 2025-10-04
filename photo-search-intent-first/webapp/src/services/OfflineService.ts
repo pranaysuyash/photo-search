@@ -6,6 +6,7 @@ export interface BaseOfflineAction {
 	timestamp: number;
 	retries: number;
 	authContext?: AuthContext;
+	nextAttemptAt?: number;
 }
 
 // Define authentication context interface
@@ -477,9 +478,12 @@ const offlineDebug = (...args: Array<unknown>) => {
 class OfflineService {
 	private readonly QUEUE_KEY = "offline_action_queue";
 	private readonly MAX_RETRIES = 3;
+	private readonly RETRY_BASE_DELAY_MS = 5000;
+	private readonly RETRY_MAX_DELAY_MS = 5 * 60 * 1000;
 	private isOnline: boolean;
 	private syncInProgress: boolean = false;
 	private listeners: Set<(online: boolean) => void> = new Set();
+	private syncRetryTimeout: number | null = null;
 
 	constructor() {
 		this.isOnline = navigator.onLine;
@@ -561,6 +565,27 @@ class OfflineService {
 		this.listeners.forEach((listener) => listener(online));
 	}
 
+	private clearScheduledSync() {
+		if (this.syncRetryTimeout !== null) {
+			window.clearTimeout(this.syncRetryTimeout);
+			this.syncRetryTimeout = null;
+		}
+	}
+
+	private scheduleNextSync(delayMs: number) {
+		this.clearScheduledSync();
+		const sanitizedDelay = Math.max(delayMs, this.RETRY_BASE_DELAY_MS);
+		this.syncRetryTimeout = window.setTimeout(() => {
+			this.syncRetryTimeout = null;
+			this.syncQueue();
+		}, sanitizedDelay);
+	}
+
+	private computeBackoffDelay(retries: number) {
+		const delay = this.RETRY_BASE_DELAY_MS * 2 ** Math.max(retries - 1, 0);
+		return Math.min(delay, this.RETRY_MAX_DELAY_MS);
+	}
+
 	// Public API
 	public onStatusChange(callback: (online: boolean) => void) {
 		this.listeners.add(callback);
@@ -585,6 +610,7 @@ class OfflineService {
 			timestamp: Date.now(),
 			retries: 0,
 			authContext,
+			nextAttemptAt: Date.now(),
 		};
 
 		// Save to storage
@@ -632,6 +658,7 @@ class OfflineService {
 				timestamp: Date.now(),
 				retries: 0,
 				authContext,
+				nextAttemptAt: Date.now(),
 			};
 		});
 
@@ -677,12 +704,18 @@ class OfflineService {
 	}
 
 	private async saveQueue(queue: OfflineAction[]): Promise<void> {
+		const sortedQueue = [...queue].sort((a, b) => {
+			const aTime = a.nextAttemptAt ?? a.timestamp ?? 0;
+			const bTime = b.nextAttemptAt ?? b.timestamp ?? 0;
+			return aTime - bTime;
+		});
+
 		try {
 			// Try IndexedDB first if supported
 			if (IndexedDBStorage.isSupported()) {
 				// For saving, we need to add/update each action individually
 				// This is a simplified approach - in a real implementation, you might want to batch these
-				for (const action of queue) {
+				for (const action of sortedQueue) {
 					try {
 						await indexedDBStorage.addAction(action);
 					} catch {
@@ -701,7 +734,7 @@ class OfflineService {
 			}
 
 			// Fallback to localStorage
-			localStorage.setItem(this.QUEUE_KEY, JSON.stringify(queue));
+			localStorage.setItem(this.QUEUE_KEY, JSON.stringify(sortedQueue));
 		} catch (error) {
 			console.error("[Offline Service] Failed to save queue:", error);
 		}
@@ -762,17 +795,41 @@ class OfflineService {
 			return;
 		}
 
+		this.clearScheduledSync();
 		this.syncInProgress = true;
+
+		const queue = await this.getQueue();
+		const now = Date.now();
+		const readyActions = queue.filter((action) => {
+			const nextAttempt = action.nextAttemptAt ?? 0;
+			return nextAttempt <= now;
+		});
+		const deferredActions = queue.filter((action) => {
+			const nextAttempt = action.nextAttemptAt ?? 0;
+			return nextAttempt > now;
+		});
+
+		if (readyActions.length === 0) {
+			this.syncInProgress = false;
+			if (deferredActions.length > 0) {
+				const earliest = Math.min(
+					...deferredActions.map((action) => action.nextAttemptAt ?? now),
+				);
+				const delay = Math.max(earliest - now, this.RETRY_BASE_DELAY_MS);
+				this.scheduleNextSync(delay);
+			}
+			return;
+		}
+
 		const syncStartTime = Date.now();
 		connectivityHistoryService.logSyncStart();
-		const queue = await this.getQueue();
 		const successfullySynced: string[] = [];
 		const remaining: OfflineAction[] = [];
 
 		// Process actions in batches for better performance
 		const batchSize = 5;
-		for (let i = 0; i < queue.length; i += batchSize) {
-			const batch = queue.slice(i, i + batchSize);
+		for (let i = 0; i < readyActions.length; i += batchSize) {
+			const batch = readyActions.slice(i, i + batchSize);
 
 			// Process batch in parallel
 			const batchPromises = batch.map(async (action) => {
@@ -789,6 +846,8 @@ class OfflineService {
 					action.retries++;
 
 					if (action.retries < this.MAX_RETRIES) {
+						action.nextAttemptAt =
+							Date.now() + this.computeBackoffDelay(action.retries);
 						remaining.push(action);
 					} else {
 						console.error(
@@ -826,16 +885,13 @@ class OfflineService {
 
 		// Save remaining actions (those that failed and need retry)
 		if (remaining.length > 0) {
-			// For remaining actions, we need to update them in storage
 			try {
 				if (IndexedDBStorage.isSupported()) {
-					// Update each remaining action
 					for (const action of remaining) {
 						await indexedDBStorage.updateAction(action);
 					}
 				} else {
-					// For localStorage, save the entire remaining queue
-					await this.saveQueue(remaining);
+					await this.saveQueue([...deferredActions, ...remaining]);
 				}
 			} catch (error) {
 				console.error(
@@ -843,14 +899,23 @@ class OfflineService {
 					error,
 				);
 			}
+		} else if (!IndexedDBStorage.isSupported()) {
+			// Ensure deferred actions remain persisted for localStorage flows
+			await this.saveQueue(deferredActions);
+		}
 
-			// Retry failed actions after delay
-			setTimeout(() => this.syncQueue(), 60000);
+		const pendingActions = [...deferredActions, ...remaining];
+		if (pendingActions.length > 0) {
+			const nextAttempt = Math.min(
+				...pendingActions.map((action) => action.nextAttemptAt ?? Date.now()),
+			);
+			const delay = Math.max(nextAttempt - Date.now(), this.RETRY_BASE_DELAY_MS);
+			this.scheduleNextSync(delay);
 		}
 
 		// Log sync completion
 		const syncDuration = Date.now() - syncStartTime;
-		const failedCount = queue.length - successfullySynced.length;
+		const failedCount = readyActions.length - successfullySynced.length;
 		connectivityHistoryService.logSyncComplete(
 			successfullySynced.length,
 			failedCount,

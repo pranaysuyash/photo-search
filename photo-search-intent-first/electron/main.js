@@ -39,7 +39,8 @@ if (isDev) {
   try { app.disableHardwareAcceleration(); } catch { }
 }
 
-let apiProc = null;
+// *** DISABLED: Using Python Service Supervisor instead ***
+// let apiProc = null;
 let viteProc = null;
 let mainWindow = null;
 let apiToken = null;
@@ -311,69 +312,71 @@ function findFreePort(preferred = 8000) {
   });
 }
 
+// *** LEGACY FUNCTIONS - kept for reference but not used with Python Service Supervisor ***
+
 // Wait for the API server to become healthy
-async function waitForAPIReady({ port = 8000, timeoutMs = 30000 } = {}) {
-  const start = Date.now();
-  const endpoints = [
-    `http://127.0.0.1:${port}/api/health`,
-    `http://127.0.0.1:${port}/health`,
-    `http://127.0.0.1:${port}/docs`
-  ];
+// async function waitForAPIReady({ port = 8000, timeoutMs = 30000 } = {}) {
+//   const start = Date.now();
+//   const endpoints = [
+//     `http://127.0.0.1:${port}/api/health`,
+//     `http://127.0.0.1:${port}/health`,
+//     `http://127.0.0.1:${port}/docs`
+//   ];
 
-  async function anyHealthy() {
-    for (const url of endpoints) {
-      if (await httpPing(url)) return true;
-    }
-    return false;
-  }
+//   async function anyHealthy() {
+//     for (const url of endpoints) {
+//       if (await httpPing(url)) return true;
+//     }
+//     return false;
+//   }
 
-  // quick backoff: 100ms -> 500ms -> 1s up to timeout
-  let delay = 100;
-  while (Date.now() - start < timeoutMs) {
-    if (await anyHealthy()) return true;
-    await new Promise((r) => setTimeout(r, delay));
-    delay = Math.min(delay * 1.5, 1000);
-  }
-  return false;
-}
+//   // quick backoff: 100ms -> 500ms -> 1s up to timeout
+//   let delay = 100;
+//   while (Date.now() - start < timeoutMs) {
+//     if (await anyHealthy()) return true;
+//     await new Promise((r) => setTimeout(r, delay));
+//     delay = Math.min(delay * 1.5, 1000);
+//   }
+//   return false;
+// }
 
 // Start the FastAPI backend server
-function startAPI({ enableProdLogging = false, port = 8000 } = {}) {
-  const cwd = path.resolve(__dirname, '..');
-  const pythonPath = path.join(cwd, '.venv', 'bin', 'python');
-  // Standardize dev API port to 8000 for consistency with docs and UI
-  const args = ['-m', 'uvicorn', 'api.server:app', '--host', '127.0.0.1', '--port', String(port)];
-  // Generate an ephemeral API token for this run
-  apiToken = crypto.randomBytes(24).toString('hex');
-  const env = { ...process.env, API_TOKEN: apiToken, API_PORT: String(port) };
+// function startAPI({ enableProdLogging = false, port = 8000 } = {}) {
+//   const cwd = path.resolve(__dirname, '..');
+//   const pythonPath = path.join(cwd, '.venv', 'bin', 'python');
+//   // Standardize dev API port to 8000 for consistency with docs and UI
+//   const args = ['-m', 'uvicorn', 'api.server:app', '--host', '127.0.0.1', '--port', String(port)];
+//   // Generate an ephemeral API token for this run
+//   apiToken = crypto.randomBytes(24).toString('hex');
+//   const env = { ...process.env, API_TOKEN: apiToken, API_PORT: String(port) };
 
-  // In production, capture logs to a file for diagnostics
-  if (getIsProd() && enableProdLogging) {
-    try {
-      const userData = app.getPath('userData');
-      const logsDir = path.join(userData, 'logs');
-      if (!containsPath(userData, logsDir)) throw new Error('Invalid logs directory path');
-      // nosemgrep: codacy.tools-configs.javascript_pathtraversal_rule-non-literal-fs-filename -- logsDir derived from app.getPath('userData'); containment verified
-      fs.mkdirSync(logsDir, { recursive: true });
-      const apiLogPath = path.join(logsDir, 'api.log');
-      if (!containsPath(logsDir, apiLogPath)) throw new Error('Invalid api.log path');
-      // nosemgrep: codacy.tools-configs.javascript_pathtraversal_rule-non-literal-fs-filename -- apiLogPath is within logsDir; containment verified
-      const out = fs.createWriteStream(apiLogPath, { flags: 'a' });
-      apiProc = spawn(pythonPath, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'], env });
-      apiProc.stdout.on('data', (d) => out.write(d));
-      apiProc.stderr.on('data', (d) => out.write(d));
-    } catch (e) {
-      log.warn('Failed to initialize API log file, falling back to inherited stdio:', e?.message);
-      apiProc = spawn(pythonPath, args, { cwd, stdio: 'inherit', env });
-    }
-  } else {
-    apiProc = spawn(pythonPath, args, { cwd, stdio: 'inherit', env });
-  }
+//   // In production, capture logs to a file for diagnostics
+//   if (getIsProd() && enableProdLogging) {
+//     try {
+//       const userData = app.getPath('userData');
+//       const logsDir = path.join(userData, 'logs');
+//       if (!containsPath(userData, logsDir)) throw new Error('Invalid logs directory path');
+//       // nosemgrep: codacy.tools-configs.javascript_pathtraversal_rule-non-literal-fs-filename -- logsDir derived from app.getPath('userData'); containment verified
+//       fs.mkdirSync(logsDir, { recursive: true });
+//       const apiLogPath = path.join(logsDir, 'api.log');
+//       if (!containsPath(logsDir, apiLogPath)) throw new Error('Invalid api.log path');
+//       // nosemgrep: codacy.tools-configs.javascript_pathtraversal_rule-non-literal-fs-filename -- apiLogPath is within logsDir; containment verified
+//       const out = fs.createWriteStream(apiLogPath, { flags: 'a' });
+//       apiProc = spawn(pythonPath, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'], env });
+//       apiProc.stdout.on('data', (d) => out.write(d));
+//       apiProc.stderr.on('data', (d) => out.write(d));
+//     } catch (e) {
+//       log.warn('Failed to initialize API log file, falling back to inherited stdio:', e?.message);
+//       apiProc = spawn(pythonPath, args, { cwd, stdio: 'inherit', env });
+//     }
+//   } else {
+//     apiProc = spawn(pythonPath, args, { cwd, stdio: 'inherit', env });
+//   }
 
-  apiProc.on('exit', (code, signal) => {
-    log.warn(`API process exited with code ${code} and signal ${signal}`);
-  });
-}
+//   apiProc.on('exit', (code, signal) => {
+//     log.warn(`API process exited with code ${code} and signal ${signal}`);
+//   });
+// }
 
 function createWindow() {
   // Resolve preload from common build locations
@@ -673,26 +676,29 @@ async function manageLicense() {
   }
 }
 
-async function restartBackend() {
-  try {
-    if (apiProc) {
-      try { apiProc.kill(); } catch { }
-      apiProc = null;
-    }
-    // Reuse the previously selected port (fixed in dev, random in prod)
-    startAPI({ enableProdLogging: true, port: selectedPort });
-    const ready = await waitForAPIReady({ port: selectedPort, timeoutMs: 20000 });
-    if (!ready) log.warn('Backend did not report ready after restart window');
-  } catch (e) {
-    log.warn('Failed to restart backend:', e?.message);
-  }
-}
+// *** REMOVED: Legacy restartBackend function - using Python Service Supervisor instead ***
+// async function restartBackend() {
+//   try {
+//     if (apiProc) {
+//       try { apiProc.kill(); } catch { }
+//       apiProc = null;
+//     }
+//     // Reuse the previously selected port (fixed in dev, random in prod)
+//     startAPI({ enableProdLogging: true, port: selectedPort });
+//     const ready = await waitForAPIReady({ port: selectedPort, timeoutMs: 20000 });
+//     if (!ready) log.warn('Backend did not report ready after restart window');
+//   } catch (e) {
+//     log.warn('Failed to restart backend:', e?.message);
+//   }
+// }
 
 // *** NEW SERVICE INTEGRATION ***
 // Import new service modules
 const { PythonServiceSupervisor } = require('./main/python-service-supervisor');
-const { FileWatcherService } = require('./main/file-watcher-service');
-const { SecureIPCHandlers } = require('./main/secure-ipc-handlers');
+const { fileWatcherService } = require('./main/file-watcher-service');
+// *** SECURE IPC HANDLERS ***
+// Instantiated automatically when module loads - registers secure IPC handlers
+// const { secureIPCHandlers } = require('./main/secure-ipc-handlers');
 
 // Create service instances
 const pythonServiceSupervisor = new PythonServiceSupervisor({
@@ -707,14 +713,6 @@ const pythonServiceSupervisor = new PythonServiceSupervisor({
   logLevel: 'info',
   enableProdLogging: true,
 });
-
-const fileWatcherService = new FileWatcherService({
-  debounceDelay: 1500,
-  maxWatchers: 100,
-  logLevel: 'info'
-});
-
-const secureIPCHandlers = new SecureIPCHandlers();
 
 // Initialize services when app is ready
 app.whenReady().then(async () => {
@@ -830,18 +828,19 @@ app.whenReady().then(async () => {
 
   if (!isApiRunning) {
     log.info('Starting API server...');
-    startAPI({ enableProdLogging: true, port: selectedPort });
-    // Wait for API health instead of a fixed delay
-    const healthy = await waitForAPIReady({ port: selectedPort, timeoutMs: 30000 });
-    if (!healthy) {
-      log.warn('API did not become healthy within timeout; UI may show limited functionality until it comes up.');
-    }
+    // *** DISABLED: Using Python Service Supervisor instead ***
+    // startAPI({ enableProdLogging: true, port: selectedPort });
+    // // Wait for API health instead of a fixed delay
+    // const healthy = await waitForAPIReady({ port: selectedPort, timeoutMs: 30000 });
+    // if (!healthy) {
+    //   log.warn('API did not become healthy within timeout; UI may show limited functionality until it comes up.');
+    // }
   } else {
     log.info(`API server already running on port ${selectedPort}`);
   }
 
   // *** NEW SERVICE STARTUP ***
-  // Start the Python service supervisor
+  // Start the Python service supervisor (replaces legacy startAPI)
   try {
     await pythonServiceSupervisor.start();
     log.info('[Services] Python service supervisor started');
@@ -876,34 +875,36 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
-    if (apiProc) {
-      apiProc.kill();
-    }
+    // *** DISABLED: Using Python Service Supervisor instead ***
+    // if (apiProc) {
+    //   apiProc.kill();
+    // }
     if (viteProc) {
       try { viteProc.kill(); } catch { }
     }
     // *** CLEAN UP NEW SERVICES ***
     // Stop file watchers
     fileWatcherService.stopAllWatching();
-    
+
     // Stop Python services
     pythonServiceSupervisor.stop();
-    
+
     app.quit();
   }
 });
 
 app.on('before-quit', () => {
-  if (apiProc) {
-    apiProc.kill();
-  }
+  // *** DISABLED: Using Python Service Supervisor instead ***
+  // if (apiProc) {
+  //   apiProc.kill();
+  // }
   if (viteProc) {
     try { viteProc.kill(); } catch { }
   }
   // *** CLEAN UP NEW SERVICES ***
   // Stop file watchers
   fileWatcherService.stopAllWatching();
-  
+
   // Stop Python services
   pythonServiceSupervisor.stop();
 });
@@ -925,6 +926,33 @@ protocol.registerSchemesAsPrivileged([
 // *** NEW IPC HANDLERS ***
 // Register secured IPC handlers when app is ready
 app.whenReady().then(() => {
+  // Clean up any existing handlers before registering new ones
+  const handlersToRegister = [
+    'select-folder',
+    'get-api-token',
+    'get-api-config',
+    'set-allowed-root',
+    'models:get-status',
+    'models:refresh',
+    'backend:restart',
+    'python-service:get-status',
+    'python-service:get-config',
+    'python-service:restart',
+    'python-service:start',
+    'python-service:stop',
+    'python-service:get-api-token',
+    'python-service:get-api-config'
+  ];
+
+  // Remove existing handlers to prevent conflicts
+  handlersToRegister.forEach(handler => {
+    try {
+      ipcMain.removeHandler(handler);
+    } catch (_) {
+      // Handler might not exist, ignore
+    }
+  });
+
   // IPC handler for folder selection
   ipcMain.handle('select-folder', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
@@ -974,8 +1002,13 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('backend:restart', async () => {
-    await restartBackend();
-    return true;
+    // *** UPDATED: Restart Python service supervisor instead of legacy API ***
+    try {
+      await pythonServiceSupervisor.restart();
+      return { success: true, message: 'Python service restarted' };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
   });
 
   // *** PYTHON SERVICE SUPERVISOR IPC HANDLERS ***
@@ -1029,55 +1062,9 @@ app.whenReady().then(() => {
     return pythonServiceSupervisor.getApiConfig();
   });
 
-  // *** FILE WATCHER SERVICE IPC HANDLERS ***
-  // Start watching a directory
-  ipcMain.handle('file-watcher:start', async (_event, directoryPath) => {
-    try {
-      const success = await fileWatcherService.startWatching(directoryPath);
-      return { success, error: success ? null : 'Failed to start watching directory' };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  // Stop watching a directory
-  ipcMain.handle('file-watcher:stop', async (_event, directoryPath) => {
-    try {
-      const success = await fileWatcherService.stopWatching(directoryPath);
-      return { success, error: success ? null : 'Failed to stop watching directory' };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  // Get file watcher status
-  ipcMain.handle('file-watcher:get-status', async () => {
-    return {
-      watching: fileWatcherService.getWatchedDirectories(),
-      pendingChanges: Object.fromEntries(
-        fileWatcherService.getWatchedDirectories().map(dir => [
-          dir, 
-          fileWatcherService.getPendingChanges(dir)
-        ])
-      )
-    };
-  });
-
-  // Manually reconcile changes
-  ipcMain.handle('file-watcher:reconcile', async (_event, directoryPath) => {
-    try {
-      const changes = fileWatcherService.getPendingChanges(directoryPath);
-      const reconciled = await fileWatcherService.reconcileChanges(directoryPath, changes);
-      fileWatcherService.clearPendingChanges(directoryPath);
-      return { success: true, reconciled, changes };
-    } catch (error) {
-      return { success: false, error: error.message, reconciled: 0, changes: [] };
-    }
-  });
-
   // *** NEW SECURE IPC HANDLERS ***
-  secureIPCHandlers.setupHandlers();
-  
+  // Handlers already initialized in constructor
+
   // *** FILE WATCHER IPC HANDLERS ***
   // Start watching directories when app is ready
   fileWatcherService.watchAllActiveDirectories();

@@ -22,6 +22,13 @@ interface WindowWithElectron extends Window {
 	process?: {
 		type?: string;
 	};
+	__PHOTO_DEMO_MAP__?: Record<
+		string,
+		{
+			dataUri: string;
+			mime?: string;
+		}
+	>;
 }
 
 // Utility function to detect Electron environment
@@ -1056,6 +1063,17 @@ export function thumbUrl(
 	path: string,
 	size = 256,
 ) {
+	if (typeof window !== "undefined") {
+		const win = window as WindowWithElectron;
+		const entry = win.__PHOTO_DEMO_MAP__?.[path];
+		if (entry?.dataUri) {
+			return entry.dataUri;
+		}
+	}
+	if (/^(data:|blob:|https?:)/.test(path)) {
+		return path;
+	}
+
 	// In Electron, use direct file access for offline capability
 	if (isElectron()) {
 		// Convert path to absolute file:// URL for direct file access
@@ -1077,6 +1095,17 @@ export function thumbFaceUrl(
 	emb: number,
 	size = 196,
 ) {
+	if (typeof window !== "undefined") {
+		const win = window as WindowWithElectron;
+		const entry = win.__PHOTO_DEMO_MAP__?.[path];
+		if (entry?.dataUri) {
+			return entry.dataUri;
+		}
+	}
+	if (/^(data:|blob:|https?:)/.test(path)) {
+		return path;
+	}
+
 	// In Electron, use direct file access for offline capability
 	if (isElectron()) {
 		// Convert path to absolute file:// URL for direct file access

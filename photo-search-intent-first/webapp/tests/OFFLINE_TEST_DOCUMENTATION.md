@@ -15,11 +15,11 @@ This document describes the comprehensive no-internet end-to-end test suite for 
 
 ### Test Categories
 
-#### 1. Offline Detection and Indicators
-- Tests offline detection mechanism
-- Validates offline indicator visibility
-- Tests network status updates in real-time
-- Ensures proper UI feedback for connectivity changes
+#### 1. Offline Detection Readiness
+- Tracks connectivity hooks and internal state changes
+- Defers visible offline indicator coverage until online features ship
+- Documents expectations for future network status UI
+- Ensures overall offline-first philosophy remains intact
 
 #### 2. Model Status Monitoring
 - Tests model status indicator in offline mode
@@ -188,8 +188,8 @@ The test suite collects and validates various performance metrics:
 
 ### Offline Detection
 - Application should detect network disconnection within 2 seconds
-- Offline indicator should be immediately visible
-- User should be informed of limited functionality
+- No dedicated offline indicator is displayed (offline-first experience)
+- User flows continue seamlessly with local models and cached data
 
 ### Action Queuing
 - User actions should be queued when offline
