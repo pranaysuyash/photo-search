@@ -70,7 +70,7 @@ Each layer maps to a focused component, letting us ship incremental improvements
 | Document current gaps and success criteria | ✅ Done | Captured in `WEBAPP_STATUS_AND_V3_DIRECTION.md` and this analysis. |
 | Inventory components needing shadcn migration | ✅ Done | `StatusBar`, `StatsBar`, `LibrarySwitcher`, `Collections`, `BottomNavigation`, `SearchBar` called out for Phase 1. |
 | OfflineService retry/backoff design | ✅ Done | Exponential backoff + retry scheduling implemented Oct 2025 (follow-up: expose status hooks/telemetry). |
-| Diagnostics surfacing plan (connection history, model status) | ▶️ Plan drafted | See `APPCHROME_PHASE0_IMPLEMENTATION_PLAN.md#1`. Needs design sign-off + implementation ticket. |
+| Diagnostics surfacing plan (connection history, model status) | In progress | Telemetry hooks implemented in `OfflineService`; ActivityTray UI pending (`APPCHROME_PHASE0_IMPLEMENTATION_PLAN.md#1`). |
 | Offline CI smoke coverage plan | ▶️ Plan drafted | See `APPCHROME_PHASE0_IMPLEMENTATION_PLAN.md#2`. Next step: wire into CI. |
 | Baseline screenshots/journey capture | ▶️ Plan drafted | See `APPCHROME_PHASE0_IMPLEMENTATION_PLAN.md#3`. Await Playwright visual harness. |
 | Design/dev workshop scheduling | ✅ Done | Added to Immediate Next Steps; calendar invite pending PM confirmation. |

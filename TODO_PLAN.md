@@ -44,8 +44,8 @@ The following roadmap captures the long-term, intent-first initiatives required 
 - **Scope:** Prepare modernization work by securing offline resilience, shared design primitives, and baseline regression artifacts.
 - **Deliverables:**
   1. Draft implementation spec for `OfflineService` exponential backoff + status emitters. — ✅ Implemented Oct 2025 (backoff + scheduling live; status emitters still TBD).
-  2. Define diagnostics telemetry schema (connection history, model health) and surface plan for upcoming ActivityTray. — ▶️ Plan drafted (`docs/APPCHROME_PHASE0_IMPLEMENTATION_PLAN.md#1`).
-  3. Outline CI offline smoke strategy (CLI script + Playwright runner) with tooling requirements. — ▶️ Plan drafted (`docs/APPCHROME_PHASE0_IMPLEMENTATION_PLAN.md#2`).
+  2. Define diagnostics telemetry schema (connection history, model health) and surface plan for upcoming ActivityTray. — In progress (telemetry hooks live; ActivityTray surfacing pending).
+  3. Outline CI offline smoke strategy (CLI script + Playwright runner) with tooling requirements. — In progress (CLI script `photo-search-intent-first/scripts/offline_smoke.sh`; Playwright job TBD).
   4. Catalog legacy components requiring shadcn migration (StatusBar, StatsBar, LibrarySwitcher, Collections, BottomNavigation, SearchBar). — ✅ Completed Oct 2025.
   5. Produce baseline UX capture plan (screenshots or Playwright visuals) for library/search/collections/onboarding journeys. — ▶️ Plan drafted (`docs/APPCHROME_PHASE0_IMPLEMENTATION_PLAN.md#3`).
   6. Schedule design/dev workshop to lock shared visual spec; circulate agenda + attendees. — ✅ Calendar invite requested Oct 2025.
@@ -86,3 +86,8 @@ The following roadmap captures the long-term, intent-first initiatives required 
 - Maintain `agents.md` status entries per task/milestone.
 - Update documentation alongside each deliverable to comply with the intent-first “document what developers actually need” principle.
 - Gate releases on completion of Phase 1 items; begin Phase 2 once offline foundation is stable.
+
+
+### Status Updates
+
+- 2025-10-05 — Frontend v3 Decision Record created: `docs/FRONTEND_V3_DECISION_RECORD.md` (scope, v1 backend first-class stance, FE adapter plan, parity TODOs). This unblocks v3 development against v1 BE without backend churn.

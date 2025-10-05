@@ -10,7 +10,7 @@ vi.mock('../card', () => ({
 
 vi.mock('../button', () => ({
 	Button: ({ children, onClick, ...props }: any) => (
-		<button onClick={onClick} {...props}>{children}</button>
+		<button type="button" onClick={onClick} {...props}>{children}</button>
 	),
 }));
 
@@ -18,7 +18,7 @@ vi.mock('../dropdown-menu', () => ({
 	DropdownMenu: ({ children }: any) => <div>{children}</div>,
 	DropdownMenuContent: ({ children }: any) => <div data-testid="dropdown-content">{children}</div>,
 	DropdownMenuItem: ({ children, onClick }: any) => (
-		<button onClick={onClick}>{children}</button>
+		<button type="button" onClick={onClick}>{children}</button>
 	),
 	DropdownMenuSeparator: () => <hr />,
 	DropdownMenuTrigger: ({ children }: any) => <div>{children}</div>,

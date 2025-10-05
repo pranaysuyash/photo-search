@@ -34,6 +34,7 @@ This document captures the concrete follow-up work needed before the shell refac
 - Persist the most recent N entries (default 50) in `IndexedDBStorage` (new store `diagnostics`).
 - Event ingestion happens in `OfflineService` (Phase 0 follow-up), but visualization waits for ActivityTray (Phase 1).
 - Add an optional in-memory subscriber hook (`offlineService.onDiagnostics`) so UI widgets can stream updates without polling.
+- **Implementation status:** telemetry events are now emitted and persisted (Oct 2025); next step is wiring ActivityTray UI consumers.
 
 ---
 
@@ -49,6 +50,8 @@ This document captures the concrete follow-up work needed before the shell refac
    - Assert that the grid renders ≥ 6 demo thumbnails (data URI images).
    - Trigger a search (keyword) and confirm results reuse the manifest.
    - Verify no network calls hit `/api/` via page route interception.
+
+> Implementation note: `webapp/tests/offline-demo.test.ts` covers this scenario (build-only mode); CI wiring still required.
 
 ### CLI / Python Job
 1. Activate venv (`source .venv/bin/activate`).

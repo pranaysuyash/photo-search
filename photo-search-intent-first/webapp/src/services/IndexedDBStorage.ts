@@ -254,7 +254,7 @@ export class IndexedDBStorage {
 	/**
 	 * Store a manifest in the database
 	 */
-	async storeManifest(key: string, manifest: any[]): Promise<void> {
+	async storeManifest(key: string, manifest: unknown[]): Promise<void> {
 		if (!this.db) {
 			await this.initialize();
 		}

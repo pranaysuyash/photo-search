@@ -5,7 +5,7 @@ import { ThemeSelector } from '../ThemeSelector';
 // Mock the shadcn/ui components
 vi.mock('../dialog', () => ({
 	Dialog: ({ children, open, onOpenChange }: any) => (
-		open ? <div data-testid="dialog" onClick={() => onOpenChange(false)}>{children}</div> : null
+		open ? <div data-testid="dialog" onClick={() => onOpenChange(false)} role="button" tabIndex={0}>{children}</div> : null
 	),
 	DialogContent: ({ children }: any) => <div data-testid="dialog-content">{children}</div>,
 	DialogHeader: ({ children }: any) => <div data-testid="dialog-header">{children}</div>,

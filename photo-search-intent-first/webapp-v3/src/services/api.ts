@@ -1,5 +1,24 @@
-// API client for photo search backend
-const API_BASE = "/api";
+// API client facade for photo search backend
+// Selects between native/refactor API and v1-backend adapter via env flag.
+
+// Vite augmentations (lightweight) for env typing
+declare global {
+  interface ImportMetaEnv {
+    VITE_API_BASE?: string;
+    VITE_API_MODE?: string;
+  }
+  interface ImportMeta {
+    readonly env: ImportMetaEnv;
+  }
+}
+
+const hasImportMeta = typeof import.meta !== "undefined" && !!(import.meta as unknown);
+const API_BASE: string = hasImportMeta && import.meta.env && import.meta.env.VITE_API_BASE
+  ? String(import.meta.env.VITE_API_BASE)
+  : "/api";
+const API_MODE: string = hasImportMeta && import.meta.env && import.meta.env.VITE_API_MODE
+  ? String(import.meta.env.VITE_API_MODE)
+  : "v1"; // default to v1
 
 // Utility function to detect Electron environment
 function isElectron(): boolean {
@@ -64,7 +83,31 @@ interface Trip {
   count: number;
 }
 
-class ApiClient {
+// Minimal contract for clients
+interface ApiClientLike {
+  getLibrary(dir: string, provider?: string, limit?: number, offset?: number): Promise<LibraryResponse>;
+  search(
+    dir: string,
+    query: string,
+    provider?: string,
+    topK?: number,
+    offset?: number
+  ): Promise<SearchResponse>;
+  getAnalytics(dir: string): Promise<AnalyticsResponse>;
+  getWorkspaces(): Promise<{ workspaces: Array<{ name: string; path: string }> }>;
+  getPhotoUrl(path: string): string;
+  getThumbnailUrl(path: string, size?: number): string;
+  getCollections(dir: string): Promise<{ collections: Record<string, Collection> }>;
+  setCollection(dir: string, name: string, photos: string[]): Promise<{ ok: boolean }>;
+  deleteCollection(dir: string, name: string): Promise<{ ok: boolean }>;
+  buildFaces(dir: string, provider?: string): Promise<{ ok: boolean; clusters: FaceCluster[] }>;
+  getFaceClusters(dir: string): Promise<{ clusters: FaceCluster[] }>;
+  nameFaceCluster(dir: string, clusterId: string, name: string): Promise<{ ok: boolean }>;
+  buildTrips(dir: string, provider?: string): Promise<{ ok: boolean; trips: Trip[] }>;
+  getTrips(dir: string): Promise<{ trips: Trip[] }>;
+}
+
+class NativeApiClient implements ApiClientLike {
   async getLibrary(
     dir: string,
     provider = "local",
@@ -298,7 +341,12 @@ class ApiClient {
   }
 }
 
-export const apiClient = new ApiClient();
+// Adapter selection via static import
+import V1Adapter from "./api_v1_adapter.ts";
+const apiClient: ApiClientLike =
+  API_MODE === "v1" ? new V1Adapter() : new NativeApiClient();
+
+export { apiClient };
 export type {
   LibraryResponse,
   SearchResponse,
