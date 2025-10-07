@@ -18,3 +18,9 @@ The adapter normalizes shapes for:
 - SearchResponse: `{ results: { path, score }[], total, query }`
 
 Electron note: thumbnails and photos use `file://` URLs when running in Electron to support offline access.
+
+## Branding
+
+Optionally customize the logo shown in the top bar via an environment flag:
+
+- `VITE_BRAND_LOGO` — Path or URL to an image. If not provided, the app will try `/generated/asset_0.png` which you can create using `scripts/gen_brand_assets.sh`. Place images under `webapp-v3/public/generated/` for static serving.

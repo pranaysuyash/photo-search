@@ -7,6 +7,7 @@ The following roadmap captures the long-term, intent-first initiatives required 
 ## Phase 1 – Offline Foundations
 
 ### 1) Model Bundling & Distribution (Electron + Web)
+
 - **Scope:** Ship CLIP weights with Electron installers while retaining the import UX as an override for advanced users.
 - **Deliverables:**
   - [x] Add CLIP weights (`clip-vit-base-patch32`) to Electron builder `extraResources`; stage into `{appData}/photo-search/models/` on first launch.
@@ -21,6 +22,7 @@ The following roadmap captures the long-term, intent-first initiatives required 
 - **Success Criteria:** Seamless offline usage out of the box; user can opt-in to alternate locations without edits.
 
 ### 2) Electron Offline Hardening & Health Surface
+
 - **Scope:** Make the Electron app resilient and transparent in air-gapped environments.
 - **Deliverables:**
   1. Upgrade `OfflineService` to exponential backoff; defer status LED UI until online cues return.
@@ -33,6 +35,7 @@ The following roadmap captures the long-term, intent-first initiatives required 
 - **Success Criteria:** Electron clearly communicates state, survives network flaps, and requires no manual config for offline.
 
 ### 3) End-to-End Offline Regression Suite
+
 - **Scope:** Institutionalize offline regression for web, Electron, and CLI.
 - **Deliverables:**
   1. Finalize Playwright `offline-pwa.test.ts` to rely on stubbed backend responses; add CI job gating SW changes.
@@ -41,6 +44,7 @@ The following roadmap captures the long-term, intent-first initiatives required 
 - **Success Criteria:** Offline smoke runs automatically; failures block release.
 
 ### Phase 0 – AppChrome Foundations (Owner: AI assistant)
+
 - **Scope:** Prepare modernization work by securing offline resilience, shared design primitives, and baseline regression artifacts.
 - **Deliverables:**
   1. Draft implementation spec for `OfflineService` exponential backoff + status emitters. — ✅ Implemented Oct 2025 (backoff + scheduling live; status emitters still TBD).
@@ -57,6 +61,7 @@ The following roadmap captures the long-term, intent-first initiatives required 
 ## Phase 2 – UX & Layout Excellence
 
 ### 4) Modal Architecture & Layout Stabilization
+
 - **Scope:** Keep AppShell mounted, centralize modal state, and eliminate responsive regressions.
 - **Deliverables:**
   1. Refactor `ModalManager` to consume `useModalControls`/`useModalStatus` exclusively; drop legacy prop plumbing.
@@ -65,6 +70,7 @@ The following roadmap captures the long-term, intent-first initiatives required 
 - **Success Criteria:** No visible shell re-layout during modal operations; automated visual diff stays green.
 
 ### 5) Onboarding & Empty-State Funnel
+
 - **Scope:** Ensure the first-run experience guides every persona—demo, import, or enterprise offline.
 - **Deliverables:**
   1. Connect `EnhancedEmptyState` CTAs to onboarding flags (demo library, folder picker, model import) and ensure state persistence across reloads.
@@ -73,6 +79,7 @@ The following roadmap captures the long-term, intent-first initiatives required 
 - **Success Criteria:** Every empty state provides an actionable path; onboarding can resume after app restart.
 
 ### 6) Search History & Keyboard Shortcut Refinement
+
 - **Scope:** Polish power-user affordances and accessibility references.
 - **Deliverables:**
   1. Wire `SearchHistoryService` into SearchBar suggestions with privacy toggle and purge button; cover with unit tests for ordering/navigation.
@@ -83,10 +90,10 @@ The following roadmap captures the long-term, intent-first initiatives required 
 ---
 
 ## Governance & Reporting
+
 - Maintain `agents.md` status entries per task/milestone.
 - Update documentation alongside each deliverable to comply with the intent-first “document what developers actually need” principle.
 - Gate releases on completion of Phase 1 items; begin Phase 2 once offline foundation is stable.
-
 
 ### Status Updates
 

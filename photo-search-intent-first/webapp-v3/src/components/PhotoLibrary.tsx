@@ -14,8 +14,6 @@ import {
   Camera,
   Palette,
   Zap,
-  Sparkles,
-  Image as ImageIcon,
   Folder,
   AlertCircle,
 } from "lucide-react";
@@ -27,6 +25,7 @@ interface PhotoLibraryProps {
   isLoading: boolean;
   currentDirectory: string | null;
   onDirectorySelect: (directory: string) => void;
+  onToggleFavorite?: (path: string, favorite: boolean) => void;
 }
 
 function LoadingSkeleton() {
@@ -54,12 +53,11 @@ function EmptyState({
   return (
     <div className="flex flex-col items-center justify-center h-full min-h-[400px] p-8">
       <div className="relative mb-6">
-        <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-2xl flex items-center justify-center">
-          <ImageIcon className="w-12 h-12 text-blue-500" />
-        </div>
-        <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-          <Sparkles className="w-4 h-4 text-white" />
-        </div>
+        <img
+          src="/generated/asset_32.png"
+          alt="Empty library visual"
+          className="w-32 h-32 object-contain"
+        />
       </div>
 
       <h3 className="text-xl font-semibold text-slate-800 dark:text-slate-200 mb-2">
@@ -139,10 +137,18 @@ function EmptyState({
   );
 }
 
-function PhotoCard({ photo, index }: { photo: Photo; index: number }) {
-  const [isLiked, setIsLiked] = useState(false);
+function PhotoCard({
+  photo,
+  index,
+  onToggleFavorite,
+}: {
+  photo: Photo;
+  index: number;
+  onToggleFavorite?: (path: string, favorite: boolean) => void;
+}) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const isFavorite = Boolean(photo.favorite);
 
   return (
     <Dialog>
@@ -186,13 +192,17 @@ function PhotoCard({ photo, index }: { photo: Photo; index: number }) {
                   className="h-7 w-7 p-0 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm hover:bg-white dark:hover:bg-slate-800"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setIsLiked(!isLiked);
+                    onToggleFavorite?.(photo.path, !isFavorite);
                   }}
+                  aria-pressed={isFavorite}
+                  aria-label={
+                    isFavorite ? "Remove from favorites" : "Add to favorites"
+                  }
                 >
                   <Heart
                     className={cn(
                       "h-3 w-3 transition-colors",
-                      isLiked
+                      isFavorite
                         ? "text-red-500 fill-red-500"
                         : "text-slate-600 dark:text-slate-400"
                     )}
@@ -250,7 +260,7 @@ function PhotoCard({ photo, index }: { photo: Photo; index: number }) {
 
               {/* Top Left Badges */}
               <div className="absolute top-2 left-2 flex flex-col space-y-1">
-                {isLiked && (
+                {isFavorite && (
                   <Badge className="bg-red-500/90 text-white text-xs px-2 py-0.5">
                     <Heart className="h-2 w-2 mr-1 fill-current" />
                     Liked
@@ -330,6 +340,7 @@ export function PhotoLibrary({
   isLoading,
   currentDirectory,
   onDirectorySelect,
+  onToggleFavorite,
 }: PhotoLibraryProps) {
   if (isLoading) {
     return <LoadingSkeleton />;
@@ -348,7 +359,12 @@ export function PhotoLibrary({
     <div className="p-6">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
         {photos.map((photo, index) => (
-          <PhotoCard key={photo.id} photo={photo} index={index} />
+          <PhotoCard
+            key={photo.id}
+            photo={photo}
+            index={index}
+            onToggleFavorite={onToggleFavorite}
+          />
         ))}
       </div>
     </div>

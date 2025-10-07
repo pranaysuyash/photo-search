@@ -36,7 +36,7 @@ Status: Adopted
 
 - Phase 1: Library (GET /library), Search (POST /search)
 - Phase 2: Collections (GET/POST/DELETE), Tags (GET/POST)
-- Phase 3: Faces (/faces/*), Trips (/trips, /trips/build)
+- Phase 3: Faces (/faces/\*), Trips (/trips, /trips/build)
 - Phase 4: Batch, OCR/Metadata, Video, Saved/Presets as needed
 
 ## 5) Endpoint Mapping (High-level Draft)
@@ -114,4 +114,5 @@ Note: The live, granular task list is tracked in the repo TODO manager (see curr
 - Optionally set `VITE_API_BASE` if v1 is hosted elsewhere; CORS/auth handled by adapter.
 
 ---
+
 This document captures the constraints and the operating model so our frontend work proceeds fast without backend churn, while keeping the path clear to add/extend endpoints in the main backend when genuinely needed.

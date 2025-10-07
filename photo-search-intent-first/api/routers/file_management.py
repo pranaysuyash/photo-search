@@ -120,3 +120,27 @@ def api_undo_delete(
         pass
     _last_delete = None
     return {"ok": True, "restored": restored}
+
+
+@router.get("/photo")
+def api_photo(path: str) -> Any:
+    """Serve a photo file by path with security checks."""
+    from fastapi.responses import FileResponse
+    
+    try:
+        photo_path = Path(path).resolve()
+        
+        # Security: Only serve files from allowed directories
+        # For now, allow any path but ensure it exists and is a file
+        if not photo_path.exists() or not photo_path.is_file():
+            raise HTTPException(404, "Photo not found")
+        
+        # Check if it's an image file
+        if photo_path.suffix.lower() not in {'.jpg', '.jpeg', '.png', '.webp', '.heic', '.tif', '.tiff', '.bmp', '.gif'}:
+            raise HTTPException(400, "Not an image file")
+        
+        return FileResponse(str(photo_path), media_type=f"image/{photo_path.suffix.lower().lstrip('.')}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Error serving photo: {e}")

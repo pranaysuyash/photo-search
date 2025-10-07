@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     showSaveDialog: (options) => ipcRenderer.invoke('show-save-dialog', options),
     showOpenDialog: (options) => ipcRenderer.invoke('show-open-dialog', options),
     showMessageBox: (options) => ipcRenderer.invoke('show-message-box', options),
+    selectDirectory: () => ipcRenderer.invoke('select-photo-directory'),
 
     // Menu action listeners
     onDirectorySelected: (callback) => ipcRenderer.on('directory-selected', callback),
@@ -30,6 +31,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onOpenPreferences: (callback) => ipcRenderer.on('open-preferences', callback),
 
     // Remove listeners
+    removeListener: (channel, callback) => ipcRenderer.removeListener(channel, callback),
     removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel),
 
     // Platform detection

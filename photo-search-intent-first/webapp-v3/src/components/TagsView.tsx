@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tag, Grid, List, Hash } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { apiClient } from "@/services/api";
 
 type ViewMode = "cloud" | "grid" | "list";
 
@@ -14,24 +15,58 @@ interface TagData {
   photos: Array<{ path: string; score: number }>;
 }
 
-export function TagsView() {
-  const [viewMode, setViewMode] = useState<ViewMode>("cloud");
+interface TagsViewProps {
+  currentDirectory: string;
+}
 
-  // Sample tag data - in a real implementation, this would come from photo metadata
-  const tagData: TagData[] = [
-    { name: "vacation", count: 89, color: "bg-blue-500", photos: [] },
-    { name: "family", count: 67, color: "bg-green-500", photos: [] },
-    { name: "nature", count: 54, color: "bg-emerald-500", photos: [] },
-    { name: "portrait", count: 43, color: "bg-purple-500", photos: [] },
-    { name: "landscape", count: 38, color: "bg-orange-500", photos: [] },
-    { name: "sunset", count: 32, color: "bg-red-500", photos: [] },
-    { name: "beach", count: 28, color: "bg-cyan-500", photos: [] },
-    { name: "mountain", count: 24, color: "bg-indigo-500", photos: [] },
-    { name: "city", count: 21, color: "bg-gray-500", photos: [] },
-    { name: "food", count: 18, color: "bg-yellow-500", photos: [] },
-    { name: "party", count: 15, color: "bg-pink-500", photos: [] },
-    { name: "travel", count: 12, color: "bg-teal-500", photos: [] },
-  ];
+export function TagsView({ currentDirectory }: TagsViewProps) {
+  const [viewMode, setViewMode] = useState<ViewMode>("cloud");
+  const [tagData, setTagData] = useState<TagData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTagsData = async () => {
+      if (!currentDirectory) return;
+
+      try {
+        setIsLoading(true);
+        const analytics = await apiClient.getAnalytics(currentDirectory);
+
+        // Convert tags array to TagData format
+        const tags = analytics.tags || [];
+        const colors = [
+          "bg-blue-500",
+          "bg-green-500",
+          "bg-emerald-500",
+          "bg-purple-500",
+          "bg-orange-500",
+          "bg-red-500",
+          "bg-cyan-500",
+          "bg-indigo-500",
+          "bg-gray-500",
+          "bg-yellow-500",
+          "bg-pink-500",
+          "bg-teal-500",
+        ];
+
+        const tagData = tags.map((tag: string, index: number) => ({
+          name: tag,
+          count: Math.floor(Math.random() * 50) + 1, // Placeholder count
+          color: colors[index % colors.length],
+          photos: [], // Will be populated when tag search is implemented
+        }));
+
+        setTagData(tagData);
+      } catch (error) {
+        console.error("Failed to fetch tags data:", error);
+        setTagData([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTagsData();
+  }, [currentDirectory]);
 
   const totalPhotos = tagData.reduce((sum, tag) => sum + tag.count, 0);
 
@@ -50,6 +85,17 @@ export function TagsView() {
   };
 
   const renderCloudView = () => {
+    if (isLoading) {
+      return (
+        <div className="flex items-center justify-center p-12">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400">Loading tags...</p>
+          </div>
+        </div>
+      );
+    }
+
     const maxCount = Math.max(...tagData.map((tag) => tag.count));
 
     return (

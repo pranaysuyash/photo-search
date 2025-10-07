@@ -479,13 +479,13 @@ const offlineDebug = (...args: Array<unknown>) => {
 	}
 };
 
-type ConnectivitySource =
+export type ConnectivitySource =
 	| "navigator"
 	| "monitoring-endpoint"
 	| "manual"
 	| "unknown";
 
-type ConnectivityStatusEvent = {
+export type ConnectivityStatusEvent = {
 	type: "connectivity-status";
 	status: "online" | "offline";
 	source: ConnectivitySource;
@@ -494,7 +494,7 @@ type ConnectivityStatusEvent = {
 	timestamp?: number;
 };
 
-type QueueSnapshotEvent = {
+export type QueueSnapshotEvent = {
 	type: "queue-snapshot";
 	reason: string;
 	queueLength: number;
@@ -505,7 +505,7 @@ type QueueSnapshotEvent = {
 	timestamp?: number;
 };
 
-type SyncCycleEvent = {
+export type SyncCycleEvent = {
 	type: "sync-cycle";
 	durationMs: number;
 	syncedCount: number;
@@ -514,12 +514,12 @@ type SyncCycleEvent = {
 	timestamp?: number;
 };
 
-type DiagnosticEvent =
+export type DiagnosticEvent =
 	| ConnectivityStatusEvent
 	| QueueSnapshotEvent
 	| SyncCycleEvent;
 
-type DiagnosticsListener = (event: DiagnosticEvent & { timestamp: number }) => void;
+export type DiagnosticsListener = (event: DiagnosticEvent & { timestamp: number }) => void;
 
 class OfflineService {
 	private readonly QUEUE_KEY = "offline_action_queue";

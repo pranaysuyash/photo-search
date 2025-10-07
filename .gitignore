@@ -233,3 +233,13 @@ cypress/screenshots/
 
 #Ignore vscode AI rules
 .github/instructions/codacy.instructions.md
+
+# Generated assets (icons, AI outputs)
+photo-search-intent-first/webapp-v3/public/generated/
+photo-search-intent-first/webapp-v3/src/assets/generated/
+assets/generated/
+
+# Local secrets and keys
+FAL_KEY*
+.fal_key
+.fal/

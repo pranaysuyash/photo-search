@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Grid, List } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { apiClient } from "@/services/api";
 
 type ViewMode = "map" | "grid" | "list";
 
@@ -14,57 +15,47 @@ interface LocationData {
   photos: Array<{ path: string; score: number }>;
 }
 
-export function PlacesView() {
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+interface PlacesViewProps {
+  currentDirectory: string;
+}
 
-  // Sample location data - in a real implementation, this would come from EXIF data
-  const locationData: LocationData[] = [
-    {
-      name: "San Francisco, CA",
-      count: 45,
-      coordinates: { lat: 37.7749, lon: -122.4194 },
-      photos: Array.from({ length: 45 }, (_, i) => ({
-        path: `sf-${i}.jpg`,
-        score: Math.random(),
-      })),
-    },
-    {
-      name: "New York, NY",
-      count: 32,
-      coordinates: { lat: 40.7128, lon: -74.006 },
-      photos: Array.from({ length: 32 }, (_, i) => ({
-        path: `ny-${i}.jpg`,
-        score: Math.random(),
-      })),
-    },
-    {
-      name: "Los Angeles, CA",
-      count: 28,
-      coordinates: { lat: 34.0522, lon: -118.2437 },
-      photos: Array.from({ length: 28 }, (_, i) => ({
-        path: `la-${i}.jpg`,
-        score: Math.random(),
-      })),
-    },
-    {
-      name: "London, UK",
-      count: 21,
-      coordinates: { lat: 51.5074, lon: -0.1278 },
-      photos: Array.from({ length: 21 }, (_, i) => ({
-        path: `london-${i}.jpg`,
-        score: Math.random(),
-      })),
-    },
-    {
-      name: "Paris, France",
-      count: 18,
-      coordinates: { lat: 48.8566, lon: 2.3522 },
-      photos: Array.from({ length: 18 }, (_, i) => ({
-        path: `paris-${i}.jpg`,
-        score: Math.random(),
-      })),
-    },
-  ];
+export function PlacesView({ currentDirectory }: PlacesViewProps) {
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [locationData, setLocationData] = useState<LocationData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPlacesData = async () => {
+      if (!currentDirectory) return;
+
+      try {
+        setIsLoading(true);
+        const analytics = await apiClient.getAnalytics(currentDirectory);
+
+        // Convert places array to LocationData format
+        // For now, create dummy coordinates since backend doesn't provide them
+        const places = analytics.places || [];
+        const locationData = places.map((place: string | number) => ({
+          name: String(place),
+          count: Math.floor(Math.random() * 50) + 1, // Placeholder count
+          coordinates: {
+            lat: 37.7749 + (Math.random() - 0.5) * 10, // Random coords around SF
+            lon: -122.4194 + (Math.random() - 0.5) * 10,
+          },
+          photos: [], // Will be populated when place search is implemented
+        }));
+
+        setLocationData(locationData);
+      } catch (error) {
+        console.error("Failed to fetch places data:", error);
+        setLocationData([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPlacesData();
+  }, [currentDirectory]);
 
   const totalPhotos = locationData.reduce((sum, loc) => sum + loc.count, 0);
 
@@ -75,36 +66,51 @@ export function PlacesView() {
     );
   };
 
-  const renderGridView = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-6">
-      {locationData.map((location) => (
-        <Card
-          key={location.name}
-          className="group cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-[1.02]"
-          onClick={() => handleLocationSelect(location)}
-        >
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/20 rounded-xl flex items-center justify-center">
-                <MapPin className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+  const renderGridView = () => {
+    if (isLoading) {
+      return (
+        <div className="flex items-center justify-center p-12">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400">
+              Loading places...
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-6">
+        {locationData.map((location) => (
+          <Card
+            key={location.name}
+            className="group cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-[1.02]"
+            onClick={() => handleLocationSelect(location)}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/20 rounded-xl flex items-center justify-center">
+                  <MapPin className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 dark:text-white">
+                    {location.name}
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {location.count} photos
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-semibold text-gray-900 dark:text-white">
-                  {location.name}
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {location.count} photos
-                </p>
+              <div className="aspect-video bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+                <MapPin className="w-8 h-8 text-gray-400" />
               </div>
-            </div>
-            <div className="aspect-video bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
-              <MapPin className="w-8 h-8 text-gray-400" />
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  };
 
   const renderListView = () => (
     <div className="divide-y divide-gray-200 dark:divide-gray-700">

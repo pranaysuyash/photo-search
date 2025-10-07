@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from pathlib import Path
 import os
 import warnings
@@ -39,11 +39,15 @@ class TransformersClipEmbedding:
         if local_dir:
             try_names.insert(0, os.path.join(local_dir, model_name))
         last_err: Optional[Exception] = None
+        processor_kwargs: Dict[str, Any] = {}
+        if offline:
+            processor_kwargs["local_files_only"] = True
+
         for name in try_names:
             try:
                 with warnings.catch_warnings():
                     warnings.filterwarnings("ignore", message=".*slow image processor.*")
-                    self.processor = AutoProcessor.from_pretrained(name, use_fast=True)
+                    self.processor = AutoProcessor.from_pretrained(name, use_fast=True, **processor_kwargs)
                 self._fast = True
                 break
             except Exception as e:
@@ -55,7 +59,7 @@ class TransformersClipEmbedding:
                 try:
                     with warnings.catch_warnings():
                         warnings.filterwarnings("ignore", message=".*slow image processor.*")
-                        self.processor = AutoProcessor.from_pretrained(name, use_fast=False)
+                        self.processor = AutoProcessor.from_pretrained(name, use_fast=False, **processor_kwargs)
                     self._fast = False
                     break
                 except Exception as e:
@@ -65,9 +69,32 @@ class TransformersClipEmbedding:
             raise RuntimeError(f"Failed to load CLIP processor for {model_name}. If offline, ensure model is cached locally. Last error: {last_err}")
 
         # Load model
+        # Torch dtype defaults to float32 for CPU/MPS. We only opt-in to float16 when on CUDA.
+        model_dtype = torch.float16 if self.device.type == "cuda" else torch.float32
+        base_model_kwargs: Dict[str, Any] = {"low_cpu_mem_usage": False}
+        if offline:
+            base_model_kwargs["local_files_only"] = True
+
+        loaded_name: Optional[str] = None
+        def _load_model(name: str, dtype_value: torch.dtype) -> None:
+            # Try the modern kwarg first, fall back to the legacy torch_dtype when necessary.
+            kwargs = dict(base_model_kwargs)
+            try:
+                kwargs["dtype"] = dtype_value
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", message=".*torch_dtype.*deprecated.*", category=FutureWarning)
+                    self.model = CLIPModel.from_pretrained(name, **kwargs)
+            except TypeError:
+                kwargs = dict(base_model_kwargs)
+                kwargs["torch_dtype"] = dtype_value
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", message=".*torch_dtype.*deprecated.*", category=FutureWarning)
+                    self.model = CLIPModel.from_pretrained(name, **kwargs)
+
         for name in try_names:
             try:
-                self.model = CLIPModel.from_pretrained(name)
+                _load_model(name, model_dtype)
+                loaded_name = name
                 break
             except Exception as e:
                 last_err = e
@@ -75,7 +102,23 @@ class TransformersClipEmbedding:
         if self.model is None:
             raise RuntimeError(f"Failed to load CLIP model for {model_name}. If offline, ensure model is cached locally. Last error: {last_err}")
 
-        self.model.to(self.device)
+        try:
+            self.model.to(self.device)
+        except NotImplementedError as err:
+            # torch>=2.5 raises NotImplementedError when parameters stay on the meta device
+            # (e.g. when Accelerate initialises the module lazily). Retry with a stricter load
+            # path that forces full weight materialisation before moving devices.
+            if any(p.is_meta for p in self.model.parameters()):
+                try:
+                    # Force a fresh load straight onto CPU to materialise tensors, then move.
+                    _load_model(loaded_name or try_names[-1], torch.float32)
+                except Exception as inner_exc:
+                    raise RuntimeError(
+                        "Failed to materialise CLIP weights from cache; ensure the model files exist locally."
+                    ) from inner_exc
+                self.model.to(self.device)
+            else:
+                raise err
         self.model.eval()
         self._index_id = f"hf-{model_name}{'-fast' if self._fast else ''}"
 

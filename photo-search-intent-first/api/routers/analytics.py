@@ -12,6 +12,9 @@ from adapters.jobs_bridge import JobsBridge
 from api.auth import require_auth
 from api.utils import _from_body, _require
 from infra.analytics import _analytics_file, _write_event as _write_event_infra, read_recent_events
+from infra.collections import load_collections
+from infra.tags import all_tags
+from infra.faces import list_clusters
 from infra.index_store import IndexStore
 
 # Main router with /api prefix for new endpoints
@@ -41,9 +44,94 @@ def api_analytics(directory: str, limit: int = 200) -> Dict[str, Any]:
         folder = Path(directory)
         store = IndexStore(folder)
         events = read_recent_events(store.index_dir, limit=limit)
-        return {"events": events}
+
+        favorites_total = 0
+        try:
+            collections = load_collections(store.index_dir)
+            favorites_total = len(collections.get("Favorites", []))
+        except Exception:
+            favorites_total = 0
+
+        total_photos, total_indexed = _summarize_index(store)
+        index_size_mb = _safe_index_size_mb(store.index_dir)
+        cameras, places = _load_exif_summary(store.index_dir)
+        tags = _safe_tags(store.index_dir)
+        people_clusters = _safe_people_clusters(store.index_dir)
+
+        return {
+            "events": events,
+            "favorites_total": favorites_total,
+            "total_photos": total_photos,
+            "total_indexed": total_indexed,
+            "index_size_mb": index_size_mb,
+            "cameras": cameras,
+            "places": places,
+            "tags": tags,
+            "people_clusters": people_clusters,
+        }
     except Exception as e:
         raise HTTPException(500, f"analytics read failed: {e}")
+
+
+def _summarize_index(store: IndexStore) -> tuple[int, int]:
+    try:
+        data = json.loads(store.paths_file.read_text())
+        total = len(data.get("paths", []) or [])
+    except Exception:
+        total = 0
+    return total, total
+
+
+def _safe_index_size_mb(index_dir: Path) -> float:
+    try:
+        total = 0
+        if not index_dir.exists():
+            return 0.0
+        for path in index_dir.rglob("*"):
+            if path.is_file():
+                try:
+                    total += path.stat().st_size
+                except OSError:
+                    continue
+        return round(total / (1024 * 1024), 2)
+    except Exception:
+        return 0.0
+
+
+def _load_exif_summary(index_dir: Path) -> tuple[List[str], List[str]]:
+    p = index_dir / "exif_index.json"
+    if not p.exists():
+        return [], []
+    try:
+        data = json.loads(p.read_text())
+        cameras = sorted({c for c in data.get("camera", []) if c})
+        places = sorted({c for c in data.get("place", []) if c})
+        return cameras, places
+    except Exception:
+        return [], []
+
+
+def _safe_tags(index_dir: Path) -> List[str]:
+    try:
+        return all_tags(index_dir)
+    except Exception:
+        return []
+
+
+def _safe_people_clusters(index_dir: Path) -> List[Dict[str, Any]]:
+    try:
+        clusters = []
+        for cluster in list_clusters(index_dir):
+            clusters.append(
+                {
+                    "id": cluster.get("id"),
+                    "name": cluster.get("name", "") or "",
+                    "size": int(cluster.get("size", 0) or 0),
+                }
+            )
+        return clusters
+    except Exception:
+        return []
 
 
 @router.post("/analytics/event")

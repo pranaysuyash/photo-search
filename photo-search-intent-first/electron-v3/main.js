@@ -418,22 +418,35 @@ class PhotoSearchApp {
     }
 
     // Menu action handlers
-    async openPhotoDirectory() {
-        const result = await dialog.showOpenDialog(this.mainWindow, {
+    async promptForPhotoDirectory() {
+        const windowRef = this.mainWindow
+        if (!windowRef) {
+            return null
+        }
+
+        const result = await dialog.showOpenDialog(windowRef, {
             properties: ['openDirectory'],
             title: 'Select Photo Library Folder'
         })
 
-        if (!result.canceled && result.filePaths.length > 0) {
-            const directory = result.filePaths[0]
-            store.set('lastSelectedDirectory', directory)
+        if (result.canceled || result.filePaths.length === 0) {
+            return null
+        }
 
-            // Add to recent directories
-            const recent = store.get('photoDirectories', [])
-            const updated = [directory, ...recent.filter(d => d !== directory)].slice(0, 10)
-            store.set('photoDirectories', updated)
+        const directory = result.filePaths[0]
+        store.set('lastSelectedDirectory', directory)
 
-            // Send to renderer
+        // Add to recent directories
+        const recent = store.get('photoDirectories', [])
+        const updated = [directory, ...recent.filter(d => d !== directory)].slice(0, 10)
+        store.set('photoDirectories', updated)
+
+        return directory
+    }
+
+    async openPhotoDirectory() {
+        const directory = await this.promptForPhotoDirectory()
+        if (directory && this.mainWindow) {
             this.mainWindow.webContents.send('directory-selected', directory)
         }
     }
@@ -526,6 +539,13 @@ ipcMain.handle('show-open-dialog', async (event, options) => {
 })
 ipcMain.handle('show-message-box', async (event, options) => {
     return await dialog.showMessageBox(photoSearchApp.mainWindow, options)
+})
+ipcMain.handle('select-photo-directory', async () => {
+    const directory = await photoSearchApp.promptForPhotoDirectory()
+    if (directory && photoSearchApp.mainWindow) {
+        photoSearchApp.mainWindow.webContents.send('directory-selected', directory)
+    }
+    return directory
 })
 
 // Export for external access

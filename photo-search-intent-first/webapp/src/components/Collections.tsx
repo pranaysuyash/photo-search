@@ -773,7 +773,7 @@ export default function Collections({
 
 				// For now, we'll simulate archiving by adding a prefix
 				// In a real implementation, this might move to a separate archived collections store
-				const archivedName = `[Archived] ${collectionName}`;
+				let archivedName = `[Archived] ${collectionName}`;
 				const collectionPaths = collections[collectionName] || [];
 
 				// Check if archived name already exists
