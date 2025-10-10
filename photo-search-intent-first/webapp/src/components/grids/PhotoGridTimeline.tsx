@@ -190,8 +190,8 @@ export const PhotoGridTimeline: React.FC<PhotoGridTimelineProps> = ({
         }
       });
 
-      if (visibleHeader?.dataset) {
-        setCurrentDate(visibleHeader.dataset.dateLabel || "");
+      if (visibleHeader && "dataset" in visibleHeader) {
+        setCurrentDate((visibleHeader as HTMLElement).dataset.dateLabel || "");
       }
     };
 
