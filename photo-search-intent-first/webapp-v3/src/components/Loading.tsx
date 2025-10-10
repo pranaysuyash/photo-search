@@ -1,6 +1,6 @@
 /**
  * Loading Components - Skeleton loaders, spinners, and progress bars
- * 
+ *
  * Usage patterns:
  * - Use LoadingSkeleton for content placeholders (photo grids, lists)
  * - Use Spinner for inline loading indicators
@@ -9,28 +9,30 @@
 
 /**
  * LoadingSkeleton - Animated skeleton placeholder for content
- * 
+ *
  * Usage:
  * ```tsx
  * {isLoading ? <LoadingSkeleton variant="photo-grid" /> : <PhotoGrid />}
  * ```
  */
 interface LoadingSkeletonProps {
-  variant?: 'photo-grid' | 'photo-card' | 'list-item' | 'text' | 'rectangle';
+  variant?: "photo-grid" | "photo-card" | "list-item" | "text" | "rectangle";
   count?: number;
   className?: string;
 }
 
-export function LoadingSkeleton({ 
-  variant = 'rectangle', 
+export function LoadingSkeleton({
+  variant = "rectangle",
   count = 1,
-  className = '' 
+  className = "",
 }: LoadingSkeletonProps) {
   const renderSkeleton = () => {
     switch (variant) {
-      case 'photo-grid':
+      case "photo-grid":
         return (
-          <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 ${className}`}>
+          <div
+            className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 ${className}`}
+          >
             {Array.from({ length: count }).map((_, i) => (
               <div key={`photo-grid-${i}`} className="animate-pulse">
                 <div className="aspect-square bg-muted rounded-lg" />
@@ -39,7 +41,7 @@ export function LoadingSkeleton({
           </div>
         );
 
-      case 'photo-card':
+      case "photo-card":
         return (
           <div className={`animate-pulse space-y-3 ${className}`}>
             <div className="aspect-square bg-muted rounded-lg" />
@@ -50,11 +52,14 @@ export function LoadingSkeleton({
           </div>
         );
 
-      case 'list-item':
+      case "list-item":
         return (
           <div className={`space-y-3 ${className}`}>
             {Array.from({ length: count }).map((_, i) => (
-              <div key={`list-item-${i}`} className="animate-pulse flex items-center gap-3">
+              <div
+                key={`list-item-${i}`}
+                className="animate-pulse flex items-center gap-3"
+              >
                 <div className="w-12 h-12 bg-muted rounded" />
                 <div className="flex-1 space-y-2">
                   <div className="h-4 bg-muted rounded w-3/4" />
@@ -65,7 +70,7 @@ export function LoadingSkeleton({
           </div>
         );
 
-      case 'text':
+      case "text":
         return (
           <div className={`space-y-2 ${className}`}>
             {Array.from({ length: count }).map((_, i) => (
@@ -76,7 +81,7 @@ export function LoadingSkeleton({
           </div>
         );
 
-      case 'rectangle':
+      case "rectangle":
       default:
         return (
           <div className={`space-y-3 ${className}`}>
@@ -95,7 +100,7 @@ export function LoadingSkeleton({
 
 /**
  * Spinner - Animated loading spinner
- * 
+ *
  * Usage:
  * ```tsx
  * <Spinner size="md" />
@@ -103,15 +108,15 @@ export function LoadingSkeleton({
  * ```
  */
 interface SpinnerProps {
-  size?: 'sm' | 'md' | 'lg';
+  size?: "sm" | "md" | "lg";
   className?: string;
 }
 
-export function Spinner({ size = 'md', className = '' }: SpinnerProps) {
+export function Spinner({ size = "md", className = "" }: SpinnerProps) {
   const sizeClasses = {
-    sm: 'w-4 h-4 border-2',
-    md: 'w-6 h-6 border-2',
-    lg: 'w-8 h-8 border-3',
+    sm: "w-4 h-4 border-2",
+    md: "w-6 h-6 border-2",
+    lg: "w-8 h-8 border-3",
   };
 
   return (
@@ -133,7 +138,7 @@ export function Spinner({ size = 'md', className = '' }: SpinnerProps) {
 
 /**
  * ProgressBar - Progress indicator for determinate operations
- * 
+ *
  * Usage:
  * ```tsx
  * <ProgressBar value={progress} max={100} label="Indexing photos..." />
@@ -152,7 +157,7 @@ export function ProgressBar({
   max = 100,
   label,
   showPercentage = true,
-  className = '',
+  className = "",
 }: ProgressBarProps) {
   const percentage = Math.round((value / max) * 100);
 
@@ -178,7 +183,7 @@ export function ProgressBar({
 
 /**
  * LoadingOverlay - Full-screen loading overlay
- * 
+ *
  * Usage:
  * ```tsx
  * {globalLoading && <LoadingOverlay message="Processing..." />}
@@ -193,9 +198,7 @@ export function LoadingOverlay({ message }: LoadingOverlayProps) {
     <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[9998] flex items-center justify-center">
       <div className="bg-card border rounded-lg shadow-lg p-6 flex flex-col items-center gap-4">
         <Spinner size="lg" />
-        {message && (
-          <p className="text-sm text-muted-foreground">{message}</p>
-        )}
+        {message && <p className="text-sm text-muted-foreground">{message}</p>}
       </div>
     </div>
   );
@@ -203,7 +206,7 @@ export function LoadingOverlay({ message }: LoadingOverlayProps) {
 
 /**
  * SuspenseFallback - Fallback for React.lazy() components
- * 
+ *
  * Usage:
  * ```tsx
  * <Suspense fallback={<SuspenseFallback label="Loading view..." />}>
@@ -215,7 +218,9 @@ interface SuspenseFallbackProps {
   label?: string;
 }
 
-export function SuspenseFallback({ label = 'Loading...' }: SuspenseFallbackProps) {
+export function SuspenseFallback({
+  label = "Loading...",
+}: SuspenseFallbackProps) {
   return (
     <div className="flex items-center justify-center min-h-[400px]">
       <div className="flex flex-col items-center gap-3">
