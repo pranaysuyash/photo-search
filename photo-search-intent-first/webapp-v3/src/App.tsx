@@ -29,6 +29,13 @@ import { apiClient, type SearchResult } from "./services/api";
 import { DEMO_LIBRARY_DIR } from "./constants/directories";
 import { useElectronBridge } from "./hooks/useElectronBridge";
 
+// Day 1 components
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { ToastContainer } from "./components/Toast";
+import { LoadingOverlay } from "./components/Loading";
+import { useUIStore } from "./store/uiStore";
+import Day1Demo from "./Day1Demo";
+
 function AppContent() {
   const {
     currentDirectory,
@@ -59,6 +66,9 @@ function AppContent() {
   const isMac =
     typeof navigator !== "undefined" && navigator.platform.includes("Mac");
   const modifierKeyLabel = isMac ? "⌘" : "Ctrl";
+
+  // Day 1: Global UI state
+  const { globalLoading, loadingMessage } = useUIStore();
 
   const ShortcutRow = ({
     action,
@@ -661,9 +671,16 @@ function AppContent() {
   );
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 relative overflow-hidden">
-      {/* Background patterns for main canvas */}
-      <div className="absolute inset-0 opacity-5 dark:opacity-10 pointer-events-none">
+    <>
+      {/* Day 1: Global loading overlay */}
+      {globalLoading && <LoadingOverlay message={loadingMessage || undefined} />}
+      
+      {/* Day 1: Toast notifications */}
+      <ToastContainer />
+      
+      <div className="flex h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 relative overflow-hidden">
+        {/* Background patterns for main canvas */}
+        <div className="absolute inset-0 opacity-5 dark:opacity-10 pointer-events-none">
         <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-br from-blue-200 to-purple-200 dark:from-blue-800 dark:to-purple-800 rounded-full blur-3xl"></div>
         <div className="absolute bottom-20 right-20 w-80 h-80 bg-gradient-to-br from-green-200 to-blue-200 dark:from-green-800 dark:to-blue-800 rounded-full blur-3xl"></div>
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-gradient-to-br from-orange-200 to-pink-200 dark:from-orange-800 dark:to-pink-800 rounded-full blur-3xl"></div>
@@ -771,6 +788,7 @@ function AppContent() {
               element={<Favorites onToggleFavorite={handleToggleFavorite} />}
             />
             <Route path="/analytics" element={<Analytics />} />
+            <Route path="/day1-demo" element={<Day1Demo />} />
             <Route path="/" element={<Navigate to="/library" replace />} />
           </Routes>
         </main>
@@ -797,14 +815,17 @@ function AppContent() {
         </Dialog>
       </div>
     </div>
+    </>
   );
 }
 
 function App() {
   return (
-    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <AppContent />
-    </Router>
+    <ErrorBoundary>
+      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <AppContent />
+      </Router>
+    </ErrorBoundary>
   );
 }
 
