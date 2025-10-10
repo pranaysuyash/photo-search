@@ -16,6 +16,8 @@ from infra.collections import load_collections
 from infra.tags import all_tags
 from infra.faces import list_clusters
 from infra.index_store import IndexStore
+import math
+from datetime import datetime, UTC
 
 # Main router with /api prefix for new endpoints
 router = APIRouter(prefix="/api", tags=["analytics"])
@@ -71,6 +73,206 @@ def api_analytics(directory: str, limit: int = 200) -> Dict[str, Any]:
         }
     except Exception as e:
         raise HTTPException(500, f"analytics read failed: {e}")
+
+
+@router.get("/analytics/places")
+def api_analytics_places(
+    directory: Optional[str] = Query(None),
+    dir_alias: Optional[str] = Query(None, alias="dir"),
+    limit: int = Query(5000, ge=1, le=20000),
+    sample_per_location: int = Query(12, ge=1, le=100),
+) -> Dict[str, Any]:
+    """Return aggregated place and GPS metadata for map visualisations.
+
+    The endpoint reads ``exif_index.json`` from the index directory, aggregates
+    photos that have latitude/longitude metadata and computes clustered
+    summaries that the frontend can use for map rendering and search filters.
+
+    Parameters
+    ----------
+    directory:
+        Library directory whose index should be analysed.
+    limit:
+        Maximum number of point records to return (down-sampled if necessary
+        to prevent enormous payloads).
+    sample_per_location:
+        Maximum number of photo points returned for each aggregated location
+        entry. This supports preview drawers without transferring the entire
+        library for every request.
+    """
+
+    resolved_directory = directory or dir_alias
+    if not resolved_directory:
+        raise HTTPException(422, "directory (or dir) query parameter is required")
+
+    try:
+        store = IndexStore(Path(resolved_directory))
+    except Exception as exc:
+        raise HTTPException(400, f"Invalid directory: {exc}") from exc
+
+    exif_path = store.index_dir / "exif_index.json"
+    if not exif_path.exists():
+        return {
+            "generated_at": datetime.now(UTC).isoformat(),
+            "directory": str(resolved_directory),
+            "total_with_coordinates": 0,
+            "total_without_coordinates": 0,
+            "locations": [],
+            "points": [],
+        }
+
+    try:
+        data = json.loads(exif_path.read_text())
+    except Exception as exc:  # pragma: no cover - defensive guard
+        raise HTTPException(500, f"Failed to parse EXIF metadata: {exc}") from exc
+
+    paths: List[str] = list(map(str, data.get("paths", [])))
+    lats: List[Optional[float]] = data.get("gps_lat", [])
+    lons: List[Optional[float]] = data.get("gps_lon", [])
+    places_raw: List[str] = [
+        str(p).strip() if isinstance(p, str) else ""
+        for p in data.get("place", [])
+    ]
+
+    aggregated: Dict[str, Dict[str, Any]] = {}
+    sampled_points: List[Dict[str, Any]] = []
+    missing_coordinates = 0
+
+    def _normalise_lat_lon(value: Optional[float]) -> Optional[float]:
+        try:
+            if value is None:
+                return None
+            if isinstance(value, (int, float)):
+                # guard against strings masquerading as numbers
+                if math.isnan(float(value)):
+                    return None
+                return float(value)
+            if isinstance(value, str) and value.strip():
+                return float(value)
+        except (ValueError, TypeError):
+            return None
+        return None
+
+    for idx, path in enumerate(paths):
+        lat = _normalise_lat_lon(lats[idx] if idx < len(lats) else None)
+        lon = _normalise_lat_lon(lons[idx] if idx < len(lons) else None)
+
+        if lat is None or lon is None:
+            missing_coordinates += 1
+            continue
+
+        place_name = places_raw[idx] if idx < len(places_raw) else ""
+        coarse_key = f"{round(lat, 3):.3f},{round(lon, 3):.3f}"
+        key = place_name.lower() if place_name else coarse_key
+
+        if key not in aggregated:
+            aggregated[key] = {
+                "name": place_name or coarse_key,
+                "count": 0,
+                "lat_sum": 0.0,
+                "lon_sum": 0.0,
+                "min_lat": lat,
+                "max_lat": lat,
+                "min_lon": lon,
+                "max_lon": lon,
+                "samples": [],
+            }
+
+        entry = aggregated[key]
+        if place_name and place_name not in entry["name"]:
+            # Prefer human readable labels when available
+            entry["name"] = place_name
+
+        entry["count"] += 1
+        entry["lat_sum"] += lat
+        entry["lon_sum"] += lon
+        entry["min_lat"] = min(entry["min_lat"], lat)
+        entry["max_lat"] = max(entry["max_lat"], lat)
+        entry["min_lon"] = min(entry["min_lon"], lon)
+        entry["max_lon"] = max(entry["max_lon"], lon)
+
+        if len(entry["samples"]) < sample_per_location:
+            entry["samples"].append({
+                "path": path,
+                "lat": lat,
+                "lon": lon,
+                "place": place_name or None,
+            })
+
+        if len(sampled_points) < limit:
+            sampled_points.append(
+                {
+                    "path": path,
+                    "lat": lat,
+                    "lon": lon,
+                    "place": place_name or None,
+                }
+            )
+
+    # Down-sample deterministically if we exceeded the requested limit
+    if len(sampled_points) > limit:
+        step = max(1, len(sampled_points) // limit)
+        sampled_points = sampled_points[::step][:limit]
+
+    locations_payload: List[Dict[str, Any]] = []
+    for key, entry in aggregated.items():
+        count = entry["count"] or 1
+        center_lat = entry["lat_sum"] / count
+        center_lon = entry["lon_sum"] / count
+        radius_km = _estimate_radius_km(
+            entry["min_lat"],
+            entry["min_lon"],
+            entry["max_lat"],
+            entry["max_lon"],
+        )
+        locations_payload.append(
+            {
+                "id": key,
+                "name": entry["name"],
+                "count": count,
+                "center": {"lat": center_lat, "lon": center_lon},
+                "bounds": {
+                    "min_lat": entry["min_lat"],
+                    "min_lon": entry["min_lon"],
+                    "max_lat": entry["max_lat"],
+                    "max_lon": entry["max_lon"],
+                },
+                "approximate_radius_km": radius_km,
+                "sample_points": entry["samples"],
+            }
+        )
+
+    locations_payload.sort(key=lambda item: item["count"], reverse=True)
+
+    return {
+        "generated_at": datetime.now(UTC).isoformat(),
+        "directory": str(resolved_directory),
+        "total_with_coordinates": sum(entry["count"] for entry in aggregated.values()),
+        "total_without_coordinates": missing_coordinates,
+        "locations": locations_payload,
+        "points": sampled_points,
+    }
+
+
+def _estimate_radius_km(min_lat: float, min_lon: float, max_lat: float, max_lon: float) -> float:
+    """Rough distance (km) covered by the bounding box for tooltips."""
+
+    if any(v is None for v in (min_lat, min_lon, max_lat, max_lon)):
+        return 0.0
+
+    # Haversine distance between opposite corners (approximate)
+    lat1 = math.radians(min_lat)
+    lon1 = math.radians(min_lon)
+    lat2 = math.radians(max_lat)
+    lon2 = math.radians(max_lon)
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    )
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(max(1e-12, 1 - a)))
+    return round(6371.0 * c, 3)
 
 
 def _summarize_index(store: IndexStore) -> tuple[int, int]:

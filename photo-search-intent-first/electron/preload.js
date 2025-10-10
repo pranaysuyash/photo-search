@@ -7,6 +7,7 @@ const { contextBridge, ipcRenderer } = require('electron')
 // Legacy API for backward compatibility
 contextBridge.exposeInMainWorld('electronAPI', {
   selectFolder: () => ipcRenderer.invoke('select-folder'),
+  selectImportFolder: () => ipcRenderer.invoke('select-import-folder'),
   getApiToken: () => ipcRenderer.invoke('get-api-token'),
   getApiConfig: () => ipcRenderer.invoke('get-api-config'),
   setAllowedRoot: (p) => ipcRenderer.invoke('set-allowed-root', p),
@@ -14,6 +15,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   models: {
     getStatus: () => ipcRenderer.invoke('models:get-status'),
     refresh: () => ipcRenderer.invoke('models:refresh')
+  },
+  // IPC event listeners for menu actions
+  on: (channel, callback) => {
+    ipcRenderer.on(channel, callback)
+  },
+  off: (channel, callback) => {
+    ipcRenderer.off(channel, callback)
+  },
+  removeAllListeners: (channel) => {
+    ipcRenderer.removeAllListeners(channel)
   }
 })
 

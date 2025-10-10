@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DEMO_LIBRARY_DIR } from "@/constants/directories";
+import { useElectronBridge } from "@/hooks/useElectronBridge";
 
 interface SidebarProps {
   currentView: string;
@@ -161,6 +162,7 @@ export function Sidebar({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showRecentSearches, setShowRecentSearches] = useState(true);
   const [showSmartAlbums, setShowSmartAlbums] = useState(true);
+  const { selectFolder, isElectron } = useElectronBridge();
   const [recentDirectories, setRecentDirectories] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
     try {
@@ -168,7 +170,9 @@ export function Sidebar({
       if (!raw) return [];
       const parsed = JSON.parse(raw);
       if (!Array.isArray(parsed)) return [];
-      return parsed.filter((item: unknown): item is string => typeof item === "string");
+      return parsed.filter(
+        (item: unknown): item is string => typeof item === "string"
+      );
     } catch {
       return [];
     }
@@ -180,7 +184,9 @@ export function Sidebar({
     const refreshFromStorage = (value?: string[]) => {
       if (Array.isArray(value)) {
         setRecentDirectories(
-          value.filter((item: unknown): item is string => typeof item === "string")
+          value.filter(
+            (item: unknown): item is string => typeof item === "string"
+          )
         );
         return;
       }
@@ -193,7 +199,9 @@ export function Sidebar({
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
           setRecentDirectories(
-            parsed.filter((item: unknown): item is string => typeof item === "string")
+            parsed.filter(
+              (item: unknown): item is string => typeof item === "string"
+            )
           );
         }
       } catch {
@@ -230,21 +238,18 @@ export function Sidebar({
   }, []);
 
   const handleDirectorySelect = async () => {
-    const w = typeof window !== "undefined" ? window : undefined;
-
-    if (w?.electronAPI?.selectDirectory) {
-      try {
-        const selectedDir = await w.electronAPI.selectDirectory();
-        if (typeof selectedDir === "string" && selectedDir.trim().length > 0) {
-          onDirectoryChange(selectedDir);
-          return;
-        }
-      } catch (error) {
-        console.warn("Electron directory selection failed:", error);
+    try {
+      const selectedDir = await selectFolder();
+      if (typeof selectedDir === "string" && selectedDir.trim().length > 0) {
+        onDirectoryChange(selectedDir);
+        return;
       }
+    } catch (error) {
+      console.warn("Directory selection failed:", error);
     }
 
-    if (!w?.electronAPI && !currentDirectory) {
+    // Fallback for non-Electron environments or if selection fails
+    if (!isElectron && !currentDirectory) {
       onDirectoryChange(DEMO_LIBRARY_DIR);
     }
   };
@@ -345,7 +350,8 @@ export function Sidebar({
           </span>
         </Button>
 
-        {recentDirectories.filter((dir) => dir !== currentDirectory).length > 0 && (
+        {recentDirectories.filter((dir) => dir !== currentDirectory).length >
+          0 && (
           <div className="mt-4">
             <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">
               Recent folders

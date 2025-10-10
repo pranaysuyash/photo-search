@@ -1,0 +1,2 @@
+This is a lightweight placeholder for the sentence-transformers CLIP model.
+It enables offline bundling tests without shipping the real weights.

@@ -1,5 +1,5 @@
 import { Search, X, Settings as SettingsIcon, Moon, Sun } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState, type KeyboardEvent } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,8 @@ interface TopBarProps {
   currentView: string;
   currentDirectory?: string | null;
   onDirectoryChange?: (dir: string) => void;
+  onSearchInputRef?: (input: HTMLInputElement | null) => void;
+  isLoading?: boolean;
 }
 
 export function TopBar({
@@ -20,6 +22,8 @@ export function TopBar({
   currentView,
   currentDirectory,
   onDirectoryChange,
+  onSearchInputRef,
+  isLoading = false,
 }: TopBarProps) {
   const envLogo = (
     import.meta as unknown as { env?: { VITE_BRAND_LOGO?: string } }
@@ -34,6 +38,10 @@ export function TopBar({
     }
     return "system";
   });
+  const modifierKeyLabel =
+    typeof navigator !== "undefined" && navigator.platform.includes("Mac")
+      ? "⌘"
+      : "Ctrl";
 
   const applyTheme = (t: string) => {
     setTheme(t);
@@ -50,7 +58,9 @@ export function TopBar({
         if (mq?.matches) root.classList.add("dark");
         else root.classList.remove("dark");
       }
-    } catch {}
+    } catch (error) {
+      console.warn("Unable to persist theme preference", error);
+    }
   };
   const handleSearch = () => {
     onSearch(searchQuery);
@@ -61,7 +71,16 @@ export function TopBar({
     onSearch("");
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleInputRef = useCallback(
+    (node: HTMLInputElement | null) => {
+      if (onSearchInputRef) {
+        onSearchInputRef(node);
+      }
+    },
+    [onSearchInputRef]
+  );
+
+  const handleKeyPress = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       handleSearch();
     }
@@ -104,7 +123,19 @@ export function TopBar({
             onKeyUp={handleKeyPress}
             placeholder={`Search your ${currentView}...`}
             className="pl-10 pr-10 py-2 h-10 w-full bg-slate-50/50 dark:bg-slate-800/50 border-slate-200/60 dark:border-slate-700/60 hover:bg-slate-100/80 dark:hover:bg-slate-700/80 transition-colors focus-visible:ring-1 focus-visible:ring-slate-400/50 dark:focus-visible:ring-slate-500/50"
+            ref={handleInputRef}
+            aria-label="Search photos"
           />
+          {!searchQuery && (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-1 text-[11px] text-slate-400 pointer-events-none">
+              <kbd className="px-1.5 py-0.5 rounded bg-slate-200/80 dark:bg-slate-700/60 text-slate-600 dark:text-slate-200 shadow-inner">
+                {modifierKeyLabel}
+              </kbd>
+              <kbd className="px-1.5 py-0.5 rounded bg-slate-200/80 dark:bg-slate-700/60 text-slate-600 dark:text-slate-200 shadow-inner">
+                K
+              </kbd>
+            </div>
+          )}
           {searchQuery && (
             <Button
               type="button"
@@ -123,6 +154,18 @@ export function TopBar({
         >
           Search
         </Button>
+        {isLoading && (
+          <div
+            className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400"
+            aria-live="polite"
+          >
+            <span className="relative flex h-3 w-3">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75" />
+              <span className="relative inline-flex h-3 w-3 rounded-full bg-blue-500" />
+            </span>
+            Loading…
+          </div>
+        )}
       </div>
 
       {/* Right settings button (offline-only; no indicators) */}

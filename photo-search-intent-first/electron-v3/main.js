@@ -31,6 +31,12 @@ class PhotoSearchApp {
         this.isQuitting = false
         this.isDevelopment = process.env.NODE_ENV === 'development'
 
+        // Mitigate excessive GPU memory in dev (some CSS backgrounds can explode GPU surfaces)
+        // You can comment this if you need GPU features.
+        app.disableHardwareAcceleration()
+        // Cap V8 old space to avoid runaway allocations
+        app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096')
+
         this.setupApp()
     }
 
@@ -156,7 +162,7 @@ class PhotoSearchApp {
         const isDev = this.isDevelopment
 
         if (isDev) {
-            // Development: load from Vite dev server
+            // Development: load from Vite dev server (explicit IPv4)
             this.mainWindow.loadURL('http://127.0.0.1:5174')
         } else {
             // Production: load from built files
@@ -178,7 +184,8 @@ class PhotoSearchApp {
                     {
                         label: 'Import Photos...',
                         accelerator: 'CmdOrCtrl+I',
-                        click: () => this.importPhotos()
+                        // Renderer will open a folder picker via preload hook
+                        click: () => this.mainWindow && this.mainWindow.webContents.send('menu:import')
                     },
                     { type: 'separator' },
                     {
@@ -189,7 +196,7 @@ class PhotoSearchApp {
                     { type: 'separator' },
                     {
                         label: 'Export Library...',
-                        click: () => this.exportLibrary()
+                        click: () => this.mainWindow && this.mainWindow.webContents.send('menu:export-library')
                     },
                     { type: 'separator' },
                     process.platform === 'darwin'

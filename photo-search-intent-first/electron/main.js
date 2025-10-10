@@ -576,6 +576,54 @@ function setupMenu() {
     {
       label: 'File',
       submenu: [
+        {
+          label: 'Import Photos...',
+          accelerator: 'CmdOrCtrl+I',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.send('menu:import');
+            }
+          }
+        },
+        {
+          label: 'Export',
+          submenu: [
+            {
+              label: 'Export Search Results...',
+              accelerator: 'CmdOrCtrl+E',
+              click: () => {
+                if (mainWindow) {
+                  mainWindow.webContents.send('menu:export-search');
+                }
+              }
+            },
+            {
+              label: 'Export Library...',
+              click: () => {
+                if (mainWindow) {
+                  mainWindow.webContents.send('menu:export-library');
+                }
+              }
+            },
+            {
+              label: 'Export Favorites...',
+              click: () => {
+                if (mainWindow) {
+                  mainWindow.webContents.send('menu:export-favorites');
+                }
+              }
+            },
+            {
+              label: 'Export Collection...',
+              click: () => {
+                if (mainWindow) {
+                  mainWindow.webContents.send('menu:export-collection');
+                }
+              }
+            }
+          ]
+        },
+        { type: 'separator' },
         isMac ? { role: 'close' } : { role: 'quit' },
       ],
     },
@@ -959,6 +1007,20 @@ app.whenReady().then(() => {
       title: 'Select Photo Folder',
       properties: ['openDirectory'],
       buttonLabel: 'Select Folder'
+    });
+
+    if (!result.canceled && result.filePaths.length > 0) {
+      return result.filePaths[0];
+    }
+    return null;
+  });
+
+  // IPC handler for import source folder selection
+  ipcMain.handle('select-import-folder', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Select Source Folder to Import From',
+      properties: ['openDirectory'],
+      buttonLabel: 'Select Source'
     });
 
     if (!result.canceled && result.filePaths.length > 0) {

@@ -12,18 +12,24 @@ declare global {
   }
 }
 
-const mockFetch = vi.fn();
+type MockFetchResponse = { ok: boolean; json: () => Promise<unknown> };
 
-global.fetch = mockFetch as any;
+const mockFetch = vi.fn<
+  Promise<MockFetchResponse>,
+  [RequestInfo | URL, RequestInit | undefined]
+>();
+
+global.fetch = mockFetch as unknown as typeof fetch;
 
 describe("API contract (v1 adapter shapes)", () => {
   beforeEach(() => {
     mockFetch.mockReset();
-    // Force v1 for tests
-    (import.meta as any).env = {
-      ...(import.meta as any).env,
-      VITE_API_MODE: "v1",
-    };
+    Object.assign(import.meta, {
+      env: {
+        ...(import.meta.env ?? {}),
+        VITE_API_MODE: "v1",
+      },
+    });
   });
 
   it("normalizes LibraryResponse", async () => {

@@ -616,3 +616,354 @@ def build_thumbnails(
         'size': size_value 
     })
     return out
+
+
+@router.post("/export/search")
+def api_export_search(
+    dir: Optional[str] = None,
+    query: Optional[str] = None,
+    format: Optional[str] = None,
+    include_metadata: Optional[bool] = None,
+    provider: Optional[str] = None,
+    hf_token: Optional[str] = None,
+    openai_key: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    """Export search results to JSON/CSV format."""
+    from infra.index_store import IndexStore
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    query_value = _require(_from_body(body, query, "query"), "query")
+    format_value = (_from_body(body, format, "format", default="json") or "json").lower()
+    include_metadata_value = _from_body(body, include_metadata, "include_metadata", default=False, cast=_as_bool) or False
+    provider_value = _from_body(body, provider, "provider", default="local") or "local"
+    hf_token_value = _from_body(body, hf_token, "hf_token")
+    openai_key_value = _from_body(body, openai_key, "openai_key")
+
+    if format_value not in ["json", "csv"]:
+        raise HTTPException(400, "Format must be 'json' or 'csv'")
+
+    folder = Path(dir_value)
+    if not folder.exists():
+        raise HTTPException(400, "Folder not found")
+
+    emb = _emb(provider_value, hf_token_value, openai_key_value)
+    store = IndexStore(folder, index_key=getattr(emb, 'index_id', None))
+    store.load()
+
+    # Perform search
+    results = store.search(emb, query_value, top_k=1000)  # Get many results for export
+
+    # Prepare export data
+    export_data = []
+    for result in results:
+        item = {
+            "path": str(result.path),
+            "score": float(result.score),
+            "query": query_value
+        }
+
+        if include_metadata_value:
+            try:
+                # Add basic file metadata
+                stat = result.path.stat()
+                item["size"] = stat.st_size
+                item["modified"] = stat.st_mtime
+
+                # Add EXIF metadata if available
+                from PIL import Image
+                with Image.open(result.path) as img:
+                    exif = img._getexif() or {}
+                    if exif:
+                        item["width"] = img.width
+                        item["height"] = img.height
+                        # Add other EXIF fields as needed
+            except Exception:
+                pass  # Skip metadata if unavailable
+
+        export_data.append(item)
+
+    if format_value == "csv":
+        # Convert to CSV format
+        import csv
+        import io
+        output = io.StringIO()
+        if export_data:
+            writer = csv.DictWriter(output, fieldnames=export_data[0].keys())
+            writer.writeheader()
+            writer.writerows(export_data)
+        return {"ok": True, "data": output.getvalue(), "format": "csv", "count": len(export_data)}
+    else:
+        return {"ok": True, "data": export_data, "format": "json", "count": len(export_data)}
+
+
+@router.post("/export/library")
+def api_export_library(
+    dir: Optional[str] = None,
+    format: Optional[str] = None,
+    include_metadata: Optional[bool] = None,
+    filter: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    """Export entire photo library to JSON/CSV format."""
+    from infra.index_store import IndexStore
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    format_value = (_from_body(body, format, "format", default="json") or "json").lower()
+    include_metadata_value = _from_body(body, include_metadata, "include_metadata", default=False, cast=_as_bool) or False
+    filter_value = _from_body(body, filter, "filter")
+
+    if format_value not in ["json", "csv"]:
+        raise HTTPException(400, "Format must be 'json' or 'csv'")
+
+    folder = Path(dir_value)
+    if not folder.exists():
+        raise HTTPException(400, "Folder not found")
+
+    # Try to find an available index store
+    store = None
+    index_dir = folder / ".photo_index"
+    if index_dir.exists():
+        # Try different possible index keys
+        possible_keys = ["clip-ViT-B-32", "hf-openai_clip-vit-base-patch32", "hf-openai_clip-vit-base-patch32-fast"]
+        for key in possible_keys:
+            try:
+                test_store = IndexStore(folder, index_key=key)
+                # Check if the paths file exists
+                if test_store.paths_file.exists():
+                    test_store.load()
+                    if test_store.state.paths:
+                        store = test_store
+                        break
+            except:
+                continue
+    
+    # Fallback to default
+    if store is None:
+        store = IndexStore(folder)
+        store.load()
+
+    # Get all photos
+    paths = store.state.paths or []
+
+    # Apply filter if specified
+    if filter_value:
+        # Simple filtering - could be extended
+        if filter_value == "images":
+            from domain.models import SUPPORTED_EXTS
+            image_exts = {ext for ext in SUPPORTED_EXTS if ext in {'jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'webp'}}
+            paths = [p for p in paths if p.suffix.lower().lstrip('.') in image_exts]
+
+    # Prepare export data
+    export_data = []
+    for path in paths:
+        item = {"path": str(path)}
+
+        if include_metadata_value:
+            try:
+                stat = path.stat()
+                item["size"] = stat.st_size
+                item["modified"] = stat.st_mtime
+
+                # Add EXIF metadata if available
+                from PIL import Image
+                with Image.open(path) as img:
+                    exif = img._getexif() or {}
+                    if exif:
+                        item["width"] = img.width
+                        item["height"] = img.height
+            except Exception:
+                pass
+
+        export_data.append(item)
+
+    if format_value == "csv":
+        import csv
+        import io
+        output = io.StringIO()
+        if export_data:
+            writer = csv.DictWriter(output, fieldnames=export_data[0].keys())
+            writer.writeheader()
+            writer.writerows(export_data)
+        return {"ok": True, "data": output.getvalue(), "format": "csv", "count": len(export_data)}
+    else:
+        return {"ok": True, "data": export_data, "format": "json", "count": len(export_data)}
+
+
+@router.post("/export/favorites")
+def api_export_favorites(
+    dir: Optional[str] = None,
+    format: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    """Export favorite photos to JSON/CSV format."""
+    from infra.collections import load_collections
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    format_value = (_from_body(body, format, "format", default="json") or "json").lower()
+
+    if format_value not in ["json", "csv"]:
+        raise HTTPException(400, "Format must be 'json' or 'csv'")
+
+    folder = Path(dir_value)
+    if not folder.exists():
+        raise HTTPException(400, "Folder not found")
+
+    # Load favorites from collections
+    collections = load_collections(folder / ".photo_index")
+    favorites = collections.get("Favorites", [])
+
+    # Prepare export data
+    export_data = []
+    for path_str in favorites:
+        path = Path(path_str)
+        item = {"path": str(path), "favorite": True}
+
+        try:
+            stat = path.stat()
+            item["size"] = stat.st_size
+            item["modified"] = stat.st_mtime
+        except Exception:
+            pass
+
+        export_data.append(item)
+
+    if format_value == "csv":
+        import csv
+        import io
+        output = io.StringIO()
+        if export_data:
+            writer = csv.DictWriter(output, fieldnames=export_data[0].keys())
+            writer.writeheader()
+            writer.writerows(export_data)
+        return {"ok": True, "data": output.getvalue(), "format": "csv", "count": len(export_data)}
+    else:
+        return {"ok": True, "data": export_data, "format": "json", "count": len(export_data)}
+
+
+@router.post("/export/collection")
+def api_export_collection(
+    dir: Optional[str] = None,
+    collection: Optional[str] = None,
+    format: Optional[str] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    """Export a collection to JSON/CSV format."""
+    from infra.collections import load_collections
+    dir_value = _require(_from_body(body, dir, "dir"), "dir")
+    collection_value = _require(_from_body(body, collection, "collection"), "collection")
+    format_value = (_from_body(body, format, "format", default="json") or "json").lower()
+
+    if format_value not in ["json", "csv"]:
+        raise HTTPException(400, "Format must be 'json' or 'csv'")
+
+    folder = Path(dir_value)
+    if not folder.exists():
+        raise HTTPException(400, "Folder not found")
+
+    # Load collections
+    collections = load_collections(folder)
+
+    if collection_value not in collections:
+        raise HTTPException(404, f"Collection '{collection_value}' not found")
+
+    collection_data = collections[collection_value]
+    photos = collection_data.get("photos", [])
+
+    # Prepare export data
+    export_data = []
+    for path_str in photos:
+        path = Path(path_str)
+        item = {"path": str(path), "collection": collection_value}
+
+        try:
+            stat = path.stat()
+            item["size"] = stat.st_size
+            item["modified"] = stat.st_mtime
+        except Exception:
+            pass
+
+        export_data.append(item)
+
+    if format_value == "csv":
+        import csv
+        import io
+        output = io.StringIO()
+        if export_data:
+            writer = csv.DictWriter(output, fieldnames=export_data[0].keys())
+            writer.writeheader()
+            writer.writerows(export_data)
+        return {"ok": True, "data": output.getvalue(), "format": "csv", "count": len(export_data)}
+    else:
+        return {"ok": True, "data": export_data, "format": "json", "count": len(export_data)}
+
+
+@router.post("/import")
+def api_import_photos(
+    source_dir: Optional[str] = None,
+    dest_dir: Optional[str] = None,
+    recursive: Optional[bool] = None,
+    copy: Optional[bool] = None,
+    body: Optional[Dict[str, Any]] = Body(None),
+) -> Dict[str, Any]:
+    """Import photos from source directory to destination directory."""
+    from domain.models import SUPPORTED_EXTS
+    source_value = _require(_from_body(body, source_dir, "source_dir"), "source_dir")
+    dest_value = _require(_from_body(body, dest_dir, "dest_dir"), "dest_dir")
+    recursive_value = _from_body(body, recursive, "recursive", default=True, cast=_as_bool) or True
+    copy_value = _from_body(body, copy, "copy", default=True, cast=_as_bool) or True
+
+    source_folder = Path(source_value).expanduser().resolve()
+    dest_folder = Path(dest_value).expanduser().resolve()
+
+    if not source_folder.exists():
+        raise HTTPException(400, "Source directory not found")
+    if not dest_folder.exists():
+        dest_folder.mkdir(parents=True, exist_ok=True)
+
+    # Find all supported photo files
+    photo_files = []
+    if recursive_value:
+        for ext in SUPPORTED_EXTS:
+            photo_files.extend(source_folder.rglob(f"*.{ext}"))
+    else:
+        for ext in SUPPORTED_EXTS:
+            photo_files.extend(source_folder.glob(f"*.{ext}"))
+
+    imported = 0; skipped = 0; errors = 0
+
+    for src_path in photo_files:
+        try:
+            # Create relative path from source
+            if recursive_value:
+                rel_path = src_path.relative_to(source_folder)
+            else:
+                rel_path = src_path.name
+
+            dest_path = dest_folder / rel_path
+
+            # Create destination subdirectories if needed
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
+
+            if dest_path.exists():
+                skipped += 1
+                continue
+
+            if copy_value:
+                import shutil
+                shutil.copy2(src_path, dest_path)
+            else:
+                # Move instead of copy
+                src_path.rename(dest_path)
+
+            imported += 1
+
+        except Exception as e:
+            print(f"Error importing {src_path}: {e}")
+            errors += 1
+
+    return {
+        "ok": True,
+        "imported": imported,
+        "skipped": skipped,
+        "errors": errors,
+        "source": str(source_folder),
+        "destination": str(dest_folder)
+    }

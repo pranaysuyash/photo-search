@@ -18,7 +18,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     showMessageBox: (options) => ipcRenderer.invoke('show-message-box', options),
     selectDirectory: () => ipcRenderer.invoke('select-photo-directory'),
 
-    // Menu action listeners
+    // Menu action listeners (named helpers)
     onDirectorySelected: (callback) => ipcRenderer.on('directory-selected', callback),
     onPhotosImport: (callback) => ipcRenderer.on('photos-import', callback),
     onFocusSearch: (callback) => ipcRenderer.on('focus-search', callback),
@@ -30,7 +30,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onExportLibrary: (callback) => ipcRenderer.on('export-library', callback),
     onOpenPreferences: (callback) => ipcRenderer.on('open-preferences', callback),
 
-    // Remove listeners
+    // Generic on/off to match renderer usage safely
+    on: (channel, listener) => ipcRenderer.on(channel, listener),
+    off: (channel, listener) => ipcRenderer.removeListener(channel, listener),
     removeListener: (channel, callback) => ipcRenderer.removeListener(channel, callback),
     removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel),
 

@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import type { Photo } from "@/store/photoStore";
 import { cn } from "@/lib/utils";
+import { useElectronBridge } from "@/hooks/useElectronBridge";
+import { apiClient } from "@/services/api";
 
 interface PhotoLibraryProps {
   photos: Photo[];
@@ -31,14 +33,15 @@ interface PhotoLibraryProps {
 function LoadingSkeleton() {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 p-6">
-      {Array.from({ length: 12 }, (_, i) => `skeleton-${Date.now()}-${i}`).map(
-        (key) => (
-          <div key={key} className="group relative">
-            <div className="aspect-square bg-slate-200 dark:bg-slate-800 rounded-xl animate-pulse" />
-            <div className="mt-2 h-4 bg-slate-200 dark:bg-slate-800 rounded animate-pulse" />
-          </div>
-        )
-      )}
+      {Array.from({ length: 12 }).map((_, index) => (
+        <Card key={`photo-skeleton-${index}`} className="overflow-hidden">
+          <div className="aspect-square bg-slate-200/80 dark:bg-slate-800/70 animate-pulse" />
+          <CardContent className="p-4 space-y-2">
+            <div className="h-4 w-3/4 bg-slate-200/80 dark:bg-slate-700/70 animate-pulse rounded" />
+            <div className="h-3 w-1/2 bg-slate-200/70 dark:bg-slate-700/60 animate-pulse rounded" />
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 }
@@ -50,6 +53,34 @@ function EmptyState({
   currentDirectory: string | null;
   onDirectorySelect: (directory: string) => void;
 }) {
+  const { selectImportFolder } = useElectronBridge();
+
+  const handleImport = async () => {
+    if (!currentDirectory) return;
+
+    try {
+      const sourceDir = await selectImportFolder();
+      if (!sourceDir) return;
+
+      // Call the import API
+      const result = await apiClient.importPhotos(sourceDir, currentDirectory, {
+        recursive: true,
+        copy: true,
+      });
+
+      if (result.ok) {
+        alert(`Import completed: ${result.imported} photos imported`);
+        // Trigger a refresh of the photo library
+        window.location.reload();
+      } else {
+        alert(`Import failed: ${result.errors} errors`);
+      }
+    } catch (error) {
+      console.error("Import failed:", error);
+      alert("Import failed. Please try again.");
+    }
+  };
+
   return (
     <div className="flex flex-col items-center justify-center h-full min-h-[400px] p-8">
       <div className="relative mb-6">
@@ -85,6 +116,7 @@ function EmptyState({
 
         {currentDirectory && (
           <Button
+            onClick={handleImport}
             variant="outline"
             className="border-slate-200 dark:border-slate-700"
           >
@@ -171,13 +203,16 @@ function PhotoCard({
                   src={photo.src}
                   alt={photo.title}
                   className={cn(
-                    "w-full h-full object-cover transition-all duration-500",
-                    "group-hover:scale-110",
-                    imageLoaded ? "opacity-100" : "opacity-0"
+                    "w-full h-full object-cover transition-all duration-500 ease-out",
+                    imageLoaded
+                      ? "opacity-100 blur-0"
+                      : "opacity-0 blur-sm scale-[1.02]",
+                    "group-hover:scale-105"
                   )}
                   onLoad={() => setImageLoaded(true)}
                   onError={() => setImageError(true)}
                   loading={index < 6 ? "eager" : "lazy"}
+                  decoding="async"
                 />
               )}
 

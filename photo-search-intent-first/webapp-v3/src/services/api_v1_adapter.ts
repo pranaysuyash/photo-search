@@ -30,6 +30,17 @@ type LibraryResponse = {
 
 type SearchResult = { path: string; score: number };
 type SearchResponse = { results: SearchResult[]; total: number; query: string };
+type SearchOptions = {
+  provider?: string;
+  topK?: number;
+  useFast?: boolean;
+  useCaptions?: boolean;
+  useOcr?: boolean;
+  favoritesOnly?: boolean;
+  place?: string;
+  tags?: string[];
+  hasText?: boolean;
+};
 type AnalyticsResponse = {
   total_photos: number;
   total_indexed: number;
@@ -40,6 +51,44 @@ type AnalyticsResponse = {
   tags: string[];
   favorites_total: number;
   events: unknown[];
+};
+type PlacePoint = {
+  path: string;
+  lat: number;
+  lon: number;
+  place: string | null;
+};
+type PlaceLocation = {
+  id: string;
+  name: string;
+  count: number;
+  center: { lat: number; lon: number };
+  bounds: {
+    min_lat: number;
+    min_lon: number;
+    max_lat: number;
+    max_lon: number;
+  };
+  approximate_radius_km: number;
+  sample_points: PlacePoint[];
+};
+type PlacesMapResponse = {
+  generated_at: string;
+  directory: string;
+  total_with_coordinates: number;
+  total_without_coordinates: number;
+  locations: PlaceLocation[];
+  points: PlacePoint[];
+};
+type TagCount = {
+  name: string;
+  count: number;
+  samplePaths: string[];
+};
+type TagsIndexResponse = {
+  tagsByPath: Record<string, string[]>;
+  tagCounts: TagCount[];
+  allTags: string[];
 };
 type Collection = {
   name: string;
@@ -163,19 +212,31 @@ export default class V1Adapter {
   async search(
     dir: string,
     query: string,
-    provider = "local",
-    topK = 50,
-    offset = 0
+    options: SearchOptions = {}
   ): Promise<SearchResponse> {
-    const form = new FormData();
-    form.append("dir", dir);
-    form.append("query", query);
-    form.append("provider", provider);
-    form.append("top_k", String(topK));
-    form.append("offset", String(offset));
+    const payload: Record<string, unknown> = {
+      dir,
+      query,
+      provider: options.provider ?? "local",
+      top_k: Math.max(1, Math.min(options.topK ?? 50, 500)),
+    };
+
+    if (options.useFast) payload.use_fast = true;
+    if (options.useCaptions) payload.use_captions = true;
+    if (options.useOcr) payload.use_ocr = true;
+    if (options.favoritesOnly) payload.favorites_only = true;
+    if (options.place && options.place.trim()) {
+      payload.place = options.place.trim();
+    }
+    if (Array.isArray(options.tags) && options.tags.length > 0) {
+      payload.tags = options.tags.filter((tag) => tag && tag.trim().length > 0);
+    }
+    if (options.hasText) payload.has_text = true;
+
     const res = await fetch(`${API_BASE}/search`, {
       method: "POST",
-      body: form,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error(`v1 search failed: ${res.statusText}`);
     const data = await res.json();
@@ -218,11 +279,11 @@ export default class V1Adapter {
         : [],
       places: Array.isArray(raw?.places) ? raw.places : [],
       people_clusters: Array.isArray(raw?.people_clusters)
-        ? raw.people_clusters.map((cluster: any) => ({
-            id: cluster?.id,
-            name: typeof cluster?.name === "string" ? cluster.name : "",
+        ? (raw.people_clusters as Record<string, unknown>[]).map((cluster) => ({
+            id: cluster.id,
+            name: typeof cluster.name === "string" ? cluster.name : "",
             size:
-              typeof cluster?.size === "number"
+              typeof cluster.size === "number"
                 ? cluster.size
                 : undefined,
           }))
@@ -234,6 +295,173 @@ export default class V1Adapter {
         ? Number(raw.favorites_total)
         : 0,
       events: Array.isArray(raw?.events) ? raw.events : [],
+    };
+  }
+
+  async getTagsIndex(dir: string): Promise<TagsIndexResponse> {
+    const res = await fetch(`${API_BASE}/tags?dir=${encodeURIComponent(dir)}`);
+    if (!res.ok) throw new Error(`v1 tags failed: ${res.statusText}`);
+
+    const raw = await res.json();
+    const tagsByPath: Record<string, string[]> = {};
+
+    if (raw && typeof raw === "object" && raw.tags) {
+      const entries = raw.tags as Record<string, unknown>;
+      for (const [path, value] of Object.entries(entries)) {
+        if (typeof path !== "string") continue;
+        if (!Array.isArray(value)) continue;
+        const cleaned = value
+          .map((tag) =>
+            typeof tag === "string" ? tag.trim() : typeof tag === "number" ? String(tag) : ""
+          )
+          .filter((tag) => tag.length > 0);
+        if (cleaned.length > 0) {
+          tagsByPath[path] = cleaned;
+        }
+      }
+    }
+
+    const countMap = new Map<string, TagCount>();
+    for (const [path, tags] of Object.entries(tagsByPath)) {
+      for (const tag of tags) {
+        const existing = countMap.get(tag);
+        if (existing) {
+          existing.count += 1;
+          if (existing.samplePaths.length < 8) {
+            existing.samplePaths.push(path);
+          }
+        } else {
+          countMap.set(tag, {
+            name: tag,
+            count: 1,
+            samplePaths: [path],
+          });
+        }
+      }
+    }
+
+    const tagCounts = Array.from(countMap.values()).sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return a.name.localeCompare(b.name);
+    });
+
+    const allTags = Array.isArray(raw?.all)
+      ? (raw.all as unknown[])
+          .map((tag) =>
+            typeof tag === "string" ? tag : typeof tag === "number" ? String(tag) : ""
+          )
+          .filter((tag) => tag.length > 0)
+      : [];
+
+    return { tagsByPath, tagCounts, allTags };
+  }
+
+  async getPlacesMap(dir: string): Promise<PlacesMapResponse> {
+    const res = await fetch(
+      `${API_BASE}/analytics/places?dir=${encodeURIComponent(dir)}&limit=8000&sample_per_location=24`
+    );
+    if (!res.ok) throw new Error(`v1 places analytics failed: ${res.statusText}`);
+
+    const raw = await res.json();
+
+    const toNumber = (value: unknown, fallback = 0): number => {
+      if (typeof value === "number" && Number.isFinite(value)) return value;
+      if (typeof value === "string" && value.trim().length > 0) {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) return parsed;
+      }
+      return fallback;
+    };
+
+    const parsePoint = (value: unknown): PlacePoint | null => {
+      if (!value || typeof value !== "object") {
+        return null;
+      }
+      const point = value as Record<string, unknown>;
+      const lat = toNumber(point.lat, NaN);
+      const lon = toNumber(point.lon, NaN);
+      const path = typeof point.path === "string" ? point.path : "";
+      if (!path || Number.isNaN(lat) || Number.isNaN(lon)) {
+        return null;
+      }
+      const placeValue =
+        typeof point.place === "string" && point.place.trim().length > 0
+          ? point.place
+          : null;
+      return { path, lat, lon, place: placeValue };
+    };
+
+    const points: PlacePoint[] = Array.isArray(raw?.points)
+      ? (raw.points as unknown[])
+          .map(parsePoint)
+          .filter((pt): pt is PlacePoint => pt !== null)
+      : [];
+
+    const locations: PlaceLocation[] = Array.isArray(raw?.locations)
+      ? (raw.locations as unknown[])
+          .map((value) => {
+            if (!value || typeof value !== "object") {
+              return null;
+            }
+            const entry = value as Record<string, unknown>;
+            const centerRecord = (entry.center ?? {}) as Record<string, unknown>;
+            const centerLat = toNumber(centerRecord.lat, NaN);
+            const centerLon = toNumber(centerRecord.lon, NaN);
+            if (Number.isNaN(centerLat) || Number.isNaN(centerLon)) {
+              return null;
+            }
+
+            const idValue = typeof entry.id === "string" ? entry.id : "";
+            const nameValue =
+              typeof entry.name === "string" && entry.name.trim().length > 0
+                ? entry.name
+                : idValue;
+            const countValue = Math.max(0, Math.floor(toNumber(entry.count, 0)));
+
+            const boundsRecord = (entry.bounds ?? {}) as Record<string, unknown>;
+            const bounds = {
+              min_lat: toNumber(boundsRecord.min_lat, centerLat),
+              min_lon: toNumber(boundsRecord.min_lon, centerLon),
+              max_lat: toNumber(boundsRecord.max_lat, centerLat),
+              max_lon: toNumber(boundsRecord.max_lon, centerLon),
+            };
+
+            const approx = toNumber(entry.approximate_radius_km, 0);
+            const samplePoints = Array.isArray(entry.sample_points)
+              ? (entry.sample_points as unknown[])
+                  .map(parsePoint)
+                  .filter((pt): pt is PlacePoint => pt !== null)
+              : [];
+
+            return {
+              id: idValue || `${centerLat.toFixed(3)},${centerLon.toFixed(3)}`,
+              name: nameValue || `${centerLat.toFixed(3)}, ${centerLon.toFixed(3)}`,
+              count: countValue,
+              center: { lat: centerLat, lon: centerLon },
+              bounds,
+              approximate_radius_km: approx,
+              sample_points: samplePoints,
+            } as PlaceLocation;
+          })
+          .filter((loc): loc is PlaceLocation => loc !== null)
+      : [];
+
+    return {
+      generated_at:
+        typeof raw?.generated_at === "string"
+          ? raw.generated_at
+          : new Date().toISOString(),
+      directory: typeof raw?.directory === "string" ? raw.directory : dir,
+      total_with_coordinates: Math.max(
+        0,
+        Math.floor(toNumber(raw?.total_with_coordinates, 0))
+      ),
+      total_without_coordinates: Math.max(
+        0,
+        Math.floor(toNumber(raw?.total_without_coordinates, 0))
+      ),
+      locations,
+      points,
     };
   }
 

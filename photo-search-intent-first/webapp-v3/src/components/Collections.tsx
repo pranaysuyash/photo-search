@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Folder, Plus, Trash2, FolderOpen, Image } from "lucide-react";
+import { Plus, Trash2, FolderOpen, Image } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import {

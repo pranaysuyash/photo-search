@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import "./styles/generated-bg.css";
 import {
   BrowserRouter as Router,
@@ -17,9 +17,17 @@ import TagsView from "./components/TagsView";
 import Favorites from "./components/Favorites";
 import { Sidebar } from "./components/Sidebar";
 import { TopBar } from "./components/TopBar";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { usePhotoStore } from "./store/photoStore";
 import { apiClient, type SearchResult } from "./services/api";
 import { DEMO_LIBRARY_DIR } from "./constants/directories";
+import { useElectronBridge } from "./hooks/useElectronBridge";
 
 function AppContent() {
   const {
@@ -46,6 +54,37 @@ function AppContent() {
   const [currentView, setCurrentView] = useState("library");
   const navigate = useNavigate();
   const [indexBootstrapped, setIndexBootstrapped] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const isMac =
+    typeof navigator !== "undefined" && navigator.platform.includes("Mac");
+  const modifierKeyLabel = isMac ? "⌘" : "Ctrl";
+
+  const ShortcutRow = ({
+    action,
+    keys,
+  }: {
+    action: string;
+    keys: string[];
+  }) => (
+    <div className="flex items-center justify-between gap-3 rounded-md bg-slate-100/80 dark:bg-slate-800/60 px-3 py-2 text-sm">
+      <span className="text-slate-600 dark:text-slate-200">{action}</span>
+      <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-300">
+        {keys.map((key) => (
+          <kbd
+            key={key}
+            className="px-1.5 py-0.5 rounded bg-slate-200/80 dark:bg-slate-700/70 text-slate-700 dark:text-slate-200 shadow-inner"
+          >
+            {key}
+          </kbd>
+        ))}
+      </div>
+    </div>
+  );
+
+  // Use Electron bridge hook
+  const { isElectron, getStoreSetting, setStoreSetting, selectImportFolder } =
+    useElectronBridge();
 
   // Ensure a directory is selected (prefer persisted workspace when running in Electron)
   useEffect(() => {
@@ -53,13 +92,9 @@ function AppContent() {
     let cancelled = false;
 
     const bootstrapDirectory = async () => {
-      const api = typeof window !== "undefined" ? window.electronAPI : undefined;
-
-      if (api?.getStoreSetting) {
+      if (isElectron) {
         try {
-          const stored = await api.getStoreSetting(
-            "lastSelectedDirectory"
-          );
+          const stored = await getStoreSetting("lastSelectedDirectory");
           if (
             !cancelled &&
             typeof stored === "string" &&
@@ -76,9 +111,7 @@ function AppContent() {
       if (!cancelled) {
         try {
           if (typeof window !== "undefined" && window.localStorage) {
-            const storedLocal = window.localStorage.getItem(
-              "ps:lastDirectory"
-            );
+            const storedLocal = window.localStorage.getItem("ps:lastDirectory");
             if (
               storedLocal &&
               typeof storedLocal === "string" &&
@@ -93,7 +126,7 @@ function AppContent() {
         }
       }
 
-      if (!cancelled && !api) {
+      if (!cancelled && !isElectron) {
         setCurrentDirectory(DEMO_LIBRARY_DIR);
       }
     };
@@ -103,34 +136,201 @@ function AppContent() {
     return () => {
       cancelled = true;
     };
-  }, [currentDirectory, setCurrentDirectory]);
+  }, [currentDirectory, setCurrentDirectory, isElectron, getStoreSetting]);
 
   // React to Electron menu-driven directory selection
   useEffect(() => {
-    const api = typeof window !== "undefined" ? window.electronAPI : undefined;
-    if (!api?.onDirectorySelected) return;
+    if (!isElectron) return;
 
-    const handler = (_event: unknown, directory: string) => {
-      if (typeof directory !== "string" || directory.trim().length === 0) {
-        return;
-      }
-      if (directory === currentDirectory) {
-        return;
-      }
-      setIndexBootstrapped(false);
-      setCurrentDirectory(directory);
-    };
-
-    api.onDirectorySelected(handler);
+    // TODO: Implement directory selection event listener through useElectronBridge hook
+    // For now, this will be handled by the Electron menu system directly calling the directory change
+    // The pattern would be:
+    // const { onDirectorySelected } = useElectronBridge();
+    // onDirectorySelected((directory) => { ... });
 
     return () => {
-      if (api.removeListener) {
-        api.removeListener("directory-selected", handler);
-      } else if (api.removeAllListeners) {
-        api.removeAllListeners("directory-selected");
+      // Cleanup would go here when event listeners are available
+    };
+  }, [isElectron]);
+
+  // Handle Electron menu IPC events for import/export
+  useEffect(() => {
+    if (!isElectron || !window.electronAPI) return;
+
+    const handleMenuExportLibrary = async () => {
+      if (!currentDirectory) return;
+      try {
+        const result = await apiClient.exportLibrary(currentDirectory, "json", {
+          include_metadata: true,
+        });
+        // Trigger download of the exported data
+        const blob = new Blob(
+          [
+            typeof result.data === "string"
+              ? result.data
+              : JSON.stringify(result.data, null, 2),
+          ],
+          {
+            type: result.format === "csv" ? "text/csv" : "application/json",
+          }
+        );
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `library_export.${result.format}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        alert(`Exported ${result.count} photos from library`);
+      } catch (error) {
+        console.error("Export library failed:", error);
+        alert("Failed to export library");
       }
     };
-  }, [currentDirectory, setCurrentDirectory]);
+
+    const handleMenuExportSearch = async () => {
+      if (!currentDirectory || !searchQuery.trim()) return;
+      try {
+        const result = await apiClient.exportSearch(
+          currentDirectory,
+          searchQuery,
+          "json",
+          { include_metadata: true }
+        );
+        // Trigger download of the exported data
+        const blob = new Blob(
+          [
+            typeof result.data === "string"
+              ? result.data
+              : JSON.stringify(result.data, null, 2),
+          ],
+          {
+            type: result.format === "csv" ? "text/csv" : "application/json",
+          }
+        );
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `search_${searchQuery.replace(
+          /[^a-zA-Z0-9]/g,
+          "_"
+        )}_export.${result.format}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        alert(`Exported ${result.count} search results for "${searchQuery}"`);
+      } catch (error) {
+        console.error("Export search failed:", error);
+        alert("Failed to export search results");
+      }
+    };
+
+    const handleMenuExportFavorites = async () => {
+      if (!currentDirectory) return;
+      try {
+        const result = await apiClient.exportFavorites(
+          currentDirectory,
+          "json"
+        );
+        // Trigger download of the exported data
+        const blob = new Blob(
+          [
+            typeof result.data === "string"
+              ? result.data
+              : JSON.stringify(result.data, null, 2),
+          ],
+          {
+            type: result.format === "csv" ? "text/csv" : "application/json",
+          }
+        );
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `favorites_export.${result.format}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        alert(`Exported ${result.count} favorite photos`);
+      } catch (error) {
+        console.error("Export favorites failed:", error);
+        alert("Failed to export favorites");
+      }
+    };
+
+    const handleMenuImport = async () => {
+      if (!currentDirectory) return;
+      try {
+        const sourceDir = await selectImportFolder();
+        if (!sourceDir) return; // User cancelled
+
+        const result = await apiClient.importPhotos(
+          sourceDir,
+          currentDirectory,
+          { recursive: true, copy: true }
+        );
+        alert(
+          `Import completed: ${result.imported} imported, ${result.skipped} skipped, ${result.errors} errors`
+        );
+
+        // Refresh the photo library after import
+        const [favoritesResult, response] = await Promise.all([
+          apiClient
+            .getFavorites(currentDirectory)
+            .catch(() => ({ favorites: [] })),
+          apiClient.getLibrary(currentDirectory, "local", 100, 0),
+        ]);
+        setFavoriteEntries(favoritesResult.favorites);
+        setPhotos(
+          response.paths.map((path: string, index: number) => ({
+            id: index + 1,
+            path,
+            src: apiClient.getPhotoUrl(path),
+            title: path.split("/").pop() || `Photo ${index + 1}`,
+          }))
+        );
+      } catch (error) {
+        console.error("Import failed:", error);
+        alert("Failed to import photos");
+      }
+    };
+
+    // Set up IPC listeners
+    window.electronAPI.on?.("menu:export-library", handleMenuExportLibrary);
+    window.electronAPI.on?.("menu:export-search", handleMenuExportSearch);
+    window.electronAPI.on?.("menu:export-favorites", handleMenuExportFavorites);
+    window.electronAPI.on?.("menu:import", handleMenuImport);
+
+    return () => {
+      // Cleanup listeners
+      if (window.electronAPI?.off) {
+        window.electronAPI.off("menu:export-library", handleMenuExportLibrary);
+        window.electronAPI.off("menu:export-search", handleMenuExportSearch);
+        window.electronAPI.off(
+          "menu:export-favorites",
+          handleMenuExportFavorites
+        );
+        window.electronAPI.off("menu:import", handleMenuImport);
+      }
+    };
+  }, [
+    isElectron,
+    currentDirectory,
+    searchQuery,
+    setFavoriteEntries,
+    setPhotos,
+    selectImportFolder,
+  ]);
+
+  // Persist current directory to Electron store
+  useEffect(() => {
+    if (!isElectron || !currentDirectory) return;
+    setStoreSetting("currentDirectory", currentDirectory).catch((error) => {
+      console.warn("Failed to persist current directory:", error);
+    });
+  }, [currentDirectory, isElectron, setStoreSetting]);
 
   // Reset indexing when switching directories
   useEffect(() => {
@@ -164,7 +364,9 @@ function AppContent() {
         ...recent.filter((item) => item !== currentDirectory),
       ].slice(0, 8);
       storage.setItem("ps:recentDirectories", JSON.stringify(next));
-      window.dispatchEvent(new CustomEvent("ps:recentDirectories", { detail: next }));
+      window.dispatchEvent(
+        new CustomEvent("ps:recentDirectories", { detail: next })
+      );
     } catch (error) {
       console.warn("Failed to persist recent directories:", error);
     }
@@ -302,7 +504,9 @@ function AppContent() {
             return; // stop polling
           }
         }
-      } catch {}
+      } catch (error) {
+        console.warn("Failed to poll for index bootstrap:", error);
+      }
       if (!cancelled) setTimeout(tick, 1500);
     };
     tick();
@@ -354,18 +558,70 @@ function AppContent() {
     }));
   }, [favoriteEntries]);
 
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      const activeElement = document.activeElement as HTMLElement | null;
+      const isTypingElement = Boolean(
+        activeElement &&
+          (activeElement.tagName === "INPUT" ||
+            activeElement.tagName === "TEXTAREA" ||
+            activeElement.getAttribute("role") === "textbox")
+      );
+      const key = event.key.toLowerCase();
+
+      if ((event.metaKey || event.ctrlKey) && key === "k") {
+        event.preventDefault();
+        if (searchInputRef.current) {
+          searchInputRef.current.focus();
+          searchInputRef.current.select();
+        }
+        return;
+      }
+
+      if (isTypingElement) {
+        return;
+      }
+
+      if (event.shiftKey && event.key === "?") {
+        event.preventDefault();
+        setShowShortcuts(true);
+        return;
+      }
+
+      if (event.shiftKey && key === "p") {
+        event.preventDefault();
+        setCurrentView("places");
+        navigate("/places");
+        return;
+      }
+
+      if (event.shiftKey && key === "t") {
+        event.preventDefault();
+        setCurrentView("tags");
+        navigate("/tags");
+        return;
+      }
+
+      if (event.shiftKey && key === "l") {
+        event.preventDefault();
+        setCurrentView("library");
+        navigate("/library");
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [navigate, setCurrentView]);
+
   const handleSearch = async (query: string) => {
     if (!query.trim() || !currentDirectory) return;
 
     try {
       setLoading(true);
-      const response = await apiClient.search(
-        currentDirectory,
-        query,
-        "local",
-        50,
-        0
-      );
+      const response = await apiClient.search(currentDirectory, query, {
+        provider: "local",
+        topK: 50,
+      });
       setPhotos(
         response.results.map((result: SearchResult, index: number) => ({
           id: index + 1,
@@ -458,6 +714,10 @@ function AppContent() {
           currentView={currentView}
           currentDirectory={currentDirectory}
           onDirectoryChange={setCurrentDirectory}
+          onSearchInputRef={(node) => {
+            searchInputRef.current = node;
+          }}
+          isLoading={isLoading}
         />
 
         <main className="flex-1 overflow-auto relative">
@@ -514,6 +774,27 @@ function AppContent() {
             <Route path="/" element={<Navigate to="/library" replace />} />
           </Routes>
         </main>
+
+        <Dialog open={showShortcuts} onOpenChange={setShowShortcuts}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Keyboard shortcuts</DialogTitle>
+              <DialogDescription>
+                Quickly navigate and perform common actions.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <ShortcutRow
+                action="Focus search"
+                keys={[modifierKeyLabel, "K"]}
+              />
+              <ShortcutRow action="Open shortcuts" keys={["Shift", "?"]} />
+              <ShortcutRow action="Go to library" keys={["Shift", "L"]} />
+              <ShortcutRow action="Go to places" keys={["Shift", "P"]} />
+              <ShortcutRow action="Go to tags" keys={["Shift", "T"]} />
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

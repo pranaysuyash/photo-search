@@ -1,0 +1,41 @@
+{
+  "generatedAt": "2025-10-09T12:01:50.282Z",
+  "models": [
+    {
+      "name": "clip-vit-b-32",
+      "repo": "sentence-transformers/clip-ViT-B-32",
+      "description": "SentenceTransformers CLIP embeddings for local similarity search",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 118,
+          "sha256": "ce6badde7f55d6c8980135dda63fe66be1bfe3eac9435b87ea03030082a19124"
+        },
+        {
+          "path": "pytorch_model.bin",
+          "size": 145,
+          "sha256": "90b87c51fc9336acad508ecaaa09de406aa7b9820a60b5271c732b30af0eac52"
+        }
+      ],
+      "totalBytes": 263
+    },
+    {
+      "name": "clip-vit-base-patch32",
+      "repo": "openai/clip-vit-base-patch32",
+      "description": "Transformers CLIP weights for image/text embedding parity",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 126,
+          "sha256": "038306abc1872dfdaf34582d3b4df2d4768401c4eb131dcd4a0e1b1d770df52d"
+        },
+        {
+          "path": "pytorch_model.bin",
+          "size": 91,
+          "sha256": "5f8c70528e69f4a025cacbea423494b998743c20496bdccdf85e360c798addd0"
+        }
+      ],
+      "totalBytes": 217
+    }
+  ]
+}

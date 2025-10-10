@@ -30,6 +30,52 @@ A beautiful, AI-powered desktop photo management application built with Electron
 
 ### Development
 
+IMPORTANT: Python venv location
+
+- The backend virtual environment is inside the intent-first tree:
+  - `/Users/pranay/Projects/adhoc_projects/photo-search/photo-search-intent-first/.venv`
+- Prefer calling its Python directly rather than `source` in npm scripts.
+
+### One-terminal dev flow (recommended)
+
+Run these in one terminal, in order:
+
+1. Start backend (uses the project venv directly)
+
+```bash
+cd /Users/pranay/Projects/adhoc_projects/photo-search/photo-search-intent-first
+PYTHONPATH=. .venv/bin/python run_server.py
+```
+
+1. Start the React dev server on port 5174
+
+```bash
+cd /Users/pranay/Projects/adhoc_projects/photo-search/photo-search-intent-first/webapp-v3
+npx vite --port 5174
+```
+
+1. Launch Electron (loads UI from 127.0.0.1:5174)
+
+```bash
+cd /Users/pranay/Projects/adhoc_projects/photo-search/photo-search-intent-first/electron-v3
+npx electron .
+```
+
+That’s it—one terminal, three steps. The Electron app will talk to the backend on `127.0.0.1:8000` and load the UI from `127.0.0.1:5174`.
+
+Alternatively, use the orchestrated launcher:
+
+```bash
+cd /Users/pranay/Projects/adhoc_projects/photo-search/photo-search-intent-first
+bash scripts/dev.sh
+```
+
+The script will:
+
+- Start the backend via the venv Python and wait for :8000
+- Start Vite on :5174 and wait for the UI
+- Launch Electron and handle clean shutdown on Ctrl+C
+
 1. **Install Dependencies**:
 
    ```bash
@@ -52,7 +98,8 @@ A beautiful, AI-powered desktop photo management application built with Electron
 4. **Start Development**:
 
    ```bash
-   # Option 1: Full development with UI and backend auto-restart
+   # Option 1: Full development (starts backend + UI, then Electron)
+   # Requires node deps installed and Python venv present
    npm run dev:full
 
    # Option 2: Quick dev (assumes backend running separately)
@@ -76,13 +123,14 @@ A beautiful, AI-powered desktop photo management application built with Electron
    ```
 
 3. **Package without Installer**:
+
    ```bash
    npm run pack
    ```
 
 ## Project Structure
 
-```
+```text
 electron-v3/
 ├── main.js              # Electron main process
 ├── preload.js           # Secure bridge script
@@ -184,6 +232,16 @@ App settings are stored using `electron-store`:
 
 ## Troubleshooting
 
+### Blank/white window in Electron
+
+- Ensure Vite is running on port 5174 (`http://127.0.0.1:5174`).
+- Ensure backend is running on port 8000 (`http://127.0.0.1:8000/docs`).
+- Open Electron DevTools (View → Toggle DevTools) and check for errors.
+- The preload now exposes `window.electronAPI.on`/`off` so IPC listener setup in the renderer won’t crash.
+- Menu event channels emitted by main:
+  - `menu:import`
+  - `menu:export-library`
+
 ### Model Download Issues
 
 ```bash
@@ -206,6 +264,42 @@ npm run setup
 - Ensure Python virtual environment is activated
 - Check that backend server starts on port 8000
 - Verify API endpoints in `../api/server.py`
+
+### Memory usage in development
+
+If Electron memory spikes (e.g., due to heavy CSS gradients or GPU surfaces):
+
+- We disable hardware acceleration in development to avoid runaway GPU memory.
+- We cap V8 old space via `--max-old-space-size=4096`.
+- To re-enable GPU if needed, remove or guard `app.disableHardwareAcceleration()` in `main.js`.
+
+### Notes on scripts
+
+- `electron-v3/package.json` uses `PYTHONPATH=. .venv/bin/python run_server.py` for `dev:backend` to avoid shell-specific `source` semantics.
+- If `npm install` errors due to `postinstall` (electron-builder) on dev machines, you can run:
+
+```bash
+cd electron-v3
+npm install --ignore-scripts
+```
+
+Then start processes manually with the one-terminal steps above.
+
+#### Orchestrated dev launcher
+
+The `scripts/dev.sh` utility is provided to streamline development. Requirements:
+
+- Python venv at `photo-search-intent-first/.venv`
+- Node/npm installed
+- Network availability for localhost ports 8000 and 5174
+
+Usage:
+
+```bash
+bash scripts/dev.sh
+```
+
+It waits for the backend and UI to be ready before launching Electron, and shuts everything down on Ctrl+C.
 
 ## Contributing
 
