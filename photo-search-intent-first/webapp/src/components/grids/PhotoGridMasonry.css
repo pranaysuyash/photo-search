@@ -1,0 +1,239 @@
+/**
+ * PhotoGridMasonry.css
+ * 
+ * Masonry grid styles with glassmorphism, animations, and responsive design
+ */
+
+/* Container */
+.masonry-grid-container {
+    width: 100%;
+    padding: 1rem;
+}
+
+/* Masonry Grid Layout */
+.masonry-grid {
+    display: flex;
+    margin-left: -1rem;
+    /* Gutter size offset */
+    width: auto;
+}
+
+.masonry-grid-column {
+    padding-left: 1rem;
+    /* Gutter size */
+    background-clip: padding-box;
+}
+
+/* Masonry Items */
+.masonry-item {
+    margin-bottom: 1rem;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    background: rgba(0, 0, 0, 0.02);
+    outline: none;
+}
+
+.masonry-item:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    z-index: 10;
+}
+
+.masonry-item:focus-visible {
+    outline: 2px solid hsl(var(--primary));
+    outline-offset: 2px;
+}
+
+/* Tile Sizes */
+.masonry-item-wide {
+    /* 2x1 - spans 2 columns width */
+    grid-column: span 2;
+}
+
+.masonry-item-large {
+    /* 2x2 - spans 2 columns width and height */
+    grid-column: span 2;
+    grid-row: span 2;
+}
+
+/* Selectable Items */
+.masonry-item-selectable {
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.masonry-item-selected {
+    outline: 3px solid hsl(var(--primary));
+    outline-offset: -3px;
+    box-shadow: 0 0 0 3px hsla(var(--primary), 0.2);
+}
+
+/* Image Wrapper */
+.masonry-image-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* Image */
+.masonry-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.masonry-image-loading {
+    opacity: 0;
+}
+
+.masonry-item:hover .masonry-image {
+    transform: scale(1.05);
+}
+
+/* Loading Shimmer */
+.masonry-shimmer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg,
+            rgba(255, 255, 255, 0) 0%,
+            rgba(255, 255, 255, 0.2) 50%,
+            rgba(255, 255, 255, 0) 100%);
+    animation: shimmer 2s infinite;
+    z-index: 1;
+}
+
+@keyframes shimmer {
+    0% {
+        transform: translateX(-100%);
+    }
+
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+/* Hover Overlay with Glassmorphism */
+.masonry-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.5);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    z-index: 2;
+}
+
+.masonry-date {
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.masonry-score {
+    font-size: 0.75rem;
+    opacity: 0.9;
+    color: hsl(var(--primary));
+}
+
+/* Selection Checkbox */
+.masonry-checkbox {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    z-index: 3;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.masonry-item:hover .masonry-checkbox,
+.masonry-item-selected .masonry-checkbox {
+    opacity: 1;
+}
+
+.masonry-checkbox input[type="checkbox"] {
+    width: 1.25rem;
+    height: 1.25rem;
+    cursor: pointer;
+    accent-color: hsl(var(--primary));
+}
+
+/* Empty State */
+.masonry-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 4rem 2rem;
+    color: hsl(var(--muted-foreground));
+}
+
+/* Dark Mode */
+@media (prefers-color-scheme: dark) {
+    .masonry-item {
+        background: rgba(255, 255, 255, 0.02);
+    }
+
+    .masonry-shimmer {
+        background: linear-gradient(90deg,
+                rgba(255, 255, 255, 0) 0%,
+                rgba(255, 255, 255, 0.1) 50%,
+                rgba(255, 255, 255, 0) 100%);
+    }
+
+    .masonry-overlay {
+        background: rgba(0, 0, 0, 0.7);
+    }
+}
+
+/* Responsive Breakpoints */
+@media (max-width: 1024px) {
+    .masonry-grid-container {
+        padding: 0.75rem;
+    }
+
+    .masonry-grid {
+        margin-left: -0.75rem;
+    }
+
+    .masonry-grid-column {
+        padding-left: 0.75rem;
+    }
+
+    .masonry-item {
+        margin-bottom: 0.75rem;
+    }
+}
+
+@media (max-width: 640px) {
+    .masonry-grid-container {
+        padding: 0.5rem;
+    }
+
+    .masonry-grid {
+        margin-left: -0.5rem;
+    }
+
+    .masonry-grid-column {
+        padding-left: 0.5rem;
+    }
+
+    .masonry-item {
+        margin-bottom: 0.5rem;
+    }
+
+    .masonry-overlay {
+        padding: 0.75rem;
+    }
+}

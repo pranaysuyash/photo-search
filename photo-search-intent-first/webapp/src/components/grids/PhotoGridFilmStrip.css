@@ -1,0 +1,302 @@
+/**
+ * PhotoGridFilmStrip.css
+ * 
+ * Film strip layout with cinematic aesthetic and smooth scrolling
+ */
+
+/* Container with dynamic height */
+.film-strip-container {
+    position: relative;
+    width: 100%;
+    background: linear-gradient(180deg, #1a1a1a 0%, #2a2a2a 100%);
+    border-radius: 0.75rem;
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.film-strip-container[data-height="120"] {
+    height: 120px;
+}
+
+.film-strip-container[data-height="160"] {
+    height: 160px;
+}
+
+.film-strip-container[data-height="200"] {
+    height: 200px;
+}
+
+.film-strip-container[data-height="240"] {
+    height: 240px;
+}
+
+/* Navigation Buttons */
+.film-strip-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 20;
+    background: rgba(0, 0, 0, 0.6);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border: none;
+    color: white;
+    transition: all 0.2s ease;
+}
+
+.film-strip-nav:hover:not(:disabled) {
+    background: rgba(0, 0, 0, 0.8);
+    transform: translateY(-50%) scale(1.1);
+}
+
+.film-strip-nav:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.film-strip-nav-left {
+    left: 0.5rem;
+}
+
+.film-strip-nav-right {
+    right: 0.5rem;
+}
+
+/* Scroll Container */
+.film-strip-scroll {
+    height: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+    cursor: grab;
+}
+
+.film-strip-scroll:active {
+    cursor: grabbing;
+}
+
+.film-strip-scroll::-webkit-scrollbar {
+    height: 6px;
+}
+
+.film-strip-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.film-strip-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+}
+
+.film-strip-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+/* Track */
+.film-strip-track {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    height: 100%;
+    position: relative;
+}
+
+/* Sprocket Holes (Film Negative Aesthetic) */
+.film-strip-sprockets {
+    position: absolute;
+    top: 0.5rem;
+    left: 0;
+    right: 0;
+    height: 0.5rem;
+    display: flex;
+    gap: 1rem;
+    pointer-events: none;
+}
+
+.film-strip-sprockets-bottom {
+    top: auto;
+    bottom: 0.5rem;
+}
+
+.sprocket-hole {
+    width: 0.5rem;
+    height: 0.5rem;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 0.125rem;
+    flex-shrink: 0;
+}
+
+/* Photo Group */
+.film-strip-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
+}
+
+/* Date Separator */
+.film-strip-date {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: rgba(0, 0, 0, 0.7);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border-radius: 0.5rem;
+    color: white;
+    font-size: 0.875rem;
+    font-weight: 500;
+    white-space: nowrap;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Photos Container */
+.film-strip-photos {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* Film Item */
+.film-strip-item {
+    position: relative;
+    flex-shrink: 0;
+    width: 140px;
+    height: 140px;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    background: none;
+    padding: 0;
+}
+
+.film-strip-item:hover {
+    border-color: rgba(255, 255, 255, 0.3);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.film-strip-item-selected {
+    border-color: hsl(var(--primary));
+    box-shadow: 0 0 0 3px hsla(var(--primary), 0.3);
+    transform: scale(1.05);
+    z-index: 10;
+}
+
+.film-strip-item-dragging {
+    cursor: grabbing;
+}
+
+/* Film Frame */
+.film-frame {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.film-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* Score Badge */
+.film-score {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    padding: 0.25rem 0.5rem;
+    background: rgba(0, 0, 0, 0.7);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 0.25rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Photo Counter */
+.film-strip-counter {
+    position: absolute;
+    bottom: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 0.5rem 1rem;
+    background: rgba(0, 0, 0, 0.7);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    color: white;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-radius: 0.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    pointer-events: none;
+    z-index: 15;
+}
+
+/* Responsive Breakpoints */
+@media (max-width: 768px) {
+    .film-strip-item {
+        width: 100px;
+        height: 100px;
+    }
+
+    .film-strip-group {
+        gap: 0.5rem;
+    }
+
+    .film-strip-photos {
+        gap: 0.375rem;
+    }
+
+    .film-strip-nav {
+        display: none;
+        /* Hide nav buttons on mobile, use touch */
+    }
+}
+
+@media (max-width: 480px) {
+    .film-strip-item {
+        width: 80px;
+        height: 80px;
+    }
+
+    .film-strip-date {
+        font-size: 0.75rem;
+        padding: 0.375rem 0.75rem;
+    }
+}
+
+/* Dark Mode Adjustments */
+@media (prefers-color-scheme: light) {
+    .film-strip-container {
+        background: linear-gradient(180deg, #f5f5f5 0%, #e5e5e5 100%);
+    }
+
+    .sprocket-hole {
+        background: rgba(0, 0, 0, 0.05);
+        border-color: rgba(0, 0, 0, 0.1);
+    }
+
+    .film-strip-date,
+    .film-strip-counter {
+        background: rgba(255, 255, 255, 0.9);
+        color: #1a1a1a;
+        border-color: rgba(0, 0, 0, 0.1);
+    }
+
+    .film-strip-item {
+        border-color: rgba(0, 0, 0, 0.1);
+    }
+
+    .film-strip-item:hover {
+        border-color: rgba(0, 0, 0, 0.3);
+    }
+}

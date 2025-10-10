@@ -1,15 +1,27 @@
-import { useState } from 'react';
-import { ErrorBoundary } from './components/ErrorBoundary';
-import { ToastContainer } from './components/Toast';
-import { LoadingSkeleton, Spinner, ProgressBar, LoadingOverlay, SuspenseFallback } from './components/Loading';
-import { useUIStore } from './store/uiStore';
-import { handleError, ErrorType, AppError } from './utils/errorHandler';
-import { Button } from './components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
+import { useState } from "react";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { ToastContainer } from "./components/Toast";
+import {
+  LoadingSkeleton,
+  Spinner,
+  ProgressBar,
+  LoadingOverlay,
+  SuspenseFallback,
+} from "./components/Loading";
+import { useUIStore } from "./store/uiStore";
+import { handleError, ErrorType, AppError } from "./utils/errorHandler";
+import { Button } from "./components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./components/ui/card";
 
 /**
  * Day 1 Component Demo Page
- * 
+ *
  * Demonstrates all Day 1 components in action:
  * - Error Boundary
  * - Toast Notifications (4 variants)
@@ -31,9 +43,9 @@ function ComponentDemo() {
         if (prev >= 100) {
           clearInterval(interval);
           addToast({
-            type: 'success',
-            title: 'Complete!',
-            message: 'Progress completed successfully',
+            type: "success",
+            title: "Complete!",
+            message: "Progress completed successfully",
           });
           return 100;
         }
@@ -44,38 +56,38 @@ function ComponentDemo() {
 
   // Simulate global loading
   const testGlobalLoading = () => {
-    setGlobalLoading(true, 'Processing your request...');
+    setGlobalLoading(true, "Processing your request...");
     setTimeout(() => {
       setGlobalLoading(false);
       addToast({
-        type: 'success',
-        title: 'Done!',
-        message: 'Global loading test complete',
+        type: "success",
+        title: "Done!",
+        message: "Global loading test complete",
       });
     }, 3000);
   };
 
   // Simulate network error
   const testNetworkError = () => {
-    handleError(new Error('Failed to fetch data from server'), {
+    handleError(new Error("Failed to fetch data from server"), {
       showToast: true,
-      context: { component: 'ComponentDemo', action: 'testNetworkError' },
+      context: { component: "ComponentDemo", action: "testNetworkError" },
     });
   };
 
   // Simulate typed error
   const testTypedError = () => {
     const error = new AppError(
-      'Invalid input: Email address is required',
+      "Invalid input: Email address is required",
       ErrorType.VALIDATION,
-      { field: 'email', component: 'ComponentDemo' }
+      { field: "email", component: "ComponentDemo" }
     );
     handleError(error, { showToast: true });
   };
 
   // Trigger error boundary
   if (throwError) {
-    throw new Error('This is a test error to demonstrate ErrorBoundary!');
+    throw new Error("This is a test error to demonstrate ErrorBoundary!");
   }
 
   return (
@@ -104,9 +116,9 @@ function ComponentDemo() {
               <Button
                 onClick={() =>
                   addToast({
-                    type: 'success',
-                    title: 'Success!',
-                    message: 'Operation completed successfully',
+                    type: "success",
+                    title: "Success!",
+                    message: "Operation completed successfully",
                   })
                 }
                 variant="default"
@@ -116,9 +128,9 @@ function ComponentDemo() {
               <Button
                 onClick={() =>
                   addToast({
-                    type: 'error',
-                    title: 'Error!',
-                    message: 'Something went wrong',
+                    type: "error",
+                    title: "Error!",
+                    message: "Something went wrong",
                   })
                 }
                 variant="destructive"
@@ -128,9 +140,9 @@ function ComponentDemo() {
               <Button
                 onClick={() =>
                   addToast({
-                    type: 'warning',
-                    title: 'Warning!',
-                    message: 'Please review before continuing',
+                    type: "warning",
+                    title: "Warning!",
+                    message: "Please review before continuing",
                   })
                 }
                 variant="outline"
@@ -140,9 +152,9 @@ function ComponentDemo() {
               <Button
                 onClick={() =>
                   addToast({
-                    type: 'info',
-                    title: 'Info',
-                    message: 'Here is some useful information',
+                    type: "info",
+                    title: "Info",
+                    message: "Here is some useful information",
                   })
                 }
                 variant="secondary"
@@ -153,12 +165,12 @@ function ComponentDemo() {
             <Button
               onClick={() =>
                 addToast({
-                  type: 'success',
-                  title: 'With Action',
-                  message: 'This toast has an action button',
+                  type: "success",
+                  title: "With Action",
+                  message: "This toast has an action button",
                   action: {
-                    label: 'Undo',
-                    onClick: () => alert('Action clicked!'),
+                    label: "Undo",
+                    onClick: () => alert("Action clicked!"),
                   },
                 })
               }
@@ -217,11 +229,15 @@ function ComponentDemo() {
               <h3 className="text-sm font-semibold mb-3">Skeleton Loaders</h3>
               <div className="space-y-4">
                 <div>
-                  <p className="text-xs text-muted-foreground mb-2">Photo Grid</p>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Photo Grid
+                  </p>
                   <LoadingSkeleton variant="photo-grid" count={6} />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground mb-2">List Items</p>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    List Items
+                  </p>
                   <LoadingSkeleton variant="list-item" count={3} />
                 </div>
               </div>
@@ -290,23 +306,27 @@ function ComponentDemo() {
           <CardContent>
             <div className="space-y-2 font-mono text-xs">
               <div>
-                <span className="text-muted-foreground">Toast Count:</span>{' '}
-                <span className="font-semibold">{useUIStore.getState().toasts.length}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Theme:</span>{' '}
-                <span className="font-semibold">{useUIStore.getState().theme}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Active Modal:</span>{' '}
+                <span className="text-muted-foreground">Toast Count:</span>{" "}
                 <span className="font-semibold">
-                  {useUIStore.getState().activeModal || 'none'}
+                  {useUIStore.getState().toasts.length}
                 </span>
               </div>
               <div>
-                <span className="text-muted-foreground">Global Loading:</span>{' '}
+                <span className="text-muted-foreground">Theme:</span>{" "}
                 <span className="font-semibold">
-                  {useUIStore.getState().globalLoading ? 'true' : 'false'}
+                  {useUIStore.getState().theme}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Active Modal:</span>{" "}
+                <span className="font-semibold">
+                  {useUIStore.getState().activeModal || "none"}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Global Loading:</span>{" "}
+                <span className="font-semibold">
+                  {useUIStore.getState().globalLoading ? "true" : "false"}
                 </span>
               </div>
             </div>

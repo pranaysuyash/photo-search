@@ -673,148 +673,150 @@ function AppContent() {
   return (
     <>
       {/* Day 1: Global loading overlay */}
-      {globalLoading && <LoadingOverlay message={loadingMessage || undefined} />}
-      
+      {globalLoading && (
+        <LoadingOverlay message={loadingMessage || undefined} />
+      )}
+
       {/* Day 1: Toast notifications */}
       <ToastContainer />
-      
+
       <div className="flex h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 relative overflow-hidden">
         {/* Background patterns for main canvas */}
         <div className="absolute inset-0 opacity-5 dark:opacity-10 pointer-events-none">
-        <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-br from-blue-200 to-purple-200 dark:from-blue-800 dark:to-purple-800 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-20 right-20 w-80 h-80 bg-gradient-to-br from-green-200 to-blue-200 dark:from-green-800 dark:to-blue-800 rounded-full blur-3xl"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-gradient-to-br from-orange-200 to-pink-200 dark:from-orange-800 dark:to-pink-800 rounded-full blur-3xl"></div>
-      </div>
+          <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-br from-blue-200 to-purple-200 dark:from-blue-800 dark:to-purple-800 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-20 right-20 w-80 h-80 bg-gradient-to-br from-green-200 to-blue-200 dark:from-green-800 dark:to-blue-800 rounded-full blur-3xl"></div>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-gradient-to-br from-orange-200 to-pink-200 dark:from-orange-800 dark:to-pink-800 rounded-full blur-3xl"></div>
+        </div>
 
-      {/* Subtle dot pattern overlay */}
-      <div className="absolute inset-0 opacity-[0.02] dark:opacity-[0.05] pointer-events-none bg-[radial-gradient(circle_at_1px_1px,rgba(0,0,0,0.15)_1px,transparent_0)] bg-[length:20px_20px]"></div>
+        {/* Subtle dot pattern overlay */}
+        <div className="absolute inset-0 opacity-[0.02] dark:opacity-[0.05] pointer-events-none bg-[radial-gradient(circle_at_1px_1px,rgba(0,0,0,0.15)_1px,transparent_0)] bg-[length:20px_20px]"></div>
 
-      <Sidebar
-        currentView={currentView}
-        onViewChange={(view) => {
-          setCurrentView(view);
-          if (view === "collections") {
-            navigate("/collections");
-          } else if (view === "library") {
-            navigate("/library");
-          } else if (view === "search") {
-            navigate("/search");
-          } else if (view === "people") {
-            navigate("/people");
-          } else if (view === "places") {
-            navigate("/places");
-          } else if (view === "tags") {
-            navigate("/tags");
-          } else if (view === "trips") {
-            navigate("/trips");
-          } else if (view === "favorites") {
-            navigate("/favorites");
-          } else if (view === "analytics") {
-            navigate("/analytics");
-          }
-        }}
-        currentDirectory={currentDirectory}
-        onDirectoryChange={setCurrentDirectory}
-        photoCount={photos.length}
-        peopleCount={analyticsCounts.people}
-        placesCount={analyticsCounts.places}
-        favoritesCount={analyticsCounts.favorites}
-        tagsCount={analyticsCounts.tags}
-        tripsCount={tripsCount}
-      />
-
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <TopBar
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          onSearch={handleSearch}
+        <Sidebar
           currentView={currentView}
+          onViewChange={(view) => {
+            setCurrentView(view);
+            if (view === "collections") {
+              navigate("/collections");
+            } else if (view === "library") {
+              navigate("/library");
+            } else if (view === "search") {
+              navigate("/search");
+            } else if (view === "people") {
+              navigate("/people");
+            } else if (view === "places") {
+              navigate("/places");
+            } else if (view === "tags") {
+              navigate("/tags");
+            } else if (view === "trips") {
+              navigate("/trips");
+            } else if (view === "favorites") {
+              navigate("/favorites");
+            } else if (view === "analytics") {
+              navigate("/analytics");
+            }
+          }}
           currentDirectory={currentDirectory}
           onDirectoryChange={setCurrentDirectory}
-          onSearchInputRef={(node) => {
-            searchInputRef.current = node;
-          }}
-          isLoading={isLoading}
+          photoCount={photos.length}
+          peopleCount={analyticsCounts.people}
+          placesCount={analyticsCounts.places}
+          favoritesCount={analyticsCounts.favorites}
+          tagsCount={analyticsCounts.tags}
+          tripsCount={tripsCount}
         />
 
-        <main className="flex-1 overflow-auto relative">
-          {/* Subtle background pattern for empty states */}
-          <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.08] pointer-events-none bg-[radial-gradient(circle_at_2px_2px,rgba(59,130,246,0.3)_1px,transparent_0)] bg-[length:40px_40px]"></div>
-          <div className="absolute inset-0 opacity-[0.02] dark:opacity-[0.05] pointer-events-none bg-[conic-gradient(from_0deg_at_50%_50%,rgba(147,51,234,0.1),rgba(59,130,246,0.1),rgba(16,185,129,0.1),rgba(147,51,234,0.1))]"></div>
-          {/* Generated canvas background (asset_47.png) as ultra-subtle overlay */}
-          <div
-            className="absolute inset-0 pointer-events-none opacity-[0.04] dark:opacity-[0.06] bg-no-repeat bg-center bg-cover"
-            data-bg="generated-asset"
-          ></div>
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <TopBar
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            onSearch={handleSearch}
+            currentView={currentView}
+            currentDirectory={currentDirectory}
+            onDirectoryChange={setCurrentDirectory}
+            onSearchInputRef={(node) => {
+              searchInputRef.current = node;
+            }}
+            isLoading={isLoading}
+          />
 
-          <Routes>
-            <Route
-              path="/library"
-              element={
-                <PhotoLibrary
-                  photos={photos}
-                  isLoading={isLoading}
-                  currentDirectory={currentDirectory}
-                  onDirectorySelect={setCurrentDirectory}
-                  onToggleFavorite={handleToggleFavorite}
-                />
-              }
-            />
-            <Route
-              path="/search"
-              element={
-                <PhotoLibrary
-                  photos={photos}
-                  isLoading={isLoading}
-                  currentDirectory={currentDirectory}
-                  onDirectorySelect={setCurrentDirectory}
-                  onToggleFavorite={handleToggleFavorite}
-                />
-              }
-            />
-            <Route path="/collections" element={<Collections />} />
-            <Route path="/people" element={<People />} />
-            <Route
-              path="/places"
-              element={<PlacesView currentDirectory={currentDirectory} />}
-            />
-            <Route
-              path="/tags"
-              element={<TagsView currentDirectory={currentDirectory} />}
-            />
-            <Route path="/trips" element={<Trips />} />
-            <Route
-              path="/favorites"
-              element={<Favorites onToggleFavorite={handleToggleFavorite} />}
-            />
-            <Route path="/analytics" element={<Analytics />} />
-            <Route path="/day1-demo" element={<Day1Demo />} />
-            <Route path="/" element={<Navigate to="/library" replace />} />
-          </Routes>
-        </main>
+          <main className="flex-1 overflow-auto relative">
+            {/* Subtle background pattern for empty states */}
+            <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.08] pointer-events-none bg-[radial-gradient(circle_at_2px_2px,rgba(59,130,246,0.3)_1px,transparent_0)] bg-[length:40px_40px]"></div>
+            <div className="absolute inset-0 opacity-[0.02] dark:opacity-[0.05] pointer-events-none bg-[conic-gradient(from_0deg_at_50%_50%,rgba(147,51,234,0.1),rgba(59,130,246,0.1),rgba(16,185,129,0.1),rgba(147,51,234,0.1))]"></div>
+            {/* Generated canvas background (asset_47.png) as ultra-subtle overlay */}
+            <div
+              className="absolute inset-0 pointer-events-none opacity-[0.04] dark:opacity-[0.06] bg-no-repeat bg-center bg-cover"
+              data-bg="generated-asset"
+            ></div>
 
-        <Dialog open={showShortcuts} onOpenChange={setShowShortcuts}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Keyboard shortcuts</DialogTitle>
-              <DialogDescription>
-                Quickly navigate and perform common actions.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-3">
-              <ShortcutRow
-                action="Focus search"
-                keys={[modifierKeyLabel, "K"]}
+            <Routes>
+              <Route
+                path="/library"
+                element={
+                  <PhotoLibrary
+                    photos={photos}
+                    isLoading={isLoading}
+                    currentDirectory={currentDirectory}
+                    onDirectorySelect={setCurrentDirectory}
+                    onToggleFavorite={handleToggleFavorite}
+                  />
+                }
               />
-              <ShortcutRow action="Open shortcuts" keys={["Shift", "?"]} />
-              <ShortcutRow action="Go to library" keys={["Shift", "L"]} />
-              <ShortcutRow action="Go to places" keys={["Shift", "P"]} />
-              <ShortcutRow action="Go to tags" keys={["Shift", "T"]} />
-            </div>
-          </DialogContent>
-        </Dialog>
+              <Route
+                path="/search"
+                element={
+                  <PhotoLibrary
+                    photos={photos}
+                    isLoading={isLoading}
+                    currentDirectory={currentDirectory}
+                    onDirectorySelect={setCurrentDirectory}
+                    onToggleFavorite={handleToggleFavorite}
+                  />
+                }
+              />
+              <Route path="/collections" element={<Collections />} />
+              <Route path="/people" element={<People />} />
+              <Route
+                path="/places"
+                element={<PlacesView currentDirectory={currentDirectory} />}
+              />
+              <Route
+                path="/tags"
+                element={<TagsView currentDirectory={currentDirectory} />}
+              />
+              <Route path="/trips" element={<Trips />} />
+              <Route
+                path="/favorites"
+                element={<Favorites onToggleFavorite={handleToggleFavorite} />}
+              />
+              <Route path="/analytics" element={<Analytics />} />
+              <Route path="/day1-demo" element={<Day1Demo />} />
+              <Route path="/" element={<Navigate to="/library" replace />} />
+            </Routes>
+          </main>
+
+          <Dialog open={showShortcuts} onOpenChange={setShowShortcuts}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Keyboard shortcuts</DialogTitle>
+                <DialogDescription>
+                  Quickly navigate and perform common actions.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                <ShortcutRow
+                  action="Focus search"
+                  keys={[modifierKeyLabel, "K"]}
+                />
+                <ShortcutRow action="Open shortcuts" keys={["Shift", "?"]} />
+                <ShortcutRow action="Go to library" keys={["Shift", "L"]} />
+                <ShortcutRow action="Go to places" keys={["Shift", "P"]} />
+                <ShortcutRow action="Go to tags" keys={["Shift", "T"]} />
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
-    </div>
     </>
   );
 }
