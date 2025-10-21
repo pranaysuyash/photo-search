@@ -38,7 +38,7 @@ The implementation prioritizes core functionality first, then adds advanced AI f
   - Build caching layer for API responses
   - _Requirements: 1.6, 6.1, 6.2, 10.1_
 
-- [ ] 2. Build core UI components with shadcn/ui
+- [-] 2. Build core UI components with shadcn/ui
   - Implement responsive layout with Sidebar and TopBar components
   - Create reusable UI components (Button, Input, Dialog, etc.)
   - Build PhotoGrid component with virtualization support
@@ -52,7 +52,7 @@ The implementation prioritizes core functionality first, then adds advanced AI f
   - Create photo selection and multi-select functionality
   - _Requirements: 7.1, 7.2, 9.7_
 
-- [ ] 2.2 Create photo viewer component with full-screen display
+- [x] 2.2 Create photo viewer component with full-screen display
   - Build modal photo viewer with keyboard navigation
   - Add zoom and pan controls with smooth animations
   - Implement slideshow mode with auto-advance

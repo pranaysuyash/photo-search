@@ -1,17 +1,27 @@
-# Photo Search - AI-Powered Photo Management
+# Photo Search - Local-First Desktop Photo Management
 
-Photo Search is an offline-first desktop photo management application that uses AI-powered semantic search to help users find photos using natural language queries.
+Photo Search is a local-first desktop photo management application that provides direct file system access for photo browsing and organization, with optional AI-powered enhancements.
 
-## Core Features
+## Core Features (Priority Order)
 
-- **Semantic Search**: Find photos using natural language (e.g., "friends having tea", "beach sunset")
-- **Offline-First**: Works completely offline with bundled CLIP models
-- **Desktop Application**: Electron-based desktop app with direct file system access
-- **Multiple Storage Backends**: File-based or SQLite storage for metadata and embeddings
-- **Advanced Organization**: Collections, tags, favorites, and smart collections
-- **Map Integration**: GPS-based photo plotting and location search
+### 🖥️ Local Desktop Features (Always Available)
+- **Direct File Access**: Browse photos using native file system APIs
+- **Local Thumbnail Generation**: Fast thumbnail creation and caching
+- **Basic Organization**: Folders, favorites, and basic metadata
+- **Offline Operation**: Works completely without internet or servers
+- **Native Performance**: Electron-based with direct OS integration
+
+### 🤖 AI Enhancement Features (Optional Backend)
+- **Semantic Search**: Find photos using natural language (e.g., "friends having tea")
 - **Face Recognition**: People detection and management
 - **OCR Support**: Text extraction from photos for searchability
+- **Smart Collections**: AI-powered auto-organizing collections
+- **Advanced Search**: Complex queries with AI understanding
+
+### 🌐 Web Features (Development/Testing)
+- **Browser Access**: Web-based interface for development
+- **API Integration**: RESTful API for external integrations
+- **Cloud Storage**: Optional cloud storage backends
 
 ## Architecture Versions
 

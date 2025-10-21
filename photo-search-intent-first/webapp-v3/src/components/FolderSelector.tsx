@@ -8,6 +8,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { useElectronBridge } from "@/hooks/useElectronBridge";
+import { fileSystemService } from "@/services/fileSystemService";
 import { DEMO_LIBRARY_DIR } from "@/constants/directories";
 
 interface FolderSelectorProps {
@@ -51,10 +52,25 @@ export function FolderSelector({
 
   const handleCustomFolder = async () => {
     try {
-      const selectedDir = await selectFolder();
-      if (typeof selectedDir === "string" && selectedDir.trim().length > 0) {
-        onDirectorySelect(selectedDir);
-        onOpenChange(false);
+      // Use enhanced file system service for multiple directory selection
+      if (fileSystemService.isAvailable()) {
+        const selectedDirs = await fileSystemService.selectPhotoDirectories();
+        if (selectedDirs && selectedDirs.length > 0) {
+          // Add all selected directories
+          for (const dir of selectedDirs) {
+            await fileSystemService.addPhotoDirectory(dir);
+          }
+          // Use the first directory as the current directory
+          onDirectorySelect(selectedDirs[0]);
+          onOpenChange(false);
+        }
+      } else {
+        // Fallback to legacy method
+        const selectedDir = await selectFolder();
+        if (typeof selectedDir === "string" && selectedDir.trim().length > 0) {
+          onDirectorySelect(selectedDir);
+          onOpenChange(false);
+        }
       }
     } catch (error) {
       console.warn("Directory selection failed:", error);

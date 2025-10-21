@@ -9,9 +9,21 @@ export interface Photo {
   path: string;
   filename: string;
   thumbnailUrl: string;
+  fileUrl?: string; // Direct file URL for offline access
+  isImage: boolean;
+  isVideo: boolean;
+  width?: number;
+  height?: number;
+  size?: number;
+  dateModified?: string;
+  dateCreated?: string;
   metadata: PhotoMetadata;
   score?: number;
   favorite: boolean;
+  tags?: string[];
+  collections?: string[];
+  rating?: number;
+  exifData?: Record<string, any>;
 }
 
 // Comprehensive Photo Metadata

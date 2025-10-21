@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { X, CheckCircle, XCircle, AlertTriangle, Info } from "lucide-react";
-import { useUIStore, type Toast as ToastType } from "@/store/uiStore";
+import { useUIStore } from "@/store/uiStore";
+import type { Toast as ToastType } from "@/types/store";
 
 /**
  * ToastContainer - Renders all active toasts

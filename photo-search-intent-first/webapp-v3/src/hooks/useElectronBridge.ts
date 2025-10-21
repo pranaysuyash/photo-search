@@ -21,6 +21,10 @@ interface ElectronBridgeState {
 interface ElectronBridgeActions {
   selectFolder: () => Promise<string | null>;
   selectImportFolder: () => Promise<string | null>;
+  selectPhotoDirectories: () => Promise<string[] | null>;
+  scanDirectory: (path: string) => Promise<any>;
+  generateThumbnail: (filePath: string, size?: number) => Promise<string>;
+  getSecureFileUrl: (filePath: string) => Promise<string>;
   restartBackend: () => Promise<boolean>;
   refreshModels: () => Promise<boolean>;
   setStoreSetting: (key: string, value: string) => Promise<boolean>;
@@ -42,28 +46,18 @@ export function useElectronBridge(): ElectronBridgeState &
     const api = window.electronAPI;
     if (!api) return;
 
-    try {
-      // Get initial API config
-      const apiConfig = await api.getApiConfig();
-      const apiToken = await api.getApiToken();
+    // For local-first mode, we don't need API config or backend
+    // Just set up basic Electron state
+    setState((prev) => ({
+      ...prev,
+      apiToken: '',
+      apiConfig: null,
+      modelStatus: null,
+      isBackendReady: false, // Backend is optional for local-first
+      backendError: null,
+    }));
 
-      // Get model status
-      const modelStatus = await api.models.getStatus();
-
-      setState((prev) => ({
-        ...prev,
-        apiToken,
-        apiConfig,
-        modelStatus,
-        isBackendReady: true,
-      }));
-    } catch (error) {
-      console.warn("Failed to initialize Electron state:", error);
-      setState((prev) => ({
-        ...prev,
-        backendError: error instanceof Error ? error.message : "Unknown error",
-      }));
-    }
+    console.log("✅ Electron bridge initialized for local-first mode");
   }, []);
 
   // Check if running in Electron
@@ -78,11 +72,20 @@ export function useElectronBridge(): ElectronBridgeState &
   }, [initializeElectronState]);
 
   const selectFolder = useCallback(async (): Promise<string | null> => {
-    if (!state.isElectron || !window.electronAPI?.selectFolder) return null;
+    if (!state.isElectron || !window.electronAPI) return null;
 
     const api = window.electronAPI;
     try {
-      return await api.selectFolder();
+      // Use enhanced photo directory selection if available
+      if (api.selectPhotoDirectories) {
+        const directories = await api.selectPhotoDirectories();
+        return directories && directories.length > 0 ? directories[0] : null;
+      }
+      // Fallback to legacy method
+      if (api.selectFolder) {
+        return await api.selectFolder();
+      }
+      return null;
     } catch (error) {
       console.error("Failed to select folder:", error);
       return null;
@@ -140,7 +143,10 @@ export function useElectronBridge(): ElectronBridgeState &
   }, [state.isElectron]);
 
   const refreshModels = useCallback(async (): Promise<boolean> => {
-    if (!state.isElectron || !window.electronAPI?.models?.refresh) return false;
+    if (!state.isElectron || !window.electronAPI?.models?.refresh) {
+      console.warn("Models API not available");
+      return false;
+    }
 
     const api = window.electronAPI;
     try {
@@ -185,10 +191,58 @@ export function useElectronBridge(): ElectronBridgeState &
     [state.isElectron]
   );
 
+  const selectPhotoDirectories = useCallback(async (): Promise<string[] | null> => {
+    if (!state.isElectron || !window.electronAPI?.selectPhotoDirectories) return null;
+
+    try {
+      return await window.electronAPI.selectPhotoDirectories();
+    } catch (error) {
+      console.error("Failed to select photo directories:", error);
+      return null;
+    }
+  }, [state.isElectron]);
+
+  const scanDirectory = useCallback(async (path: string): Promise<any> => {
+    if (!state.isElectron || !window.electronAPI?.scanDirectory) return null;
+
+    try {
+      return await window.electronAPI.scanDirectory(path);
+    } catch (error) {
+      console.error("Failed to scan directory:", error);
+      return null;
+    }
+  }, [state.isElectron]);
+
+  const generateThumbnail = useCallback(async (filePath: string, size: number = 300): Promise<string> => {
+    if (!state.isElectron || !window.electronAPI?.generateThumbnail) return "";
+
+    try {
+      return await window.electronAPI.generateThumbnail(filePath, size);
+    } catch (error) {
+      console.error("Failed to generate thumbnail:", error);
+      return "";
+    }
+  }, [state.isElectron]);
+
+  const getSecureFileUrl = useCallback(async (filePath: string): Promise<string> => {
+    if (!state.isElectron || !window.electronAPI?.getSecureFileUrl) return "";
+
+    try {
+      return await window.electronAPI.getSecureFileUrl(filePath);
+    } catch (error) {
+      console.error("Failed to get secure file URL:", error);
+      return "";
+    }
+  }, [state.isElectron]);
+
   return {
     ...state,
     selectFolder,
     selectImportFolder,
+    selectPhotoDirectories,
+    scanDirectory,
+    generateThumbnail,
+    getSecureFileUrl,
     restartBackend,
     refreshModels,
     setStoreSetting,

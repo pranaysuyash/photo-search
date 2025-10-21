@@ -7,12 +7,23 @@ import { Photo, Collection, Tag, Person, Place, Trip } from './photo';
 import { SearchRequest, SearchResponse, SearchHistoryEntry, SavedSearch, SearchIndexStatus } from './search';
 import { AppSettings, WorkspaceConfig, ImportStatus } from './api';
 
+// Offline Mode Capabilities Interface
+export interface OfflineCapabilities {
+  canScanDirectories: boolean;
+  canDisplayPhotos: boolean;
+  canGenerateThumbnails: boolean;
+  canAccessMetadata: boolean;
+  hasFileSystemAccess: boolean;
+}
+
 // Photo Store State Interface
 export interface PhotoStoreState {
   // Photo data
   photos: Photo[];
   selectedPhotos: Set<string>;
   currentPhoto: Photo | null;
+  currentDirectory: string | null;
+  favoriteEntries: any[];
   
   // Loading states
   isLoading: boolean;
@@ -25,6 +36,10 @@ export interface PhotoStoreState {
   
   // Error handling
   error: string | null;
+  
+  // Offline mode
+  isOfflineMode: boolean;
+  offlineCapabilities: OfflineCapabilities;
   
   // Actions
   setPhotos: (photos: Photo[]) => void;
@@ -39,6 +54,21 @@ export interface PhotoStoreState {
   toggleFavorite: (photoId: string) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
+  
+  // Directory management
+  setCurrentDirectory: (directory: string | null) => void;
+  
+  // Favorites management
+  setFavoriteEntries: (favorites: any[]) => void;
+  updateFavoriteForPath: (path: string, isFavorite: boolean) => void;
+  
+  // Offline mode actions
+  loadPhotosOffline: () => Promise<void>;
+  updateOfflineMode: (offlineMode: { isOffline: boolean; capabilities: OfflineCapabilities }) => void;
+  addPhotoDirectory: (dirPath?: string) => Promise<boolean>;
+  removePhotoDirectory: (dirPath: string) => Promise<boolean>;
+  getPhotoDirectories: () => Promise<string[]>;
+  
   reset: () => void;
 }
 
@@ -79,6 +109,19 @@ export interface SearchStoreState {
   reset: () => void;
 }
 
+// Toast Interface
+export interface Toast {
+  id: string;
+  type: 'success' | 'error' | 'warning' | 'info';
+  title?: string;
+  message: string;
+  duration?: number;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
+}
+
 // UI Store State Interface
 export interface UIStoreState {
   // Layout and view
@@ -102,8 +145,9 @@ export interface UIStoreState {
   globalLoading: boolean;
   progressBars: Record<string, { progress: number; message: string }>;
   
-  // Notifications
+  // Notifications and toasts
   notifications: Notification[];
+  toasts: Toast[];
   
   // Theme and appearance
   theme: 'light' | 'dark' | 'system';
@@ -120,6 +164,8 @@ export interface UIStoreState {
   removeProgress: (id: string) => void;
   addNotification: (notification: Notification) => void;
   removeNotification: (id: string) => void;
+  addToast: (toast: Omit<Toast, 'id'>) => void;
+  removeToast: (id: string) => void;
   setTheme: (theme: UIStoreState['theme']) => void;
   reset: () => void;
 }

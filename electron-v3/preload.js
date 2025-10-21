@@ -1,6 +1,30 @@
 const { contextBridge, ipcRenderer } = require('electron');
-const path = require('path');
-const fs = require('fs');
+
+// Provide fallback implementations for Node.js modules
+// Note: These are not used in the renderer process as all file operations
+// are handled through IPC calls to the main process
+const path = {
+  join: (...args) => args.join('/'),
+  dirname: (p) => p.split('/').slice(0, -1).join('/'),
+  basename: (p, ext) => {
+    const name = p.split('/').pop() || '';
+    return ext ? name.replace(ext, '') : name;
+  },
+  extname: (p) => {
+    const parts = p.split('.');
+    return parts.length > 1 ? '.' + parts.pop() : '';
+  },
+  resolve: (...args) => args.join('/'),
+  isAbsolute: (p) => p.startsWith('/'),
+  sep: '/',
+  delimiter: ':'
+};
+
+const fs = {
+  existsSync: () => false,
+  statSync: () => ({ isDirectory: () => false, isFile: () => false }),
+  readdirSync: () => []
+};
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -10,6 +34,39 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setSetting: (key, value) => ipcRenderer.invoke('set-setting', key, value),
     getAllSettings: () => ipcRenderer.invoke('get-all-settings'),
     resetSettings: () => ipcRenderer.invoke('reset-settings'),
+    
+    // Preferences management
+    getPreference: (key, defaultValue) => ipcRenderer.invoke('get-preference', key, defaultValue),
+    setPreference: (key, value) => ipcRenderer.invoke('set-preference', key, value),
+    getAllPreferences: () => ipcRenderer.invoke('get-all-preferences'),
+    
+    // Settings backup and restore
+    exportSettings: () => ipcRenderer.invoke('export-settings'),
+    importSettings: (jsonData) => ipcRenderer.invoke('import-settings', jsonData),
+    getBackupList: () => ipcRenderer.invoke('get-backup-list'),
+    restoreFromBackup: (backupId) => ipcRenderer.invoke('restore-from-backup', backupId),
+    settingsHealthCheck: () => ipcRenderer.invoke('settings-health-check'),
+
+    // State management
+    saveApplicationState: (state) => ipcRenderer.invoke('save-application-state', state),
+    restoreApplicationState: () => ipcRenderer.invoke('restore-application-state'),
+    getRecentActivity: () => ipcRenderer.invoke('get-recent-activity'),
+    addRecentDirectory: (dirPath) => ipcRenderer.invoke('add-recent-directory', dirPath),
+    addRecentSearch: (query) => ipcRenderer.invoke('add-recent-search', query),
+    addRecentFile: (filePath, metadata) => ipcRenderer.invoke('add-recent-file', filePath, metadata),
+    addBookmark: (path, name) => ipcRenderer.invoke('add-bookmark', path, name),
+    removeBookmark: (path) => ipcRenderer.invoke('remove-bookmark', path),
+    getBookmarks: () => ipcRenderer.invoke('get-bookmarks'),
+    exportState: () => ipcRenderer.invoke('export-state'),
+    importState: (stateData) => ipcRenderer.invoke('import-state', stateData),
+
+    // Error handling and recovery
+    detectCorruption: () => ipcRenderer.invoke('detect-corruption'),
+    createEmergencyBackup: () => ipcRenderer.invoke('create-emergency-backup'),
+    performHealthCheck: () => ipcRenderer.invoke('perform-health-check'),
+    getErrorLog: () => ipcRenderer.invoke('get-error-log'),
+    clearErrorLog: () => ipcRenderer.invoke('clear-error-log'),
+    getRecoveryStats: () => ipcRenderer.invoke('get-recovery-stats'),
 
     // Directory Management
     selectPhotoDirectories: () => ipcRenderer.invoke('select-photo-directories'),
@@ -34,6 +91,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getThumbnailCacheInfo: () => ipcRenderer.invoke('get-thumbnail-cache-info'),
     preloadThumbnails: (filePaths, sizes) => ipcRenderer.invoke('preload-thumbnails', filePaths, sizes),
 
+    // Enhanced Thumbnail Processing Controls
+    pauseThumbnailProcessing: () => ipcRenderer.invoke('pause-thumbnail-processing'),
+    resumeThumbnailProcessing: () => ipcRenderer.invoke('resume-thumbnail-processing'),
+    setThumbnailConcurrency: (concurrency) => ipcRenderer.invoke('set-thumbnail-concurrency', concurrency),
+    getThumbnailProcessingStats: () => ipcRenderer.invoke('get-thumbnail-processing-stats'),
+    getThumbnailWorkerStats: () => ipcRenderer.invoke('get-thumbnail-worker-stats'),
+    getThumbnailCacheHealth: () => ipcRenderer.invoke('get-thumbnail-cache-health'),
+    optimizeThumbnailQueue: () => ipcRenderer.invoke('optimize-thumbnail-queue'),
+    validateThumbnailCache: () => ipcRenderer.invoke('validate-thumbnail-cache'),
+    batchProcessThumbnails: (filePaths, options) => ipcRenderer.invoke('batch-process-thumbnails', filePaths, options),
+    cancelThumbnailJobs: () => ipcRenderer.invoke('cancel-thumbnail-jobs'),
+    startResourceMonitoring: (intervalMs) => ipcRenderer.invoke('start-resource-monitoring', intervalMs),
+    stopResourceMonitoring: () => ipcRenderer.invoke('stop-resource-monitoring'),
+
     // File URL Generation
     getFileUrl: (filePath) => ipcRenderer.invoke('get-file-url', filePath),
     getSecureFileUrl: (filePath) => ipcRenderer.invoke('get-secure-file-url', filePath),
@@ -46,6 +117,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     startBackend: () => ipcRenderer.invoke('start-backend'),
     stopBackend: () => ipcRenderer.invoke('stop-backend'),
     getBackendStatus: () => ipcRenderer.invoke('backend-status'),
+
+    // API configuration
+    getApiConfig: () => ipcRenderer.invoke('get-api-config'),
+    getApiToken: () => ipcRenderer.invoke('get-api-token'),
+    setApiConfig: (config) => ipcRenderer.invoke('set-api-config', config),
 
     // App information
     getAppVersion: () => ipcRenderer.invoke('get-app-version'),
@@ -75,6 +151,42 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     onFileSystemError: (callback) => {
         ipcRenderer.on('file-system-error', callback);
+    },
+
+    // Enhanced Thumbnail Event Listeners
+    onThumbnailCacheCleaned: (callback) => {
+        ipcRenderer.on('thumbnail-cache-cleaned', callback);
+    },
+    onThumbnailQueueStarted: (callback) => {
+        ipcRenderer.on('thumbnail-queue-started', callback);
+    },
+    onThumbnailQueueProgress: (callback) => {
+        ipcRenderer.on('thumbnail-queue-progress', callback);
+    },
+    onThumbnailQueueCompleted: (callback) => {
+        ipcRenderer.on('thumbnail-queue-completed', callback);
+    },
+    onThumbnailProcessingPaused: (callback) => {
+        ipcRenderer.on('thumbnail-processing-paused', callback);
+    },
+    onThumbnailProcessingResumed: (callback) => {
+        ipcRenderer.on('thumbnail-processing-resumed', callback);
+    },
+    onThumbnailResourceMonitor: (callback) => {
+        ipcRenderer.on('thumbnail-resource-monitor', callback);
+    },
+    onThumbnailBatchProgress: (callback) => {
+        ipcRenderer.on('thumbnail-batch-progress', callback);
+    },
+
+    // State restoration event
+    onStateRestored: (callback) => {
+        ipcRenderer.on('state-restored', callback);
+    },
+
+    // Health check warning event
+    onHealthCheckWarning: (callback) => {
+        ipcRenderer.on('health-check-warning', callback);
     },
 
     // Remove event listeners

@@ -72,5 +72,11 @@ def run(tmp_root: Path):
     print("OK intent-first dummy smoke: ", results[0].path.name)
 
 
+def test_dummy_index_store_round_trip(tmp_path):
+    """Exercise IndexStore end-to-end with generated images."""
+
+    run(tmp_path)
+
+
 if __name__ == "__main__":
     run(Path("/tmp/photo_search_intent_test"))

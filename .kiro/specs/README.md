@@ -2,7 +2,28 @@
 
 ## Overview
 
-This directory contains a comprehensive suite of feature-specific specifications for building a world-class, AI-powered photo management application. Each specification focuses on a specific domain while ensuring seamless integration across the entire system.
+This directory contains a comprehensive suite of feature-specific specifications for building a **local-first desktop photo management application** with optional AI enhancements. Each specification focuses on a specific domain while ensuring seamless integration across the entire system.
+
+## Architecture Priority
+
+**Photo Search follows a local-first architecture with three operational modes:**
+
+1. **🖥️ Desktop Local App (Primary)** - Standalone Electron application
+   - Direct file system access without any server requirements
+   - Local thumbnail generation and caching
+   - Basic photo organization and management
+   - Works completely offline
+
+2. **🤖 AI Enhanced Mode (Secondary)** - Desktop app + optional backend
+   - All local features PLUS AI-powered semantic search
+   - Face recognition and people management  
+   - OCR text extraction and advanced search
+   - Backend server provides AI processing
+
+3. **🌐 Web App Mode (Tertiary)** - Browser-based development/testing
+   - Requires backend server to be running
+   - Limited to web-based file access
+   - Primarily for development and testing purposes
 
 ## Specification Architecture
 
@@ -174,20 +195,20 @@ graph TB
 
 ## Development Priorities
 
-### Phase 1: Foundation (Months 1-2)
-1. **Backend API Architecture** - Document and enhance existing FastAPI implementation
-2. **Frontend V3 Application** - Build modern React interface connecting to existing backend
-3. **AI Pipeline Optimization** - Optimize existing AI managers and orchestration
+### Phase 1: Local-First Foundation (Months 1-2)
+1. **Desktop Electron Integration** - Primary local-first desktop application
+2. **Frontend V3 Application** - React interface with direct file system access
+3. **Local Photo Management** - File browsing, thumbnails, basic organization
 
-### Phase 2: Intelligence (Months 2-3)
-1. **Semantic Search Engine** - Enhance search capabilities with advanced ANN indexing
-2. **Face Recognition System** - Improve face recognition accuracy and user experience
-3. **Desktop Electron Integration** - Create native desktop application
+### Phase 2: AI Enhancement Layer (Months 2-3)
+1. **Backend API Architecture** - Optional FastAPI backend for AI features
+2. **Semantic Search Engine** - AI-powered search when backend available
+3. **Face Recognition System** - People management with AI processing
 
-### Phase 3: Business (Months 3-4)
-1. **Landing Page and Marketing** - Build customer acquisition and conversion systems
-2. **Performance Optimization** - Scale for large libraries and enterprise use
-3. **Advanced Features** - Polish and advanced functionality
+### Phase 3: Advanced Features (Months 3-4)
+1. **AI Pipeline Optimization** - Enhanced AI processing and model management
+2. **Landing Page and Marketing** - Business growth and customer acquisition
+3. **Extended Features** - Video management, smart collections, analytics
 
 ## Key Integration Points
 

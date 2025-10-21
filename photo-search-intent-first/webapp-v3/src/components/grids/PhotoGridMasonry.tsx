@@ -31,12 +31,28 @@ import {
 import Masonry from "react-masonry-css";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { fileSystemService } from "@/services/fileSystemService";
+import { offlineModeHandler } from "@/services/offlineModeHandler";
 import "./PhotoGridMasonry.css";
+
+// Utility function to format video duration
+function formatDuration(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+  return `${minutes}:${secs.toString().padStart(2, '0')}`;
+}
 
 interface Photo {
   path: string;
   score?: number;
   thumbnail?: string;
+  isVideo?: boolean;
+  isImage?: boolean;
   metadata?: {
     timestamp?: number;
     views?: number;
@@ -116,6 +132,7 @@ export function PhotoGridMasonry({
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
+  const [photoUrls, setPhotoUrls] = useState<Map<string, { thumbnail: string; secure: string }>>(new Map());
   const gridRef = useRef<HTMLDivElement>(null);
 
   // Breakpoints for responsive columns
@@ -135,6 +152,43 @@ export function PhotoGridMasonry({
       ...photo,
       tileSize: calculateTileSize(photo, index, photos.length),
     }));
+  }, [photos]);
+
+  // Load thumbnails and secure URLs for offline mode
+  useEffect(() => {
+    if (!fileSystemService.isAvailable()) return;
+
+    const loadPhotoUrls = async () => {
+      const newUrls = new Map<string, { thumbnail: string; secure: string }>();
+      
+      // Load URLs for visible photos first (first 50)
+      const visiblePhotos = photos.slice(0, 50);
+      
+      for (const photo of visiblePhotos) {
+        try {
+          const [thumbnailUrl, secureUrl] = await Promise.all([
+            fileSystemService.getThumbnailUrl(photo.path, 300),
+            fileSystemService.getSecureFileUrl(photo.path)
+          ]);
+          
+          newUrls.set(photo.path, {
+            thumbnail: thumbnailUrl,
+            secure: secureUrl
+          });
+        } catch (error) {
+          console.error(`Failed to load URLs for ${photo.path}:`, error);
+          // Fallback to original path
+          newUrls.set(photo.path, {
+            thumbnail: photo.thumbnail || photo.path,
+            secure: photo.path
+          });
+        }
+      }
+      
+      setPhotoUrls(newUrls);
+    };
+
+    loadPhotoUrls();
   }, [photos]);
 
   /**
@@ -276,18 +330,47 @@ export function PhotoGridMasonry({
                 onMouseEnter={() => setHoveredIndex(index)}
                 onMouseLeave={() => setHoveredIndex(null)}
               >
-                {/* Photo Image */}
+                {/* Photo/Video Image */}
                 <div className="masonry-image-wrapper">
-                  <img
-                    src={photo.thumbnail || photo.path}
-                    alt={`Item ${index + 1}`}
-                    className={cn(
-                      "masonry-image",
-                      !isLoaded && "masonry-image-loading"
-                    )}
-                    loading="lazy"
-                    onLoad={() => handleImageLoad(photo.path)}
-                  />
+                  {photo.isVideo ? (
+                    <div className="relative">
+                      <img
+                        src={photoUrls.get(photo.path)?.thumbnail || photo.thumbnail || photo.path}
+                        alt={`Video ${index + 1}`}
+                        className={cn(
+                          "masonry-image",
+                          !isLoaded && "masonry-image-loading"
+                        )}
+                        loading="lazy"
+                        onLoad={() => handleImageLoad(photo.path)}
+                      />
+                      {/* Video Play Indicator */}
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="bg-black/50 rounded-full p-2">
+                          <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z"/>
+                          </svg>
+                        </div>
+                      </div>
+                      {/* Video duration badge if available */}
+                      {photo.metadata?.duration && (
+                        <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                          {formatDuration(photo.metadata.duration)}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <img
+                      src={photoUrls.get(photo.path)?.thumbnail || photo.thumbnail || photo.path}
+                      alt={`Photo ${index + 1}`}
+                      className={cn(
+                        "masonry-image",
+                        !isLoaded && "masonry-image-loading"
+                      )}
+                      loading="lazy"
+                      onLoad={() => handleImageLoad(photo.path)}
+                    />
+                  )}
 
                   {/* Loading Shimmer */}
                   {!isLoaded && (

@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The Electron V3 frontend integration requires completing the bridge between the React V3 frontend and Electron's main process to enable direct file system access for image/video loading without requiring the Python backend for basic photo display operations. The system should support offline-first photo management with direct file:// URL access while maintaining security through context isolation.
+The Electron V3 frontend integration creates a **local-first desktop photo management application** that operates independently without requiring any backend server. The system provides direct file system access for image/video loading, local thumbnail generation, and basic photo organization. The Python backend is entirely optional and only provides enhanced AI features when explicitly enabled by the user.
 
 ## Glossary
 
@@ -14,7 +14,8 @@ The Electron V3 frontend integration requires completing the bridge between the 
 - **Preload_Script**: The secure bridge script that exposes limited APIs to the renderer process
 - **Photo_Directory_Scanner**: Component that recursively scans directories for image/video files
 - **Thumbnail_Generator**: System for creating and caching thumbnail images for performance
-- **Offline_Mode**: Operation mode where all photo loading and basic operations work without backend
+- **Local_First_Mode**: Primary operation mode where all photo management works without any backend server
+- **AI_Enhanced_Mode**: Optional mode where backend provides additional AI features like semantic search
 
 ## Requirements
 
@@ -68,15 +69,15 @@ The Electron V3 frontend integration requires completing the bridge between the 
 
 ### Requirement 5
 
-**User Story:** As a user, I want the app to work offline so that I can manage my photos without internet connectivity or backend services.
+**User Story:** As a user, I want the app to work as a local-first desktop application so that I can manage my photos without requiring any server or internet connectivity.
 
 #### Acceptance Criteria
 
-1. WHEN the app starts, THE Electron_V3_App SHALL detect if backend is available but not require it
-2. WHEN operating in offline mode, THE React_V3_Frontend SHALL use direct file access for all photo operations
-3. WHEN backend is unavailable, THE Offline_Mode SHALL provide basic photo browsing and organization
-4. WHILE in offline mode, THE Electron_V3_App SHALL disable features that require backend processing
-5. WHERE backend becomes available, THE Electron_V3_App SHALL seamlessly enable advanced features
+1. WHEN the app starts, THE Electron_V3_App SHALL operate in local-first mode by default without requiring backend
+2. WHEN managing photos, THE React_V3_Frontend SHALL use direct file system access for all basic operations
+3. WHEN backend is unavailable, THE Local_First_Mode SHALL provide complete photo browsing and organization
+4. WHILE in local-first mode, THE Electron_V3_App SHALL provide all core photo management features
+5. WHERE backend is explicitly enabled, THE AI_Enhanced_Mode SHALL add semantic search and AI features
 
 ### Requirement 6
 

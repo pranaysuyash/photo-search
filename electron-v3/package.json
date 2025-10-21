@@ -8,9 +8,10 @@
     "homepage": ".",
     "scripts": {
         "dev": "cross-env NODE_ENV=development electron .",
+        "dev:ui": "npm run build:ui && npm run dev",
         "dev:full": "npm run build:ui && npm run prepare:models && npm run dev",
         "build": "npm run build:ui && npm run prepare:models && electron-builder",
-        "build:ui": "cd ../photo-search-intent-first/webapp-v3 && npm run build && cp -r dist/* ../../../electron-v3/app/",
+        "build:ui": "node scripts/build-ui.js",
         "build:backend": "echo 'Backend bundling not implemented yet'",
         "prepare:models": "node scripts/download-models.js",
         "start": "electron .",

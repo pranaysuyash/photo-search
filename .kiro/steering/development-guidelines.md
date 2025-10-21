@@ -1,5 +1,15 @@
 # Photo Search Development Guidelines
 
+## Architecture Priority
+
+**Photo Search is a local-first desktop application. Development should prioritize:**
+
+1. **🖥️ Desktop Local App (Primary)** - Electron V3 with direct file system access
+2. **🤖 AI Enhanced Mode (Secondary)** - Optional backend for AI features  
+3. **🌐 Web App (Tertiary)** - Browser version for development/testing only
+
+**Key Principle:** The app MUST work without any backend server. AI features are enhancements, not requirements.
+
 ## Virtual Environment Usage
 
 **ALWAYS use the existing .venv when working with Python components:**

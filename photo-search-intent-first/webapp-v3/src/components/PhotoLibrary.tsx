@@ -22,18 +22,25 @@ import {
   FolderOpen,
   Info,
   Images,
+
 } from "lucide-react";
-import type { Photo as StorePhoto } from "@/store/photoStore";
+import type { Photo } from "@/types/photo";
 import { cn } from "@/lib/utils";
 import { GridViewSwitcher, type ViewMode } from "@/components/grids";
 import { apiClient } from "@/services/api";
 import { FolderSelector } from "./FolderSelector";
+import { usePhotoStore } from "@/store/photoStore";
+import { offlineModeHandler } from "@/services/offlineModeHandler";
+import { fileSystemService } from "@/services/fileSystemService";
+import { VideoInfo } from "./VideoInfo";
+import { DEMO_LIBRARY_DIR } from "@/constants/directories";
+import { useElectronBridge } from "@/hooks/useElectronBridge";
 
 const GUIDE_STORAGE_KEY = "photo-library-guide-dismissed";
 const INACTIVITY_DELAY_MS = 20000;
 
 interface PhotoLibraryProps {
-  photos: StorePhoto[];
+  photos: Photo[];
   isLoading: boolean;
   currentDirectory: string | null;
   onDirectorySelect: (directory: string) => void;
@@ -43,6 +50,8 @@ interface PhotoLibraryProps {
 interface GridPhoto {
   path: string;
   thumbnail?: string;
+  isVideo?: boolean;
+  isImage?: boolean;
   metadata?: {
     timestamp?: number;
     title?: string;
@@ -62,8 +71,8 @@ function getPhotoTitle(path: string, fallback?: string): string {
   return filename.replace(/_[0-9]{6,}$/u, "");
 }
 
-function transformToGridPhoto(photo: StorePhoto, index: number): GridPhoto {
-  const typed = photo as StorePhoto & {
+function transformToGridPhoto(photo: Photo, index: number): GridPhoto {
+  const typed = photo as Photo & {
     metadata?: {
       timestamp?: number;
       title?: string;
@@ -71,6 +80,8 @@ function transformToGridPhoto(photo: StorePhoto, index: number): GridPhoto {
       lastViewed?: number;
     };
     thumbnail?: string;
+    isVideo?: boolean;
+    isImage?: boolean;
   };
 
   const fallbackTimestamp = Date.now() - index * 60000;
@@ -82,11 +93,13 @@ function transformToGridPhoto(photo: StorePhoto, index: number): GridPhoto {
 
   return {
     path: photo.path,
-    thumbnail: typed.thumbnail ?? photo.src,
+    thumbnail: typed.thumbnail ?? photo.thumbnailUrl ?? photo.filename,
+    isVideo: typed.isVideo ?? photo.isVideo,
+    isImage: typed.isImage ?? photo.isImage,
     metadata: {
       ...metadata,
       timestamp,
-      title: getPhotoTitle(photo.path, metadata.title ?? photo.title),
+      title: getPhotoTitle(photo.path, metadata.title ?? photo.filename),
     },
     score: photo.score,
     favorite: Boolean(photo.favorite),
@@ -113,39 +126,84 @@ function EmptyState({
   currentDirectory,
   onDirectorySelect,
   onShowGuide,
+  isOfflineMode,
+  canScanDirectories,
+  onSelectPhotoDirectories,
 }: {
   currentDirectory: string | null;
   onDirectorySelect: (directory: string) => void;
   onShowGuide: () => void;
+  isOfflineMode: boolean;
+  canScanDirectories: boolean;
+  onSelectPhotoDirectories?: () => Promise<string[] | null>;
 }) {
   const [showFolderSelector, setShowFolderSelector] = useState(false);
+  const { loadPhotosOffline, addPhotoDirectory } = usePhotoStore();
+
+  const handleSelectDirectory = useCallback(async () => {
+    if (isOfflineMode && canScanDirectories) {
+      // Use Electron file system service for directory selection
+      const success = await addPhotoDirectory();
+      if (success) {
+        // Load photos from the newly added directory
+        await loadPhotosOffline();
+      }
+    } else {
+      // Fallback to regular folder selector
+      setShowFolderSelector(true);
+    }
+  }, [isOfflineMode, canScanDirectories, addPhotoDirectory, loadPhotosOffline]);
 
   const handleImport = useCallback(async () => {
+    if (isOfflineMode && onSelectPhotoDirectories) {
+      // In local-first mode, add new photo directories
+      try {
+        const selectedDirectories = await onSelectPhotoDirectories();
+        if (selectedDirectories && selectedDirectories.length > 0) {
+          // Add each selected directory
+          for (const dir of selectedDirectories) {
+            await addPhotoDirectory(dir);
+          }
+          // Reload photos from all directories
+          await loadPhotosOffline();
+          alert(`Added ${selectedDirectories.length} photo directories`);
+        }
+      } catch (error) {
+        console.error("Failed to add photo directories:", error);
+        alert("Failed to add photo directories. Please try again.");
+      }
+      return;
+    }
+
+    // Legacy backend mode (if backend is available)
     if (!currentDirectory) {
       setShowFolderSelector(true);
       return;
     }
 
     try {
-      const sourceDir = await selectImportFolder();
-      if (!sourceDir) return;
+      if (onSelectPhotoDirectories) {
+        const selectedDirectories = await onSelectPhotoDirectories();
+        if (!selectedDirectories || selectedDirectories.length === 0) return;
 
-      const result = await apiClient.importPhotos(sourceDir, currentDirectory, {
-        recursive: true,
-        copy: true,
-      });
+        const sourceDir = selectedDirectories[0]; // Use first selected directory
+        const result = await apiClient.importPhotos(sourceDir, currentDirectory, {
+          recursive: true,
+          copy: true,
+        });
 
-      if (result.ok) {
-        alert(`Import completed: ${result.imported} photos imported`);
-        window.location.reload();
-      } else {
-        alert(`Import failed: ${result.errors} errors`);
+        if (result.ok) {
+          alert(`Import completed: ${result.imported} photos imported`);
+          window.location.reload();
+        } else {
+          alert(`Import failed: ${result.errors} errors`);
+        }
       }
     } catch (error) {
       console.error("Import failed:", error);
       alert("Import failed. Please try again.");
     }
-  }, [currentDirectory]);
+  }, [currentDirectory, isOfflineMode, loadPhotosOffline, onSelectPhotoDirectories, addPhotoDirectory]);
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-6 p-10 text-center">
@@ -157,18 +215,25 @@ function EmptyState({
         <p className="max-w-md text-sm text-slate-600 dark:text-slate-400">
           {currentDirectory
             ? "This folder is empty or contains no supported images. Import photos or choose a different library to get started."
-            : "Select a photo library to explore your images with the new grid experiences. The guided tour is always available if you want a walkthrough."}
+            : "Local-first photo management with optional AI enhancement. Select photo directories to explore your images with direct file access."}
         </p>
+        <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+          <FolderOpen className="h-4 w-4" />
+          <span>Direct file system access</span>
+          {isOfflineMode && !canScanDirectories && (
+            <span className="text-amber-600 dark:text-amber-400">• Browser mode (limited)</span>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-3">
-        <Button onClick={() => setShowFolderSelector(true)} className="gap-2">
+        <Button onClick={handleSelectDirectory} className="gap-2">
           <FolderOpen className="h-4 w-4" />
-          {currentDirectory ? "Change library" : "Select photo library"}
+          {currentDirectory ? "Change library" : "Select photo directories"}
         </Button>
         <Button variant="outline" onClick={handleImport} className="gap-2">
           <Sparkles className="h-4 w-4" />
-          Import photos
+          {isOfflineMode ? "Scan directories" : "Import photos"}
         </Button>
         <Button variant="ghost" onClick={onShowGuide} className="gap-2">
           <Info className="h-4 w-4" />
@@ -208,7 +273,7 @@ function GuidePreview() {
         defaultView="masonry"
         persistenceKey="grid-demo-guide"
         showLabels
-        onViewModeChange={() => {}}
+        onViewModeChange={() => { }}
       />
     </div>
   );
@@ -220,33 +285,81 @@ function PhotoLightbox({
   onOpenChange,
   onToggleFavorite,
 }: {
-  photo: StorePhoto | null;
+  photo: Photo | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onToggleFavorite?: (path: string, favorite: boolean) => void;
 }) {
+  const [secureUrl, setSecureUrl] = useState<string>('');
+  const [videoMetadata, setVideoMetadata] = useState<any>(null);
+
+  useEffect(() => {
+    if (!photo || !fileSystemService.isAvailable()) {
+      setSecureUrl(photo?.thumbnailUrl || '');
+      return;
+    }
+
+    const loadSecureUrl = async () => {
+      try {
+        const url = await fileSystemService.getSecureFileUrl(photo.path);
+        setSecureUrl(url);
+
+        // Load video metadata if it's a video file
+        if ((photo as any).isVideo) {
+          try {
+            const metadata = await fileSystemService.getFileMetadata(photo.path);
+            setVideoMetadata(metadata);
+          } catch (error) {
+            console.error('Failed to get video metadata:', error);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to get secure URL:', error);
+        setSecureUrl(photo.thumbnailUrl);
+      }
+    };
+
+    loadSecureUrl();
+  }, [photo]);
+
   if (!photo) return null;
 
   const isFavorite = Boolean(photo.favorite);
+  const isVideo = (photo as any).isVideo;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl overflow-hidden border-0 bg-slate-950/95 p-0">
         <div className="relative flex h-[70vh] flex-col md:h-[80vh]">
-          <img
-            src={photo.src}
-            alt={photo.title}
-            className="h-full w-full flex-1 bg-black object-contain"
-          />
+          {isVideo ? (
+            <video
+              src={secureUrl || photo.thumbnailUrl}
+              controls
+              className="h-full w-full flex-1 bg-black object-contain"
+              preload="metadata"
+            />
+          ) : (
+            <img
+              src={secureUrl || photo.thumbnailUrl}
+              alt={photo.filename}
+              className="h-full w-full flex-1 bg-black object-contain"
+            />
+          )}
           <div className="flex flex-wrap items-center justify-between gap-3 p-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge className="bg-black/70 text-white">
-                {getPhotoTitle(photo.path, photo.title)}
-              </Badge>
-              {photo.score && (
-                <Badge className="bg-emerald-500/80 text-white">
-                  {Math.round(photo.score * 100)}% match
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className="bg-black/70 text-white">
+                  {getPhotoTitle(photo.path, photo.filename)}
                 </Badge>
+                {photo.score && (
+                  <Badge className="bg-emerald-500/80 text-white">
+                    {Math.round(photo.score * 100)}% match
+                  </Badge>
+                )}
+              </div>
+              {/* Video metadata display */}
+              {isVideo && videoMetadata && (
+                <VideoInfo metadata={videoMetadata} />
               )}
             </div>
             <div className="flex items-center gap-2">
@@ -303,6 +416,55 @@ export function PhotoLibrary({
     return (stored as ViewMode) || "masonry";
   });
 
+  // Offline mode state
+  const {
+    isOfflineMode,
+    offlineCapabilities,
+    loadPhotosOffline,
+    addPhotoDirectory
+  } = usePhotoStore();
+  const [offlineMode, setOfflineMode] = useState(offlineModeHandler.getOfflineMode());
+
+  // Electron bridge for directory selection
+  const { selectPhotoDirectories } = useElectronBridge();
+
+  // Listen for offline mode changes
+  useEffect(() => {
+    const handleOfflineModeChange = (mode: typeof offlineMode) => {
+      setOfflineMode(mode);
+      usePhotoStore.getState().updateOfflineMode(mode);
+    };
+
+    offlineModeHandler.addListener(handleOfflineModeChange);
+    return () => offlineModeHandler.removeListener(handleOfflineModeChange);
+  }, []);
+
+  // Auto-load demo photos in Electron when no directories configured (first-time use)
+  useEffect(() => {
+    const autoLoadDemo = async () => {
+      if (isOfflineMode && offlineCapabilities.canScanDirectories && !isLoading) {
+        try {
+          // Check if user has any directories configured
+          const existingDirectories = await fileSystemService.getPhotoDirectories();
+
+          // Only load demo if no directories are configured (first-time use)
+          if (existingDirectories.length === 0) {
+            console.log("🔄 First-time use detected - loading demo photos...");
+            await addPhotoDirectory(DEMO_LIBRARY_DIR);
+            await loadPhotosOffline();
+            console.log("✅ Demo photos loaded for first-time use");
+          }
+        } catch (error) {
+          console.warn("Failed to auto-load demo photos:", error);
+        }
+      }
+    };
+
+    // Small delay to ensure everything is initialized
+    const timer = setTimeout(autoLoadDemo, 1000);
+    return () => clearTimeout(timer);
+  }, [isOfflineMode, offlineCapabilities.canScanDirectories, isLoading, addPhotoDirectory, loadPhotosOffline]);
+
   useEffect(() => {
     if (guideDismissed || showGuide) {
       setShowGuideHint(false);
@@ -348,32 +510,33 @@ export function PhotoLibrary({
     }
   }, []);
 
-  const handleImport = useCallback(async () => {
-    if (!currentDirectory) {
-      setShowFolderSelector(true);
-      return;
-    }
+  // Import functionality - currently unused but kept for future use
+  // const handleImport = useCallback(async () => {
+  //   if (!currentDirectory) {
+  //     setShowFolderSelector(true);
+  //     return;
+  //   }
 
-    try {
-      const sourceDir = await selectImportFolder();
-      if (!sourceDir) return;
+  //   try {
+  //     const sourceDir = await selectImportFolder();
+  //     if (!sourceDir) return;
 
-      const result = await apiClient.importPhotos(sourceDir, currentDirectory, {
-        recursive: true,
-        copy: true,
-      });
+  //     const result = await apiClient.importPhotos(sourceDir, currentDirectory, {
+  //       recursive: true,
+  //       copy: true,
+  //     });
 
-      if (result.ok) {
-        alert(`Import completed: ${result.imported} photos imported`);
-        window.location.reload();
-      } else {
-        alert(`Import failed: ${result.errors} errors`);
-      }
-    } catch (error) {
-      console.error("Import failed:", error);
-      alert("Import failed. Please try again.");
-    }
-  }, [currentDirectory]);
+  //     if (result.ok) {
+  //       alert(`Import completed: ${result.imported} photos imported`);
+  //       window.location.reload();
+  //     } else {
+  //       alert(`Import failed: ${result.errors} errors`);
+  //     }
+  //   } catch (error) {
+  //     console.error("Import failed:", error);
+  //     alert("Import failed. Please try again.");
+  //   }
+  // }, [currentDirectory]);
 
   if (isLoading) {
     return <LoadingSkeleton />;
@@ -385,6 +548,9 @@ export function PhotoLibrary({
         currentDirectory={currentDirectory}
         onDirectorySelect={onDirectorySelect}
         onShowGuide={() => handleGuideChange(true)}
+        isOfflineMode={isOfflineMode}
+        canScanDirectories={offlineCapabilities.canScanDirectories}
+        onSelectPhotoDirectories={selectPhotoDirectories}
       />
     );
   }
@@ -399,9 +565,21 @@ export function PhotoLibrary({
         <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/70 p-4 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/60">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Library
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Photo Library
+                </p>
+                <Badge variant="secondary" className="text-xs">
+                  <FolderOpen className="h-3 w-3 mr-1" />
+                  Local-First
+                </Badge>
+                {offlineMode.backendAvailable && (
+                  <Badge variant="default" className="text-xs">
+                    <Sparkles className="h-3 w-3 mr-1" />
+                    AI Enhanced
+                  </Badge>
+                )}
+              </div>
               <p className="text-base font-semibold text-slate-900 dark:text-slate-100">
                 {currentDirLabel}
               </p>
@@ -411,7 +589,8 @@ export function PhotoLibrary({
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 View:{" "}
                 {currentViewMode.charAt(0).toUpperCase() +
-                  currentViewMode.slice(1)}
+                  currentViewMode.slice(1)} • Direct file access
+                {offlineMode.backendAvailable && " • AI features enabled"}
               </p>
             </div>
 
@@ -420,19 +599,27 @@ export function PhotoLibrary({
                 variant="ghost"
                 size="sm"
                 className="gap-2"
-                onClick={() => setShowFolderSelector(true)}
+                onClick={async () => {
+                  if (offlineCapabilities.canScanDirectories) {
+                    await addPhotoDirectory();
+                  } else {
+                    setShowFolderSelector(true);
+                  }
+                }}
               >
                 <FolderOpen className="h-4 w-4" />
-                Change library
+                Add directory
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 className="gap-2"
-                onClick={handleImport}
+                onClick={async () => {
+                  await loadPhotosOffline();
+                }}
               >
                 <Sparkles className="h-4 w-4" />
-                Add photos
+                Scan photos
               </Button>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -528,25 +715,4 @@ export function PhotoLibrary({
   );
 }
 
-async function selectImportFolder(): Promise<string | null> {
-  if (typeof window === "undefined") {
-    console.warn("Folder selection is not available in this environment");
-    return null;
-  }
 
-  if (
-    window.electronAPI &&
-    typeof window.electronAPI.selectFolder === "function"
-  ) {
-    try {
-      const result = await window.electronAPI.selectFolder();
-      return result || null;
-    } catch (error) {
-      console.error("Failed to select folder:", error);
-      return null;
-    }
-  }
-
-  console.warn("Electron bridge not available for folder selection");
-  return null;
-}

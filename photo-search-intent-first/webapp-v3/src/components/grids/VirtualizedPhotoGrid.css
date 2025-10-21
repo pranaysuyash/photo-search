@@ -1,0 +1,212 @@
+/**
+ * VirtualizedPhotoGrid.css
+ * 
+ * Styles for the high-performance virtualized photo grid component
+ */
+
+/* Container */
+.virtualized-grid-container {
+  @apply w-full h-full relative;
+}
+
+.virtualized-grid {
+  @apply outline-none;
+}
+
+/* Grid Items */
+.virtualized-grid-item {
+  @apply relative rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 
+         border border-slate-200 dark:border-slate-700 cursor-pointer
+         transition-all duration-200 ease-out;
+  @apply hover:shadow-lg hover:border-slate-300 dark:hover:border-slate-600;
+  @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+}
+
+.virtualized-grid-item-selected {
+  @apply ring-2 ring-blue-500 ring-offset-2 border-blue-500;
+  @apply bg-blue-50 dark:bg-blue-900/20;
+}
+
+.virtualized-grid-item-selectable:hover {
+  @apply ring-1 ring-slate-300 dark:ring-slate-600;
+}
+
+/* Image Container */
+.virtualized-grid-image-container {
+  @apply relative w-full h-full overflow-hidden;
+}
+
+.virtualized-grid-image {
+  @apply w-full h-full object-cover transition-opacity duration-300;
+}
+
+.virtualized-grid-image-loading {
+  @apply opacity-0;
+}
+
+/* Loading State */
+.virtualized-grid-loading {
+  @apply absolute inset-0 flex items-center justify-center bg-slate-100 dark:bg-slate-800;
+}
+
+.virtualized-grid-loading-container {
+  @apply w-full h-full flex items-center justify-center;
+}
+
+.virtualized-grid-loading-content {
+  @apply flex flex-col items-center justify-center text-center;
+}
+
+/* Empty State */
+.virtualized-grid-empty {
+  @apply w-full h-full flex flex-col items-center justify-center text-center p-8;
+}
+
+/* Video Indicator */
+.virtualized-grid-video-indicator {
+  @apply absolute inset-0 flex items-center justify-center pointer-events-none;
+  @apply bg-black/20 backdrop-blur-sm;
+}
+
+.virtualized-grid-video-indicator::before {
+  content: '';
+  @apply absolute inset-0 bg-gradient-to-br from-transparent via-black/10 to-black/30;
+}
+
+/* Selection Checkbox */
+.virtualized-grid-checkbox {
+  @apply absolute top-2 left-2 z-10;
+}
+
+.virtualized-grid-checkbox input[type="checkbox"] {
+  @apply w-4 h-4 rounded border-2 border-white bg-white/80 backdrop-blur-sm;
+  @apply checked:bg-blue-500 checked:border-blue-500;
+  @apply focus:ring-2 focus:ring-blue-500 focus:ring-offset-0;
+  @apply transition-all duration-200;
+}
+
+/* Favorite Button */
+.virtualized-grid-favorite {
+  @apply absolute top-2 right-2 z-10 p-1 rounded-full;
+  @apply bg-black/20 backdrop-blur-sm hover:bg-black/40;
+  @apply transition-all duration-200 opacity-0 group-hover:opacity-100;
+}
+
+.virtualized-grid-item:hover .virtualized-grid-favorite {
+  @apply opacity-100;
+}
+
+/* Metadata Overlay */
+.virtualized-grid-metadata {
+  @apply absolute bottom-0 left-0 right-0 p-2;
+  @apply bg-gradient-to-t from-black/60 via-black/20 to-transparent;
+  @apply text-white text-xs space-y-1;
+  @apply opacity-0 transition-opacity duration-200;
+}
+
+.virtualized-grid-item:hover .virtualized-grid-metadata {
+  @apply opacity-100;
+}
+
+.virtualized-grid-score {
+  @apply inline-block px-2 py-1 bg-green-500/80 rounded text-white font-medium;
+}
+
+.virtualized-grid-date {
+  @apply block text-white/90;
+}
+
+/* Selection Summary */
+.virtualized-grid-selection-summary {
+  @apply absolute bottom-4 left-1/2 transform -translate-x-1/2;
+  @apply bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700;
+  @apply rounded-lg px-4 py-2 shadow-lg backdrop-blur-sm;
+  @apply flex items-center gap-3 text-sm;
+  @apply z-50;
+}
+
+/* Responsive Design */
+@media (max-width: 640px) {
+  .virtualized-grid-checkbox {
+    @apply top-1 left-1;
+  }
+  
+  .virtualized-grid-favorite {
+    @apply top-1 right-1 p-0.5;
+  }
+  
+  .virtualized-grid-metadata {
+    @apply p-1 text-xs;
+  }
+  
+  .virtualized-grid-selection-summary {
+    @apply bottom-2 text-xs px-3 py-1.5;
+  }
+}
+
+/* High DPI / Retina Display Optimizations */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .virtualized-grid-image {
+    image-rendering: crisp-edges;
+    image-rendering: -webkit-optimize-contrast;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .virtualized-grid-item,
+  .virtualized-grid-image,
+  .virtualized-grid-favorite,
+  .virtualized-grid-metadata {
+    @apply transition-none;
+  }
+}
+
+/* Dark Mode Adjustments */
+@media (prefers-color-scheme: dark) {
+  .virtualized-grid-checkbox input[type="checkbox"] {
+    @apply border-slate-600 bg-slate-700/80;
+  }
+  
+  .virtualized-grid-favorite {
+    @apply bg-white/10 hover:bg-white/20;
+  }
+}
+
+/* Focus Visible for Better Accessibility */
+.virtualized-grid-item:focus-visible {
+  @apply ring-2 ring-blue-500 ring-offset-2 outline-none;
+}
+
+/* Loading Animation */
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+.virtualized-grid-loading::after {
+  content: '';
+  @apply absolute inset-0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
+  background-size: 200px 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Performance Optimizations */
+.virtualized-grid-item {
+  contain: layout style paint;
+  will-change: transform;
+}
+
+.virtualized-grid-image {
+  contain: layout style paint;
+}

@@ -103,20 +103,33 @@ class TransformersClipEmbedding:
             raise RuntimeError(f"Failed to load CLIP model for {model_name}. If offline, ensure model is cached locally. Last error: {last_err}")
 
         try:
-            self.model.to(self.device)
+            # Check if model has meta tensors and handle appropriately
+            if any(p.is_meta for p in self.model.parameters()):
+                # Use to_empty() for meta tensors as recommended by PyTorch
+                self.model = self.model.to_empty(device=self.device)
+                # Reload the model weights properly
+                try:
+                    _load_model(loaded_name or try_names[-1], torch.float32)
+                except Exception as inner_exc:
+                    raise RuntimeError(
+                        "Failed to materialise CLIP weights from cache; ensure the model files exist locally."
+                    ) from inner_exc
+            else:
+                self.model.to(self.device)
         except NotImplementedError as err:
             # torch>=2.5 raises NotImplementedError when parameters stay on the meta device
             # (e.g. when Accelerate initialises the module lazily). Retry with a stricter load
             # path that forces full weight materialisation before moving devices.
             if any(p.is_meta for p in self.model.parameters()):
                 try:
+                    # Use to_empty() instead of to() for meta tensors
+                    self.model = self.model.to_empty(device=self.device)
                     # Force a fresh load straight onto CPU to materialise tensors, then move.
                     _load_model(loaded_name or try_names[-1], torch.float32)
                 except Exception as inner_exc:
                     raise RuntimeError(
                         "Failed to materialise CLIP weights from cache; ensure the model files exist locally."
                     ) from inner_exc
-                self.model.to(self.device)
             else:
                 raise err
         self.model.eval()

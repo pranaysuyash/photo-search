@@ -60,27 +60,134 @@ export interface ThumbnailCacheInfo {
   cacheDir: string;
   totalSize: number;
   maxSize: number;
+  usagePercentage: number;
   entryCount: number;
+  totalFiles: number;
   supportedSizes: number[];
+  sizeBreakdown: Record<string, { count: number; size: number }>;
   queueLength: number;
   activeJobs: number;
+  isProcessing: boolean;
+  oldestAccess: Date | null;
+  newestAccess: Date | null;
+  cacheAge: number;
 }
 
 export interface ThumbnailPreloadResult {
   queued: number;
+  existing: number;
   totalQueue: number;
+  estimatedTime: {
+    seconds: number;
+    formatted: string;
+  };
 }
 
 export interface ThumbnailGeneratedEvent {
   filePath: string;
   size: number;
   thumbnailPath: string;
+  processingTime?: number;
+  priority?: number;
+  metadata?: {
+    width: number;
+    height: number;
+    format: string;
+  };
 }
 
 export interface ThumbnailErrorEvent {
   filePath: string;
   size: number;
   error: string;
+  processingTime?: number;
+}
+
+export interface ThumbnailProcessingStats {
+  isProcessing: boolean;
+  queueLength: number;
+  activeJobs: number;
+  concurrency: number;
+  activeJobDetails: Array<{
+    filePath: string;
+    size: number;
+    priority: number;
+    processingTime: number;
+  }>;
+  queuedJobDetails: Array<{
+    filePath: string;
+    size: number;
+    priority: number;
+    queuedTime: number;
+  }>;
+}
+
+export interface ThumbnailWorkerStats {
+  totalProcessed: number;
+  totalErrors: number;
+  averageProcessingTime: number;
+  startTime: number;
+  uptime: number;
+  throughput: number;
+  errorRate: number;
+  isPaused: boolean;
+  isProcessing: boolean;
+  concurrency: number;
+}
+
+export interface ThumbnailCacheHealth {
+  overall: 'good' | 'warning' | 'critical';
+  issues: string[];
+  recommendations: string[];
+  metrics: ThumbnailCacheInfo;
+}
+
+export interface ThumbnailQueueProgress {
+  processed: number;
+  total: number;
+  remaining: number;
+  active: number;
+  progress: number;
+  elapsedTime: number;
+  estimatedTimeRemaining: {
+    milliseconds: number;
+    formatted: string;
+  } | null;
+  isPaused: boolean;
+}
+
+export interface ThumbnailBatchProcessOptions {
+  sizes?: number[];
+  priority?: number;
+  maxBatchSize?: number;
+  progressCallback?: (progress: ThumbnailBatchProgress) => void;
+}
+
+export interface ThumbnailBatchProgress {
+  totalFiles: number;
+  totalBatches: number;
+  processed: number;
+  errors: string[];
+  startTime: number;
+  currentBatch?: number;
+  batchProgress?: number;
+  endTime?: number;
+  totalTime?: number;
+}
+
+export interface ThumbnailResourceInfo {
+  memory: {
+    rss: number;
+    heapTotal: number;
+    heapUsed: number;
+    external: number;
+  };
+  heapUsagePercent: number;
+  currentConcurrency: number;
+  recommendedConcurrency: number;
+  activeJobs: number;
+  queueLength: number;
+  shouldAdjust: boolean;
 }
 
 export interface BackendStatus {
@@ -134,6 +241,20 @@ export interface ElectronAPI {
   getThumbnailCacheInfo(): Promise<ThumbnailCacheInfo>;
   preloadThumbnails(filePaths: string[], sizes?: number[]): Promise<ThumbnailPreloadResult>;
 
+  // Enhanced Thumbnail Processing Controls
+  pauseThumbnailProcessing(): Promise<boolean>;
+  resumeThumbnailProcessing(): Promise<boolean>;
+  setThumbnailConcurrency(concurrency: number): Promise<boolean>;
+  getThumbnailProcessingStats(): Promise<ThumbnailProcessingStats>;
+  getThumbnailWorkerStats(): Promise<ThumbnailWorkerStats>;
+  getThumbnailCacheHealth(): Promise<ThumbnailCacheHealth>;
+  optimizeThumbnailQueue(): Promise<number>;
+  validateThumbnailCache(): Promise<boolean>;
+  batchProcessThumbnails(filePaths: string[], options?: ThumbnailBatchProcessOptions): Promise<ThumbnailBatchProgress>;
+  cancelThumbnailJobs(): Promise<number>;
+  startResourceMonitoring(intervalMs?: number): Promise<boolean>;
+  stopResourceMonitoring(): Promise<boolean>;
+
   // File URL Generation
   getFileUrl(filePath: string): Promise<string>;
   getSecureFileUrl(filePath: string): Promise<string>;
@@ -160,6 +281,16 @@ export interface ElectronAPI {
   onThumbnailGenerated(callback: (data: ThumbnailGeneratedEvent) => void): void;
   onDirectoryChanged(callback: (path: string) => void): void;
   onFileSystemError(callback: (error: ThumbnailErrorEvent) => void): void;
+
+  // Enhanced Thumbnail Event Listeners
+  onThumbnailCacheCleaned(callback: (info: any) => void): void;
+  onThumbnailQueueStarted(callback: (info: any) => void): void;
+  onThumbnailQueueProgress(callback: (progress: ThumbnailQueueProgress) => void): void;
+  onThumbnailQueueCompleted(callback: (stats: any) => void): void;
+  onThumbnailProcessingPaused(callback: (info: any) => void): void;
+  onThumbnailProcessingResumed(callback: (info: any) => void): void;
+  onThumbnailResourceMonitor(callback: (resourceInfo: ThumbnailResourceInfo) => void): void;
+  onThumbnailBatchProgress(callback: (progress: ThumbnailBatchProgress) => void): void;
 
   // Remove event listeners
   removeAllListeners(channel: string): void;

@@ -8,11 +8,23 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { UIStoreState, Notification } from "../types/store";
 
-const initialState: Omit<UIStoreState, keyof UIStoreState> = {
+export interface Toast {
+  id: string;
+  type: 'success' | 'error' | 'warning' | 'info';
+  title?: string;
+  message: string;
+  duration?: number;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
+}
+
+const initialState = {
   sidebarCollapsed: false,
-  currentView: 'library',
-  viewMode: 'grid',
-  gridSize: 'medium',
+  currentView: 'library' as const,
+  viewMode: 'grid' as const,
+  gridSize: 'medium' as const,
   modals: {
     photoViewer: false,
     collectionEditor: false,
@@ -23,9 +35,10 @@ const initialState: Omit<UIStoreState, keyof UIStoreState> = {
     export: false,
   },
   globalLoading: false,
-  progressBars: {},
-  notifications: [],
-  theme: 'system',
+  progressBars: {} as Record<string, { progress: number; message: string }>,
+  notifications: [] as Notification[],
+  toasts: [] as Toast[],
+  theme: 'system' as const,
 };
 
 export const useUIStore = create<UIStoreState>()(
@@ -91,6 +104,32 @@ export const useUIStore = create<UIStoreState>()(
       removeNotification: (id) =>
         set((state) => ({
           notifications: state.notifications.filter((n) => n.id !== id),
+        })),
+
+      // Toast management
+      addToast: (toast: Omit<Toast, 'id'>) => {
+        const id = `toast_${Date.now()}_${Math.random()}`;
+        const newToast: Toast = {
+          ...toast,
+          id,
+          duration: toast.duration ?? 5000,
+        };
+
+        set((state) => ({
+          toasts: [...state.toasts, newToast],
+        }));
+
+        // Auto-remove after duration
+        if (newToast.duration && newToast.duration > 0) {
+          setTimeout(() => {
+            get().removeToast(id);
+          }, newToast.duration);
+        }
+      },
+
+      removeToast: (id) =>
+        set((state) => ({
+          toasts: state.toasts.filter((t) => t.id !== id),
         })),
 
       setTheme: (theme) => set({ theme }),

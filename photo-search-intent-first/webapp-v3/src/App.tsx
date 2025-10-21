@@ -38,6 +38,7 @@ import { LoadingOverlay } from "./components/Loading";
 import { useUIStore } from "./store/uiStore";
 import Day1Demo from "./Day1Demo";
 import { GridDemo } from "./components/GridDemo";
+import { DebugInfo } from "./components/DebugInfo";
 
 function AppContent() {
   const {
@@ -612,7 +613,7 @@ function AppContent() {
   useEffect(() => {
     setAnalyticsCounts((prev) => ({
       ...prev,
-      favorites: favoriteEntries.length,
+      favorites: favoriteEntries?.length || 0,
     }));
   }, [favoriteEntries]);
 
@@ -728,6 +729,9 @@ function AppContent() {
       {/* Day 1: Toast notifications */}
       <ToastContainer />
 
+      {/* Debug info for testing */}
+      <DebugInfo />
+
       <div className="flex h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 relative overflow-hidden">
         {/* Background patterns for main canvas */}
         <div className="absolute inset-0 opacity-5 dark:opacity-10 pointer-events-none">
@@ -765,7 +769,7 @@ function AppContent() {
           }}
           currentDirectory={currentDirectory}
           onDirectoryChange={setCurrentDirectory}
-          photoCount={photos.length}
+          photoCount={photos?.length || 0}
           peopleCount={analyticsCounts.people}
           placesCount={analyticsCounts.places}
           favoritesCount={analyticsCounts.favorites}

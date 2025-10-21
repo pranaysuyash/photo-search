@@ -31,6 +31,8 @@ import "./PhotoGridFilmStrip.css";
 interface Photo {
   path: string;
   thumbnail?: string;
+  isVideo?: boolean;
+  isImage?: boolean;
   metadata?: {
     timestamp?: number;
     title?: string;

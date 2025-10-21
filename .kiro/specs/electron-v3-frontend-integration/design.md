@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Electron V3 frontend integration design focuses on creating a secure, offline-first photo management system that enables direct file system access for image and video loading without requiring the Python backend for basic operations. The architecture leverages Electron's security model with context isolation while providing seamless photo browsing capabilities through direct file:// URL access.
+The Electron V3 frontend integration design creates a **local-first desktop photo management application** that operates independently as the primary mode of operation. The system provides direct file system access, local thumbnail generation, and complete photo management without requiring any backend server. The Python backend is entirely optional and only adds AI enhancement features when explicitly enabled by the user.
 
 ## Architecture
 

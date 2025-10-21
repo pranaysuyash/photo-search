@@ -1,15 +1,34 @@
-# photo-search
+# Photo Search - Local-First AI Photo Management
+
+## Architecture Priority
+
+**Photo Search is a local-first desktop application with three operational modes:**
+
+1. **🖥️ Desktop Local App (Primary)** - Electron app with direct file system access
+   - Works completely offline without any server
+   - Direct photo viewing using file:// URLs
+   - Local thumbnail generation and caching
+   - Basic photo management and organization
+
+2. **🤖 AI Search Enhanced (Secondary)** - Desktop app + optional backend
+   - All local features PLUS AI-powered semantic search
+   - Face recognition and people management
+   - OCR text extraction from photos
+   - Advanced search and filtering capabilities
+
+3. **🌐 React Web App (Tertiary)** - Browser-based version
+   - Requires backend server to be running
+   - Limited to web-based file access
+   - Primarily for development and testing
 
 ## Tech Stack
 
-- **Shell:** Electron (desktop)
-- **Frontend:** React + Vite (dev at `http://127.0.0.1:5173`, prod built into `photo-search-intent-first/api/web/index.html` served via `app://`)
-- **Backend:** FastAPI (Uvicorn on `http://127.0.0.1:8000`, `/docs` for OpenAPI, optional `/app/` to serve SPA)
-- **State/UX:** Zustand, TanStack React Query, Radix UI, Tailwind, Framer Motion
-- **Not used:** Streamlit (legacy prototype lives under `photo-search-intent-first/ui/`, not part of the app)
-
-> **Note:** `photo-search-intent-first/ui` contains a legacy Streamlit proof-of-concept.  
-> The shipping application is `photo-search-intent-first/webapp` (React) + `photo-search-intent-first/electron` (shell) with a FastAPI backend in `photo-search-intent-first/api`
+- **Primary Shell:** Electron V3 (desktop app in `electron-v3/`)
+- **Frontend:** React V3 + TypeScript + Vite (in `photo-search-intent-first/webapp-v3/`)
+- **Optional Backend:** FastAPI + Python AI models (in `photo-search-intent-first/api/`)
+- **State Management:** Zustand, direct file system APIs
+- **UI Components:** shadcn/ui, Radix UI, Tailwind CSS, Framer Motion
+- **Legacy:** Streamlit prototype (not part of shipping app)
 
 What’s Included
 
