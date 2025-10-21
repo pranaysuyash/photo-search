@@ -7,6 +7,10 @@ const windowStateKeeper = require('electron-window-state');
 const log = require('electron-log');
 const { autoUpdater } = require('electron-updater');
 
+// Import our custom managers
+const FileSystemManager = require('./lib/FileSystemManager');
+const ThumbnailGenerator = require('./lib/ThumbnailGenerator');
+
 // Configure logging
 log.transports.file.level = 'info';
 log.transports.console.level = 'debug';
@@ -19,7 +23,7 @@ const store = new Store({
         theme: 'system',
         windowBounds: { width: 1200, height: 800 },
         searchProvider: 'local',
-        autoStartBackend: true,
+        autoStartBackend: false,
         modelDownloadPath: path.join(__dirname, 'models'),
         lastSearch: '',
         recentSearches: []
@@ -34,7 +38,50 @@ class PhotoSearchApp {
         this.backendPort = 8000;
         this.isDev = process.env.NODE_ENV === 'development';
 
+        // Initialize file system and thumbnail managers
+        this.fileSystemManager = new FileSystemManager();
+        this.thumbnailGenerator = new ThumbnailGenerator({
+            cacheDir: path.join(app.getPath('userData'), 'thumbnails'),
+            maxCacheSize: 1024 * 1024 * 1024, // 1GB
+            concurrency: 3
+        });
+
+        // Setup manager event listeners
+        this.setupManagerEventListeners();
+
         this.initializeApp();
+    }
+
+    setupManagerEventListeners() {
+        // File system manager events
+        this.fileSystemManager.on('scan-progress', (progress) => {
+            if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                this.mainWindow.webContents.send('scan-progress', progress);
+            }
+        });
+
+        this.fileSystemManager.on('allowed-roots-updated', (roots) => {
+            if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                this.mainWindow.webContents.send('photo-directories-updated', roots);
+            }
+        });
+
+        // Thumbnail generator events
+        this.thumbnailGenerator.on('thumbnail-generated', (data) => {
+            if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                this.mainWindow.webContents.send('thumbnail-generated', data);
+            }
+        });
+
+        this.thumbnailGenerator.on('thumbnail-error', (error) => {
+            if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                this.mainWindow.webContents.send('file-system-error', error);
+            }
+        });
+
+        this.thumbnailGenerator.on('cache-cleaned', (info) => {
+            log.info('Thumbnail cache cleaned:', info);
+        });
     }
 
     initializeApp() {
@@ -86,9 +133,12 @@ class PhotoSearchApp {
 
         // Load the app
         const appPath = this.isDev
-            ? 'http://localhost:5173'
+            ? 'http://localhost:5174'
             : `file://${path.join(__dirname, 'app', 'index.html')}`;
 
+        this.mainWindow.webContents.once('did-finish-load', () => {
+            this.notifyBackendStatus();
+        });
         await this.mainWindow.loadURL(appPath);
 
         // Show window when ready
@@ -100,12 +150,23 @@ class PhotoSearchApp {
             }
         });
 
+        // Initialize file system manager with existing directories
+        const existingDirectories = store.get('photoDirectories') || [];
+        for (const dirPath of existingDirectories) {
+            this.fileSystemManager.addAllowedRoot(dirPath);
+        }
+
         // Create application menu
         this.createMenu();
 
         // Start backend if auto-start is enabled
-        if (store.get('autoStartBackend')) {
-            this.startBackend();
+        const shouldAutoStart = Boolean(store.get('autoStartBackend'));
+        if (shouldAutoStart) {
+            log.info('Auto-start backend enabled; attempting to start Python service');
+            this.startBackend(false);
+        } else {
+            log.info('Auto-start backend disabled; running in renderer-only mode');
+            this.notifyBackendStatus();
         }
 
         // Handle external links
@@ -177,7 +238,7 @@ class PhotoSearchApp {
                 submenu: [
                     {
                         label: 'Start Backend',
-                        click: () => this.startBackend(),
+                        click: () => this.startBackend(true),
                         enabled: !this.isBackendRunning
                     },
                     {
@@ -230,7 +291,7 @@ class PhotoSearchApp {
     }
 
     setupIpcHandlers() {
-        // Settings handlers
+        // Enhanced Settings handlers
         ipcMain.handle('get-setting', (event, key) => {
             return store.get(key);
         });
@@ -240,7 +301,171 @@ class PhotoSearchApp {
             return true;
         });
 
-        // File system handlers
+        ipcMain.handle('get-all-settings', () => {
+            return store.store;
+        });
+
+        ipcMain.handle('reset-settings', () => {
+            store.clear();
+            return true;
+        });
+
+        // Enhanced Directory Management
+        ipcMain.handle('select-photo-directories', async () => {
+            const result = await dialog.showOpenDialog(this.mainWindow, {
+                properties: ['openDirectory', 'multiSelections'],
+                title: 'Select Photo Directories'
+            });
+
+            if (!result.canceled && result.filePaths.length > 0) {
+                // Add to file system manager
+                for (const dirPath of result.filePaths) {
+                    this.fileSystemManager.addAllowedRoot(dirPath);
+                }
+
+                // Update store
+                const directories = store.get('photoDirectories') || [];
+                const newDirectories = [...new Set([...directories, ...result.filePaths])];
+                store.set('photoDirectories', newDirectories);
+
+                return result.filePaths;
+            }
+            return null;
+        });
+
+        ipcMain.handle('get-photo-directories', () => {
+            return store.get('photoDirectories') || [];
+        });
+
+        ipcMain.handle('add-photo-directory', (event, dirPath) => {
+            try {
+                this.fileSystemManager.addAllowedRoot(dirPath);
+                const directories = store.get('photoDirectories') || [];
+                const newDirectories = [...new Set([...directories, dirPath])];
+                store.set('photoDirectories', newDirectories);
+                return true;
+            } catch (error) {
+                log.error('Failed to add photo directory:', error);
+                return false;
+            }
+        });
+
+        ipcMain.handle('remove-photo-directory', (event, dirPath) => {
+            try {
+                this.fileSystemManager.removeAllowedRoot(dirPath);
+                const directories = store.get('photoDirectories') || [];
+                const newDirectories = directories.filter(dir => dir !== dirPath);
+                store.set('photoDirectories', newDirectories);
+                return true;
+            } catch (error) {
+                log.error('Failed to remove photo directory:', error);
+                return false;
+            }
+        });
+
+        ipcMain.handle('validate-directory-access', (event, dirPath) => {
+            const validation = this.fileSystemManager.validatePath(dirPath);
+            return validation;
+        });
+
+        // File System Operations
+        ipcMain.handle('scan-directory', async (event, dirPath, options) => {
+            try {
+                return await this.fileSystemManager.scanDirectory(dirPath, options);
+            } catch (error) {
+                log.error('Directory scan failed:', error);
+                throw error;
+            }
+        });
+
+        ipcMain.handle('get-file-metadata', async (event, filePath) => {
+            try {
+                return await this.fileSystemManager.getFileMetadata(filePath);
+            } catch (error) {
+                log.error('Failed to get file metadata:', error);
+                throw error;
+            }
+        });
+
+        ipcMain.handle('validate-file-path', (event, filePath) => {
+            return this.fileSystemManager.validatePath(filePath);
+        });
+
+        ipcMain.handle('get-directory-contents', async (event, dirPath, options) => {
+            try {
+                return await this.fileSystemManager.getDirectoryContents(dirPath, options);
+            } catch (error) {
+                log.error('Failed to get directory contents:', error);
+                throw error;
+            }
+        });
+
+        // Thumbnail Operations
+        ipcMain.handle('get-thumbnail-path', (event, filePath, size) => {
+            return this.thumbnailGenerator.getThumbnailPath(filePath, size);
+        });
+
+        ipcMain.handle('generate-thumbnail', async (event, filePath, size) => {
+            try {
+                return await this.thumbnailGenerator.generateThumbnail(filePath, size);
+            } catch (error) {
+                log.error('Thumbnail generation failed:', error);
+                throw error;
+            }
+        });
+
+        ipcMain.handle('get-thumbnail-url', async (event, filePath, size) => {
+            try {
+                const thumbnailPath = await this.thumbnailGenerator.generateThumbnail(filePath, size);
+                return this.thumbnailGenerator.getThumbnailUrl(filePath, size);
+            } catch (error) {
+                log.error('Failed to get thumbnail URL:', error);
+                throw error;
+            }
+        });
+
+        ipcMain.handle('clear-thumbnail-cache', async () => {
+            try {
+                return await this.thumbnailGenerator.clearCache();
+            } catch (error) {
+                log.error('Failed to clear thumbnail cache:', error);
+                return false;
+            }
+        });
+
+        ipcMain.handle('get-thumbnail-cache-info', () => {
+            return this.thumbnailGenerator.getCacheInfo();
+        });
+
+        ipcMain.handle('preload-thumbnails', async (event, filePaths, sizes) => {
+            try {
+                return await this.thumbnailGenerator.preloadThumbnails(filePaths, sizes);
+            } catch (error) {
+                log.error('Failed to preload thumbnails:', error);
+                throw error;
+            }
+        });
+
+        // File URL Generation
+        ipcMain.handle('get-file-url', (event, filePath) => {
+            try {
+                return this.fileSystemManager.generateSecureFileUrl(filePath);
+            } catch (error) {
+                log.error('Failed to generate file URL:', error);
+                throw error;
+            }
+        });
+
+        ipcMain.handle('get-secure-file-url', (event, filePath) => {
+            try {
+                return this.fileSystemManager.generateSecureFileUrl(filePath);
+            } catch (error) {
+                log.error('Failed to generate secure file URL:', error);
+                throw error;
+            }
+        });
+
+        // Legacy handlers (for backward compatibility)
         ipcMain.handle('select-directory', async () => {
             const result = await dialog.showOpenDialog(this.mainWindow, {
                 properties: ['openDirectory', 'multiSelections'],
@@ -257,7 +482,7 @@ class PhotoSearchApp {
         });
 
         // Backend control handlers
-        ipcMain.handle('start-backend', () => this.startBackend());
+        ipcMain.handle('start-backend', () => this.startBackend(true));
         ipcMain.handle('stop-backend', () => this.stopBackend());
         ipcMain.handle('backend-status', () => ({
             running: this.isBackendRunning,
@@ -266,9 +491,33 @@ class PhotoSearchApp {
 
         // App control handlers
         ipcMain.handle('get-app-version', () => app.getVersion());
+        ipcMain.handle('get-app-info', () => ({
+            version: app.getVersion(),
+            name: app.getName(),
+            platform: process.platform,
+            arch: process.arch,
+            electronVersion: process.versions.electron,
+            nodeVersion: process.versions.node
+        }));
+
         ipcMain.handle('show-item-in-folder', (event, fullPath) => {
             shell.showItemInFolder(fullPath);
         });
+
+        // Development handlers
+        if (this.isDev) {
+            ipcMain.handle('open-dev-tools', () => {
+                if (this.mainWindow) {
+                    this.mainWindow.webContents.openDevTools();
+                }
+            });
+
+            ipcMain.handle('reload-app', () => {
+                if (this.mainWindow) {
+                    this.mainWindow.reload();
+                }
+            });
+        }
     }
 
     async selectPhotoDirectory() {
@@ -317,26 +566,74 @@ class PhotoSearchApp {
         this.mainWindow.webContents.send('start-indexing', directories);
     }
 
-    startBackend() {
+    startBackend(manual = false) {
         if (this.isBackendRunning) {
             log.info('Backend already running');
+            this.notifyBackendStatus();
             return;
         }
 
-        const backendPath = this.isDev
-            ? path.join(__dirname, '..', 'photo-search-intent-first', 'api', 'server.py')
-            : path.join(process.resourcesPath, 'backend', 'server.py');
+        const backendDir = this.isDev
+            ? path.join(__dirname, '..')
+            : path.join(process.resourcesPath, 'backend');
 
-        if (!fs.existsSync(backendPath)) {
-            log.error('Backend not found at:', backendPath);
-            this.showBackendError('Backend server not found');
+        log.info('Looking for backend in directory:', backendDir);
+        if (!fs.existsSync(backendDir)) {
+            const message = `Backend directory not found at: ${backendDir}`;
+            log.warn(message);
+            if (manual) {
+                this.showBackendError(message);
+            }
+            this.notifyBackendStatus();
             return;
+        }
+
+        const serverPath = path.join(backendDir, 'api', 'server.py');
+        if (!fs.existsSync(serverPath)) {
+            const message = `Backend server file not found at: ${serverPath}`;
+            log.warn(message);
+            if (manual) {
+                this.showBackendError(message);
+            }
+            this.notifyBackendStatus();
+            return;
+        }
+
+        let pythonExecutable = path.join(backendDir, '.venv', 'bin', 'python');
+        if (process.platform === 'win32') {
+            pythonExecutable = path.join(backendDir, '.venv', 'Scripts', 'python.exe');
+        }
+
+        if (!fs.existsSync(pythonExecutable)) {
+            const fallback = process.platform === 'win32' ? 'python' : 'python3';
+            log.warn(`Virtual environment Python not found at ${pythonExecutable}; falling back to ${fallback}`);
+            pythonExecutable = fallback;
+        }
+
+        const args = [
+            '-m',
+            'uvicorn',
+            'api.server:app',
+            '--host',
+            '127.0.0.1',
+            '--port',
+            this.backendPort.toString()
+        ];
+
+        if (this.isDev) {
+            args.push('--reload');
         }
 
         try {
-            this.backendProcess = spawn('python', [backendPath], {
-                cwd: path.dirname(backendPath),
-                stdio: ['pipe', 'pipe', 'pipe']
+            this.backendProcess = spawn(pythonExecutable, args, {
+                cwd: backendDir,
+                stdio: ['pipe', 'pipe', 'pipe'],
+                env: {
+                    ...process.env,
+                    PYTHONPATH: process.env.PYTHONPATH
+                        ? `${backendDir}${path.delimiter}${process.env.PYTHONPATH}`
+                        : backendDir
+                }
             });
 
             this.backendProcess.stdout.on('data', (data) => {
@@ -350,23 +647,29 @@ class PhotoSearchApp {
             this.backendProcess.on('close', (code) => {
                 log.info(`Backend process exited with code ${code}`);
                 this.isBackendRunning = false;
+                this.backendProcess = null;
                 this.updateBackendMenu();
+                this.notifyBackendStatus();
+            });
+
+            this.backendProcess.on('error', (error) => {
+                log.error('Backend process error:', error);
             });
 
             this.isBackendRunning = true;
             this.updateBackendMenu();
 
             log.info('Backend started successfully');
-
-            // Notify renderer
-            this.mainWindow.webContents.send('backend-status-changed', {
-                running: true,
-                port: this.backendPort
-            });
-
+            this.notifyBackendStatus();
         } catch (error) {
             log.error('Failed to start backend:', error);
-            this.showBackendError('Failed to start backend server');
+            this.backendProcess = null;
+            this.isBackendRunning = false;
+            this.updateBackendMenu();
+            this.notifyBackendStatus();
+            if (manual) {
+                this.showBackendError('Failed to start backend server');
+            }
         }
     }
 
@@ -382,11 +685,7 @@ class PhotoSearchApp {
 
         log.info('Backend stopped');
 
-        // Notify renderer
-        this.mainWindow.webContents.send('backend-status-changed', {
-            running: false,
-            port: this.backendPort
-        });
+        this.notifyBackendStatus();
     }
 
     updateBackendMenu() {
@@ -398,6 +697,21 @@ class PhotoSearchApp {
                 backendMenu.submenu.items[0].enabled = !this.isBackendRunning; // Start
                 backendMenu.submenu.items[1].enabled = this.isBackendRunning;  // Stop
             }
+        }
+    }
+
+    notifyBackendStatus() {
+        if (!this.mainWindow || this.mainWindow.isDestroyed()) {
+            return;
+        }
+
+        try {
+            this.mainWindow.webContents.send('backend-status-changed', {
+                running: this.isBackendRunning,
+                port: this.backendPort
+            });
+        } catch (error) {
+            log.warn('Unable to notify renderer about backend status:', error);
         }
     }
 

@@ -11,6 +11,7 @@ import {
   useErrorNotification,
 } from "../framework/EnhancedErrorHandling";
 import type { WorkspaceState } from "./types";
+import type { EngineHealthSnapshot, EngineLogEntry } from "../types/engine";
 
 // Simple state management to replace Zustand and eliminate infinite loops
 interface SimpleSettings {
@@ -25,6 +26,7 @@ interface SimpleSettings {
   useOcr: boolean;
   hasText: boolean;
   useOsTrash: boolean;
+  dataMode: "live" | "mock";
   highContrast: boolean;
   camera: string;
   isoMin: number;
@@ -67,6 +69,9 @@ interface SimpleUI {
   error?: AppError;
   showErrorBanner: boolean;
   errorNotifications: AppError[];
+  engineHealth: EngineHealthSnapshot | null;
+  engineHealthHistory: EngineHealthSnapshot[];
+  engineLogs: EngineLogEntry[];
 }
 
 interface SimpleWorkspace {
@@ -111,6 +116,7 @@ const initialState: SimpleStore = {
     useOcr: false,
     hasText: false,
     useOsTrash: false,
+    dataMode: "live",
     highContrast: false,
     camera: "",
     isoMin: 0,
@@ -145,6 +151,9 @@ const initialState: SimpleStore = {
     showHelp: false,
     showErrorBanner: false,
     errorNotifications: [],
+    engineHealth: null,
+    engineHealthHistory: [],
+    engineLogs: [],
   },
   workspace: {
     workspace: "",
@@ -158,6 +167,8 @@ const initialState: SimpleStore = {
   },
 };
 
+const DEFAULT_HEALTH_HISTORY_LIMIT = 60;
+const DEFAULT_ENGINE_LOG_LIMIT = 400;
 const SimpleStoreContext = createContext<{
   state: SimpleStore;
   setSettings: (settings: Partial<SimpleSettings>) => void;
@@ -165,7 +176,11 @@ const SimpleStoreContext = createContext<{
     photo: Partial<SimplePhoto> | ((prev: SimpleStore) => Partial<SimplePhoto>)
   ) => void;
   setUI: (ui: Partial<SimpleUI>) => void;
-  setWorkspace: (workspace: Partial<SimpleWorkspace>) => void;
+  setWorkspace: (
+    workspace:
+      | Partial<SimpleWorkspace>
+      | ((prev: SimpleStore) => Partial<SimpleWorkspace>)
+  ) => void;
   // Enhanced error handling methods
   setError: (error: AppError | null) => void;
   clearError: () => void;
@@ -173,6 +188,18 @@ const SimpleStoreContext = createContext<{
   addErrorNotification: (error: AppError) => void;
   removeErrorNotification: (timestamp: number) => void;
   clearErrorNotifications: () => void;
+  recordEngineHealth: (
+    snapshot: EngineHealthSnapshot,
+    options?: { historyLimit?: number }
+  ) => void;
+  replaceEngineLogs: (
+    entries: EngineLogEntry[],
+    options?: { limit?: number }
+  ) => void;
+  appendEngineLogs: (
+    entries: EngineLogEntry[],
+    options?: { limit?: number }
+  ) => void;
 } | null>(null);
 
 export const SimpleStoreProvider: React.FC<{ children: React.ReactNode }> = ({
@@ -306,6 +333,67 @@ export const SimpleStoreProvider: React.FC<{ children: React.ReactNode }> = ({
     }));
   }, []);
 
+  const recordEngineHealth = useCallback(
+    (snapshot: EngineHealthSnapshot, options?: { historyLimit?: number }) => {
+      const limit = Math.max(
+        1,
+        options?.historyLimit ?? DEFAULT_HEALTH_HISTORY_LIMIT
+      );
+      setState((prev) => {
+        const nextHistory = [...prev.ui.engineHealthHistory, snapshot];
+        const trimmed =
+          nextHistory.length > limit
+            ? nextHistory.slice(nextHistory.length - limit)
+            : nextHistory;
+        return {
+          ...prev,
+          ui: {
+            ...prev.ui,
+            engineHealth: snapshot,
+            engineHealthHistory: trimmed,
+          },
+        };
+      });
+    },
+    []
+  );
+
+  const replaceEngineLogs = useCallback(
+    (entries: EngineLogEntry[], options?: { limit?: number }) => {
+      const limit = Math.max(0, options?.limit ?? DEFAULT_ENGINE_LOG_LIMIT);
+      const trimmed = limit > 0 ? entries.slice(-limit) : entries.slice();
+      setState((prev) => ({
+        ...prev,
+        ui: {
+          ...prev.ui,
+          engineLogs: trimmed,
+        },
+      }));
+    },
+    []
+  );
+
+  const appendEngineLogs = useCallback(
+    (entries: EngineLogEntry[], options?: { limit?: number }) => {
+      if (!entries.length) {
+        return;
+      }
+      const limit = Math.max(0, options?.limit ?? DEFAULT_ENGINE_LOG_LIMIT);
+      setState((prev) => {
+        const combined = [...prev.ui.engineLogs, ...entries];
+        const trimmed = limit > 0 ? combined.slice(-limit) : combined;
+        return {
+          ...prev,
+          ui: {
+            ...prev.ui,
+            engineLogs: trimmed,
+          },
+        };
+      });
+    },
+    []
+  );
+
   return (
     <SimpleStoreContext.Provider
       value={{
@@ -320,6 +408,9 @@ export const SimpleStoreProvider: React.FC<{ children: React.ReactNode }> = ({
         addErrorNotification,
         removeErrorNotification,
         clearErrorNotifications,
+        recordEngineHealth,
+        replaceEngineLogs,
+        appendEngineLogs,
       }}
     >
       {children}
@@ -402,6 +493,10 @@ export const useGroups = () => useSimpleStore().state.workspace.groups;
 export const usePoints = () => useSimpleStore().state.workspace.points;
 export const useDiag = () => useSimpleStore().state.workspace.diag;
 export const useTrips = () => useSimpleStore().state.workspace.trips;
+export const useEngineHealth = () => useSimpleStore().state.ui.engineHealth;
+export const useEngineHealthHistory = () =>
+  useSimpleStore().state.ui.engineHealthHistory;
+export const useEngineLogs = () => useSimpleStore().state.ui.engineLogs;
 
 // Action hooks
 export const useSettingsActions = () => {
@@ -420,6 +515,7 @@ export const useSettingsActions = () => {
       setUseOcr: (useOcr: boolean) => setSettings({ useOcr }),
       setHasText: (hasText: boolean) => setSettings({ hasText }),
       setUseOsTrash: (useOsTrash: boolean) => setSettings({ useOsTrash }),
+      setDataMode: (dataMode: "live" | "mock") => setSettings({ dataMode }),
       setHighContrast: (highContrast: boolean) => setSettings({ highContrast }),
       setCamera: (camera: string) => setSettings({ camera }),
       setIsoMin: (isoMin: number | string) =>
@@ -640,6 +736,24 @@ export const useWorkspaceActions = () => {
       setTrips: (trips: SimpleWorkspace["trips"]) => setWorkspace({ trips }),
     }),
     [setWorkspace]
+  );
+};
+
+export const useEngineTelemetryActions = () => {
+  const { recordEngineHealth, replaceEngineLogs, appendEngineLogs } =
+    useSimpleStore();
+  return React.useMemo(
+    () => ({
+      recordHealth: (
+        snapshot: EngineHealthSnapshot,
+        options?: { historyLimit?: number }
+      ) => recordEngineHealth(snapshot, options),
+      replaceLogs: (entries: EngineLogEntry[], options?: { limit?: number }) =>
+        replaceEngineLogs(entries, options),
+      appendLogs: (entries: EngineLogEntry[], options?: { limit?: number }) =>
+        appendEngineLogs(entries, options),
+    }),
+    [recordEngineHealth, replaceEngineLogs, appendEngineLogs]
   );
 };
 

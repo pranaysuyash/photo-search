@@ -128,7 +128,7 @@ User settings are managed using `electron-store`:
   lastPhotoDirectory: null,
   theme: 'system',
   searchProvider: 'local',
-  autoStartBackend: true,
+  autoStartBackend: false,
   modelDownloadPath: './models'
 }
 ```
@@ -149,7 +149,7 @@ User settings are managed using `electron-store`:
 
 ### Backend Control
 
-The app can automatically start and stop the Python backend:
+The app exposes manual controls to start/stop the Python backend (it stays off by default for local browsing):
 
 ```javascript
 // Start backend

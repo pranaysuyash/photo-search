@@ -7,6 +7,7 @@ import {
   Navigate,
   useNavigate,
 } from "react-router-dom";
+import { ThemeProvider } from "./lib/theme";
 import { PhotoLibrary } from "./components/PhotoLibrary";
 import { Collections } from "./components/Collections";
 import { People } from "./components/People";
@@ -17,6 +18,7 @@ import TagsView from "./components/TagsView";
 import Favorites from "./components/Favorites";
 import { Sidebar } from "./components/Sidebar";
 import { TopBar } from "./components/TopBar";
+import { Preferences } from "./components/Preferences";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +37,7 @@ import { ToastContainer } from "./components/Toast";
 import { LoadingOverlay } from "./components/Loading";
 import { useUIStore } from "./store/uiStore";
 import Day1Demo from "./Day1Demo";
+import { GridDemo } from "./components/GridDemo";
 
 function AppContent() {
   const {
@@ -63,6 +66,7 @@ function AppContent() {
   const [indexBootstrapped, setIndexBootstrapped] = useState(false);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showPreferences, setShowPreferences] = useState(false);
   const isMac =
     typeof navigator !== "undefined" && navigator.platform.includes("Mac");
   const modifierKeyLabel = isMac ? "⌘" : "Ctrl";
@@ -148,20 +152,60 @@ function AppContent() {
     };
   }, [currentDirectory, setCurrentDirectory, isElectron, getStoreSetting]);
 
-  // React to Electron menu-driven directory selection
+  // React to Electron menu-driven directory selection events when exposed
   useEffect(() => {
     if (!isElectron) return;
 
-    // TODO: Implement directory selection event listener through useElectronBridge hook
-    // For now, this will be handled by the Electron menu system directly calling the directory change
-    // The pattern would be:
-    // const { onDirectorySelected } = useElectronBridge();
-    // onDirectorySelected((directory) => { ... });
+    const api = window.electronAPI;
+    if (!api) return;
 
-    return () => {
-      // Cleanup would go here when event listeners are available
+    const channel = "directory:selected";
+    const handler = (_event: unknown, directory: unknown) => {
+      if (typeof directory === "string" && directory.trim().length > 0) {
+        setCurrentDirectory(directory);
+      }
     };
-  }, [isElectron]);
+
+    let cleanup: (() => void) | undefined;
+
+    if (typeof api.onDirectorySelected === "function") {
+      const boundHandler = (_event: unknown, directory: unknown) =>
+        handler(_event, directory);
+      api.onDirectorySelected(boundHandler);
+      cleanup = () => {
+        api.removeListener?.(channel, boundHandler);
+      };
+    } else if (typeof api.on === "function") {
+      const boundHandler = (_event: unknown, directory: unknown) =>
+        handler(_event, directory);
+      api.on(channel, boundHandler);
+      cleanup = () => {
+        api.removeListener?.(channel, boundHandler);
+      };
+    }
+
+    return cleanup;
+  }, [isElectron, setCurrentDirectory]);
+
+  // Ensure Electron secure bridge has access to the active directory for direct photo reads
+  useEffect(() => {
+    if (!isElectron) return;
+    const next = currentDirectory?.trim();
+    if (!next) return;
+
+    const secure = window.secureElectronAPI;
+    const legacy = window.electronAPI;
+
+    const securePromise = secure?.setAllowedRoot?.(next);
+    securePromise?.catch((error) => {
+      console.warn("Failed to set secure allowed root:", error);
+    });
+
+    const legacyPromise = legacy?.setAllowedRoot?.(next);
+    legacyPromise?.catch((error: unknown) => {
+      console.warn("Failed to set legacy allowed root:", error);
+    });
+  }, [currentDirectory, isElectron]);
 
   // Handle Electron menu IPC events for import/export
   useEffect(() => {
@@ -307,11 +351,14 @@ function AppContent() {
       }
     };
 
+    const handleOpenPreferences = () => setShowPreferences(true);
+
     // Set up IPC listeners
     window.electronAPI.on?.("menu:export-library", handleMenuExportLibrary);
     window.electronAPI.on?.("menu:export-search", handleMenuExportSearch);
     window.electronAPI.on?.("menu:export-favorites", handleMenuExportFavorites);
     window.electronAPI.on?.("menu:import", handleMenuImport);
+    window.electronAPI.on?.("open-preferences", handleOpenPreferences);
 
     return () => {
       // Cleanup listeners
@@ -323,6 +370,7 @@ function AppContent() {
           handleMenuExportFavorites
         );
         window.electronAPI.off("menu:import", handleMenuImport);
+        window.electronAPI.off("open-preferences", handleOpenPreferences);
       }
     };
   }, [
@@ -621,7 +669,7 @@ function AppContent() {
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [navigate, setCurrentView]);
+  }, [navigate]);
 
   const handleSearch = async (query: string) => {
     if (!query.trim() || !currentDirectory) return;
@@ -791,6 +839,7 @@ function AppContent() {
               />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/day1-demo" element={<Day1Demo />} />
+              <Route path="/grid-demo" element={<GridDemo />} />
               <Route path="/" element={<Navigate to="/library" replace />} />
             </Routes>
           </main>
@@ -815,6 +864,12 @@ function AppContent() {
               </div>
             </DialogContent>
           </Dialog>
+
+          {/* Preferences Dialog */}
+          <Preferences
+            open={showPreferences}
+            onOpenChange={setShowPreferences}
+          />
         </div>
       </div>
     </>
@@ -824,9 +879,11 @@ function AppContent() {
 function App() {
   return (
     <ErrorBoundary>
-      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <AppContent />
-      </Router>
+      <ThemeProvider>
+        <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <AppContent />
+        </Router>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }

@@ -33,11 +33,13 @@ export function LoadingSkeleton({
           <div
             className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 ${className}`}
           >
-            {Array.from({ length: count }).map((_, i) => (
-              <div key={`photo-grid-${i}`} className="animate-pulse">
-                <div className="aspect-square bg-muted rounded-lg" />
-              </div>
-            ))}
+            {Array.from({ length: count }, () => crypto.randomUUID()).map(
+              (id) => (
+                <div key={id} className="animate-pulse">
+                  <div className="aspect-square bg-muted rounded-lg" />
+                </div>
+              )
+            )}
           </div>
         );
 
@@ -55,29 +57,30 @@ export function LoadingSkeleton({
       case "list-item":
         return (
           <div className={`space-y-3 ${className}`}>
-            {Array.from({ length: count }).map((_, i) => (
-              <div
-                key={`list-item-${i}`}
-                className="animate-pulse flex items-center gap-3"
-              >
-                <div className="w-12 h-12 bg-muted rounded" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-muted rounded w-3/4" />
-                  <div className="h-3 bg-muted rounded w-1/2" />
+            {Array.from({ length: count }, () => crypto.randomUUID()).map(
+              (id) => (
+                <div key={id} className="animate-pulse flex items-center gap-3">
+                  <div className="w-12 h-12 bg-muted rounded" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-muted rounded w-3/4" />
+                    <div className="h-3 bg-muted rounded w-1/2" />
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            )}
           </div>
         );
 
       case "text":
         return (
           <div className={`space-y-2 ${className}`}>
-            {Array.from({ length: count }).map((_, i) => (
-              <div key={`text-${i}`} className="animate-pulse">
-                <div className="h-4 bg-muted rounded" />
-              </div>
-            ))}
+            {Array.from({ length: count }, () => crypto.randomUUID()).map(
+              (id) => (
+                <div key={id} className="animate-pulse">
+                  <div className="h-4 bg-muted rounded" />
+                </div>
+              )
+            )}
           </div>
         );
 
@@ -85,11 +88,13 @@ export function LoadingSkeleton({
       default:
         return (
           <div className={`space-y-3 ${className}`}>
-            {Array.from({ length: count }).map((_, i) => (
-              <div key={`rectangle-${i}`} className="animate-pulse">
-                <div className="h-32 bg-muted rounded-lg" />
-              </div>
-            ))}
+            {Array.from({ length: count }, () => crypto.randomUUID()).map(
+              (id) => (
+                <div key={id} className="animate-pulse">
+                  <div className="h-32 bg-muted rounded-lg" />
+                </div>
+              )
+            )}
           </div>
         );
     }
@@ -120,7 +125,7 @@ export function Spinner({ size = "md", className = "" }: SpinnerProps) {
   };
 
   return (
-    <div
+    <output
       className={`
         inline-block
         ${sizeClasses[size]}
@@ -132,7 +137,7 @@ export function Spinner({ size = "md", className = "" }: SpinnerProps) {
       aria-label="Loading"
     >
       <span className="sr-only">Loading...</span>
-    </div>
+    </output>
   );
 }
 

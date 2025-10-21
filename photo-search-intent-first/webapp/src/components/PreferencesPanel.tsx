@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import {
+	useDataMode,
 	useEnableDemoLibrary,
 	useSettingsActions,
 } from "../stores/settingsStore";
@@ -25,7 +26,8 @@ export function PreferencesPanel({ isOpen, onClose }: PreferencesPanelProps) {
 
 	// Get demo library setting and actions
 	const enableDemoLibrary = useEnableDemoLibrary();
-	const { setEnableDemoLibrary } = useSettingsActions();
+	const dataMode = useDataMode();
+	const { setEnableDemoLibrary, setDataMode } = useSettingsActions();
 
 	// Preferences state
 	const [preferences, setPreferences] = useState({
@@ -240,6 +242,53 @@ export function PreferencesPanel({ isOpen, onClose }: PreferencesPanelProps) {
 												</div>
 											</label>
 										</div>
+									</div>
+								</div>
+
+								<div>
+									<span className="block text-sm font-medium mb-2">
+										Data Source
+									</span>
+									<div className="space-y-2">
+										<label className="flex items-center gap-3">
+											<input
+												type="radio"
+												name="data-mode"
+												value="live"
+												checked={dataMode === "live"}
+												onChange={() => setDataMode("live")}
+												className="rounded"
+											/>
+											<div>
+												<div className="text-sm font-medium">
+													Use Live API
+												</div>
+												<div className="text-xs text-gray-500">
+													Calls the FastAPI backend running on
+													{" "}
+													<code>http://127.0.0.1:8000</code> during development.
+												</div>
+											</div>
+										</label>
+										<label className="flex items-center gap-3">
+											<input
+												type="radio"
+												name="data-mode"
+												value="mock"
+												checked={dataMode === "mock"}
+												onChange={() => setDataMode("mock")}
+												className="rounded"
+											/>
+											<div>
+												<div className="text-sm font-medium">
+													Use Mock Responses
+												</div>
+												<div className="text-xs text-gray-500">
+													Return deterministic demo data via the mock service
+													worker when the backend is unavailable.
+												</div>
+											</div>
+										</label>
 									</div>
 								</div>
 							</div>

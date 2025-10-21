@@ -6,226 +6,103 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { UIStoreState, Notification } from "../types/store";
 
-export interface Toast {
-  id: string;
-  type: "success" | "error" | "warning" | "info";
-  title: string;
-  message?: string;
-  duration?: number; // milliseconds, 0 = permanent
-  action?: {
-    label: string;
-    onClick: () => void;
-  };
-}
-
-export type Modal =
-  | "collections"
-  | "tags"
-  | "people"
-  | "settings"
-  | "help"
-  | "about"
-  | "advanced-search"
-  | "share"
-  | "export"
-  | "lightbox"
-  | null;
-
-export type Drawer = "filters" | "metadata" | "history" | "diagnostics" | null;
-
-type AnyData = Record<string, unknown>;
-
-interface UIState {
-  // Theme
-  theme: "light" | "dark" | "system";
-
-  // Modals
-  activeModal: Modal;
-  modalData: AnyData;
-
-  // Drawers
-  activeDrawer: Drawer;
-  drawerData: AnyData;
-
-  // Toasts
-  toasts: Toast[];
-
-  // Loading
-  globalLoading: boolean;
-  loadingMessage: string | null;
-
-  // Sidebar
-  sidebarCollapsed: boolean;
-  sidebarWidth: number;
-
-  // Command palette
-  commandPaletteOpen: boolean;
-
-  // Actions - Theme
-  setTheme: (theme: UIState["theme"]) => void;
-  toggleTheme: () => void;
-
-  // Actions - Modals
-  openModal: (modal: Modal, data?: AnyData) => void;
-  closeModal: () => void;
-  setModalData: (data: AnyData) => void;
-
-  // Actions - Drawers
-  openDrawer: (drawer: Drawer, data?: AnyData) => void;
-  closeDrawer: () => void;
-  toggleDrawer: (drawer: Drawer) => void;
-  setDrawerData: (data: AnyData) => void;
-
-  // Actions - Toasts
-  addToast: (toast: Omit<Toast, "id">) => void;
-  removeToast: (id: string) => void;
-  clearToasts: () => void;
-
-  // Actions - Loading
-  setGlobalLoading: (loading: boolean, message?: string | null) => void;
-
-  // Actions - Sidebar
-  toggleSidebar: () => void;
-  setSidebarWidth: (width: number) => void;
-
-  // Actions - Command Palette
-  toggleCommandPalette: () => void;
-  setCommandPaletteOpen: (open: boolean) => void;
-
-  // Utility
-  reset: () => void;
-}
-
-const initialState = {
-  theme: "system" as const,
-  activeModal: null,
-  modalData: {},
-  activeDrawer: null,
-  drawerData: {},
-  toasts: [],
-  globalLoading: false,
-  loadingMessage: null,
+const initialState: Omit<UIStoreState, keyof UIStoreState> = {
   sidebarCollapsed: false,
-  sidebarWidth: 240,
-  commandPaletteOpen: false,
+  currentView: 'library',
+  viewMode: 'grid',
+  gridSize: 'medium',
+  modals: {
+    photoViewer: false,
+    collectionEditor: false,
+    tagEditor: false,
+    personEditor: false,
+    preferences: false,
+    import: false,
+    export: false,
+  },
+  globalLoading: false,
+  progressBars: {},
+  notifications: [],
+  theme: 'system',
 };
 
-export const useUIStore = create<UIState>()(
+export const useUIStore = create<UIStoreState>()(
   persist(
     (set, get) => ({
       ...initialState,
 
-      // Theme actions
-      setTheme: (theme) => set({ theme }),
+      // Actions
+      setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
 
-      toggleTheme: () => {
-        const { theme } = get();
-        const newTheme = theme === "light" ? "dark" : "light";
-        set({ theme: newTheme });
-      },
+      setCurrentView: (currentView) => set({ currentView }),
 
-      // Modal actions
-      openModal: (activeModal, data = {}) =>
-        set({
-          activeModal,
-          modalData: data,
-        }),
+      setViewMode: (viewMode) => set({ viewMode }),
 
-      closeModal: () =>
-        set({
-          activeModal: null,
-          modalData: {},
-        }),
+      setGridSize: (gridSize) => set({ gridSize }),
 
-      setModalData: (data) =>
+      openModal: (modal) =>
         set((state) => ({
-          modalData: { ...state.modalData, ...data },
+          modals: { ...state.modals, [modal]: true },
         })),
 
-      // Drawer actions
-      openDrawer: (activeDrawer, data = {}) =>
-        set({
-          activeDrawer,
-          drawerData: data,
-        }),
-
-      closeDrawer: () =>
-        set({
-          activeDrawer: null,
-          drawerData: {},
-        }),
-
-      toggleDrawer: (drawer) => {
-        const { activeDrawer } = get();
-        set({
-          activeDrawer: activeDrawer === drawer ? null : drawer,
-          drawerData: activeDrawer === drawer ? {} : get().drawerData,
-        });
-      },
-
-      setDrawerData: (data) =>
+      closeModal: (modal) =>
         set((state) => ({
-          drawerData: { ...state.drawerData, ...data },
+          modals: { ...state.modals, [modal]: false },
         })),
 
-      // Toast actions
-      addToast: (toast) => {
-        const id = `toast_${Date.now()}_${Math.random()}`;
-        const newToast: Toast = {
-          ...toast,
+      setGlobalLoading: (globalLoading) => set({ globalLoading }),
+
+      setProgress: (id, progress, message) =>
+        set((state) => ({
+          progressBars: {
+            ...state.progressBars,
+            [id]: { progress, message },
+          },
+        })),
+
+      removeProgress: (id) =>
+        set((state) => {
+          const { [id]: removed, ...rest } = state.progressBars;
+          return { progressBars: rest };
+        }),
+
+      addNotification: (notification) => {
+        const id = `notification_${Date.now()}_${Math.random()}`;
+        const newNotification: Notification = {
+          ...notification,
           id,
-          duration: toast.duration ?? 5000, // Default 5 seconds
+          timestamp: new Date(),
         };
 
         set((state) => ({
-          toasts: [...state.toasts, newToast],
+          notifications: [...state.notifications, newNotification],
         }));
 
         // Auto-remove after duration
-        if (newToast.duration && newToast.duration > 0) {
+        if (notification.duration && notification.duration > 0) {
           setTimeout(() => {
-            get().removeToast(id);
-          }, newToast.duration);
+            get().removeNotification(id);
+          }, notification.duration);
         }
       },
 
-      removeToast: (id) =>
+      removeNotification: (id) =>
         set((state) => ({
-          toasts: state.toasts.filter((t) => t.id !== id),
+          notifications: state.notifications.filter((n) => n.id !== id),
         })),
 
-      clearToasts: () => set({ toasts: [] }),
+      setTheme: (theme) => set({ theme }),
 
-      // Loading actions
-      setGlobalLoading: (globalLoading, loadingMessage = null) =>
-        set({ globalLoading, loadingMessage }),
-
-      // Sidebar actions
-      toggleSidebar: () =>
-        set((state) => ({
-          sidebarCollapsed: !state.sidebarCollapsed,
-        })),
-
-      setSidebarWidth: (sidebarWidth) => set({ sidebarWidth }),
-
-      // Command palette actions
-      toggleCommandPalette: () =>
-        set((state) => ({
-          commandPaletteOpen: !state.commandPaletteOpen,
-        })),
-
-      setCommandPaletteOpen: (commandPaletteOpen) =>
-        set({ commandPaletteOpen }),
-
-      // Utility
       reset: () =>
         set({
           ...initialState,
-          // Keep theme preference
+          // Keep persisted preferences
           theme: get().theme,
           sidebarCollapsed: get().sidebarCollapsed,
-          sidebarWidth: get().sidebarWidth,
+          viewMode: get().viewMode,
+          gridSize: get().gridSize,
         }),
     }),
     {
@@ -233,7 +110,9 @@ export const useUIStore = create<UIState>()(
       partialize: (state) => ({
         theme: state.theme,
         sidebarCollapsed: state.sidebarCollapsed,
-        sidebarWidth: state.sidebarWidth,
+        viewMode: state.viewMode,
+        gridSize: state.gridSize,
+        currentView: state.currentView,
       }),
     }
   )

@@ -1,24 +1,40 @@
 import { HttpResponse, http } from "msw";
 
 // Import the same API_BASE computation used by the actual API
+const LOOPBACK_PROTOCOL = "http";
+const LOOPBACK_HOST = "127.0.0.1";
+const LOOPBACK_PORT = "8000";
+const DEFAULT_LOOPBACK_BASE = `${LOOPBACK_PROTOCOL}://${LOOPBACK_HOST}:${LOOPBACK_PORT}`;
+
+function hasElectronBridge(): boolean {
+  if (typeof window === "undefined") return false;
+  const w = window as { electronAPI?: unknown; engine?: unknown };
+  return Boolean(w.electronAPI || w.engine);
+}
+
 function computeApiBase(): string {
   const envBase = import.meta.env?.VITE_API_BASE;
   if (envBase) return envBase;
+
+  if (import.meta.env?.DEV && !hasElectronBridge()) {
+    return DEFAULT_LOOPBACK_BASE;
+  }
+
   try {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    // Use real HTTP origin only
-    if (origin?.startsWith("http")) return origin;
+    if (origin?.startsWith("http")) {
+      if (origin.includes(":5173")) {
+        return DEFAULT_LOOPBACK_BASE;
+      }
+      return origin;
+    }
   } catch {
     // Ignore errors
   }
   // In Electron packaged builds (file:// origin), talk to the bundled API server
-  if (
-    typeof window !== "undefined" &&
-    (window as { electronAPI?: unknown }).electronAPI
-  )
-    return "http://127.0.0.1:8000";
-  // Fallback sensible default for dev server
-  return "http://127.0.0.1:5173"; // overridden by env in real deployments
+  if (hasElectronBridge()) return DEFAULT_LOOPBACK_BASE;
+  // Fallback sensible default for static hosting
+  return DEFAULT_LOOPBACK_BASE;
 }
 
 const API_BASE = computeApiBase();

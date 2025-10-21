@@ -113,6 +113,7 @@ export const useSettingsStore = create<SettingsStore>()(
       showInfoOverlay: false,
       highContrast: false,
       enableDemoLibrary: true,
+      dataMode: "live",
 
       // EXIF filters
       camera: "",
@@ -144,6 +145,7 @@ export const useSettingsStore = create<SettingsStore>()(
       setHighContrast: (highContrast) => set({ highContrast }),
       setEnableDemoLibrary: (enableDemoLibrary: boolean) =>
         set({ enableDemoLibrary }),
+      setDataMode: (dataMode) => set({ dataMode }),
       setCamera: (camera) => set({ camera }),
       setIsoMin: (isoMin: number | string) =>
         set({ isoMin: Number(isoMin) || 0 }),
@@ -176,6 +178,7 @@ export const useSettingsStore = create<SettingsStore>()(
         fMax: state.fMax,
         place: state.place,
         enableDemoLibrary: state.enableDemoLibrary,
+        dataMode: state.dataMode,
         // Don't persist sensitive tokens
         // hfToken and openaiKey are not included
       }),
@@ -198,6 +201,7 @@ export const useOcrEnabled = () => useSettingsStore((state) => state.useOcr);
 export const useHasText = () => useSettingsStore((state) => state.hasText);
 export const useOsTrashEnabled = () =>
   useSettingsStore((state) => state.useOsTrash);
+export const useDataMode = () => useSettingsStore((state) => state.dataMode);
 export const useSearchCommandCenter = () =>
   useSettingsStore((state) => state.searchCommandCenter);
 export const useShowExplain = () =>
@@ -253,6 +257,7 @@ export const useSettingsActions = () => {
   const setShowInfoOverlay = useSettingsStore((s) => s.setShowInfoOverlay);
   const setHighContrast = useSettingsStore((s) => s.setHighContrast);
   const setEnableDemoLibrary = useSettingsStore((s) => s.setEnableDemoLibrary);
+  const setDataMode = useSettingsStore((s) => s.setDataMode);
   const setCamera = useSettingsStore((s) => s.setCamera);
   const setIsoMin = useSettingsStore((s) => s.setIsoMin);
   const setIsoMax = useSettingsStore((s) => s.setIsoMax);
@@ -282,6 +287,7 @@ export const useSettingsActions = () => {
       setShowInfoOverlay,
       setHighContrast,
       setEnableDemoLibrary,
+      setDataMode,
       setCamera,
       setIsoMin,
       setIsoMax,
@@ -307,6 +313,7 @@ export const useSettingsActions = () => {
       setShowInfoOverlay,
       setHighContrast,
       setEnableDemoLibrary,
+      setDataMode,
       setCamera,
       setIsoMin,
       setIsoMax,

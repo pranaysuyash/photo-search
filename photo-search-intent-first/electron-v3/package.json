@@ -30,6 +30,7 @@
         "setup": "npm install && npm run prepare:models && npm run build:ui"
     },
     "dependencies": {
+        "better-sqlite3": "^9.4.0",
         "electron-log": "^5.0.1",
         "electron-store": "^8.1.0",
         "electron-updater": "^6.1.7",
@@ -54,6 +55,7 @@
             "preload.js",
             "app/**/*",
             "models/**/*",
+            "services/**/*",
             "!node_modules",
             "!src",
             "!scripts",

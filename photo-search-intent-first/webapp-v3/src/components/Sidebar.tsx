@@ -351,15 +351,26 @@ export function Sidebar({
         </Button>
 
         {recentDirectories.filter((dir) => dir !== currentDirectory).length >
-          0 && (
+          0 || currentDirectory !== DEMO_LIBRARY_DIR ? (
           <div className="mt-4">
             <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">
               Recent folders
             </p>
             <div className="space-y-1">
+              {currentDirectory !== DEMO_LIBRARY_DIR && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleRecentPick(DEMO_LIBRARY_DIR)}
+                  className="w-full justify-start text-left text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-100/70 dark:hover:bg-slate-800/70"
+                >
+                  <Sparkles className="h-3.5 w-3.5 mr-2 text-blue-400" />
+                  <span className="truncate">Demo Library</span>
+                </Button>
+              )}
               {recentDirectories
                 .filter((dir) => dir !== currentDirectory)
-                .slice(0, 5)
+                .slice(0, 4)
                 .map((dir) => (
                   <Button
                     key={dir}
@@ -375,6 +386,21 @@ export function Sidebar({
                   </Button>
                 ))}
             </div>
+          </div>
+        ) : (
+          <div className="mt-4">
+            <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">
+              Quick Access
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleRecentPick(DEMO_LIBRARY_DIR)}
+              className="w-full justify-start text-left text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-100/70 dark:hover:bg-slate-800/70"
+            >
+              <Sparkles className="h-3.5 w-3.5 mr-2 text-blue-400" />
+              <span className="truncate">Demo Library</span>
+            </Button>
           </div>
         )}
       </div>

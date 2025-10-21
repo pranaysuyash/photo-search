@@ -195,7 +195,7 @@ export function TopBar({
                 className="h-9"
                 aria-label="Photos directory"
               />
-              <div className="flex justify-end mt-2">
+              <div className="flex gap-2 mt-2">
                 <Button
                   type="button"
                   size="sm"
@@ -205,6 +205,17 @@ export function TopBar({
                   }}
                 >
                   Use Directory
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    onDirectoryChange?.("/Users/pranay/Projects/adhoc_projects/photo-search/e2e_data");
+                    setShowSettings(false);
+                  }}
+                >
+                  Demo
                 </Button>
               </div>
             </div>

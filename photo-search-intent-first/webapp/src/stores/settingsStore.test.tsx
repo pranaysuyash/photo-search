@@ -1,6 +1,11 @@
 import { render } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
-import { useNeedsHf, useNeedsOAI, useSettingsStore } from "./settingsStore";
+import {
+	useDataMode,
+	useNeedsHf,
+	useNeedsOAI,
+	useSettingsStore,
+} from "./settingsStore";
 
 describe("settingsStore", () => {
 	beforeEach(() => {
@@ -16,6 +21,7 @@ describe("settingsStore", () => {
 			useOcr: false,
 			hasText: false,
 			enableDemoLibrary: true,
+			dataMode: "live",
 			camera: "",
 			isoMin: 0,
 			isoMax: 0,
@@ -30,6 +36,7 @@ describe("settingsStore", () => {
 		expect(s.engine).toBe("local");
 		expect(s.vlmModel).toBeTruthy();
 		expect(s.enableDemoLibrary).toBe(true);
+		expect(s.dataMode).toBe("live");
 		expect({
 			camera: s.camera,
 			isoMin: s.isoMin,
@@ -72,6 +79,22 @@ describe("settingsStore", () => {
 		// Re-enable demo library
 		s.setEnableDemoLibrary(true);
 		expect(useSettingsStore.getState().enableDemoLibrary).toBe(true);
+	});
+
+	it("data mode toggle persists", () => {
+		function Mode() {
+			const mode = useDataMode();
+			return <div data-mode={mode} />;
+		}
+		const { container, rerender } = render(<Mode />);
+		expect(
+			(container.firstChild as HTMLElement)?.getAttribute("data-mode"),
+		).toBe("live");
+		useSettingsStore.getState().setDataMode("mock");
+		rerender(<Mode />);
+		expect(
+			(container.firstChild as HTMLElement)?.getAttribute("data-mode"),
+		).toBe("mock");
 	});
 
 	it("computed flags for providers", () => {

@@ -7,219 +7,166 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-
-export interface SearchFilter {
-  dateFrom?: string;
-  dateTo?: string;
-  location?: string;
-  camera?: string;
-  tags?: string[];
-  favorites?: boolean;
-  people?: string[];
-}
-
-export interface SearchResult {
-  path: string;
-  score: number;
-  thumbnail?: string;
-  metadata?: {
-    date?: string;
-    location?: string;
-    camera?: string;
-    width?: number;
-    height?: number;
-  };
-}
-
-export interface SavedSearch {
-  id: string;
-  name: string;
-  query: string;
-  filters?: SearchFilter;
-  createdAt: number;
-}
-
-interface SearchState {
-  // Current search
-  query: string;
-  filters: SearchFilter;
-  results: SearchResult[];
-  isSearching: boolean;
-  searchError: string | null;
-  
-  // Search history
-  recentSearches: string[];
-  savedSearches: SavedSearch[];
-  
-  // Pagination
-  currentPage: number;
-  totalResults: number;
-  pageSize: number;
-  
-  // Actions - Search
-  setQuery: (query: string) => void;
-  setFilters: (filters: SearchFilter) => void;
-  updateFilter: <K extends keyof SearchFilter>(key: K, value: SearchFilter[K]) => void;
-  clearFilters: () => void;
-  
-  // Actions - Results
-  setResults: (results: SearchResult[]) => void;
-  setIsSearching: (isSearching: boolean) => void;
-  setSearchError: (error: string | null) => void;
-  clearResults: () => void;
-  
-  // Actions - History
-  addRecentSearch: (query: string) => void;
-  clearRecentSearches: () => void;
-  
-  // Actions - Saved Searches
-  saveSearch: (name: string, query: string, filters?: SearchFilter) => void;
-  deleteSavedSearch: (id: string) => void;
-  loadSavedSearch: (id: string) => void;
-  
-  // Actions - Pagination
-  setPage: (page: number) => void;
-  setPageSize: (size: number) => void;
-  
-  // Utility
-  reset: () => void;
-}
-
-const initialFilters: SearchFilter = {};
+import type { SearchStoreState } from '../types/store';
 
 const initialState = {
-  query: '',
-  filters: initialFilters,
-  results: [],
+  currentQuery: '',
+  currentFilters: {},
+  currentResults: null,
   isSearching: false,
   searchError: null,
-  recentSearches: [],
-  savedSearches: [],
-  currentPage: 1,
-  totalResults: 0,
-  pageSize: 50,
+  searchHistory: [] as any[],
+  savedSearches: [] as any[],
+  suggestions: [] as string[],
+  isLoadingSuggestions: false,
+  indexStatus: {
+    isIndexing: false,
+    totalPhotos: 0,
+    indexedPhotos: 0,
+    progress: 0,
+    errors: [] as string[],
+  },
 };
 
-export const useSearchStore = create<SearchState>()(
+export const useSearchStore = create<SearchStoreState>()(
   persist(
     (set, get) => ({
       ...initialState,
       
-      // Search actions
-      setQuery: (query) => {
-        set({ query });
-        if (query.trim()) {
-          get().addRecentSearch(query);
+      // Actions
+      setQuery: (currentQuery) => {
+        set({ currentQuery });
+        if (currentQuery.trim()) {
+          // Add to history when query is set
+          const entry = {
+            id: `history_${Date.now()}`,
+            query: currentQuery,
+            filters: get().currentFilters,
+            timestamp: new Date(),
+            resultCount: 0,
+            searchTimeMs: 0,
+          };
+          get().addToHistory(entry);
         }
       },
       
-      setFilters: (filters) => set({ filters }),
+      setFilters: (currentFilters) => set({ currentFilters }),
       
-      updateFilter: (key, value) => 
-        set((state) => ({
-          filters: { ...state.filters, [key]: value }
-        })),
-      
-      clearFilters: () => set({ filters: initialFilters }),
-      
-      // Results actions
-      setResults: (results) => 
-        set({ 
-          results,
-          totalResults: results.length,
-          searchError: null 
-        }),
-      
-      setIsSearching: (isSearching) => set({ isSearching }),
-      
-      setSearchError: (searchError) => 
-        set({ searchError, isSearching: false }),
-      
-      clearResults: () => 
-        set({ 
-          results: [], 
-          totalResults: 0,
-          currentPage: 1 
-        }),
-      
-      // History actions
-      addRecentSearch: (query) => {
-        const { recentSearches } = get();
-        const trimmed = query.trim();
+      performSearch: async (request) => {
+        set({ isSearching: true, searchError: null });
         
-        if (!trimmed) return;
-        
-        // Remove duplicates and add to front
-        const updated = [
-          trimmed,
-          ...recentSearches.filter(q => q !== trimmed)
-        ].slice(0, 10); // Keep only last 10
-        
-        set({ recentSearches: updated });
-      },
-      
-      clearRecentSearches: () => set({ recentSearches: [] }),
-      
-      // Saved searches actions
-      saveSearch: (name, query, filters) => {
-        const { savedSearches } = get();
-        const newSearch: SavedSearch = {
-          id: `search_${Date.now()}`,
-          name,
-          query,
-          filters,
-          createdAt: Date.now()
-        };
-        
-        set({ 
-          savedSearches: [...savedSearches, newSearch]
-        });
-      },
-      
-      deleteSavedSearch: (id) => {
-        const { savedSearches } = get();
-        set({
-          savedSearches: savedSearches.filter(s => s.id !== id)
-        });
-      },
-      
-      loadSavedSearch: (id) => {
-        const { savedSearches } = get();
-        const search = savedSearches.find(s => s.id === id);
-        
-        if (search) {
-          set({
-            query: search.query,
-            filters: search.filters || initialFilters
+        try {
+          // This would be implemented to call the actual search API
+          // For now, just simulate the structure
+          const startTime = Date.now();
+          
+          // Simulate API call
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          const searchTimeMs = Date.now() - startTime;
+          
+          // Update history with results
+          const historyEntry = {
+            id: `history_${Date.now()}`,
+            query: request.query,
+            filters: request.filters,
+            timestamp: new Date(),
+            resultCount: 0, // Would be filled by actual API response
+            searchTimeMs,
+          };
+          
+          get().addToHistory(historyEntry);
+          
+          set({ 
+            isSearching: false,
+            currentQuery: request.query,
+            currentFilters: request.filters,
+          });
+        } catch (error) {
+          set({ 
+            isSearching: false,
+            searchError: error instanceof Error ? error.message : 'Search failed',
           });
         }
       },
       
-      // Pagination actions
-      setPage: (currentPage) => set({ currentPage }),
+      clearSearch: () => 
+        set({ 
+          currentQuery: '',
+          currentFilters: {},
+          currentResults: null,
+          searchError: null,
+        }),
       
-      setPageSize: (pageSize) => 
-        set({ pageSize, currentPage: 1 }), // Reset to page 1 when changing size
+      addToHistory: (entry) =>
+        set((state) => ({
+          searchHistory: [entry, ...state.searchHistory.slice(0, 49)], // Keep last 50
+        })),
       
-      // Utility
-      reset: () => set(initialState)
+      saveSearch: (search) =>
+        set((state) => ({
+          savedSearches: [...state.savedSearches, search],
+        })),
+      
+      removeSavedSearch: (searchId) =>
+        set((state) => ({
+          savedSearches: state.savedSearches.filter(s => s.id !== searchId),
+        })),
+      
+      loadSuggestions: async (query) => {
+        set({ isLoadingSuggestions: true });
+        
+        try {
+          // This would call the actual suggestions API
+          // For now, just simulate
+          await new Promise(resolve => setTimeout(resolve, 200));
+          
+          // Mock suggestions based on query
+          const mockSuggestions = query ? [
+            `${query} photos`,
+            `${query} from last year`,
+            `${query} with people`,
+          ] : [];
+          
+          set({ 
+            suggestions: mockSuggestions,
+            isLoadingSuggestions: false,
+          });
+        } catch (error) {
+          set({ 
+            suggestions: [],
+            isLoadingSuggestions: false,
+          });
+        }
+      },
+      
+      updateIndexStatus: (indexStatus) => set({ indexStatus }),
+      
+      setSearching: (isSearching) => set({ isSearching }),
+      
+      setSearchError: (searchError) => set({ searchError }),
+      
+      reset: () => set({
+        ...initialState,
+        // Keep persisted data
+        searchHistory: get().searchHistory,
+        savedSearches: get().savedSearches,
+      }),
     }),
     {
       name: 'photo-search-search-store',
       partialize: (state) => ({
-        // Only persist these fields
-        recentSearches: state.recentSearches,
+        searchHistory: state.searchHistory,
         savedSearches: state.savedSearches,
-        pageSize: state.pageSize,
       }),
     }
   )
 );
 
 // Selectors for common derived state
-export const useSearchQuery = () => useSearchStore(state => state.query);
-export const useSearchResults = () => useSearchStore(state => state.results);
+export const useSearchQuery = () => useSearchStore(state => state.currentQuery);
+export const useSearchResults = () => useSearchStore(state => state.currentResults);
 export const useIsSearching = () => useSearchStore(state => state.isSearching);
-export const useSearchFilters = () => useSearchStore(state => state.filters);
-export const useRecentSearches = () => useSearchStore(state => state.recentSearches);
+export const useSearchFilters = () => useSearchStore(state => state.currentFilters);
+export const useSearchHistory = () => useSearchStore(state => state.searchHistory);
 export const useSavedSearches = () => useSearchStore(state => state.savedSearches);

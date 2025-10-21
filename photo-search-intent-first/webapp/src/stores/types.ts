@@ -83,9 +83,10 @@ export interface SettingsState {
 	useOsTrash: boolean;
 	showExplain?: boolean;
 	showInfoOverlay?: boolean;
-	highContrast: boolean;
-	enableDemoLibrary?: boolean;
-	searchCommandCenter?: boolean;
+ highContrast: boolean;
+ enableDemoLibrary?: boolean;
+  dataMode: "live" | "mock";
+  searchCommandCenter?: boolean;
 
 	// EXIF filters
 	camera: string;
@@ -114,7 +115,8 @@ export interface SettingsActions {
 	setShowExplain?: (show: boolean) => void;
 	setShowInfoOverlay?: (show: boolean) => void;
 	setSearchCommandCenter?: (searchCommandCenter: boolean) => void;
-	setEnableDemoLibrary?: (enableDemoLibrary: boolean) => void;
+  setEnableDemoLibrary?: (enableDemoLibrary: boolean) => void;
+  setDataMode: (mode: "live" | "mock") => void;
 	setCamera: (camera: string) => void;
 	setIsoMin: (iso: number | string) => void;
 	setIsoMax: (iso: number | string) => void;

@@ -13,6 +13,8 @@ import { AccessibilityProvider } from "./framework/AccessibilityFramework";
 import { PhotoVaultAPIProvider } from "./services/PhotoVaultAPIProvider";
 import { SimpleStoreProvider } from "./stores/SimpleStore";
 import { ThemeProvider } from "./components/ThemeProvider";
+import { EngineTelemetryProvider } from "./services/EngineTelemetryProvider";
+import { ApiModeBridge } from "./services/ApiModeBridge";
 
 // Create a client
 const queryClient = new QueryClient({
@@ -34,32 +36,35 @@ const queryClient = new QueryClient({
 export function RootProviders({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
+      <ApiModeBridge />
       <HashRouter
         future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
       >
         <SimpleStoreProvider>
-          <SettingsProvider>
-            <UIProvider>
-              <ThemeProvider>
-                <PhotoVaultAPIProvider>
-                  <JobsProvider>
-                    <LibraryProvider>
-                      <SearchProvider>
-                        <ModalProvider>
-                          <AccessibilityProvider>
-                            <HintProvider>
-                              {children}
-                              <GlobalAnnouncer />
-                            </HintProvider>
-                          </AccessibilityProvider>
-                        </ModalProvider>
-                      </SearchProvider>
-                    </LibraryProvider>
-                  </JobsProvider>
-                </PhotoVaultAPIProvider>
-              </ThemeProvider>
-            </UIProvider>
-          </SettingsProvider>
+          <EngineTelemetryProvider>
+            <SettingsProvider>
+              <UIProvider>
+                <ThemeProvider>
+                  <PhotoVaultAPIProvider>
+                    <JobsProvider>
+                      <LibraryProvider>
+                        <SearchProvider>
+                          <ModalProvider>
+                            <AccessibilityProvider>
+                              <HintProvider>
+                                {children}
+                                <GlobalAnnouncer />
+                              </HintProvider>
+                            </AccessibilityProvider>
+                          </ModalProvider>
+                        </SearchProvider>
+                      </LibraryProvider>
+                    </JobsProvider>
+                  </PhotoVaultAPIProvider>
+                </ThemeProvider>
+              </UIProvider>
+            </SettingsProvider>
+          </EngineTelemetryProvider>
         </SimpleStoreProvider>
       </HashRouter>
     </QueryClientProvider>

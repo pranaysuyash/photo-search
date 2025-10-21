@@ -230,9 +230,11 @@ export const PhotoGridFilmStrip: React.FC<PhotoGridFilmStripProps> = ({
       </Button>
 
       {/* Film Strip Scroll Container */}
-      <div
+      <section
         ref={scrollRef}
         className="film-strip-scroll"
+        aria-label="Photo timeline"
+        tabIndex={0}
         onMouseDown={() => setIsDragging(true)}
         onMouseUp={() => setIsDragging(false)}
         onTouchStart={() => setIsDragging(true)}
@@ -241,11 +243,12 @@ export const PhotoGridFilmStrip: React.FC<PhotoGridFilmStripProps> = ({
         <div className="film-strip-track">
           {/* Sprocket Holes (decorative) */}
           <div className="film-strip-sprockets" aria-hidden="true">
-            {Array.from({ length: Math.ceil(photos.length / 4) }).map(
-              (_, i) => (
-                <div key={`sprocket-top-${i}`} className="sprocket-hole" />
-              )
-            )}
+            {Array.from(
+              { length: Math.ceil(photos.length / 4) },
+              (_, i) => `sprocket-top-${i}`
+            ).map((sprocketId) => (
+              <div key={sprocketId} className="sprocket-hole" />
+            ))}
           </div>
 
           {/* Photo Groups with Date Separators */}
@@ -313,15 +316,15 @@ export const PhotoGridFilmStrip: React.FC<PhotoGridFilmStripProps> = ({
             className="film-strip-sprockets film-strip-sprockets-bottom"
             aria-hidden="true"
           >
-            {Array.from({ length: Math.ceil(photos.length / 4) }).map(
-              (_, i) => (
-                <div key={`sprocket-bottom-${i}`} className="sprocket-hole" />
-              )
-            )}
+            {Array.from(
+              { length: Math.ceil(photos.length / 4) },
+              (_, i) => `sprocket-bottom-${i}`
+            ).map((sprocketId) => (
+              <span key={sprocketId} className="sprocket-hole" />
+            ))}
           </div>
         </div>
-      </div>
-
+      </section>
       {/* Photo Counter */}
       <div className="film-strip-counter">
         {selectedIndex + 1} / {photos.length}

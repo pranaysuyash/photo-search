@@ -23,6 +23,105 @@ const API_MODE: string =
     ? String(import.meta.env.VITE_API_MODE)
     : "v1"; // default to v1
 
+type ElectronPhotoRecord =
+  | string
+  | {
+      path?: string;
+      name?: string;
+      relativePath?: string;
+      size?: number;
+      mtime?: number;
+      ctime?: number;
+      extension?: string;
+    };
+
+const MAX_DIRECT_RESULTS = 5000;
+
+function getSecureElectronAPI():
+  | (Window & {
+      secureElectronAPI?: {
+        readDirectoryPhotos?: (
+          directoryPath:
+            | string
+            | { directory: string; limit?: number; offset?: number }
+        ) => Promise<ElectronPhotoRecord[] | { paths?: string[] }>;
+        setAllowedRoot?: (path: string) => Promise<boolean>;
+      };
+    })
+  | undefined {
+  if (typeof window === "undefined") return undefined;
+  return window as typeof window & {
+    secureElectronAPI?: {
+      readDirectoryPhotos?: (
+        directoryPath:
+          | string
+          | { directory: string; limit?: number; offset?: number }
+      ) => Promise<ElectronPhotoRecord[] | { paths?: string[] }>;
+      setAllowedRoot?: (path: string) => Promise<boolean>;
+    };
+  };
+}
+
+async function tryDirectLibraryRead(
+  dir: string,
+  limit = 100,
+  offset = 0
+): Promise<LibraryResponse | null> {
+  const platform = getSecureElectronAPI();
+  const secureApi = platform?.secureElectronAPI;
+  if (!secureApi?.readDirectoryPhotos) {
+    return null;
+  }
+
+  try {
+    // Grant renderer access to the selected directory before reading
+    await secureApi.setAllowedRoot?.(dir);
+
+    const raw = await secureApi.readDirectoryPhotos({
+      directory: dir,
+      limit: Math.max(1, Math.min(limit, MAX_DIRECT_RESULTS)),
+      offset: Math.max(0, offset),
+    });
+
+    const toArray = Array.isArray(raw)
+      ? raw
+      : Array.isArray((raw as { paths?: string[] }).paths)
+      ? ((raw as { paths?: string[] }).paths as ElectronPhotoRecord[])
+      : [];
+
+    const normalizedPaths = toArray
+      .map((entry) => {
+        if (typeof entry === "string") return entry;
+        if (entry && typeof entry === "object" && entry.path) {
+          return entry.path;
+        }
+        return null;
+      })
+      .filter((value): value is string => typeof value === "string");
+
+    if (!normalizedPaths.length) {
+      return { paths: [], total: 0, offset, limit };
+    }
+
+    const boundedOffset = Math.max(0, offset);
+    const boundedLimit = Math.max(1, limit);
+    const sliced = normalizedPaths.slice(
+      boundedOffset,
+      boundedOffset + boundedLimit
+    );
+
+    return {
+      paths: sliced,
+      total: normalizedPaths.length,
+      offset: boundedOffset,
+      limit: boundedLimit,
+    };
+  } catch (error) {
+    console.warn("Direct library load failed, falling back to API:", error);
+    return null;
+  }
+}
+
 // Utility function to detect Electron environment
 function isElectron(): boolean {
   return (
@@ -31,19 +130,19 @@ function isElectron(): boolean {
   );
 }
 
-interface LibraryResponse {
+export interface LibraryResponse {
   paths: string[];
   total: number;
   offset: number;
   limit: number;
 }
 
-interface SearchResult {
+export interface SearchResult {
   path: string;
   score: number;
 }
 
-interface SearchResponse {
+export interface SearchResponse {
   results: SearchResult[];
   total: number;
   query: string;
@@ -61,7 +160,7 @@ export interface SearchOptions {
   hasText?: boolean;
 }
 
-interface AnalyticsResponse {
+export interface AnalyticsResponse {
   total_photos: number;
   total_indexed: number;
   index_size_mb: number;
@@ -116,21 +215,21 @@ export interface TagsIndexResponse {
   allTags: string[];
 }
 
-interface Collection {
+export interface Collection {
   name: string;
   photos: string[];
   created?: string;
   description?: string;
 }
 
-interface FaceCluster {
+export interface FaceCluster {
   id: string;
   name?: string;
   size: number;
   examples: [string, number][];
 }
 
-interface Trip {
+export interface Trip {
   id: string;
   name: string;
   startDate: string;
@@ -143,17 +242,17 @@ interface Trip {
   count: number;
 }
 
-interface FavoriteEntry {
+export interface FavoriteEntry {
   path: string;
   mtime?: number;
   isFavorite: boolean;
 }
 
-interface FavoritesResponse {
+export interface FavoritesResponse {
   favorites: FavoriteEntry[];
 }
 
-interface FavoriteToggleResponse {
+export interface FavoriteToggleResponse {
   ok: boolean;
   path: string;
   favorite: boolean;
@@ -223,7 +322,7 @@ interface IndexStatus {
 }
 
 // Export types
-interface ExportDataItem {
+export interface ExportDataItem {
   path: string;
   score?: number;
   query?: string;
@@ -235,7 +334,7 @@ interface ExportDataItem {
   collection?: string;
 }
 
-interface ExportResponse {
+export interface ExportResponse {
   ok: boolean;
   data: ExportDataItem[] | string;
   format: string;
@@ -341,6 +440,11 @@ class NativeApiClient implements ApiClientLike {
     limit = 100,
     offset = 0
   ): Promise<LibraryResponse> {
+    const direct = await tryDirectLibraryRead(dir, limit, offset);
+    if (direct) {
+      return direct;
+    }
+
     // Fix: Backend expects GET request with query parameters, not POST with FormData
     const params = new URLSearchParams({
       dir,
@@ -376,8 +480,9 @@ class NativeApiClient implements ApiClientLike {
     if (options.useCaptions) payload.use_captions = true;
     if (options.useOcr) payload.use_ocr = true;
     if (options.favoritesOnly) payload.favorites_only = true;
-    if (options.place && options.place.trim()) {
-      payload.place = options.place.trim();
+    const trimmedPlace = options.place?.trim();
+    if (trimmedPlace) {
+      payload.place = trimmedPlace;
     }
     if (Array.isArray(options.tags) && options.tags.length > 0) {
       payload.tags = options.tags.filter((tag) => tag && tag.trim().length > 0);
@@ -427,7 +532,10 @@ class NativeApiClient implements ApiClientLike {
       places: Array.isArray(raw?.places) ? raw.places : [],
       people_clusters: Array.isArray(raw?.people_clusters)
         ? (raw.people_clusters as Record<string, unknown>[]).map((cluster) => ({
-            id: cluster.id,
+            id:
+              typeof cluster.id === "string" || typeof cluster.id === "number"
+                ? cluster.id
+                : undefined,
             name: typeof cluster.name === "string" ? cluster.name : "",
             size: typeof cluster.size === "number" ? cluster.size : undefined,
           }))
@@ -444,7 +552,9 @@ class NativeApiClient implements ApiClientLike {
 
   async getPlacesMap(dir: string): Promise<PlacesMapResponse> {
     const response = await fetch(
-      `${API_BASE}/analytics/places?dir=${encodeURIComponent(dir)}&limit=8000&sample_per_location=24`
+      `${API_BASE}/analytics/places?dir=${encodeURIComponent(
+        dir
+      )}&limit=8000&sample_per_location=24`
     );
 
     if (!response.ok) {
@@ -493,7 +603,10 @@ class NativeApiClient implements ApiClientLike {
               return null;
             }
             const entry = value as Record<string, unknown>;
-            const centerRecord = (entry.center ?? {}) as Record<string, unknown>;
+            const centerRecord = (entry.center ?? {}) as Record<
+              string,
+              unknown
+            >;
             const centerLat = toNumber(centerRecord.lat, NaN);
             const centerLon = toNumber(centerRecord.lon, NaN);
             if (Number.isNaN(centerLat) || Number.isNaN(centerLon)) {
@@ -505,9 +618,15 @@ class NativeApiClient implements ApiClientLike {
               typeof entry.name === "string" && entry.name.trim().length > 0
                 ? entry.name
                 : idValue;
-            const countValue = Math.max(0, Math.floor(toNumber(entry.count, 0)));
+            const countValue = Math.max(
+              0,
+              Math.floor(toNumber(entry.count, 0))
+            );
 
-            const boundsRecord = (entry.bounds ?? {}) as Record<string, unknown>;
+            const boundsRecord = (entry.bounds ?? {}) as Record<
+              string,
+              unknown
+            >;
             const bounds = {
               min_lat: toNumber(boundsRecord.min_lat, centerLat),
               min_lon: toNumber(boundsRecord.min_lon, centerLon),
@@ -524,7 +643,8 @@ class NativeApiClient implements ApiClientLike {
 
             return {
               id: idValue || `${centerLat.toFixed(3)},${centerLon.toFixed(3)}`,
-              name: nameValue || `${centerLat.toFixed(3)}, ${centerLon.toFixed(3)}`,
+              name:
+                nameValue || `${centerLat.toFixed(3)}, ${centerLon.toFixed(3)}`,
               count: countValue,
               center: { lat: centerLat, lon: centerLon },
               bounds,
@@ -573,7 +693,11 @@ class NativeApiClient implements ApiClientLike {
         if (!Array.isArray(value)) continue;
         const cleaned = value
           .map((tag) =>
-            typeof tag === "string" ? tag.trim() : typeof tag === "number" ? String(tag) : ""
+            typeof tag === "string"
+              ? tag.trim()
+              : typeof tag === "number"
+              ? String(tag)
+              : ""
           )
           .filter((tag) => tag.length > 0);
         if (cleaned.length > 0) {
@@ -609,7 +733,11 @@ class NativeApiClient implements ApiClientLike {
     const allTags = Array.isArray(raw?.all)
       ? (raw.all as unknown[])
           .map((tag) =>
-            typeof tag === "string" ? tag : typeof tag === "number" ? String(tag) : ""
+            typeof tag === "string"
+              ? tag
+              : typeof tag === "number"
+              ? String(tag)
+              : ""
           )
           .filter((tag) => tag.length > 0)
       : [];
@@ -992,28 +1120,39 @@ class NativeApiClient implements ApiClientLike {
 
 // Adapter selection via static import
 import V1Adapter from "./api_v1_adapter.ts";
-const apiClient: ApiClientLike =
-  API_MODE === "v1" ? new V1Adapter() : new NativeApiClient();
+
+function createApiClient(): ApiClientLike {
+  const baseClient = (
+    API_MODE === "v1" ? new V1Adapter() : new NativeApiClient()
+  ) as ApiClientLike;
+
+  // Ensure getLibrary always attempts direct access before falling back.
+  return new Proxy<ApiClientLike>(baseClient, {
+    get(target, prop, receiver) {
+      if (prop === "getLibrary") {
+        return async (
+          dir: string,
+          provider = "local",
+          limit = 100,
+          offset = 0
+        ) => {
+          const direct = await tryDirectLibraryRead(dir, limit, offset);
+          if (direct) {
+            return direct;
+          }
+          return target.getLibrary.call(target, dir, provider, limit, offset);
+        };
+      }
+
+      const value = Reflect.get(target, prop, receiver);
+      if (typeof value === "function") {
+        return value.bind(target);
+      }
+      return value;
+    },
+  });
+}
+
+const apiClient = createApiClient();
 
 export { apiClient };
-export type {
-  LibraryResponse,
-  SearchResponse,
-  SearchResult,
-  SearchOptions,
-  AnalyticsResponse,
-  PlacePoint,
-  PlaceLocation,
-  PlacesMapResponse,
-  TagCount,
-  TagsIndexResponse,
-  Collection,
-  FaceCluster,
-  Trip,
-  FavoriteEntry,
-  FavoritesResponse,
-  FavoriteToggleResponse,
-  // Export types
-  ExportDataItem,
-  ExportResponse,
-};

@@ -1,47 +1,110 @@
-import { useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Heart,
   Download,
   Share2,
-  MoreHorizontal,
-  Star,
-  Eye,
-  Clock,
-  Camera,
-  Palette,
-  Zap,
-  Folder,
-  AlertCircle,
+  Sparkles,
+  FolderOpen,
+  Info,
+  Images,
 } from "lucide-react";
-import type { Photo } from "@/store/photoStore";
+import type { Photo as StorePhoto } from "@/store/photoStore";
 import { cn } from "@/lib/utils";
-import { useElectronBridge } from "@/hooks/useElectronBridge";
+import { GridViewSwitcher, type ViewMode } from "@/components/grids";
 import { apiClient } from "@/services/api";
+import { FolderSelector } from "./FolderSelector";
+
+const GUIDE_STORAGE_KEY = "photo-library-guide-dismissed";
+const INACTIVITY_DELAY_MS = 20000;
 
 interface PhotoLibraryProps {
-  photos: Photo[];
+  photos: StorePhoto[];
   isLoading: boolean;
   currentDirectory: string | null;
   onDirectorySelect: (directory: string) => void;
   onToggleFavorite?: (path: string, favorite: boolean) => void;
 }
 
+interface GridPhoto {
+  path: string;
+  thumbnail?: string;
+  metadata?: {
+    timestamp?: number;
+    title?: string;
+    views?: number;
+    lastViewed?: number;
+  };
+  score?: number;
+  favorite?: boolean;
+}
+
+function getPhotoTitle(path: string, fallback?: string): string {
+  if (fallback && fallback.trim().length > 0) {
+    return fallback;
+  }
+  const parts = path.split(/[\\/]/);
+  const filename = parts[parts.length - 1] || "Photo";
+  return filename.replace(/_[0-9]{6,}$/u, "");
+}
+
+function transformToGridPhoto(photo: StorePhoto, index: number): GridPhoto {
+  const typed = photo as StorePhoto & {
+    metadata?: {
+      timestamp?: number;
+      title?: string;
+      views?: number;
+      lastViewed?: number;
+    };
+    thumbnail?: string;
+  };
+
+  const fallbackTimestamp = Date.now() - index * 60000;
+  const metadata = typed.metadata ?? {};
+  const timestamp =
+    typeof metadata.timestamp === "number" && metadata.timestamp > 0
+      ? metadata.timestamp
+      : fallbackTimestamp;
+
+  return {
+    path: photo.path,
+    thumbnail: typed.thumbnail ?? photo.src,
+    metadata: {
+      ...metadata,
+      timestamp,
+      title: getPhotoTitle(photo.path, metadata.title ?? photo.title),
+    },
+    score: photo.score,
+    favorite: Boolean(photo.favorite),
+  };
+}
+
 function LoadingSkeleton() {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 p-6">
-      {Array.from({ length: 12 }).map((_, index) => (
-        <Card key={`photo-skeleton-${index}`} className="overflow-hidden">
-          <div className="aspect-square bg-slate-200/80 dark:bg-slate-800/70 animate-pulse" />
-          <CardContent className="p-4 space-y-2">
-            <div className="h-4 w-3/4 bg-slate-200/80 dark:bg-slate-700/70 animate-pulse rounded" />
-            <div className="h-3 w-1/2 bg-slate-200/70 dark:bg-slate-700/60 animate-pulse rounded" />
-          </CardContent>
-        </Card>
-      ))}
+    <div className="flex flex-col gap-4 p-6">
+      <div className="h-10 w-full rounded-lg bg-slate-200/70 dark:bg-slate-800/60 animate-pulse" />
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+        {Array.from({ length: 12 }).map((_, index) => (
+          <div
+            key={`photo-skeleton-${index}-${Math.random()}`}
+            className="aspect-square rounded-2xl bg-slate-200/60 dark:bg-slate-800/50 animate-pulse"
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -49,20 +112,24 @@ function LoadingSkeleton() {
 function EmptyState({
   currentDirectory,
   onDirectorySelect,
+  onShowGuide,
 }: {
   currentDirectory: string | null;
   onDirectorySelect: (directory: string) => void;
+  onShowGuide: () => void;
 }) {
-  const { selectImportFolder } = useElectronBridge();
+  const [showFolderSelector, setShowFolderSelector] = useState(false);
 
-  const handleImport = async () => {
-    if (!currentDirectory) return;
+  const handleImport = useCallback(async () => {
+    if (!currentDirectory) {
+      setShowFolderSelector(true);
+      return;
+    }
 
     try {
       const sourceDir = await selectImportFolder();
       if (!sourceDir) return;
 
-      // Call the import API
       const result = await apiClient.importPhotos(sourceDir, currentDirectory, {
         recursive: true,
         copy: true,
@@ -70,7 +137,6 @@ function EmptyState({
 
       if (result.ok) {
         alert(`Import completed: ${result.imported} photos imported`);
-        // Trigger a refresh of the photo library
         window.location.reload();
       } else {
         alert(`Import failed: ${result.errors} errors`);
@@ -79,287 +145,131 @@ function EmptyState({
       console.error("Import failed:", error);
       alert("Import failed. Please try again.");
     }
-  };
+  }, [currentDirectory]);
 
   return (
-    <div className="flex flex-col items-center justify-center h-full min-h-[400px] p-8">
-      <div className="relative mb-6">
-        <img
-          src="/generated/asset_32.png"
-          alt="Empty library visual"
-          className="w-32 h-32 object-contain"
-        />
+    <div className="flex h-full flex-col items-center justify-center gap-6 p-10 text-center">
+      <Images className="h-16 w-16 text-slate-300 dark:text-slate-700" />
+      <div className="space-y-2">
+        <h3 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+          {currentDirectory ? "No photos yet" : "Welcome to Photo Search"}
+        </h3>
+        <p className="max-w-md text-sm text-slate-600 dark:text-slate-400">
+          {currentDirectory
+            ? "This folder is empty or contains no supported images. Import photos or choose a different library to get started."
+            : "Select a photo library to explore your images with the new grid experiences. The guided tour is always available if you want a walkthrough."}
+        </p>
       </div>
 
-      <h3 className="text-xl font-semibold text-slate-800 dark:text-slate-200 mb-2">
-        {currentDirectory ? "No Photos Found" : "Get Started"}
-      </h3>
-
-      <p className="text-slate-600 dark:text-slate-400 text-center max-w-md mb-6">
-        {currentDirectory
-          ? "This folder appears to be empty or contains no supported image files."
-          : "Select a photo library to start exploring your memories with AI-powered search."}
-      </p>
-
-      <div className="flex flex-col sm:flex-row gap-3">
-        <Button
-          onClick={() =>
-            onDirectorySelect(
-              "/Users/pranay/Projects/adhoc_projects/photo-search/e2e_data"
-            )
-          }
-          className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-        >
-          <Folder className="w-4 h-4 mr-2" />
-          {currentDirectory ? "Change Library" : "Select Photo Library"}
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <Button onClick={() => setShowFolderSelector(true)} className="gap-2">
+          <FolderOpen className="h-4 w-4" />
+          {currentDirectory ? "Change library" : "Select photo library"}
         </Button>
-
-        {currentDirectory && (
-          <Button
-            onClick={handleImport}
-            variant="outline"
-            className="border-slate-200 dark:border-slate-700"
-          >
-            <Camera className="w-4 h-4 mr-2" />
-            Import Photos
-          </Button>
-        )}
+        <Button variant="outline" onClick={handleImport} className="gap-2">
+          <Sparkles className="h-4 w-4" />
+          Import photos
+        </Button>
+        <Button variant="ghost" onClick={onShowGuide} className="gap-2">
+          <Info className="h-4 w-4" />
+          View guided tour
+        </Button>
       </div>
 
-      {!currentDirectory && (
-        <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-lg">
-          <div className="text-center p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-            <div className="w-8 h-8 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center mx-auto mb-2">
-              <Zap className="w-4 h-4 text-green-600" />
-            </div>
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              Smart Search
-            </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Find photos by content
-            </p>
-          </div>
-
-          <div className="text-center p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-            <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center mx-auto mb-2">
-              <Eye className="w-4 h-4 text-purple-600" />
-            </div>
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              Face Recognition
-            </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Organize by people
-            </p>
-          </div>
-
-          <div className="text-center p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-            <div className="w-8 h-8 bg-orange-100 dark:bg-orange-900/20 rounded-lg flex items-center justify-center mx-auto mb-2">
-              <Palette className="w-4 h-4 text-orange-600" />
-            </div>
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              Auto Tags
-            </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Intelligent categorization
-            </p>
-          </div>
-        </div>
-      )}
+      <FolderSelector
+        open={showFolderSelector}
+        onOpenChange={setShowFolderSelector}
+        onDirectorySelect={onDirectorySelect}
+      />
     </div>
   );
 }
 
-function PhotoCard({
+function GuidePreview() {
+  const [photos] = useState(() => {
+    const now = Date.now();
+    return Array.from({ length: 18 }, (_, index) => ({
+      path: `/demo_photos/sample-${(index % 12) + 1}.jpg`,
+      thumbnail: `/demo_photos/sample-${(index % 12) + 1}.jpg`,
+      score: Math.random(),
+      metadata: {
+        timestamp: now - index * 86400000,
+        title: `Sample photo ${index + 1}`,
+        views: 12 + index,
+        lastViewed: now - index * 43200000,
+      },
+    }));
+  });
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white/80 p-2 dark:border-slate-800 dark:bg-slate-900/80">
+      <GridViewSwitcher
+        photos={photos}
+        defaultView="masonry"
+        persistenceKey="grid-demo-guide"
+        showLabels
+        onViewModeChange={() => {}}
+      />
+    </div>
+  );
+}
+
+function PhotoLightbox({
   photo,
-  index,
+  open,
+  onOpenChange,
   onToggleFavorite,
 }: {
-  photo: Photo;
-  index: number;
+  photo: StorePhoto | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onToggleFavorite?: (path: string, favorite: boolean) => void;
 }) {
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [imageError, setImageError] = useState(false);
+  if (!photo) return null;
+
   const isFavorite = Boolean(photo.favorite);
 
   return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Card className="group relative overflow-hidden bg-white dark:bg-slate-900 border-slate-200/60 dark:border-slate-700/60 hover:shadow-xl hover:shadow-slate-200/60 dark:hover:shadow-slate-900/60 transition-all duration-300 hover:scale-[1.02] cursor-pointer">
-          <CardContent className="p-0">
-            <div className="relative aspect-square overflow-hidden">
-              {!imageLoaded && !imageError && (
-                <div className="absolute inset-0 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 animate-pulse flex items-center justify-center">
-                  <Eye className="h-8 w-8 text-slate-400" />
-                </div>
-              )}
-
-              {imageError ? (
-                <div className="absolute inset-0 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 flex items-center justify-center">
-                  <AlertCircle className="h-8 w-8 text-slate-400" />
-                </div>
-              ) : (
-                <img
-                  src={photo.src}
-                  alt={photo.title}
-                  className={cn(
-                    "w-full h-full object-cover transition-all duration-500 ease-out",
-                    imageLoaded
-                      ? "opacity-100 blur-0"
-                      : "opacity-0 blur-sm scale-[1.02]",
-                    "group-hover:scale-105"
-                  )}
-                  onLoad={() => setImageLoaded(true)}
-                  onError={() => setImageError(true)}
-                  loading={index < 6 ? "eager" : "lazy"}
-                  decoding="async"
-                />
-              )}
-
-              {/* Gradient Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-              {/* Top Actions */}
-              <div className="absolute top-2 right-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="h-7 w-7 p-0 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm hover:bg-white dark:hover:bg-slate-800"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleFavorite?.(photo.path, !isFavorite);
-                  }}
-                  aria-pressed={isFavorite}
-                  aria-label={
-                    isFavorite ? "Remove from favorites" : "Add to favorites"
-                  }
-                >
-                  <Heart
-                    className={cn(
-                      "h-3 w-3 transition-colors",
-                      isFavorite
-                        ? "text-red-500 fill-red-500"
-                        : "text-slate-600 dark:text-slate-400"
-                    )}
-                  />
-                </Button>
-
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="h-7 w-7 p-0 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm hover:bg-white dark:hover:bg-slate-800"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <MoreHorizontal className="h-3 w-3 text-slate-600 dark:text-slate-400" />
-                </Button>
-              </div>
-
-              {/* Bottom Info */}
-              <div className="absolute bottom-2 left-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-1">
-                    {photo.score && (
-                      <Badge className="bg-green-500/90 text-white text-xs px-2 py-0.5">
-                        {Math.round(photo.score * 100)}%
-                      </Badge>
-                    )}
-                    <Badge className="bg-black/60 text-white text-xs px-2 py-0.5">
-                      <Camera className="h-2 w-2 mr-1" />
-                      IMG
-                    </Badge>
-                  </div>
-
-                  <div className="flex items-center space-x-1">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      className="h-6 px-2 bg-black/60 text-white hover:bg-black/80 text-xs"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Download className="h-2 w-2 mr-1" />
-                      Save
-                    </Button>
-
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      className="h-6 px-2 bg-black/60 text-white hover:bg-black/80 text-xs"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Share2 className="h-2 w-2 mr-1" />
-                      Share
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Top Left Badges */}
-              <div className="absolute top-2 left-2 flex flex-col space-y-1">
-                {isFavorite && (
-                  <Badge className="bg-red-500/90 text-white text-xs px-2 py-0.5">
-                    <Heart className="h-2 w-2 mr-1 fill-current" />
-                    Liked
-                  </Badge>
-                )}
-              </div>
-            </div>
-
-            {/* Photo Title */}
-            <div className="p-3">
-              <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">
-                {photo.title}
-              </p>
-              <div className="flex items-center justify-between mt-1">
-                <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center">
-                  <Clock className="h-2 w-2 mr-1" />2 hours ago
-                </p>
-                <div className="flex items-center">
-                  <Star className="h-3 w-3 text-yellow-500 mr-1" />
-                  <span className="text-xs text-slate-500 dark:text-slate-400">
-                    4.8
-                  </span>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </DialogTrigger>
-
-      {/* Lightbox Modal */}
-      <DialogContent className="max-w-4xl w-full h-[80vh] p-0 overflow-hidden">
-        <div className="relative w-full h-full bg-black rounded-lg overflow-hidden">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-5xl overflow-hidden border-0 bg-slate-950/95 p-0">
+        <div className="relative flex h-[70vh] flex-col md:h-[80vh]">
           <img
             src={photo.src}
             alt={photo.title}
-            className="w-full h-full object-contain"
+            className="h-full w-full flex-1 bg-black object-contain"
           />
-
-          {/* Modal Controls */}
-          <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Badge className="bg-black/60 text-white">{photo.title}</Badge>
+          <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="bg-black/70 text-white">
+                {getPhotoTitle(photo.path, photo.title)}
+              </Badge>
               {photo.score && (
-                <Badge className="bg-green-500/90 text-white">
-                  Match: {Math.round(photo.score * 100)}%
+                <Badge className="bg-emerald-500/80 text-white">
+                  {Math.round(photo.score * 100)}% match
                 </Badge>
               )}
             </div>
-
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center gap-2">
               <Button
-                variant="secondary"
+                variant={isFavorite ? "default" : "secondary"}
                 size="sm"
-                className="bg-black/60 text-white hover:bg-black/80"
+                className="gap-2"
+                onClick={() => onToggleFavorite?.(photo.path, !isFavorite)}
               >
-                <Download className="h-4 w-4 mr-2" />
+                <Heart
+                  className={cn(
+                    "h-4 w-4",
+                    isFavorite ? "fill-current" : undefined
+                  )}
+                />
+                {isFavorite ? "Favorited" : "Add to favorites"}
+              </Button>
+              <Button variant="secondary" size="sm" className="gap-2">
+                <Download className="h-4 w-4" />
                 Download
               </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="bg-black/60 text-white hover:bg-black/80"
-              >
-                <Share2 className="h-4 w-4 mr-2" />
+              <Button variant="secondary" size="sm" className="gap-2">
+                <Share2 className="h-4 w-4" />
                 Share
               </Button>
             </div>
@@ -377,6 +287,94 @@ export function PhotoLibrary({
   onDirectorySelect,
   onToggleFavorite,
 }: PhotoLibraryProps) {
+  const [showFolderSelector, setShowFolderSelector] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
+  const [showGuideHint, setShowGuideHint] = useState(false);
+  const [guideDismissed, setGuideDismissed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(GUIDE_STORAGE_KEY) === "true";
+  });
+  const [activePhotoPath, setActivePhotoPath] = useState<string | null>(null);
+  const [currentViewMode, setCurrentViewMode] = useState<ViewMode>(() => {
+    if (typeof window === "undefined") {
+      return "masonry";
+    }
+    const stored = localStorage.getItem("photo-library-view");
+    return (stored as ViewMode) || "masonry";
+  });
+
+  useEffect(() => {
+    if (guideDismissed || showGuide) {
+      setShowGuideHint(false);
+      return;
+    }
+
+    const markInteraction = () => {
+      setShowGuideHint(false);
+    };
+
+    const timer = window.setTimeout(() => {
+      setShowGuideHint(true);
+    }, INACTIVITY_DELAY_MS);
+
+    window.addEventListener("pointerdown", markInteraction, { once: true });
+    window.addEventListener("keydown", markInteraction, { once: true });
+
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("pointerdown", markInteraction);
+      window.removeEventListener("keydown", markInteraction);
+    };
+  }, [guideDismissed, showGuide]);
+
+  const gridPhotos = useMemo(() => photos.map(transformToGridPhoto), [photos]);
+
+  const activePhoto = useMemo(
+    () => photos.find((item) => item.path === activePhotoPath) ?? null,
+    [photos, activePhotoPath]
+  );
+
+  const handlePhotoClick = useCallback((photo: GridPhoto) => {
+    setActivePhotoPath(photo.path);
+  }, []);
+
+  const handleGuideChange = useCallback((open: boolean) => {
+    setShowGuide(open);
+    if (!open) {
+      setGuideDismissed(true);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(GUIDE_STORAGE_KEY, "true");
+      }
+    }
+  }, []);
+
+  const handleImport = useCallback(async () => {
+    if (!currentDirectory) {
+      setShowFolderSelector(true);
+      return;
+    }
+
+    try {
+      const sourceDir = await selectImportFolder();
+      if (!sourceDir) return;
+
+      const result = await apiClient.importPhotos(sourceDir, currentDirectory, {
+        recursive: true,
+        copy: true,
+      });
+
+      if (result.ok) {
+        alert(`Import completed: ${result.imported} photos imported`);
+        window.location.reload();
+      } else {
+        alert(`Import failed: ${result.errors} errors`);
+      }
+    } catch (error) {
+      console.error("Import failed:", error);
+      alert("Import failed. Please try again.");
+    }
+  }, [currentDirectory]);
+
   if (isLoading) {
     return <LoadingSkeleton />;
   }
@@ -386,22 +384,169 @@ export function PhotoLibrary({
       <EmptyState
         currentDirectory={currentDirectory}
         onDirectorySelect={onDirectorySelect}
+        onShowGuide={() => handleGuideChange(true)}
       />
     );
   }
 
+  const currentDirLabel = currentDirectory
+    ? currentDirectory.split(/[\\/]/).slice(-2).join("/") || currentDirectory
+    : "No library selected";
+
   return (
-    <div className="p-6">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
-        {photos.map((photo, index) => (
-          <PhotoCard
-            key={photo.id}
-            photo={photo}
-            index={index}
-            onToggleFavorite={onToggleFavorite}
+    <TooltipProvider>
+      <div className="flex h-full flex-col gap-4 p-6">
+        <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/70 p-4 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/60">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Library
+              </p>
+              <p className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                {currentDirLabel}
+              </p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                {photos.length} {photos.length === 1 ? "photo" : "photos"}
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                View:{" "}
+                {currentViewMode.charAt(0).toUpperCase() +
+                  currentViewMode.slice(1)}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-2"
+                onClick={() => setShowFolderSelector(true)}
+              >
+                <FolderOpen className="h-4 w-4" />
+                Change library
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={handleImport}
+              >
+                <Sparkles className="h-4 w-4" />
+                Add photos
+              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className={cn("gap-2", showGuideHint && "animate-pulse")}
+                    onClick={() => setShowGuide(true)}
+                  >
+                    <Info className="h-4 w-4" />
+                    Guided tour
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Interactive walkthrough of the new grids.</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-hidden rounded-3xl border border-slate-200 bg-white/70 p-2 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/60">
+          <GridViewSwitcher
+            photos={gridPhotos}
+            onPhotoClick={handlePhotoClick}
+            defaultView={currentViewMode}
+            persistenceKey="photo-library-view"
+            showLabels={false}
+            compact
+            onViewModeChange={setCurrentViewMode}
           />
-        ))}
+        </div>
       </div>
-    </div>
+
+      <FolderSelector
+        open={showFolderSelector}
+        onOpenChange={setShowFolderSelector}
+        onDirectorySelect={onDirectorySelect}
+      />
+
+      <Dialog open={showGuide} onOpenChange={handleGuideChange}>
+        <DialogContent className="max-w-5xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-2xl">
+              <Sparkles className="h-5 w-5 text-blue-500" />
+              Guided tour
+            </DialogTitle>
+            <DialogDescription>
+              Explore the new Masonry, Film Strip, and Timeline views. Switch
+              modes with the toolbar or press 1, 2, or 3 on your keyboard.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-6 lg:grid-cols-[280px,1fr]">
+            <div className="space-y-4 text-sm text-slate-600 dark:text-slate-300">
+              <div>
+                <h3 className="font-semibold text-slate-900 dark:text-slate-100">
+                  What's new
+                </h3>
+                <ul className="mt-2 space-y-2">
+                  <li>• Masonry view adapts to recency and score.</li>
+                  <li>
+                    • Film Strip provides a cinema-style horizontal scroll.
+                  </li>
+                  <li>• Timeline groups photos by date automatically.</li>
+                </ul>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/40">
+                <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Pro Tip
+                </p>
+                <p className="mt-1 text-sm">
+                  Use keyboard shortcuts 1, 2, or 3 to switch views instantly.
+                  Your preference is saved per library.
+                </p>
+              </div>
+            </div>
+
+            <GuidePreview />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <PhotoLightbox
+        photo={activePhoto}
+        open={Boolean(activePhoto)}
+        onOpenChange={(open) => {
+          if (!open) setActivePhotoPath(null);
+        }}
+        onToggleFavorite={onToggleFavorite}
+      />
+    </TooltipProvider>
   );
+}
+
+async function selectImportFolder(): Promise<string | null> {
+  if (typeof window === "undefined") {
+    console.warn("Folder selection is not available in this environment");
+    return null;
+  }
+
+  if (
+    window.electronAPI &&
+    typeof window.electronAPI.selectFolder === "function"
+  ) {
+    try {
+      const result = await window.electronAPI.selectFolder();
+      return result || null;
+    } catch (error) {
+      console.error("Failed to select folder:", error);
+      return null;
+    }
+  }
+
+  console.warn("Electron bridge not available for folder selection");
+  return null;
 }

@@ -18,8 +18,14 @@ import { UIProvider } from "../contexts/UIContext";
 import { AccessibilityProvider } from "../framework/AccessibilityFramework";
 import { initializeAPI } from "../services/PhotoVaultAPI";
 import { PhotoVaultAPIProvider } from "../services/PhotoVaultAPIProvider";
+import { EngineTelemetryProvider } from "../services/EngineTelemetryProvider";
 import { SimpleStoreProvider } from "../stores/SimpleStore";
 import "@testing-library/jest-dom/vitest";
+
+const MOCK_PROTOCOL = "http";
+const MOCK_HOST = "localhost";
+const MOCK_PORT = "8000";
+const MOCK_API_BASE = `${MOCK_PROTOCOL}://${MOCK_HOST}:${MOCK_PORT}`;
 
 // Helpful: surface a console hint if the API enforces auth but frontend lacks token
 if (typeof window !== "undefined") {
@@ -27,7 +33,6 @@ if (typeof window !== "undefined") {
   const meta = import.meta as ImportMeta & { env?: Record<string, string> };
   const token = meta.env?.VITE_API_TOKEN || localStorage.getItem("api_token");
   if (!token) {
-    // eslint-disable-next-line no-console
     console.info(
       "Tip: If your API sets API_TOKEN, add VITE_API_TOKEN in webapp .env or localStorage.setItem('api_token', '<value>')."
     );
@@ -54,7 +59,7 @@ vi.mock("../components/AccessibilityPanel", () => ({
 
 // Mock API_BASE and apiAnalytics
 vi.mock("../api", () => ({
-  API_BASE: "http://localhost:8000",
+  API_BASE: MOCK_API_BASE,
   apiAnalytics: vi.fn(() => Promise.resolve({ events: [], summary: {} })),
 }));
 
@@ -65,7 +70,7 @@ vi.mock("../stores/settingsStore", async (importOriginal) => {
   >();
 
   const themeState = {
-    themeMode: "light" as const,
+    themeMode: "light" as "light" | "dark" | "auto",
     colorScheme: "blue" as const,
     density: "normal" as const,
     customColors: undefined as
@@ -464,89 +469,91 @@ const AllTheProviders: React.FC<{ children: React.ReactNode }> = ({
             <SettingsProvider>
               <UIProvider>
                 <SimpleStoreProvider>
-                  <PhotoVaultAPIProvider>
-                    <JobsProvider>
-                      <LibraryProvider>
-                        <SearchProvider>
-                          <AccessibilityProvider>
-                            <ModalProvider>
-                              <ModalDataProvider
-                                data={{
-                                  selected: new Set(),
-                                  dir: "",
-                                  engine: "local",
-                                  topK: 100,
-                                  highContrast: false,
-                                  useFast: false,
-                                  fastKind: "",
-                                  useCaps: false,
-                                  useOcr: false,
-                                  hasText: false,
-                                  useOsTrash: false,
-                                  searchText: "",
-                                  query: "",
-                                  collections: {},
-                                  clusters: [],
-                                  allTags: [],
-                                  meta: { cameras: [], places: [] },
-                                }}
-                                actions={{
-                                  settingsActions: {
-                                    setDir: vi.fn(),
-                                    setUseOsTrash: vi.fn(),
-                                    setUseFast: vi.fn(),
-                                    setFastKind: vi.fn(),
-                                    setUseCaps: vi.fn(),
-                                    setUseOcr: vi.fn(),
-                                    setHasText: vi.fn(),
-                                    setHighContrast: vi.fn(),
-                                  },
-                                  uiActions: {
-                                    setBusy: vi.fn(),
-                                    setNote: vi.fn(),
-                                  },
-                                  photoActions: {
-                                    setResults: vi.fn(),
-                                    setSaved: vi.fn(),
-                                    setCollections: vi.fn(),
-                                  },
-                                  libIndex: vi.fn(),
-                                  prepareFast: vi.fn(),
-                                  buildOCR: vi.fn(),
-                                  buildMetadata: vi.fn(),
-                                  tagSelected: vi.fn(),
-                                }}
-                              >
-                                <HintProvider>
-                                  <HintManager>
-                                    <ResultsConfigProvider
-                                      value={{
-                                        resultView: "grid",
-                                        setResultView: () => {},
-                                        timelineBucket: "day",
-                                        setTimelineBucket: () => {},
-                                      }}
-                                    >
-                                      <MobileOptimizations
-                                        onSwipeLeft={vi.fn()}
-                                        onSwipeRight={vi.fn()}
-                                        onSwipeUp={vi.fn()}
-                                        enableSwipeGestures={false}
-                                        enablePullToRefresh={false}
-                                        onPullToRefresh={vi.fn()}
+                  <EngineTelemetryProvider>
+                    <PhotoVaultAPIProvider>
+                      <JobsProvider>
+                        <LibraryProvider>
+                          <SearchProvider>
+                            <AccessibilityProvider>
+                              <ModalProvider>
+                                <ModalDataProvider
+                                  data={{
+                                    selected: new Set(),
+                                    dir: "",
+                                    engine: "local",
+                                    topK: 100,
+                                    highContrast: false,
+                                    useFast: false,
+                                    fastKind: "",
+                                    useCaps: false,
+                                    useOcr: false,
+                                    hasText: false,
+                                    useOsTrash: false,
+                                    searchText: "",
+                                    query: "",
+                                    collections: {},
+                                    clusters: [],
+                                    allTags: [],
+                                    meta: { cameras: [], places: [] },
+                                  }}
+                                  actions={{
+                                    settingsActions: {
+                                      setDir: vi.fn(),
+                                      setUseOsTrash: vi.fn(),
+                                      setUseFast: vi.fn(),
+                                      setFastKind: vi.fn(),
+                                      setUseCaps: vi.fn(),
+                                      setUseOcr: vi.fn(),
+                                      setHasText: vi.fn(),
+                                      setHighContrast: vi.fn(),
+                                    },
+                                    uiActions: {
+                                      setBusy: vi.fn(),
+                                      setNote: vi.fn(),
+                                    },
+                                    photoActions: {
+                                      setResults: vi.fn(),
+                                      setSaved: vi.fn(),
+                                      setCollections: vi.fn(),
+                                    },
+                                    libIndex: vi.fn(),
+                                    prepareFast: vi.fn(),
+                                    buildOCR: vi.fn(),
+                                    buildMetadata: vi.fn(),
+                                    tagSelected: vi.fn(),
+                                  }}
+                                >
+                                  <HintProvider>
+                                    <HintManager>
+                                      <ResultsConfigProvider
+                                        value={{
+                                          resultView: "grid",
+                                          setResultView: () => {},
+                                          timelineBucket: "day",
+                                          setTimelineBucket: () => {},
+                                        }}
                                       >
-                                        {children}
-                                      </MobileOptimizations>
-                                    </ResultsConfigProvider>
-                                  </HintManager>
-                                </HintProvider>
-                              </ModalDataProvider>
-                            </ModalProvider>
-                          </AccessibilityProvider>
-                        </SearchProvider>
-                      </LibraryProvider>
-                    </JobsProvider>
-                  </PhotoVaultAPIProvider>
+                                        <MobileOptimizations
+                                          onSwipeLeft={vi.fn()}
+                                          onSwipeRight={vi.fn()}
+                                          onSwipeUp={vi.fn()}
+                                          enableSwipeGestures={false}
+                                          enablePullToRefresh={false}
+                                          onPullToRefresh={vi.fn()}
+                                        >
+                                          {children}
+                                        </MobileOptimizations>
+                                      </ResultsConfigProvider>
+                                    </HintManager>
+                                  </HintProvider>
+                                </ModalDataProvider>
+                              </ModalProvider>
+                            </AccessibilityProvider>
+                          </SearchProvider>
+                        </LibraryProvider>
+                      </JobsProvider>
+                    </PhotoVaultAPIProvider>
+                  </EngineTelemetryProvider>
                 </SimpleStoreProvider>
               </UIProvider>
             </SettingsProvider>

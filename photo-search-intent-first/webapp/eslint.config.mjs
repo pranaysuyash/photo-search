@@ -67,6 +67,33 @@ const tsRecommendedRules = {
   "@typescript-eslint/ban-ts-comment": "warn",
 };
 
+const restrictedBackendSelectors = [
+  {
+    selector: [
+      "Literal[value='http://127.0.0.1:8000']",
+      "Literal[value=\"http://127.0.0.1:8000\"]",
+      "Literal[value='http://localhost:8000']",
+      "Literal[value=\"http://localhost:8000\"]",
+      "TemplateElement[value.raw*='http://127.0.0.1:8000']",
+      "TemplateElement[value.raw*='http://localhost:8000']",
+      "TemplateElement[value.cooked*='http://127.0.0.1:8000']",
+      "TemplateElement[value.cooked*='http://localhost:8000']",
+    ].join(", "),
+    message:
+      "Renderer code must not call the backend directly; use the engine request facade.",
+  },
+  {
+    selector: [
+      "TemplateLiteral > TemplateElement[value.raw*='http://127.0.0.1:8000']",
+      "TemplateLiteral > TemplateElement[value.raw*='http://localhost:8000']",
+      "TemplateLiteral > TemplateElement[value.cooked*='http://127.0.0.1:8000']",
+      "TemplateLiteral > TemplateElement[value.cooked*='http://localhost:8000']",
+    ].join(", "),
+    message:
+      "Renderer code must not call the backend directly; use the engine request facade.",
+  },
+];
+
 export default [
   {
     ignores: commonIgnores,
@@ -109,6 +136,12 @@ export default [
     },
     settings: {
       "boundaries/elements": boundariesElements,
+    },
+  },
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": ["error", ...restrictedBackendSelectors],
     },
   },
 ];
